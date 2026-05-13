@@ -1,0 +1,25 @@
+[project]
+name = "qos-5g-stack"
+version = "0.1.0"
+description = "QoS-optimized 5G stack: two-tier scheduler (Tier-1 LP + Tier-2 drift-plus-penalty) with a lightweight simulator."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "cvxpy>=1.5",
+    "matplotlib>=3.7",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.uv]
+# Pin a single Python version so every dev (Linux/macOS/Windows) resolves the
+# lockfile identically. Bump intentionally; uv will auto-install if missing.
+required-version = ">=0.5"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

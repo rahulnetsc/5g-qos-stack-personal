@@ -1,0 +1,125 @@
+# Simulator workload configuration: UEs, flows, and run parameters.
+#
+# System-side parameters (bandwidth, TDD pattern, MIMO) live in
+# system_config.yml — this file only describes the load that the scheduler
+# is asked to serve.
+#
+# A note on MCS vs SNR: the simulator is SNR-driven — given an SNR, the
+# channel model in sim/channel.py picks an MCS via a 12-row staircase
+# (~0.75 of Shannon). So per-UE radio quality is configured as `mean_snr_db`
+# below, not as an MCS index. If you want to pin MCS instead, that's a code
+# change in channel.py — flag it and I'll wire an override.
+
+simulation:
+  horizon_slots: 4000   # at numerology=2 (0.25 ms slot) this is 1.0 s of wall time
+  seed: 42
+
+defaults:
+  # Applied to every UE / flow unless overridden below.
+  ue:
+    mean_snr_db: 20.0       # ~ AL=1 PDCCH, ~3.5 b/s/Hz spectral efficiency
+    coherence_slots: 2000   # AR(1) decorrelation time; large -> slow fading
+  flow:
+    direction: DL           # DL or UL
+    flow_class: PF          # PF | GBR | Delay
+    min_data_rate_bps: 0          # GFBR — guaranteed floor (0 = best effort)
+    max_data_rate_bps: 2_000_000  # MFBR — upper cap (2 Mbps); not yet enforced in sim
+    max_delay_budget_ms: 30       # PDB — packet delay budget
+    traffic:
+      kind: poisson         # poisson | deterministic | video_frame
+      rate_bps: 1_000_000   # offered load for poisson
+
+# 10 UEs, 2 flows each. Anything omitted falls back to `defaults`.
+ues:
+  - ue_id: 1
+    mean_snr_db: 22.0
+    flows:
+      - qfi: 9              # 5QI 9: non-GBR best-effort
+        flow_class: PF
+      - qfi: 2              # 5QI 2: GBR conversational video
+        flow_class: GBR
+        min_data_rate_bps: 1_000_000
+        max_delay_budget_ms: 150
+
+  - ue_id: 2
+    mean_snr_db: 18.0
+    flows:
+      - qfi: 9
+      - qfi: 1              # 5QI 1: GBR conversational voice
+        flow_class: GBR
+        min_data_rate_bps: 64_000
+        max_delay_budget_ms: 100
+
+  - ue_id: 3
+    mean_snr_db: 25.0
+    flows:
+      - qfi: 9
+      - qfi: 82             # 5QI 82: low-latency discrete automation
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 200}
+
+  - ue_id: 4
+    mean_snr_db: 15.0       # cell-edge-ish
+    flows:
+      - qfi: 9
+      - qfi: 2
+        flow_class: GBR
+        min_data_rate_bps: 500_000
+        max_delay_budget_ms: 150
+
+  - ue_id: 5
+    mean_snr_db: 20.0
+    flows:
+      - qfi: 9              # 5QI 9: internet default best-effort
+      - qfi: 8              # 5QI 8: non-GBR best-effort with looser PDB
+        max_delay_budget_ms: 300
+
+  - ue_id: 6
+    mean_snr_db: 12.0       # cell-edge — AL=2 PDCCH cost
+    flows:
+      - qfi: 9
+      - qfi: 82
+        flow_class: Delay
+        max_delay_budget_ms: 15
+        traffic: {kind: deterministic, period_ms: 10.0, bytes_per_period: 200}
+
+  - ue_id: 7
+    mean_snr_db: 22.0
+    flows:
+      - qfi: 9
+      - qfi: 2
+        flow_class: GBR
+        min_data_rate_bps: 1_500_000
+        max_delay_budget_ms: 150
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 6_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+
+  - ue_id: 8
+    mean_snr_db: 17.0
+    flows:
+      - qfi: 9
+      - qfi: 8
+        max_delay_budget_ms: 300
+
+  - ue_id: 9
+    mean_snr_db: 24.0
+    flows:
+      - qfi: 9
+      - qfi: 1
+        flow_class: GBR
+        min_data_rate_bps: 64_000
+        max_delay_budget_ms: 100
+
+  - ue_id: 10
+    mean_snr_db: 19.0
+    flows:
+      - qfi: 9
+      - qfi: 82
+        flow_class: Delay
+        max_delay_budget_ms: 20
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 400}

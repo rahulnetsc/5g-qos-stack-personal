@@ -27,27 +27,35 @@ Both have `[OPEN]` markers on remaining decisions.
 
 ## Quick start
 
+The project is managed by [uv](https://docs.astral.sh/uv/) — see
+[installation_usage.md](installation_usage.md) for the full guide,
+including OS-specific install commands, troubleshooting, and the
+maintainer workflow.
+
 ```bash
-pip install -r requirements.txt
+# One-time: install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Unit tests
-python -m pytest tests/
+# Setup (downloads Python 3.12, creates .venv, installs all pinned deps)
+make install
 
-# Run smoke scenario through round-robin, dump per-flow JSON
-python scripts/run_smoke.py
+# Run the test suite
+make test
 
-# Run smoke + overload + vision + sensor scenarios through 4 schedulers,
-# side-by-side table
-python scripts/compare_schedulers.py
+# Single smoke scenario, JSON output
+make smoke
 
-# Per-slot time-series plots for one scheduler or two side-by-side
-python scripts/plot_timeseries.py --scenario sensor --schedulers pf twotier
-python scripts/plot_timeseries.py --scenario smoke --scheduler twotier
+# Five scenarios x four schedulers, side-by-side
+make compare
+
+# Per-slot time-series plots
+uv run python scripts/plot_timeseries.py --scenario sensor --schedulers pf twotier
+uv run python scripts/plot_timeseries.py --scenario smoke --scheduler twotier
 ```
 
 ## What `compare_schedulers.py` shows
 
-Two scenarios (mixed workload under capacity, and a 4.8× DL overload),
+Five scenarios (smoke / overload / vision / sensor-dense / YAML-driven),
 each run through four schedulers. The interesting comparison is on the
 overload scenario, where the two-tier system delivers 97% of GFBR vs 57%
 for plain PF, by sacrificing best-effort throughput. See the design doc
@@ -58,19 +66,27 @@ for the full table.
 ```
 .
 ├── README.md
-├── requirements.txt
+├── installation_usage.md         install + usage guide (uv workflow, troubleshooting)
+├── pyproject.toml                project metadata + dependencies
+├── uv.lock                       cross-platform pinned versions (37 packages)
+├── .python-version               pins CPython to 3.12
+├── Makefile                      thin wrapper over uv (install / test / smoke / ...)
+├── configs/                      YAML configs driving the yaml_scenario
+│   ├── system_config.yml         radio: TDD, bandwidth, numerology, MIMO
+│   └── sim_config.yml            workload: UEs, flows, GFBR/PDB, traffic
 ├── design-docs/                  scheduler + simulator design notes
 │   ├── scheduler-design.md
 │   └── simulator-design.md
 ├── sim/                          simulator core
 │   ├── config.py                 scenario / flow / UE / TDD dataclasses
+│   ├── config_loader.py          YAML -> ScenarioConfig loader
 │   ├── resource.py               TDD pattern, per-slot grid
 │   ├── channel.py                stationary AR(1) SNR, MCS staircase
 │   ├── buffer.py                 fluid byte buffers w/ HoL timestamps
 │   ├── traffic.py                deterministic / Poisson / video-frame
 │   ├── metrics.py                per-flow stats, percentile latency
 │   ├── tier1.py                  CVXPY LP solver
-│   ├── scenarios.py              reusable scenario definitions
+│   ├── scenarios.py              reusable scenario definitions (incl. yaml_scenario)
 │   ├── driver.py                 main simulation loop
 │   └── schedulers/
 │       ├── round_robin.py        baseline
@@ -79,9 +95,11 @@ for the full table.
 │       └── two_tier.py           Tier-1 LP + Tier-2 drift-plus-penalty
 ├── scripts/                      entry points
 │   ├── run_smoke.py
-│   └── compare_schedulers.py
+│   ├── compare_schedulers.py
+│   └── plot_timeseries.py
 └── tests/
-    └── test_smoke.py             buffer, channel, grid, all schedulers
+    ├── test_smoke.py             buffer, channel, grid, all schedulers
+    └── test_config_loader.py     YAML -> ScenarioConfig round-trip
 ```
 
 ## What works today
@@ -99,9 +117,13 @@ for the full table.
   High-SNR UEs get cheap DCIs; edge UEs pay more, making PDCCH bind sooner.
 - Per-slot time-series recording (opt-in) and matplotlib plots for
   throughput, HoL latency, buffer occupancy, PRB and PDCCH utilization.
-- 23 unit tests covering buffer mechanics, channel stationarity, GBR
+- YAML-driven scenarios via [configs/system_config.yml](configs/system_config.yml)
+  and [configs/sim_config.yml](configs/sim_config.yml) — radio params and
+  workload split into two files, loaded by [sim/config_loader.py](sim/config_loader.py).
+- 26 unit tests covering buffer mechanics, channel stationarity, GBR
   protection under overload, fairness, Tier-1 feasibility, SPS
-  accounting, PDCCH-limited regime, AL monotonicity, time-series shape.
+  accounting, PDCCH-limited regime, AL monotonicity, time-series shape,
+  and the YAML loader.
 
 ## Roadmap
 

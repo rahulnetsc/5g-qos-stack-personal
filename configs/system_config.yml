@@ -1,0 +1,45 @@
+# System / radio configuration for the 5G QoS stack.
+#
+# These parameters describe the gNodeB and the air interface — things that
+# would typically be fixed at deployment time (or per-cell), not per-UE or
+# per-flow. Per-UE / per-flow workload lives in sim_config.yml.
+#
+# Status: this file is not yet loaded by the simulator. See sim/config.py
+# for the live dataclasses; a loader can map this YAML into CarrierConfig /
+# TDDConfig once we decide it's wanted.
+
+gnodeb:
+  count: 1               # single-cell simulator for now; >1 not modeled
+
+carrier:
+  bandwidth_mhz: 40      # FR1 channel bandwidth
+  numerology: 2          # mu — SCS = 15 * 2^mu kHz; slot duration = 1 / 2^mu ms
+                         #   mu=0 -> 15 kHz / 1.0 ms slot
+                         #   mu=1 -> 30 kHz / 0.5 ms slot
+                         #   mu=2 -> 60 kHz / 0.25 ms slot
+  duplex: TDD            # only TDD is modeled today
+  overhead_factor: 0.85  # fraction of nominal PRBs usable for data (refs/sync/etc removed)
+
+tdd:
+  pattern: DSUUU         # one period; D=DL, U=UL, S=special, F=flexible
+  # S-slot symbol split (sum must equal 14 OFDM symbols per slot)
+  s_slot_split:
+    dl_symbols: 3
+    gap_symbols: 2
+    ul_symbols: 9
+
+mimo:
+  mu_mimo_active: false  # MU-MIMO multi-layer pairing — not modeled yet
+  max_dl_layers: 1       # SU-MIMO rank cap on DL
+  max_ul_layers: 1       # SU-MIMO rank cap on UL
+
+pdcch:
+  # Control-channel budget per slot, used by the simulator to gate dynamic
+  # scheduling against SPS. Real 5G CORESET sizing depends on aggregation
+  # level distribution; here it's a flat per-slot CCE budget.
+  cce_budget_per_slot: 16
+
+# Notes / not yet wired through the simulator:
+#   - gnodeb.count > 1 (multi-cell, inter-cell interference)
+#   - mimo.mu_mimo_active = true (would multiply per-PRB capacity by paired layers)
+#   - duplex = FDD

@@ -4,6 +4,8 @@ Each scenario is a function returning a ScenarioConfig. Keep these as pure
 data so different schedulers can be exercised on identical workloads.
 """
 
+from pathlib import Path
+
 from .config import (
     CarrierConfig,
     FlowConfig,
@@ -11,6 +13,20 @@ from .config import (
     TDDConfig,
     UEConfig,
 )
+from .config_loader import load_scenario as _load_scenario_from_yaml
+
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_CONFIGS_DIR = _REPO_ROOT / "configs"
+
+
+def yaml_scenario(
+    system_path: str | Path = _CONFIGS_DIR / "system_config.yml",
+    sim_path: str | Path = _CONFIGS_DIR / "sim_config.yml",
+    name: str = "yaml",
+) -> ScenarioConfig:
+    """Scenario loaded from configs/system_config.yml + configs/sim_config.yml."""
+    return _load_scenario_from_yaml(system_path, sim_path, name=name)
 
 
 def smoke_scenario() -> ScenarioConfig:
