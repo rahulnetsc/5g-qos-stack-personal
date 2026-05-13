@@ -1,125 +1,272 @@
 # Simulator workload configuration: UEs, flows, and run parameters.
 #
-# System-side parameters (bandwidth, TDD pattern, MIMO) live in
-# system_config.yml — this file only describes the load that the scheduler
-# is asked to serve.
+# Scenario: 10 factory robots on a private 5G cell. Each robot uploads
+# video / sensor data to an edge server (UL-heavy GBR) and receives
+# control-loop commands (DL low-rate, tight delay). Three robots also do
+# best-effort UL uploads (logs / software backups) — those are the
+# sacrificable load that scheduler comparison should exercise. UE 10 is
+# an asymmetric TCP example to illustrate how a bidirectional app is
+# modeled as two flow entries with different QFIs.
 #
-# A note on MCS vs SNR: the simulator is SNR-driven — given an SNR, the
-# channel model in sim/channel.py picks an MCS via a 12-row staircase
-# (~0.75 of Shannon). So per-UE radio quality is configured as `mean_snr_db`
-# below, not as an MCS index. If you want to pin MCS instead, that's a code
-# change in channel.py — flag it and I'll wire an override.
+# Each flow is uni-directional by design (matches 3GPP — UL and DL flows
+# have separate QFIs even when they share an application). For a
+# bidirectional app, write two flow entries; the simulator keys metrics
+# by (ue_id, qfi), so the UL and DL halves must use different QFIs.
+#
+# Aggregate offered load against the system_config.yml radio (40 MHz,
+# numerology=2, DSUUU + S-slot 3:2:9):
+#   - UL capacity (~peak): ~112 Mbps; UL offered: ~110 Mbps  -> ~98% UL load
+#   - DL capacity (~peak): ~37 Mbps;  DL offered:  ~11 Mbps  -> ~30% DL load
+# UL is in the overload regime — the right pressure to expose TwoTier's
+# GBR protection vs PF's equal-share behavior on best-effort flows.
+#
+# A note on MCS vs SNR: the simulator is SNR-driven. Per-UE radio quality
+# is `mean_snr_db`; MCS is derived from a staircase in sim/channel.py.
 
 simulation:
   horizon_slots: 4000   # at numerology=2 (0.25 ms slot) this is 1.0 s of wall time
   seed: 42
 
 defaults:
-  # Applied to every UE / flow unless overridden below.
   ue:
-    mean_snr_db: 20.0       # ~ AL=1 PDCCH, ~3.5 b/s/Hz spectral efficiency
-    coherence_slots: 2000   # AR(1) decorrelation time; large -> slow fading
+    mean_snr_db: 20.0
+    coherence_slots: 2000
   flow:
-    direction: DL           # DL or UL
-    flow_class: PF          # PF | GBR | Delay
+    # `direction` is intentionally NOT defaulted — every flow declares UL or DL
+    # explicitly so the workload is unambiguous at a glance.
+    flow_class: PF
     min_data_rate_bps: 0          # GFBR — guaranteed floor (0 = best effort)
-    max_data_rate_bps: 2_000_000  # MFBR — upper cap (2 Mbps); not yet enforced in sim
-    max_delay_budget_ms: 30       # PDB — packet delay budget
-    traffic:
-      kind: poisson         # poisson | deterministic | video_frame
-      rate_bps: 1_000_000   # offered load for poisson
+    max_data_rate_bps: 2_000_000  # MFBR — upper cap (not yet enforced in sim)
+    max_delay_budget_ms: 30       # PDB
 
-# 10 UEs, 2 flows each. Anything omitted falls back to `defaults`.
 ues:
+  # ---- HD-camera robots (UE 1-4): 8 Mbps UL video + DL control loop ----
   - ue_id: 1
     mean_snr_db: 22.0
     flows:
-      - qfi: 9              # 5QI 9: non-GBR best-effort
-        flow_class: PF
-      - qfi: 2              # 5QI 2: GBR conversational video
+      - qfi: 2                    # UL: H.264 camera stream
+        direction: UL
         flow_class: GBR
-        min_data_rate_bps: 1_000_000
-        max_delay_budget_ms: 150
+        min_data_rate_bps: 8_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 33_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+      - qfi: 82                   # DL: control commands (deterministic, tight)
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
 
   - ue_id: 2
     mean_snr_db: 18.0
     flows:
-      - qfi: 9
-      - qfi: 1              # 5QI 1: GBR conversational voice
-        flow_class: GBR
-        min_data_rate_bps: 64_000
-        max_delay_budget_ms: 100
-
-  - ue_id: 3
-    mean_snr_db: 25.0
-    flows:
-      - qfi: 9
-      - qfi: 82             # 5QI 82: low-latency discrete automation
-        flow_class: Delay
-        max_delay_budget_ms: 10
-        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 200}
-
-  - ue_id: 4
-    mean_snr_db: 15.0       # cell-edge-ish
-    flows:
-      - qfi: 9
       - qfi: 2
+        direction: UL
         flow_class: GBR
-        min_data_rate_bps: 500_000
-        max_delay_budget_ms: 150
-
-  - ue_id: 5
-    mean_snr_db: 20.0
-    flows:
-      - qfi: 9              # 5QI 9: internet default best-effort
-      - qfi: 8              # 5QI 8: non-GBR best-effort with looser PDB
-        max_delay_budget_ms: 300
-
-  - ue_id: 6
-    mean_snr_db: 12.0       # cell-edge — AL=2 PDCCH cost
-    flows:
-      - qfi: 9
-      - qfi: 82
-        flow_class: Delay
-        max_delay_budget_ms: 15
-        traffic: {kind: deterministic, period_ms: 10.0, bytes_per_period: 200}
-
-  - ue_id: 7
-    mean_snr_db: 22.0
-    flows:
-      - qfi: 9
-      - qfi: 2
-        flow_class: GBR
-        min_data_rate_bps: 1_500_000
-        max_delay_budget_ms: 150
+        min_data_rate_bps: 8_000_000
+        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
-          avg_bytes: 6_000
+          avg_bytes: 33_000
           i_frame_multiplier: 4.0
           i_frame_period_in_frames: 30
+      - qfi: 82
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
 
-  - ue_id: 8
-    mean_snr_db: 17.0
+  - ue_id: 3
+    mean_snr_db: 20.0
     flows:
-      - qfi: 9
-      - qfi: 8
-        max_delay_budget_ms: 300
+      - qfi: 2
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 8_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 33_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+      - qfi: 82
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
 
-  - ue_id: 9
+  - ue_id: 4
+    mean_snr_db: 16.0
+    flows:
+      - qfi: 2
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 8_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 33_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+      - qfi: 82
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
+
+  # ---- LIDAR+camera robots (UE 5-7): 14 Mbps UL combined + DL control ----
+  - ue_id: 5
     mean_snr_db: 24.0
     flows:
-      - qfi: 9
-      - qfi: 1
+      - qfi: 2                    # UL: LIDAR + camera combined stream
+        direction: UL
         flow_class: GBR
-        min_data_rate_bps: 64_000
-        max_delay_budget_ms: 100
+        min_data_rate_bps: 14_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 58_000
+          i_frame_multiplier: 3.0
+          i_frame_period_in_frames: 30
+      - qfi: 82
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
 
-  - ue_id: 10
+  - ue_id: 6
     mean_snr_db: 19.0
     flows:
-      - qfi: 9
+      - qfi: 2
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 14_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 58_000
+          i_frame_multiplier: 3.0
+          i_frame_period_in_frames: 30
       - qfi: 82
+        direction: DL
         flow_class: Delay
-        max_delay_budget_ms: 20
-        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 400}
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
+
+  - ue_id: 7
+    mean_snr_db: 14.0           # further from gNodeB, AL=2 PDCCH cost
+    flows:
+      - qfi: 2
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 14_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 58_000
+          i_frame_multiplier: 3.0
+          i_frame_period_in_frames: 30
+      - qfi: 82
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
+
+  # ---- Best-effort UL load on three of the camera robots ----
+  # These flows model on-robot logs, recordings, software updates being
+  # uploaded opportunistically. They share the UL pipe with the GBR video
+  # above and are what TwoTier should sacrifice under overload.
+  - ue_id: 8
+    mean_snr_db: 21.0
+    flows:
+      - qfi: 2                    # UL: HD camera (lower bitrate)
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 6_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 25_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+      - qfi: 9                    # UL: best-effort log / backup upload
+        direction: UL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 10_000_000}
+      - qfi: 82                   # DL: control loop
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
+
+  - ue_id: 9
+    mean_snr_db: 17.0
+    flows:
+      - qfi: 2
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 6_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 25_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+      - qfi: 9
+        direction: UL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 10_000_000}
+      - qfi: 82
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
+
+  # ---- Robot 10: asymmetric TCP example ----
+  # Robot uploads camera (UL GBR) AND downloads a large training dataset
+  # / firmware over TCP (DL bulk + UL acks). The DL bulk + UL acks pair
+  # shows the canonical bidirectional-app pattern: two flow entries with
+  # different QFIs, rates expressed in their respective directions.
+  - ue_id: 10
+    mean_snr_db: 20.0
+    flows:
+      - qfi: 2                    # UL: camera stream (the "robot work")
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 6_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 33.33
+          avg_bytes: 25_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30
+      - qfi: 9                    # DL: TCP bulk download (firmware / dataset)
+        direction: DL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 10_000_000}
+      - qfi: 8                    # UL: TCP acks (~3% of DL bulk rate)
+        direction: UL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 300_000}
+      - qfi: 82                   # DL: control loop
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}

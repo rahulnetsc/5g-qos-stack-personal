@@ -3,9 +3,12 @@ import numpy as np
 from .config import UEConfig
 
 
-# (snr_db_threshold, spectral_efficiency_bits_per_symbol_per_subcarrier, target_BLER)
+# (snr_db_threshold, spectral_efficiency_bps_per_hz, target_BLER)
 # Crude staircase derived from a 0.75-of-Shannon curve. Captures the macro behavior
 # (higher SNR -> more bits/RB) without being defensible at the PHY level.
+# bits_per_prb() consumes SE as if it were bits/RE (i.e., ignores the ~7% CP
+# overhead that separates b/s/Hz from b/RE). The carrier.overhead_factor knob
+# dominates this error, so it's fine for comparative scheduler work.
 _MCS_TABLE = [
     (-2.0, 0.15, 0.10),
     (1.0, 0.30, 0.10),

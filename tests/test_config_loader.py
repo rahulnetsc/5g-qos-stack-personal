@@ -27,9 +27,9 @@ def test_load_scenario_flattens_ues_and_flows():
         _CONFIGS / "system_config.yml",
         _CONFIGS / "sim_config.yml",
     )
-    # 10 UEs, 2 flows each
+    # 10 robot UEs; mix of 2/3/4 flows each (24 total in the current scenario).
     assert len(scen.ues) == 10
-    assert len(scen.flows) == 20
+    assert len(scen.flows) == 24
     # Defaults propagate (every UE got a coherence_slots, every flow got a PDB)
     assert all(ue.coherence_slots > 0 for ue in scen.ues)
     assert all(f.pdb_ms > 0 for f in scen.flows)
@@ -38,6 +38,10 @@ def test_load_scenario_flattens_ues_and_flows():
     delay_flows = [f for f in scen.flows if f.flow_class == "Delay"]
     assert gbr_flows and all(f.gfbr_bps > 0 for f in gbr_flows)
     assert delay_flows and all(f.pdb_ms <= 30 for f in delay_flows)
+    # UL/DL split: this scenario is uplink-heavy (more UL flows than DL).
+    ul_flows = [f for f in scen.flows if f.direction == "UL"]
+    dl_flows = [f for f in scen.flows if f.direction == "DL"]
+    assert len(ul_flows) > len(dl_flows)
 
 
 def test_yaml_scenario_runs_end_to_end():
@@ -45,6 +49,6 @@ def test_yaml_scenario_runs_end_to_end():
     scen = yaml_scenario()
     summary = run(scen, RoundRobin())
     assert summary["horizon_s"] > 0
-    assert len(summary["flows"]) == 20
+    assert len(summary["flows"]) == 24
     # At least one flow should have delivered bytes (sanity, not correctness)
     assert any(f["throughput_bps"] > 0 for f in summary["flows"].values())
