@@ -537,6 +537,42 @@ def test_tier1_per_flow_penalty_shifts_allocation():
     assert boosted[(2, 2)] > uni[(2, 2)] + 0.2e6
 
 
+def test_tier1_se_penalty_exponent_tilts_allocation():
+    """The SE-tilt exponent k scales each flow's GBR penalty by
+    (SE_i/SE_max)**k. With two GBR flows that cannot both be met, k>0
+    (efficiency-first) leaves the poor-SE flow sacrificed, while k<0
+    (RB-level parity) pulls allocation back toward it."""
+    from sim.config import TDDConfig
+
+    grid = ResourceGrid(
+        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
+    )
+    flows = [
+        FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+                   gfbr_bps=3_000_000, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 3_000_000}),
+        FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
+                   gfbr_bps=3_000_000, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 3_000_000}),
+    ]
+    demand = {(1, 2): 3_000_000, (2, 2): 3_000_000}
+    snr = {1: 22.0, 2: 8.0}  # flow 2 is the poor-SE flow
+
+    base = solve_tier1(flows, snr, grid, demand, gbr_slack_penalty=1e3)
+    eff_first = solve_tier1(flows, snr, grid, demand,
+                            gbr_slack_penalty=1e3, se_penalty_exponent=2.0)
+    rb_parity = solve_tier1(flows, snr, grid, demand,
+                            gbr_slack_penalty=1e3, se_penalty_exponent=-2.0)
+
+    # k<0 (RB-level parity) gives the poor-SE flow materially more rate than
+    # k>0 (efficiency-first) does.
+    assert rb_parity[(2, 2)] > eff_first[(2, 2)] + 0.2e6
+    # k>0 does not rescue the poor-SE flow -- it is already the dump target.
+    assert eff_first[(2, 2)] <= base[(2, 2)] + 1.0
+    # k<0 strictly improves it over the untilted baseline.
+    assert rb_parity[(2, 2)] > base[(2, 2)] + 1.0
+
+
 def _two_gbr_partial_infeasible_scenario():
     """Two GBR flows — one good-SNR, one poor-SNR — on a carrier that cannot
     meet both GFBRs at once. 6 Tier-1 solves over the horizon."""

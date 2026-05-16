@@ -58,6 +58,7 @@ def solve_tier1(
     demand_bps: dict[tuple[int, int], float],
     gbr_slack_penalty: "float | dict[tuple[int, int], float]" = 1e3,
     capacity_safety_factor: float = 1.0,
+    se_penalty_exponent: float = 0.0,
 ) -> dict[tuple[int, int], float]:
     """Solve Tier-1 LP. Returns target rate (bps) per (ue_id, qfi).
 
@@ -65,6 +66,16 @@ def solve_tier1(
     keyed by (ue_id, qfi). The dict form is what TwoTier's adaptive
     dual-ascent update uses to escalate the penalty on GBR flows that keep
     missing their floor.
+
+    se_penalty_exponent (k) tilts each flow's GBR slack penalty by its
+    spectral efficiency: p_i is multiplied by (SE_i / SE_max) ** k.
+        k = 0  -> no tilt (default; identical to the old behaviour).
+        k > 0  -> discount poor-SE flows. A low-SE flow's GBR shortfall
+                  drags the objective down less ("efficiency-first": spend
+                  RBs where they convert to the most rate).
+        k < 0  -> boost poor-SE flows. k = -1 equalises the per-RB value of
+                  closing a GBR gap (p_i * SE_i) across flows -- "RB-level"
+                  parity rather than rate-level.
     """
     n = len(flows)
     if n == 0:
@@ -84,6 +95,13 @@ def solve_tier1(
         )
     else:
         penalty = np.full(n, float(gbr_slack_penalty))
+
+    # Optional spectral-efficiency tilt: p_i *= (SE_i / SE_max) ** k. See the
+    # docstring -- k>0 is efficiency-first, k<0 is RB-level parity, k=0 off.
+    if se_penalty_exponent != 0.0:
+        se_max = float(se.max())
+        if se_max > 0.0:
+            penalty = penalty * (se / se_max) ** se_penalty_exponent
 
     cap_dl, cap_ul = grid_capacity_prbsym_per_sec(grid)
     cap_dl *= capacity_safety_factor

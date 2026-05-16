@@ -143,6 +143,38 @@ Implemented in [sim/tier1.py](../sim/tier1.py) (`solve_tier1` accepts a
 per-flow penalty dict) and [sim/schedulers/two_tier.py](../sim/schedulers/two_tier.py)
 (`_update_gbr_penalties`, knobs `gbr_penalty_init / _lr / _max`).
 
+### Spectral-efficiency tilt of the penalty (knob `k`)
+
+A second, *static* lever on the penalty: scale each flow's `p_i` by its
+spectral efficiency, `p_i ← p_i · (SE_i / SE_max)^k`.
+
+The lever exists because the LP allocates RBs, not bps. The marginal
+objective gain of one RB spent closing flow `i`'s GBR gap is `p_i · SE_i`
+(an RB buys `SE_i` bps of slack reduction). So:
+
+- `k = 0` — off. Per-RB priority `∝ SE_i`; the objective already favours
+  high-SE flows.
+- `k > 0` — *efficiency-first*. Per-RB priority `∝ SE_i^(1+k)`; poor-SE
+  flows' shortfall drags the objective down less.
+- `k < 0` — *RB-level parity*. `k = -1` makes per-RB priority `∝ const`:
+  every GBR gap is equally urgent per RB, regardless of channel.
+
+Empirically (10-robot scenario, `gbr_penalty_lr = 0`): `k > 0` is a near
+no-op — the objective is already efficiency-tilted, so the cell-edge GBR
+flows are sacrificed at `k = 0` and `k > 0` cannot sacrifice them further.
+`k < 0` does rescue the cell-edge flows (ue4 8→65 %, ue7 4→64 % at
+`k = -1`) but **only relocates** starvation: it re-sorts victims by SE
+rank, crushing the next tier (ue8/9/10) and lowering both mean GBR
+delivery and total throughput. A static tilt cannot lift the worst-case
+floor — only the adaptive penalty above does that, because it targets the
+flow that is *actually* missing rather than re-ranking by channel. The two
+mechanisms interfere: `k < 0` stacked on `lr > 0` overshoots the adaptive
+correction and lowers the floor again. Recommended default: `k = 0`; treat
+`k > 0` as an explicit "efficiency over cell-edge" policy choice.
+
+Knob: `gbr_penalty_se_exponent` on `TwoTier`; `se_penalty_exponent` on
+`solve_tier1`.
+
 ### Constraints
 
 **Symbol-RB capacity (separately for DL and UL):**
