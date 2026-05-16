@@ -24,10 +24,14 @@ class TwoTier:
     drift-plus-penalty (Lyapunov optimization) to steer actual rates to targets.
 
     Virtual queue per flow:
-        Q_i(t+1) = max(0, Q_i(t) + target_i * slot_duration_s - delivered_i(t))
-    grown only when the flow's RLC buffer has data (avoids accumulating
-    phantom debt for idle flows). Q_i is also capped to prevent runaway when
-    a target is set above what arrivals can sustain.
+        Q_i += target_i * slot_duration_s          (grow at the Tier-1 target)
+        Q_i  = min(Q_i, real_backlog_bits_i)       (clamp to physical backlog)
+        Q_i  = max(0, Q_i - delivered_i)           (drain by delivered bits)
+    The virtual queue is a control accumulator, not a buffer of real bits.
+    Its arrivals are the Tier-1 *target* rate (the only lever Tier-1 has on
+    Tier-2); its physical ceiling is the real RLC backlog, since a flow can
+    never be "behind target" by more bits than actually exist unsent. That
+    clamp subsumes both an idle-flow gate and a runaway cap.
 
     Per-slot metric:
         metric_i = (Q_i + delay_urgency_bonus_i) * spectral_efficiency_i
@@ -44,7 +48,6 @@ class TwoTier:
         snr_window_slots: int = 100,
         delay_urgency_weight: float = 4.0,
         delay_exponent: float = 2.0,
-        q_cap_periods: float = 1.0,
         enable_sps: bool = True,
         sps_safety_margin: float = 1.10,
     ) -> None:
@@ -52,8 +55,6 @@ class TwoTier:
         self.snr_window = max(1, snr_window_slots)
         self.delay_w = delay_urgency_weight
         self.delay_exp = delay_exponent
-        # Cap Q at this many Tier-1 periods worth of target inflow.
-        self.q_cap_periods = q_cap_periods
         # SPS: decide PRB reservation for periodic flows after each Tier-1 solve.
         self.enable_sps = enable_sps
         self.sps_safety_margin = sps_safety_margin
@@ -185,19 +186,18 @@ class TwoTier:
             self._resolve_tier1()
             self._last_solve_slot = slot.slot_index
 
-        # Grow virtual queues only for flows with backlog. Cap at q_cap_periods
-        # of target inflow to prevent runaway when target > arrivals.
+        # Grow each virtual queue at its Tier-1 target rate, then clamp to the
+        # real backlog: a flow cannot be "behind target" by more bits than
+        # physically exist unsent. The clamp handles both idle flows (backlog
+        # 0 -> Q 0) and flows offered below their target (Q can't outrun the
+        # bits that actually arrived).
         for f in self._flows:
             key = (f.ue_id, f.qfi)
-            if buffers.state(*key).bytes_queued > 0:
-                target_bps = self._targets_bps.get(key, 0.0)
-                inflow_bits = target_bps * self.slot_duration_s
-                self._virtual_q[key] += inflow_bits
-                cap_bits = (
-                    target_bps * self.tier1_period * self.slot_duration_s * self.q_cap_periods
-                )
-                if cap_bits > 0 and self._virtual_q[key] > cap_bits:
-                    self._virtual_q[key] = cap_bits
+            target_bps = self._targets_bps.get(key, 0.0)
+            self._virtual_q[key] += target_bps * self.slot_duration_s
+            backlog_bits = buffers.state(*key).bytes_queued * 8
+            if self._virtual_q[key] > backlog_bits:
+                self._virtual_q[key] = float(backlog_bits)
 
         # Tracks bytes the scheduler has committed (drained-equivalent) to
         # each flow within this slot, so SPS + dynamic for the same flow

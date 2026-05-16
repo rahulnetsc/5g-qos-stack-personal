@@ -421,6 +421,53 @@ def test_timeseries_default_off():
     assert "timeseries" not in summary
 
 
+def test_two_tier_virtual_queue_clamped_to_backlog():
+    """The virtual queue must never exceed the real backlog (in bits). This
+    pins the clamp that replaced the old idle-gate + q_cap hacks: a flow
+    offered below its Tier-1 target should not accumulate runaway Q debt."""
+    # One flow whose configured offered rate is well below the carrier
+    # capacity, so Tier-1 will hand it a target near its (modest) demand and
+    # the buffer mostly stays small.
+    scenario = ScenarioConfig(
+        name="below_target",
+        horizon_slots=2000,
+        carrier=CarrierConfig(numerology=1, bandwidth_hz=30_000_000),
+        ues=[UEConfig(ue_id=1, mean_snr_db=22.0, coherence_slots=2000)],
+        flows=[
+            FlowConfig(
+                ue_id=1, qfi=9, direction="DL", flow_class="PF",
+                traffic_kind="poisson",
+                traffic_params={"rate_bps": 2_000_000},
+            )
+        ],
+        seed=5,
+    )
+    sched = TwoTier(tier1_period_slots=2000)
+
+    # Re-run the simulation but assert the invariant every slot by wrapping
+    # the scheduler. Simplest: run normally, then check that the scheduler's
+    # virtual queue never exceeds the (final) buffer — and more robustly,
+    # check the invariant holds against the live buffer during allocate().
+    from sim.buffer import BufferModel as _BM
+
+    violations = []
+    orig_allocate = sched.allocate
+
+    def checked_allocate(slot, buffers: _BM, channel):
+        result = orig_allocate(slot, buffers, channel)
+        for key, q in sched._virtual_q.items():
+            backlog_bits = buffers.state(*key).bytes_queued * 8
+            # After allocate(): Q was grown, clamped to backlog, then drained.
+            # Draining only shrinks Q, so post-allocate Q <= the clamp ceiling.
+            if q > backlog_bits + 1:
+                violations.append((slot.slot_index, key, q, backlog_bits))
+        return result
+
+    sched.allocate = checked_allocate  # type: ignore[method-assign]
+    run(scenario, sched)
+    assert not violations, f"virtual queue exceeded backlog: {violations[:3]}"
+
+
 def test_two_tier_runs_without_overload():
     """With abundant capacity, TwoTier should serve every flow's full demand."""
     scenario = ScenarioConfig(
