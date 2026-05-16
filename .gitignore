@@ -35,3 +35,6 @@ htmlcov/
 /*.csv
 /*.json
 /timeseries.png
+
+#claude
+.claude
