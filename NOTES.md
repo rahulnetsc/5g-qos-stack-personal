@@ -104,3 +104,72 @@ the 3-flow overload.
    under deep overload. Compare against an SNR-aware weighting variant.
 3. Each tweak: run `make compare` and check the yaml block. Lock in any
    improvements in this file (replace ⚠️ with ✓ once a finding is closed).
+
+---
+
+## 2026-05-16 — Windowed ceiling fix, adaptive penalty, SE-tilt knob
+
+Three changes since the 05-13 notes. The headline table above is the
+*default* TwoTier (`gbr_penalty_lr=0`, `gbr_penalty_se_exponent=0`) and
+its numbers still hold — the work below is a fix plus two opt-in knobs.
+
+### Regression caught and reverted: virtual-queue clamp
+
+An interim change clamped the Tier-2 virtual queue to instantaneous real
+backlog (`Q = min(Q, backlog_bits)`). It was claimed behavior-preserving
+on the 3-flow scenario but crushed bursty mixed-flow GBR on the 10-robot
+scenario (ue8 42→6%, ue10 42→1%): the clamp zeroes a bursty flow's
+virtual queue in the gaps between video frames, destroying its
+rate-tracking debt. Replaced with a **windowed ceiling** —
+`ceiling = max(0, min(target·W, arrived_W) − delivered_W)` over a
+trailing Tier-1 window. Restores the 05-13 baseline. Regression guard:
+`test_two_tier_windowed_ceiling_protects_bursty_gbr`.
+
+### Finding 1 — now has a working mitigation (adaptive penalty)
+
+The adaptive per-flow GBR penalty (dual ascent, `gbr_penalty_lr>0`)
+escalates `p_i` on whichever flow is *actually* missing its GFBR,
+channel-agnostic. On the 10-robot scenario (`lr=1e5`, vs default):
+
+| Metric | default | adaptive |
+|---|---|---|
+| ue4_qfi2 / ue7_qfi2 | 8% / 4% | **45% / 26%** |
+| ue9_qfi2 | 30% | **69%** |
+| min GBR delivery | 4.4% | **19.8%** |
+| mean GBR delivery | 51.7% | 47.5% |
+| total throughput | 76.1 Mbps | 70.6 Mbps |
+
+It lifts the worst-case floor by targeting the real misser. Cost: ~4 pts
+mean GBR, ~7% throughput, and it trades *within* the GBR set —
+ue8 42→24%, ue10 38→20%. So Finding 1 is **mitigated, not closed**: a
+fairness/efficiency tradeoff knob, not a free win. Hard floors /
+lexicographic max-min are still worth prototyping for a cleaner guarantee.
+
+### SE-tilt knob (k) — explored, does NOT fix Finding 1
+
+New knob `gbr_penalty_se_exponent` (k): scales each flow's penalty by
+`(SE_i/SE_max)^k`. Motivation was "RB-level vs rate-level fairness."
+Sweep on the 10-robot scenario, `lr=0`:
+
+| k | mean GBR | min GBR | sum Mbps | ue4 | ue7 | ue8 | ue9 | ue10 |
+|---|---|---|---|---|---|---|---|---|
+| −1 (RB-parity) | 39.4% | 0.0% | 66.9 | 65% | 64% | 4% | 0% | 4% |
+| **0 (default)** | **51.7%** | **4.4%** | **76.1** | 8% | 4% | 42% | 30% | 38% |
+| +1 (efficiency) | 52.5% | 4.5% | 76.7 | 8% | 5% | 64% | 11% | 48% |
+
+`k>0` is a near no-op — the objective is already efficiency-tilted, so
+the cell-edge flows are sacrificed at `k=0` and `k>0` can't sacrifice
+them harder. `k<0` *does* rescue ue4/ue7 but **only relocates**
+starvation: it re-sorts victims by SE rank, crushing ue8/9/10 and
+lowering both mean GBR and throughput. A static tilt cannot lift the
+worst-case floor — only the adaptive penalty does. Stacking `k<0` with
+`lr>0` interferes (overshoots the adaptive correction; min GBR
+19.8→9.8%). Default stays `k=0`. Full writeup in
+[design-docs/scheduler-design.md](design-docs/scheduler-design.md).
+
+### Finding 2 — still open, and now more visible
+
+The `k<0` sweep makes Finding 2 sharper: ue8/9/10 (the mixed-flow UEs)
+are exactly the UEs that absorb relocated starvation under every
+redistribution we try. Root cause still uninvestigated — see the
+05-13 hypotheses and the per-flow LP-dump plan above.
