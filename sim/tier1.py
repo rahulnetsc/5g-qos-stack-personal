@@ -56,10 +56,16 @@ def solve_tier1(
     snr_db_per_ue: dict[int, float],
     grid: ResourceGrid,
     demand_bps: dict[tuple[int, int], float],
-    gbr_slack_penalty: float = 1e3,
+    gbr_slack_penalty: "float | dict[tuple[int, int], float]" = 1e3,
     capacity_safety_factor: float = 1.0,
 ) -> dict[tuple[int, int], float]:
-    """Solve Tier-1 LP. Returns target rate (bps) per (ue_id, qfi)."""
+    """Solve Tier-1 LP. Returns target rate (bps) per (ue_id, qfi).
+
+    gbr_slack_penalty may be a scalar (uniform penalty) or a per-flow dict
+    keyed by (ue_id, qfi). The dict form is what TwoTier's adaptive
+    dual-ascent update uses to escalate the penalty on GBR flows that keep
+    missing their floor.
+    """
     n = len(flows)
     if n == 0:
         return {}
@@ -70,6 +76,14 @@ def solve_tier1(
         snr = snr_db_per_ue.get(f.ue_id, 20.0)
         bits, bler = bits_per_prb(snr, symbols=1)
         se[i] = max(1.0, bits * (1.0 - bler))
+
+    # Per-flow slack penalty vector (scalar broadcasts to all flows).
+    if isinstance(gbr_slack_penalty, dict):
+        penalty = np.array(
+            [float(gbr_slack_penalty.get((f.ue_id, f.qfi), 1e3)) for f in flows]
+        )
+    else:
+        penalty = np.full(n, float(gbr_slack_penalty))
 
     cap_dl, cap_ul = grid_capacity_prbsym_per_sec(grid)
     cap_dl *= capacity_safety_factor
@@ -101,7 +115,7 @@ def solve_tier1(
     utility = cp.sum(
         [_utility_weight(f.flow_class) * cp.log(r[i] + epsilon) for i, f in enumerate(flows)]
     )
-    objective = cp.Maximize(utility - gbr_slack_penalty * cp.sum(slack))
+    objective = cp.Maximize(utility - cp.sum(cp.multiply(penalty, slack)))
 
     problem = cp.Problem(objective, constraints)
     try:

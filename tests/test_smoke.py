@@ -421,13 +421,10 @@ def test_timeseries_default_off():
     assert "timeseries" not in summary
 
 
-def test_two_tier_virtual_queue_clamped_to_backlog():
-    """The virtual queue must never exceed the real backlog (in bits). This
-    pins the clamp that replaced the old idle-gate + q_cap hacks: a flow
-    offered below its Tier-1 target should not accumulate runaway Q debt."""
-    # One flow whose configured offered rate is well below the carrier
-    # capacity, so Tier-1 will hand it a target near its (modest) demand and
-    # the buffer mostly stays small.
+def test_two_tier_virtual_queue_windowed_ceiling():
+    """The windowed ceiling bounds Q at one Tier-1 window of target inflow:
+    Q_i <= target_bps_i * tier1_period * slot_duration_s. This pins the
+    cap and guards against runaway Q for a flow offered below its target."""
     scenario = ScenarioConfig(
         name="below_target",
         horizon_slots=2000,
@@ -443,29 +440,191 @@ def test_two_tier_virtual_queue_clamped_to_backlog():
         seed=5,
     )
     sched = TwoTier(tier1_period_slots=2000)
-
-    # Re-run the simulation but assert the invariant every slot by wrapping
-    # the scheduler. Simplest: run normally, then check that the scheduler's
-    # virtual queue never exceeds the (final) buffer — and more robustly,
-    # check the invariant holds against the live buffer during allocate().
-    from sim.buffer import BufferModel as _BM
-
     violations = []
     orig_allocate = sched.allocate
 
-    def checked_allocate(slot, buffers: _BM, channel):
+    def checked_allocate(slot, buffers, channel):
         result = orig_allocate(slot, buffers, channel)
+        window_s = sched.tier1_period * sched.slot_duration_s
         for key, q in sched._virtual_q.items():
-            backlog_bits = buffers.state(*key).bytes_queued * 8
-            # After allocate(): Q was grown, clamped to backlog, then drained.
-            # Draining only shrinks Q, so post-allocate Q <= the clamp ceiling.
-            if q > backlog_bits + 1:
-                violations.append((slot.slot_index, key, q, backlog_bits))
+            cap = sched._targets_bps.get(key, 0.0) * window_s
+            if q > cap * 1.01 + 1:
+                violations.append((slot.slot_index, key, q, cap))
         return result
 
     sched.allocate = checked_allocate  # type: ignore[method-assign]
     run(scenario, sched)
-    assert not violations, f"virtual queue exceeded backlog: {violations[:3]}"
+    assert not violations, f"virtual queue exceeded windowed cap: {violations[:3]}"
+
+
+def test_two_tier_windowed_ceiling_protects_bursty_gbr():
+    """Regression guard for the 10-robot finding: a bursty GBR flow sharing a
+    UE with a continuous best-effort flow must not be starved by TwoTier.
+    With the old instantaneous-backlog clamp the bursty flow's Q collapsed
+    between video frames and the continuous PF flow won; the windowed
+    ceiling fixes that. TwoTier should serve the GBR flow at least as well
+    as plain PF does."""
+    from sim.config import TDDConfig
+    from sim.schedulers.pf import ProportionalFair
+
+    def scenario():
+        return ScenarioConfig(
+            name="mixed_flow_ue",
+            horizon_slots=8000,
+            carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
+            tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
+            ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=2000)],
+            flows=[
+                # Bursty GBR video on the same UE as ...
+                FlowConfig(
+                    ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+                    gfbr_bps=6_000_000, pdb_ms=30,
+                    traffic_kind="video_frame",
+                    traffic_params={
+                        "period_ms": 33.33, "avg_bytes": 25_000,
+                        "i_frame_multiplier": 4.0,
+                        "i_frame_period_in_frames": 30,
+                    },
+                ),
+                # ... a continuous best-effort upload competing in the UL pool.
+                FlowConfig(
+                    ue_id=1, qfi=9, direction="UL", flow_class="PF",
+                    pdb_ms=300, traffic_kind="poisson",
+                    traffic_params={"rate_bps": 15_000_000},
+                ),
+            ],
+            seed=4,
+        )
+
+    pf = run(scenario(), ProportionalFair(ewma_window_slots=200))
+    tt = run(scenario(), TwoTier(tier1_period_slots=2000))
+    pf_gbr = pf["flows"]["ue1_qfi2"]["delivery_ratio"]
+    tt_gbr = tt["flows"]["ue1_qfi2"]["delivery_ratio"]
+    assert tt_gbr >= pf_gbr, (
+        f"TwoTier GBR delivery {tt_gbr:.0%} should be >= PF's {pf_gbr:.0%} "
+        "(bursty GBR must not lose to continuous PF on the same UE)"
+    )
+
+
+def test_tier1_per_flow_penalty_shifts_allocation():
+    """A higher per-flow GBR penalty pulls LP allocation toward that flow.
+    Under partial infeasibility with a uniform penalty the poor-SNR GBR flow
+    is sacrificed; boosting its penalty reverses that."""
+    from sim.config import TDDConfig
+
+    grid = ResourceGrid(
+        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
+    )
+    flows = [
+        FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+                   gfbr_bps=3_000_000, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 3_000_000}),
+        FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
+                   gfbr_bps=3_000_000, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 3_000_000}),
+    ]
+    demand = {(1, 2): 3_000_000, (2, 2): 3_000_000}
+    snr = {1: 22.0, 2: 8.0}  # flow 2 is the poor-SNR flow
+
+    uni = solve_tier1(flows, snr, grid, demand, gbr_slack_penalty=1e3)
+    boosted = solve_tier1(
+        flows, snr, grid, demand,
+        gbr_slack_penalty={(1, 2): 1e3, (2, 2): 1e5},
+    )
+    # Uniform penalty sacrifices the poor-SNR flow.
+    assert uni[(2, 2)] < uni[(1, 2)]
+    # Boosting flow 2's penalty pulls allocation back to it.
+    assert boosted[(2, 2)] > uni[(2, 2)] + 0.2e6
+
+
+def _two_gbr_partial_infeasible_scenario():
+    """Two GBR flows — one good-SNR, one poor-SNR — on a carrier that cannot
+    meet both GFBRs at once. 6 Tier-1 solves over the horizon."""
+    from sim.config import TDDConfig
+
+    return ScenarioConfig(
+        name="two_gbr",
+        horizon_slots=12000,
+        carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
+        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
+        ues=[
+            UEConfig(ue_id=1, mean_snr_db=22.0, coherence_slots=4000),
+            UEConfig(ue_id=2, mean_snr_db=8.0, coherence_slots=4000),
+        ],
+        flows=[
+            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=3_000_000, pdb_ms=100, traffic_kind="poisson",
+                       traffic_params={"rate_bps": 3_000_000}),
+            FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=3_000_000, pdb_ms=100, traffic_kind="poisson",
+                       traffic_params={"rate_bps": 3_000_000}),
+        ],
+        seed=3,
+    )
+
+
+def test_two_tier_adaptive_penalty_helps_poor_snr_gbr():
+    """Adaptive per-flow penalty (b>0) rebalances the GBR sacrifice toward
+    the poor-SNR flow, improving the worst-served GBR flow vs fixed b=0."""
+    fixed = run(_two_gbr_partial_infeasible_scenario(),
+                TwoTier(tier1_period_slots=2000, gbr_penalty_lr=0.0))
+    adaptive = run(_two_gbr_partial_infeasible_scenario(),
+                   TwoTier(tier1_period_slots=2000, gbr_penalty_lr=1e5))
+
+    def min_delivery(summary):
+        return min(f["delivery_ratio"] for f in summary["flows"].values())
+
+    assert min_delivery(adaptive) > min_delivery(fixed) + 0.01, (
+        f"adaptive min delivery {min_delivery(adaptive):.1%} should beat "
+        f"fixed {min_delivery(fixed):.1%}"
+    )
+    # The poor-SNR flow (ue2) specifically improves.
+    assert (
+        adaptive["flows"]["ue2_qfi2"]["delivery_ratio"]
+        > fixed["flows"]["ue2_qfi2"]["delivery_ratio"]
+    )
+
+
+def test_two_tier_adaptive_penalty_caps_at_max():
+    """A genuinely infeasible GBR flow must not diverge: its penalty stops
+    at gbr_penalty_max instead of growing without bound."""
+    from sim.config import TDDConfig
+
+    scenario = ScenarioConfig(
+        name="infeasible_gbr",
+        horizon_slots=8000,  # 4 Tier-1 solves
+        carrier=CarrierConfig(numerology=1, bandwidth_hz=10_000_000),
+        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
+        ues=[UEConfig(ue_id=1, mean_snr_db=8.0, coherence_slots=4000)],
+        flows=[
+            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=50_000_000,  # far above carrier capacity
+                       pdb_ms=100, traffic_kind="poisson",
+                       traffic_params={"rate_bps": 50_000_000}),
+        ],
+        seed=1,
+    )
+    p_max = 5_000.0
+    sched = TwoTier(
+        tier1_period_slots=2000, gbr_penalty_lr=1e6, gbr_penalty_max=p_max
+    )
+    run(scenario, sched)
+    pen = sched._gbr_penalty[(1, 2)]
+    assert pen <= p_max, f"penalty {pen} exceeded cap {p_max}"
+    assert pen == p_max, (
+        f"infeasible flow should drive the penalty to the cap; got {pen}"
+    )
+
+
+def test_two_tier_adaptive_penalty_disabled_by_default():
+    """With gbr_penalty_lr=0 (default) the penalties never move from init."""
+    from sim.scenarios import overload_scenario
+
+    sched = TwoTier(tier1_period_slots=2000)  # default gbr_penalty_lr=0
+    run(overload_scenario(), sched)
+    assert all(
+        p == sched.gbr_penalty_init for p in sched._gbr_penalty.values()
+    )
 
 
 def test_two_tier_runs_without_overload():

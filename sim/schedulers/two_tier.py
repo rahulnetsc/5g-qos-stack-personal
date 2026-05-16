@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
 
 from ..buffer import BufferModel
@@ -25,13 +25,22 @@ class TwoTier:
 
     Virtual queue per flow:
         Q_i += target_i * slot_duration_s          (grow at the Tier-1 target)
-        Q_i  = min(Q_i, real_backlog_bits_i)       (clamp to physical backlog)
+        Q_i  = min(Q_i, windowed_ceiling_i)        (clamp, see below)
         Q_i  = max(0, Q_i - delivered_i)           (drain by delivered bits)
     The virtual queue is a control accumulator, not a buffer of real bits.
     Its arrivals are the Tier-1 *target* rate (the only lever Tier-1 has on
-    Tier-2); its physical ceiling is the real RLC backlog, since a flow can
-    never be "behind target" by more bits than actually exist unsent. That
-    clamp subsumes both an idle-flow gate and a runaway cap.
+    Tier-2).
+
+    The ceiling is the bits the flow legitimately should have delivered over
+    the last `tier1_period` slots but didn't:
+        ceiling_i = max(0, min(target_i * W, arrived_W_i) - delivered_W_i)
+    where W is the window in seconds and arrived_W / delivered_W are bits
+    over the trailing window. A flow can't be owed more than its target,
+    nor more than what actually arrived. Using a *windowed* arrival count
+    rather than instantaneous backlog is essential: a bursty flow's RLC
+    buffer momentarily empties between frames, and clamping Q to that
+    instantaneous (near-zero) backlog destroys the legitimate rate-tracking
+    debt, letting continuous flows starve bursty GBR ones.
 
     Per-slot metric:
         metric_i = (Q_i + delay_urgency_bonus_i) * spectral_efficiency_i
@@ -50,6 +59,9 @@ class TwoTier:
         delay_exponent: float = 2.0,
         enable_sps: bool = True,
         sps_safety_margin: float = 1.10,
+        gbr_penalty_init: float = 1e3,
+        gbr_penalty_lr: float = 0.0,
+        gbr_penalty_max: float = 1e6,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -58,12 +70,23 @@ class TwoTier:
         # SPS: decide PRB reservation for periodic flows after each Tier-1 solve.
         self.enable_sps = enable_sps
         self.sps_safety_margin = sps_safety_margin
+        # Adaptive per-flow GBR slack penalty (dual ascent). gbr_penalty_lr=0
+        # freezes the penalty at gbr_penalty_init -> identical to the old
+        # uniform-scalar behaviour.
+        self.gbr_penalty_init = gbr_penalty_init
+        self.gbr_penalty_lr = gbr_penalty_lr
+        self.gbr_penalty_max = gbr_penalty_max
 
         self._flows: list[FlowConfig] = []
         self._snr_avg: dict[int, float] = {}
         self._targets_bps: dict[tuple[int, int], float] = {}
         self._demand_bps: dict[tuple[int, int], float] = {}
         self._virtual_q: dict[tuple[int, int], float] = {}
+        self._gbr_penalty: dict[tuple[int, int], float] = {}
+        # Trailing-window snapshots of cumulative arrived/delivered bytes,
+        # one append per slot, length tier1_period -> a sliding window.
+        self._arr_hist: dict[tuple[int, int], deque] = {}
+        self._del_hist: dict[tuple[int, int], deque] = {}
         self._sps: list[_SPSReservation] = []
         self._sps_keys: set[tuple[int, int]] = set()
         self.slot_duration_s = 0.0
@@ -79,6 +102,15 @@ class TwoTier:
         self._demand_bps = {(f.ue_id, f.qfi): estimate_demand_bps(f) for f in flows}
         self._targets_bps = dict(self._demand_bps)
         self._virtual_q = {(f.ue_id, f.qfi): 0.0 for f in flows}
+        self._gbr_penalty = {
+            (f.ue_id, f.qfi): self.gbr_penalty_init for f in flows
+        }
+        self._arr_hist = {
+            (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
+        }
+        self._del_hist = {
+            (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
+        }
 
     def _resolve_tier1(self) -> None:
         snr_in = {
@@ -89,10 +121,40 @@ class TwoTier:
             snr_db_per_ue=snr_in,
             grid=self._grid,
             demand_bps=self._demand_bps,
+            gbr_slack_penalty=self._gbr_penalty,
         )
         self._tier1_solve_count += 1
+        self._update_gbr_penalties()
         if self.enable_sps:
             self._update_sps_reservations(snr_in)
+
+    def _update_gbr_penalties(self) -> None:
+        """Dual ascent on the per-flow GBR slack penalty.
+
+        A GBR flow that misses its GFBR has its penalty raised by
+        gbr_penalty_lr * (shortfall / GFBR). The shortfall is normalized by
+        GFBR so it lands in [0, 1] and the learning rate is scale-free. The
+        penalty is capped at gbr_penalty_max so a genuinely infeasible flow
+        cannot diverge -- hitting the cap is itself the signal that the flow
+        needs admission control rather than more penalty.
+
+        With gbr_penalty_lr == 0 this is a no-op: the penalty stays at its
+        uniform initial value, identical to the old scalar behaviour.
+        """
+        if self.gbr_penalty_lr <= 0.0:
+            return
+        for f in self._flows:
+            if f.flow_class != "GBR" or f.gfbr_bps <= 0:
+                continue
+            key = (f.ue_id, f.qfi)
+            shortfall = max(0.0, f.gfbr_bps - self._targets_bps.get(key, 0.0))
+            if shortfall <= 0.0:
+                continue
+            self._gbr_penalty[key] = min(
+                self.gbr_penalty_max,
+                self._gbr_penalty[key]
+                + self.gbr_penalty_lr * (shortfall / f.gfbr_bps),
+            )
 
     @staticmethod
     def _is_sps_eligible(f: FlowConfig) -> bool:
@@ -186,18 +248,31 @@ class TwoTier:
             self._resolve_tier1()
             self._last_solve_slot = slot.slot_index
 
-        # Grow each virtual queue at its Tier-1 target rate, then clamp to the
-        # real backlog: a flow cannot be "behind target" by more bits than
-        # physically exist unsent. The clamp handles both idle flows (backlog
-        # 0 -> Q 0) and flows offered below their target (Q can't outrun the
-        # bits that actually arrived).
+        # Grow each virtual queue at its Tier-1 target rate, then clamp to a
+        # windowed ceiling: the bits the flow legitimately should have
+        # delivered over the last tier1_period slots but didn't. A windowed
+        # arrival count (not instantaneous backlog) is what lets a bursty
+        # flow keep its rate-tracking debt across the gaps between frames.
+        window_s = self.tier1_period * self.slot_duration_s
         for f in self._flows:
             key = (f.ue_id, f.qfi)
             target_bps = self._targets_bps.get(key, 0.0)
             self._virtual_q[key] += target_bps * self.slot_duration_s
-            backlog_bits = buffers.state(*key).bytes_queued * 8
-            if self._virtual_q[key] > backlog_bits:
-                self._virtual_q[key] = float(backlog_bits)
+
+            arr_now = buffers.arrived_cum(*key) * 8
+            del_now = buffers.delivered_cum(*key) * 8
+            arr_hist = self._arr_hist[key]
+            del_hist = self._del_hist[key]
+            arrived_w = arr_now - (arr_hist[0] if arr_hist else 0)
+            delivered_w = del_now - (del_hist[0] if del_hist else 0)
+            arr_hist.append(arr_now)
+            del_hist.append(del_now)
+
+            # Can't be owed more than the target, nor more than what arrived.
+            should_deliver = min(target_bps * window_s, arrived_w)
+            ceiling = max(0.0, should_deliver - delivered_w)
+            if self._virtual_q[key] > ceiling:
+                self._virtual_q[key] = ceiling
 
         # Tracks bytes the scheduler has committed (drained-equivalent) to
         # each flow within this slot, so SPS + dynamic for the same flow

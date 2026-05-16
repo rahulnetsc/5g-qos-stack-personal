@@ -16,11 +16,28 @@ class BufferModel:
         self._buffers: dict[tuple[int, int], BufferState] = {}
         # Each chunk is [timestamp_s, bytes_remaining]; FIFO via deque.
         self._chunks: dict[tuple[int, int], deque] = {}
+        # Monotone lifetime counters (bytes). Used by schedulers that need a
+        # windowed view of offered/served load.
+        self._arrived_cum: dict[tuple[int, int], int] = {}
+        self._delivered_cum: dict[tuple[int, int], int] = {}
 
     def register(self, ue_id: int, qfi: int) -> None:
         key = (ue_id, qfi)
         self._buffers[key] = BufferState()
         self._chunks[key] = deque()
+        self._arrived_cum[key] = 0
+        self._delivered_cum[key] = 0
+
+    def arrived_cum(self, ue_id: int, qfi: int) -> int:
+        """Cumulative bytes ever enqueued for this flow."""
+        return self._arrived_cum[(ue_id, qfi)]
+
+    def delivered_cum(self, ue_id: int, qfi: int) -> int:
+        """Cumulative bytes ever drained (delivered) for this flow.
+
+        Excludes PDB-expired bytes — those leave via expire(), not drain().
+        """
+        return self._delivered_cum[(ue_id, qfi)]
 
     def keys(self) -> list[tuple[int, int]]:
         return list(self._buffers.keys())
@@ -38,6 +55,7 @@ class BufferModel:
             state.hol_timestamp_s = timestamp_s
         chunks.append([timestamp_s, bytes_count])
         state.bytes_queued += bytes_count
+        self._arrived_cum[key] += bytes_count
 
     def drain(self, ue_id: int, qfi: int, bytes_count: int) -> int:
         """Remove up to bytes_count bytes from the head. Returns bytes actually removed."""
@@ -58,6 +76,7 @@ class BufferModel:
                 chunks.popleft()
         state.bytes_queued -= removed
         state.hol_timestamp_s = chunks[0][0] if chunks else 0.0
+        self._delivered_cum[key] += removed
         return removed
 
     def expire(self, now_s: float, pdb_s: float, ue_id: int, qfi: int) -> int:

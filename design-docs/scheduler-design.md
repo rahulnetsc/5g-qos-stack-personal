@@ -86,19 +86,23 @@ For each (UE *i*, QFI *q*) pair active in the next horizon:
 - `sps_{i,q}` — boolean / structured: whether this flow gets a Configured Grant, and its periodicity + size.
 
 ### Objective (decided form)
-Composite utility, summed across flows:
+Composite utility, summed across flows. The GBR slack penalty is a
+per-flow **vector** `p`, not a scalar:
 
 ```
 maximize  Σ_i  w_class_i · log(r_i + ε)
-        - GBR_SLACK_PENALTY · Σ_i slack_i
+        - pᵀ · slack          (p, slack are length-(#flows) vectors)
 ```
 
 - Per-class utility weights: `w_PF = 1`, `w_GBR = 1`, `w_Delay = 5`.
   Delay's higher weight makes the LP fund it well during overload; GBR
   also has a hard floor via slack.
 - GBR enforcement: soft floor `r_i + slack_i ≥ GFBR_i`, with `slack_i ≥ 0`
-  and a large slack penalty (`1e3` is enough in practice). Soft form keeps
-  the LP feasible under arbitrary overload — slack just carries the cost.
+  and a slack penalty `p_i` per flow. At the baseline value `p_i = 1e3`
+  the penalty so dominates the log-utility that the floor is effectively
+  hard whenever the flow is *feasible*; slack only appears under genuine
+  (partial) infeasibility. Soft form keeps the LP feasible under arbitrary
+  overload — slack just carries the cost.
 - Delay flows: handled in Tier-2 via HoL urgency on top of Tier-1's rate
   target. The LP itself doesn't model delay; it just gives Delay flows
   extra utility weight so they're well-funded for their (typically modest)
@@ -107,6 +111,37 @@ maximize  Σ_i  w_class_i · log(r_i + ε)
 CVXPY directly handles the log-sum-with-linear-constraints. Solve time on
 the simulator's scenarios is well under 100 ms — fast enough for 1 s
 cadence. If solver becomes a bottleneck, switch to ECOS/Mosek explicitly.
+
+### Adaptive per-flow GBR penalty (dual ascent)
+
+A *uniform* penalty has a bias: under partial infeasibility (the cell
+cannot meet every GBR floor at once), `min pᵀ·slack` with equal `p`
+minimizes total **bps** of shortfall, which is cheapest by sacrificing
+*poor-SNR* GBR flows — reducing their slack costs the most capacity per
+bit. So the flows in the worst channel are exactly the ones dropped.
+
+Fix: adapt `p` per flow by dual ascent between solves. After solve `k`:
+
+```
+p_i(k+1) = min( p_max,  p_i(k) + b · slack_i(k) / GFBR_i )
+```
+
+- `slack_i / GFBR_i ∈ [0, 1]` — normalized shortfall, so the learning
+  rate `b` is scale-free.
+- `b = 0` recovers the fixed uniform penalty exactly.
+- This is dual-subgradient ascent on the GBR constraints: a flow that
+  keeps missing accrues an escalating penalty until the LP funds it.
+  Steady state drives contending GBR flows toward **equal normalized
+  shortfall** — proportional fairness among GBR flows under infeasibility,
+  instead of "sacrifice the poor-SNR one".
+- `p_max` cap: a genuinely infeasible flow's `p_i` would otherwise
+  diverge and starve everything (including other GBR flows). Capping
+  bounds the damage; a flow pinned at `p_max` and still missing is the
+  signal for admission control to reject it.
+
+Implemented in [sim/tier1.py](../sim/tier1.py) (`solve_tier1` accepts a
+per-flow penalty dict) and [sim/schedulers/two_tier.py](../sim/schedulers/two_tier.py)
+(`_update_gbr_penalties`, knobs `gbr_penalty_init / _lr / _max`).
 
 ### Constraints
 
