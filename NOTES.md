@@ -365,3 +365,42 @@ flow — surface it in the metrics summary and the study output. Then
 correlate drops with I-frame slots, and compare one I-frame's byte count
 against the bytes deliverable to that flow within one PDB at its SNR. If
 drops concentrate on I-frame arrivals, Finding 3 is confirmed.
+
+---
+
+## 2026-05-17 — Warm-up transient: a standard run reads GBR delivery ~5 pts low
+
+Checked whether the standard 4000-slot horizon captures steady state by
+running `factory_robots` for 60 consecutive 4000-slot windows (60 s) and
+tracking GBR delivery and total backlog per window —
+`scripts/transient_check.py`.
+
+| | window 1 (= a standard run) | steady state (windows 31–60) | per-window std |
+|---|---|---|---|
+| TwoTier GBR delivery | 53.7% | 58.5% | ±2.0 pts |
+| PF GBR delivery | 45.2% | 49.6% | ±1.5 pts |
+| total backlog | ~0.8 MB (still filling) | ~1.0 MB | — |
+
+**Finding — warm-up bias.** Window 1 reads GBR delivery **4.5–4.8 pts
+below steady state** on both schedulers (2.3–3.1× the per-window noise
+std — a real bias, not scatter). Cause: the buffers fill from empty over
+the first ~second (0 → ~1 MB); until occupancy is stationary,
+arrived-but-not-yet-delivered bytes depress the delivered/arrived ratio.
+Backlog plateaus within one window — the transient is ~1 s long.
+
+**Finding — per-window noise.** Even in steady state a single 4000-slot
+window scatters ±1.5–2.0 pts. Channel coherence is 2000 slots, so a
+4000-slot run spans only ~2 coherence times — a noisy sample of the
+channel ensemble.
+
+**Implication.** Every single-4000-slot number in this file is ~5 pts low
+on *absolute* GBR delivery and carries ±~2 pt scatter. But the
+**TwoTier − PF gap is stable** — 8.9 pts at steady state vs 8.5 pts at
+window 1 — so the comparative findings (which scheduler wins, by roughly
+how much) hold; it is the absolute figures that are soft.
+
+**Recommendation.** For absolute figures, discard a 4000-slot warm-up
+window (measure from slot 4000 on) and/or average several windows. For
+scheduler-vs-scheduler comparison the standard horizon is fine as-is.
+Whether to raise the project-default horizon is left open — it would
+2–6× every test and study run.

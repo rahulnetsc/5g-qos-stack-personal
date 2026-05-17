@@ -105,6 +105,7 @@ required. Full results and a build/don't-build decision table are in
 │   ├── run_smoke.py
 │   ├── compare_schedulers.py
 │   ├── scheduler_study.py        overload-sweep / PDCCH / latency studies
+│   ├── transient_check.py        long-run windowed steady-state check
 │   └── plot_timeseries.py
 └── tests/
     ├── test_smoke.py             buffer, channel, grid, all schedulers

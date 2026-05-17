@@ -423,6 +423,7 @@ scripts/
   run_smoke.py           # one scheduler, one scenario, dump JSON
   compare_schedulers.py  # all schedulers x all scenarios, side-by-side
   scheduler_study.py     # overload-sweep / PDCCH / latency studies
+  transient_check.py     # long-run windowed steady-state check
   plot_timeseries.py     # per-slot multi-panel matplotlib plots
 tests/
   test_smoke.py          # buffer, channel, grid, all schedulers, SPS / PDCCH,
