@@ -51,6 +51,19 @@ def test_factory_robots_flattens_ues_and_flows():
     assert len(ul) > len(dl)
 
 
+def test_ran_override_runs_workload_on_a_different_radio():
+    """Passing ran_id swaps the radio while leaving the workload intact."""
+    default = scenarios.latency_bound_scenario()
+    override = scenarios.latency_bound_scenario(ran_id="dsuuu_30mhz")
+    # Default RAN is DL-heavy DDDSU; the override is balanced DSUUU.
+    assert default.tdd.pattern == "DDDSU"
+    assert override.tdd.pattern == "DSUUU"
+    assert override.carrier.bandwidth_hz == 30_000_000
+    # The workload (UEs/flows) is identical regardless of RAN.
+    assert len(default.flows) == len(override.flows)
+    assert [f.qfi for f in default.flows] == [f.qfi for f in override.flows]
+
+
 def test_empty_flow_inherits_defaults():
     """`flows: [{}]` must inherit the whole default flow (sensor_dense uses
     this to stay compact)."""

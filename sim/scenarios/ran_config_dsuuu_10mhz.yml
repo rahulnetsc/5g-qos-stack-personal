@@ -1,0 +1,12 @@
+# RAN config: 10 MHz, numerology 1, balanced DSUUU TDD.
+# A deliberately small cell — pair it with a heavy workload to drive the
+# overload regime that exposes scheduler QoS-enforcement differences.
+
+carrier:
+  bandwidth_mhz: 10
+  numerology: 1         # SCS = 15 * 2^mu kHz; slot = 1 / 2^mu ms -> 0.5 ms
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DSUUU        # D=DL, U=UL, S=special
+  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}

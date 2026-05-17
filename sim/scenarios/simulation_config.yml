@@ -1,0 +1,7 @@
+# Run window — shared by every scenario. This is the "run" concern: change
+# it to lengthen a run or re-seed the RNG, independently of the radio
+# (ran_config_*.yml) and the workload (scenario_config_*.yml).
+
+simulation:
+  horizon_slots: 4000   # slots to simulate; wall time = slots * slot_duration
+  seed: 42              # RNG seed for the channel and Poisson traffic

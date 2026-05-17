@@ -1,22 +1,10 @@
-# Vision scenario: three 30 fps cameras + best-effort upload. The cameras'
-# average bandwidth fits the carrier, but their I-frame bursts stress a
-# non-SPS scheduler's tail latency. I-frame phases are staggered (0/10/20
-# of 30) so the bursts don't all land in the same slot.
+# Scenario 3 — vision: three 30 fps cameras + best-effort upload. The
+# cameras' average bandwidth fits the carrier, but their I-frame bursts
+# stress a non-SPS scheduler's tail latency. I-frame phases are staggered
+# (0/10/20 of 30) so the bursts don't all land in the same slot.
 
 name: vision
-
-simulation:
-  horizon_slots: 4000
-  seed: 11
-
-carrier:
-  bandwidth_mhz: 30
-  numerology: 1
-  overhead_factor: 0.85
-
-tdd:
-  pattern: DSUUU
-  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+default_ran: dsuuu_30mhz
 
 defaults:
   ue:

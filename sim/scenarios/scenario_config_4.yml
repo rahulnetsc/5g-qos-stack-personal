@@ -1,25 +1,13 @@
-# Sensor-dense scenario: 30 small periodic UL sensor flows.
+# Scenario 4 — sensor_dense: 30 small periodic UL sensor flows.
 #
 # Each sensor: 5 ms reporting period, 200 bytes (~320 kbps), 15 ms PDB.
-# Total offered (~10 Mbps) is well under PRB capacity -- the binding
+# Total offered (~10 Mbps) is well under PRB capacity — the binding
 # constraint is the per-slot PDCCH/CCE budget for dynamic grants. SNR 12 dB
 # puts every sensor at DCI aggregation level 2, which makes PDCCH bind and
 # lets SPS / Configured Grants (no per-slot DCI) shine.
 
 name: sensor_dense
-
-simulation:
-  horizon_slots: 4000
-  seed: 23
-
-carrier:
-  bandwidth_mhz: 30
-  numerology: 1
-  overhead_factor: 0.85
-
-tdd:
-  pattern: DSUUU
-  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+default_ran: dsuuu_30mhz
 
 defaults:
   ue:

@@ -1,0 +1,12 @@
+# RAN config: 40 MHz, numerology 2, balanced DSUUU TDD.
+# A wide-band cell with 0.25 ms slots — the radio for the factory-robots
+# workload.
+
+carrier:
+  bandwidth_mhz: 40
+  numerology: 2         # SCS = 15 * 2^mu kHz; slot = 1 / 2^mu ms -> 0.25 ms
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DSUUU        # D=DL, U=UL, S=special
+  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}

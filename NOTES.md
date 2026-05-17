@@ -255,7 +255,7 @@ data channel. Delay contract = ≥99% on-time within the 15 ms PDB:
 | Scheduler | On-time | Worst p99 | Total |
 |---|---|---|---|
 | RoundRobin | 0/30 | 15.0 ms | 7.0M |
-| PF | 18/30 | 15.0 ms | 9.4M |
+| PF | 1/30 | 15.0 ms | 8.9M |
 | TwoTier | **30/30** | **5.0 ms** | 9.6M |
 
 The mechanism is SPS / Configured Grants — a periodic flow gets a standing
@@ -276,17 +276,17 @@ DL with 80 Mbps of bulk. Delay contract = ≥99% packets on-time:
 | Scheduler | On-time | Worst p99 | Bulk DL |
 |---|---|---|---|
 | RoundRobin | 3/8 | 12.0 ms | 22.8M |
-| PF | 4/8 | 12.0 ms | 24.9M |
-| TwoTier | **8/8** | **7.5 ms** | 16.8M |
+| PF | 5/8 | 12.0 ms | 24.6M |
+| TwoTier | **8/8** | **9.5 ms** | 14.4M |
 
 PF schedules by channel-relative throughput and equalizes delivered rate —
 no notion of PDB or backlog age — so a healthy 5 Mbps deadline flow is
 throttled like any bulk flow. TwoTier funds the interactive set (Delay
 class 5× in Tier-1, HoL urgency in Tier-2) and squeezes bulk: an explicit,
-deliberate ~8 Mbps bulk trade to meet every deadline.
+deliberate ~10 Mbps bulk trade to meet every deadline.
 
 The dangerous part: PF's failure is **silent**. Its control-flow mean
-delivery is 89% — that reads "fine" on a dashboard — but the missing 11%
+delivery is 86% — that reads "fine" on a dashboard — but the missing 14%
 are aged-out packets, the late control commands, and in a teleoperation /
 motion-control loop those are the safety-relevant ones.
 

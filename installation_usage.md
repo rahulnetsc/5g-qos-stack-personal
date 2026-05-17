@@ -64,19 +64,21 @@ required (though that works too if you want a long-running shell session).
 
 ## Scenario files
 
-Every simulation scenario is a self-contained YAML file in
-[sim/scenarios/](sim/scenarios/), named `scenario_config_<id>.yml`. One
-file carries the whole scenario: the radio (carrier, TDD), the run window
-(horizon, seed), and the per-UE / per-flow workload. A `defaults:` block
-lets each UE/flow stanza specify only its overrides.
+A simulation run in [sim/scenarios/](sim/scenarios/) is assembled from
+three independently editable files, so each concern varies on its own:
 
-- A loader function `<id>_scenario()` in the `sim/scenarios/` package's
-  `__init__.py` reads one file into a `ScenarioConfig` via
-  [sim/config_loader.py](sim/config_loader.py).
-- To add a scenario, drop a new `scenario_config_<id>.yml` file in that
-  directory and add a one-line loader function. See
-  [sim/scenarios/README.md](sim/scenarios/README.md) for the full file
-  structure and conventions.
+- `ran_config_<id>.yml` — the radio: carrier (bandwidth, numerology,
+  overhead) and TDD pattern / S-slot split.
+- `simulation_config.yml` — the run window: `horizon_slots`, `seed`.
+- `scenario_config_<n>.yml` — the workload: UEs and flows, plus a
+  `default_ran:` naming the radio it expects. A `defaults:` block lets
+  each UE/flow stanza specify only its overrides.
+
+`scenario(n)` (or a named helper like `factory_robots_scenario()`) loads
+workload n on its `default_ran`; pass `ran_id=` to run the same workload
+on a different radio. To add a scenario, drop a `scenario_config_<next>.yml`
+file in that directory. See [sim/scenarios/README.md](sim/scenarios/README.md)
+for the full file structure.
 
 Fields the simulator doesn't yet model (a flow's MFBR / `max_data_rate_bps`)
 are accepted and ignored. A couple of fields don't map directly to the

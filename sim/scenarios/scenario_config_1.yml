@@ -1,20 +1,8 @@
-# Smoke scenario: mixed workload, no overload. Every scheduler should
-# comfortably serve every flow -- a sanity baseline, not a stress test.
+# Scenario 1 — smoke: mixed workload, no overload. Every scheduler should
+# comfortably serve every flow — a sanity baseline, not a stress test.
 
 name: smoke
-
-simulation:
-  horizon_slots: 4000   # numerology 1 -> 0.5 ms slots -> 2.0 s of wall time
-  seed: 7
-
-carrier:
-  bandwidth_mhz: 30
-  numerology: 1
-  overhead_factor: 0.85
-
-tdd:
-  pattern: DSUUU
-  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+default_ran: dsuuu_30mhz
 
 defaults:
   ue:

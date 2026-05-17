@@ -411,7 +411,7 @@ sim/
   buffer.py              # BufferModel
   resource.py            # ResourceGrid + TDD pattern + per-slot CCE budget
   metrics.py             # collectors and exporters (incl. CCE utilization)
-  scenarios/             # scenario_config_<id>.yml files + loader funcs
+  scenarios/             # ran / simulation / scenario YAML configs + loaders
   tier1.py               # Tier-1 CVXPY LP solver
   schedulers/
     __init__.py          # Scheduler protocol + Allocation + DEFAULT_DCI_CCE_COST
@@ -427,14 +427,16 @@ scripts/
 tests/
   test_smoke.py          # buffer, channel, grid, all schedulers, SPS / PDCCH,
                          # penalty knobs, latency-bound deadline protection
-  test_config_loader.py  # every scenario_config_<id>.yml loads and runs
+  test_config_loader.py  # every scenario_config_<n>.yml loads and runs
 ```
 
-Scenario files are YAML — one self-contained `scenario_config_<id>.yml`
-per scenario in [sim/scenarios/](../sim/scenarios/), loaded by
-`config_loader.py`. (Earlier these were Python builders; they moved to
-YAML once the scenario count grew past a handful, as the original sketch
-anticipated.)
+Scenario files are YAML in [sim/scenarios/](../sim/scenarios/), split three
+ways — `ran_config_<id>.yml` (radio), `simulation_config.yml` (run window),
+and `scenario_config_<n>.yml` (workload, naming a `default_ran`) — so one
+workload can be exercised on different radios. Assembled by
+`config_loader.py`. (Earlier these were Python builders, then single
+self-contained files; the three-way split came once RAN exploration
+mattered.)
 
 ### Build status
 1. ✅ Skeleton + RoundRobin: driver loop, traffic, channel, buffer, grid, metrics.

@@ -1,28 +1,16 @@
-# Latency-bound scenario: DL-congested factory teleoperation.
+# Scenario 5 — latency_bound: DL-congested factory teleoperation.
 #
 # 8 robots each receive a 5 Mbps interactive stream (control + operator
 # view) with a tight 12 ms PDB. 4 UEs pull bulk best-effort downloads
 # (20 Mbps offered each, 80 Mbps total) that flood the downlink.
 #
-# The interactive streams are feasible as a set if prioritised, but at
-# 5 Mbps they sit above PF's per-flow equal share, so a deadline-blind
-# scheduler throttles them like any bulk flow and their packets age past
-# the PDB. DL-heavy TDD (DDDSU) makes the downlink the contended resource.
+# At 5 Mbps the interactive streams sit above PF's per-flow equal share,
+# so a deadline-blind scheduler throttles them like any bulk flow and
+# their packets age past the PDB. Pair with a DL-heavy RAN (default:
+# dddsu_40mhz) so the downlink is the contended resource.
 
 name: latency_bound
-
-simulation:
-  horizon_slots: 4000
-  seed: 29
-
-carrier:
-  bandwidth_mhz: 40
-  numerology: 1
-  overhead_factor: 0.85
-
-tdd:
-  pattern: DDDSU
-  s_slot_split: {dl_symbols: 11, gap_symbols: 1, ul_symbols: 2}
+default_ran: dddsu_40mhz
 
 defaults:
   ue:

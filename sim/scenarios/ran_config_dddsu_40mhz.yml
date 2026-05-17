@@ -1,0 +1,12 @@
+# RAN config: 40 MHz, numerology 1, DL-heavy DDDSU TDD.
+# Three DL slots per period make the downlink the contended resource —
+# the radio for the latency-bound workload.
+
+carrier:
+  bandwidth_mhz: 40
+  numerology: 1         # SCS = 15 * 2^mu kHz; slot = 1 / 2^mu ms -> 0.5 ms
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DDDSU        # D=DL, U=UL, S=special
+  s_slot_split: {dl_symbols: 11, gap_symbols: 1, ul_symbols: 2}

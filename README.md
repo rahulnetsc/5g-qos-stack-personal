@@ -94,7 +94,7 @@ required. Full results and a build/don't-build decision table are in
 │   ├── traffic.py                deterministic / Poisson / video-frame
 │   ├── metrics.py                per-flow stats, percentile latency
 │   ├── tier1.py                  CVXPY LP solver
-│   ├── scenarios/                one scenario_config_<id>.yml per scenario + loaders
+│   ├── scenarios/                ran / simulation / scenario YAML configs + loaders
 │   ├── driver.py                 main simulation loop
 │   └── schedulers/
 │       ├── round_robin.py        baseline
@@ -126,10 +126,12 @@ required. Full results and a build/don't-build decision table are in
   High-SNR UEs get cheap DCIs; edge UEs pay more, making PDCCH bind sooner.
 - Per-slot time-series recording (opt-in) and matplotlib plots for
   throughput, HoL latency, buffer occupancy, PRB and PDCCH utilization.
-- Every scenario is a self-contained YAML file in [sim/scenarios/](sim/scenarios/)
-  (`scenario_config_<id>.yml` — radio, run window, and UE/flow workload),
-  loaded by [sim/config_loader.py](sim/config_loader.py). See the
-  [scenarios README](sim/scenarios/README.md) for the file structure.
+- Scenarios in [sim/scenarios/](sim/scenarios/) are a three-file split —
+  `ran_config_<id>.yml` (radio), `simulation_config.yml` (run window), and
+  `scenario_config_<n>.yml` (workload, naming a `default_ran`) — so one
+  workload can be run on different radios. Assembled by
+  [sim/config_loader.py](sim/config_loader.py); see the
+  [scenarios README](sim/scenarios/README.md).
 - Contract-oriented scheduler study ([scripts/scheduler_study.py](scripts/scheduler_study.py)):
   overload-sweep, PDCCH-limited, and latency-bound regimes scored on
   GBR/Delay contract satisfaction and p99 latency.

@@ -1,22 +1,10 @@
-# Overload scenario: severe DL overload (~5 Mbps capacity, ~24 Mbps
-# offered). Designed to expose how each scheduler enforces QoS under
-# contention -- a PF best-effort flow, a GBR flow, and a Delay flow all
-# competing on a deliberately small 10 MHz carrier.
+# Scenario 2 — overload: a PF best-effort flow, a GBR flow, and a Delay
+# flow competing under severe overload. Pair with a small-cell RAN
+# (default: dsuuu_10mhz) so offered load far exceeds capacity and the
+# schedulers' QoS-enforcement differences show.
 
 name: overload
-
-simulation:
-  horizon_slots: 4000
-  seed: 2
-
-carrier:
-  bandwidth_mhz: 10
-  numerology: 1
-  overhead_factor: 0.85
-
-tdd:
-  pattern: DSUUU
-  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+default_ran: dsuuu_10mhz
 
 defaults:
   ue:

@@ -1,9 +1,16 @@
-"""Load a ScenarioConfig from a single self-contained scenario YAML.
+"""Assemble a ScenarioConfig from the three-file layout in sim/scenarios/.
 
-Each scenario lives in one file, sim/scenarios/scenario_config_<id>.yml,
-carrying the radio (carrier, tdd), the run window (simulation), optional
-defaults, and the UE/flow workload. See sim/scenarios/README.md for the
-full file structure.
+A simulation run is the product of three independently editable concerns:
+
+  - ran_config_<id>.yml      the radio: carrier (bandwidth, numerology,
+                             overhead) and TDD pattern / S-slot split.
+  - simulation_config.yml    the run window: horizon_slots, seed. Shared.
+  - scenario_config_<n>.yml  the workload: UEs and flows, plus a
+                             `default_ran:` naming the RAN it expects.
+
+Keeping them separate lets one workload be run against different radios
+(DSUUU vs DDDSU, narrow vs wide) without touching the workload file. See
+sim/scenarios/README.md for the file structure.
 
 Fields the simulator does not model are accepted and silently ignored
 (e.g. a flow's max_data_rate_bps / MFBR — there is no rate-cap enforcement).
@@ -28,8 +35,8 @@ def _load_yaml(path: str | Path) -> dict:
         return yaml.safe_load(f)
 
 
-def _carrier_from(cfg: dict) -> CarrierConfig:
-    c = cfg["carrier"]
+def _carrier_from(ran: dict) -> CarrierConfig:
+    c = ran["carrier"]
     return CarrierConfig(
         bandwidth_hz=int(c["bandwidth_mhz"] * 1_000_000),
         numerology=int(c["numerology"]),
@@ -37,8 +44,8 @@ def _carrier_from(cfg: dict) -> CarrierConfig:
     )
 
 
-def _tdd_from(cfg: dict) -> TDDConfig:
-    t = cfg["tdd"]
+def _tdd_from(ran: dict) -> TDDConfig:
+    t = ran["tdd"]
     s = t["s_slot_split"]
     return TDDConfig(
         pattern=str(t["pattern"]),
@@ -79,24 +86,32 @@ def _flow_from_dict(ue_id: int, flow_dict: dict) -> FlowConfig:
     )
 
 
-def load_scenario_file(
-    path: str | Path, name: str | None = None
+def load_scenario(
+    scenarios_dir: str | Path,
+    scenario_id: int | str,
+    ran_id: str | None = None,
 ) -> ScenarioConfig:
-    """Build a ScenarioConfig from one self-contained scenario YAML file.
+    """Assemble a ScenarioConfig from `scenarios_dir`'s three-file layout.
 
-    `name` overrides the scenario name; otherwise the file's `name:` key is
-    used, falling back to the filename stem.
+    Reads `scenario_config_<scenario_id>.yml` for the workload, the shared
+    `simulation_config.yml` for the run window, and a RAN file for the radio.
+    The RAN is the scenario's `default_ran` unless `ran_id` overrides it —
+    that override is the knob for running one workload on different radios.
     """
-    cfg = _load_yaml(path)
+    scenarios_dir = Path(scenarios_dir)
+    scen = _load_yaml(scenarios_dir / f"scenario_config_{scenario_id}.yml")
+    ran_id = ran_id or scen["default_ran"]
+    ran = _load_yaml(scenarios_dir / f"ran_config_{ran_id}.yml")
+    sim = _load_yaml(scenarios_dir / "simulation_config.yml")
 
-    run = cfg.get("simulation", {})
-    defaults = cfg.get("defaults", {})
+    run = sim.get("simulation", {})
+    defaults = scen.get("defaults", {})
     ue_defaults = defaults.get("ue", {})
     flow_defaults = defaults.get("flow", {})
 
     ues: list[UEConfig] = []
     flows: list[FlowConfig] = []
-    for ue_block in cfg["ues"]:
+    for ue_block in scen["ues"]:
         ue_id = int(ue_block["ue_id"])
         ues.append(
             UEConfig(
@@ -119,10 +134,10 @@ def load_scenario_file(
             flows.append(_flow_from_dict(ue_id, merged))
 
     return ScenarioConfig(
-        name=str(name or cfg.get("name", Path(path).stem)),
+        name=str(scen.get("name", f"scenario_{scenario_id}")),
         horizon_slots=int(run.get("horizon_slots", 4000)),
-        carrier=_carrier_from(cfg),
-        tdd=_tdd_from(cfg),
+        carrier=_carrier_from(ran),
+        tdd=_tdd_from(ran),
         ues=ues,
         flows=flows,
         seed=int(run.get("seed", 42)),
