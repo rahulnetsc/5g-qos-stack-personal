@@ -1,6 +1,8 @@
 # QoS-Optimized Two-Tier Scheduler for Private 5G
 
-**Status:** Draft skeleton — sections marked `[OPEN]` need decisions before implementation.
+**Status:** Implemented and validated in simulation; the scheduler is
+extracted into a standalone `scheduler/` library for OAI integration.
+Remaining `[OPEN]` markers are deployment choices, not algorithm gaps.
 **Target stack:** OpenAirInterface (OAI) gNB, private 5G factory/warehouse deployment.
 
 ---
@@ -186,6 +188,28 @@ correction and lowers the floor again. Recommended default: `k = 0`; treat
 Knob: `gbr_penalty_se_exponent` on `TwoTier`; `se_penalty_exponent` on
 `solve_tier1`.
 
+### Network slicing (soft RB-share floors)
+
+Each flow carries a `slice_id`. An operator gives each network slice a
+guaranteed fraction of per-direction PRB-symbol capacity via
+`slice_shares = {slice_id: {"DL": frac, "UL": frac}}`. Tier-1 enforces it
+as a soft floor — the same shape as the GBR floor:
+
+```
+Σ_{i ∈ slice s, dir d} r_i/SE_i  +  slice_slack_{s,d}  ≥  min(share_s·C_d, slice_demand_{s,d})
+```
+
+- The floor is capped at the slice's own offered demand, so an idle slice
+  holds no capacity.
+- The per-direction capacity constraint keeps it **work-conserving**: a
+  busy slice freely borrows an idle slice's unused share. Modelling the
+  share as a guaranteed *minimum* (not a hard cap) is what makes that
+  borrowing free.
+- The slack is penalised (`slice_slack_penalty`), so the LP stays feasible
+  when slice floors and GBR floors cannot all be met.
+
+Tier-2 needs no slice logic — it tracks the now slice-aware Tier-1 targets.
+
 ### Constraints
 
 **Symbol-RB capacity (separately for DL and UL):**
@@ -204,7 +228,7 @@ Knob: `gbr_penalty_se_exponent` on `TwoTier`; `se_penalty_exponent` on
 ```
 This caps how many UEs can be dynamically scheduled per slot. SPS UEs don't consume PDCCH per slot.
 
-**Slice partitions:** if multiple S-NSSAIs, hard or soft RB partitioning per slice.
+**Slice partitions:** soft per-slice RB-share floors — see "Network slicing" above.
 
 **HARQ feedback feasibility (TDD):** for each UL transmission slot, there must be a downstream D-slot or S-slot DL portion within k1_max for the ACK/NACK. In DSUUU this is tight — the single D-slot per cycle has to carry HARQ feedback for 3+ U-slots.
 
@@ -246,49 +270,70 @@ Q_i(t+1) = max(0, Q_i(t) + r_target_i · slot_duration − delivered_i(t))
 ```
 
 `Q_i` grows when the flow falls behind its target and shrinks when it gets
-ahead. The per-slot scheduling metric is:
+ahead.
+
+**Scheduling is per UE**, mirroring the 5G MAC: one grant — one DCI, one
+transport block — per UE per slot. Each UE is ranked by the summed
+drift-plus-penalty deficit of its backlogged flows, weighted by its
+spectral efficiency:
 
 ```
-metric_i = (Q_i + delay_urgency_bonus_i) · spectral_efficiency_i
+ue_metric = ( Σ_{f ∈ UE}  Q_f + delay_urgency_f ) · spectral_efficiency_UE
 ```
 
-This is opportunistic (good channel → high `spectral_efficiency`) AND
-rate-tracking (behind target → high Q). Long-run delivered rate converges
-to `r_target_i` set by Tier-1.
+A granted UE gets PRBs sized to a transport block; a **MAC logical-channel
+multiplexer** then fills the TB across the UE's flows — in `priority_level`
+order, and within a priority tier by drift-plus-penalty deficit. The rule
+is opportunistic (good channel → high `spectral_efficiency`) AND
+rate-tracking (a flow behind its target → high Q); long-run delivered rate
+converges to the `r_target` Tier-1 set.
 
 ### Implementation details that matter
 
-1. **Gate Q growth on buffer non-empty.** Otherwise idle flows accumulate
-   phantom debt and starve everyone else when they finally have data.
+1. **Clamp Q to a windowed ceiling.** After growing Q by the target
+   inflow, clamp it to the bits the flow legitimately should have
+   delivered over the last Tier-1 window but did not:
+   `ceiling = max(0, min(target·W, arrived_W) − delivered_W)` over a
+   trailing `tier1_period` window. A flow cannot be owed more than its
+   target, nor more than what actually arrived. A *windowed* arrival count
+   — not the instantaneous backlog — is essential: a bursty flow's buffer
+   momentarily empties between frames, and clamping Q to that near-zero
+   backlog would destroy its rate-tracking debt and let continuous flows
+   starve bursty GBR ones.
 
-2. **Cap Q at `q_cap_periods × tier1_period × target × slot_duration`.**
-   Prevents runaway Q when actual arrivals are below the configured target
-   (e.g., bursty Poisson with low realized rate).
-
-3. **Delay urgency must be scaled by max-system-Q, not by per-flow target
-   rate.** Small periodic flows (low `target_bps` → tiny `Q`) cannot
-   compete with bulk flows on absolute Q. The fix:
+2. **Delay urgency scaled by max-system-Q, not per-flow target rate.**
+   Small periodic flows (low `target_bps` → tiny `Q`) cannot compete with
+   bulk flows on absolute Q. The fix:
    ```
    delay_bonus = delay_w · (HoL/PDB)^k · max(Q across all flows)
    ```
    This makes deadline-pressed delay flows preempt anything when their HoL
-   approaches PDB.
+   approaches PDB. The bonus is folded into each flow's `Q_f` before the
+   per-UE sum.
 
-4. **PRB right-sizing.** Each chosen flow gets only as many PRBs as needed
-   to drain its buffer, never more. Greedy fill across flows in metric order.
+3. **One DCI per UE.** A UE's whole transport block — all its flows — costs
+   a single DCI, not one per flow. The MAC multiplexer fills the TB; the
+   PRB count and CCE cost ride on the grant, not the logical channels.
+
+4. **Transport-block right-sizing.** A granted UE gets only as many PRBs
+   as its total backlog needs. Greedy fill across UEs in metric order.
 
 ### Per-slot flow
-1. SPS-reserved PRBs are pre-allocated — Tier-2 skips them.
-2. Update virtual queues: `Q_i += target_i · slot_duration` (gated, capped).
-3. For each direction with available symbols:
-   - Compute `metric_i = (Q_i + delay_bonus_i) · spectral_efficiency_i`.
-   - Sort by metric, descending.
-   - Greedy fill: each flow takes only the PRBs it needs.
-4. Drain virtual queues by expected delivered bits (post-BLER).
+1. Grow each virtual queue by its target inflow; clamp to the windowed
+   ceiling.
+2. For each direction (DL, then UL):
+   - **SPS** — serve each UE's configured grant; the MAC multiplexer fills
+     the SPS transport block across the UE's flows.
+   - **Dynamic** — rank UEs by `ue_metric`; on the remaining PRBs grant
+     each UE a transport block (one DCI) and MAC-multiplex it across the
+     UE's flows.
+3. Drain each served flow's virtual queue by its expected delivered bits
+   (post-BLER).
 
 ### Where Tier-1 and Tier-2 meet
-- Tier-1 produces: SPS allocations (planned, see §7), per-flow target rates
-  `r_target_i`, slice quotas (when implemented).
+- Tier-1 produces: per-flow target rates `r_target_i`, and (inside the
+  scheduler) the SPS reservations and slice-aware allocation derived from
+  those targets.
 - Tier-2 reads target rates through shared state at each Tier-1 solve.
   Between solves, virtual queues evolve based on the standing targets.
 
@@ -320,16 +365,16 @@ vanishes at deep overload or light load. Cite the study, not this table.
 
 ```
 struct Tier1Output {
-  // SPS / Configured Grants  [planned, not yet in simulator]
+  // SPS / Configured Grants  [implemented]
   ConfiguredGrant sps[MAX_UE_QFI];          // periodicity, RB range, MCS, lifetime
 
   // The single load-bearing field for the dynamic pool
   float target_rate_bps[UE_ID][QFI];        // per-flow rate target
 
-  // Slice partitioning (when implemented)
+  // Slice partitioning  [implemented as soft RB-share floors]
   RBRange slice_partition[SLICE_ID];
 
-  // Admission decisions (when implemented)
+  // Admission decisions  [planned]
   bool admitted[UE_ID];
 
   uint64_t valid_until_ns;                  // expires at next Tier-1 solve
@@ -362,9 +407,29 @@ real hardware.
 - Best-effort flows.
 - I-frame "spillover" from camera flows that exceed the SPS allocation in a given period.
 
-### Sizing
-- Size SPS for **average frame size**, not peak (I-frame). Spillover handled via dynamic pool.
-- `[OPEN]` Periodicity quantization: 5G NR allows specific values (1, 2, 4, 5, 8, 10, 16, 20, 32, 40, ... slots). Closest to 16.67 ms at μ=3 (0.125 ms/slot) is 128 slots = 16 ms, or 136 slots = 17 ms. Decision: over-provision at 16 ms (preferred — never under-serves, slight 4% over-allocation), or use staggered configs.
+### Sizing and the reservation policy (as implemented)
+- Each SPS reservation is sized to the flow's **contracted floor** — the
+  GFBR for a GBR flow, the deterministic rate for a periodic Delay flow —
+  not the peak (I-frame). Bursts spill to the dynamic pool.
+- Reservations are allocated per direction in **priority tiers** (lower
+  `priority_level` first). Within a tier, if the floors over-subscribe the
+  PRB budget, every reservation is scaled back **proportionally** — no flow
+  is dropped just for being last in the flow list (NOTES.md Finding 2 was
+  exactly that bug: a greedy first-come reservation starved the last UEs).
+- **Viability floor:** if a tier's reservations would scale below ~75% of
+  their desired size, SPS is undersized and tends to lose to the adaptive
+  dynamic scheduler, so the tier runs dynamically instead — *unless*
+  dropping it would overrun the PDCCH/CCE budget, in which case SPS's
+  zero-DCI property keeps it. SPS is capped at ~85% of the carrier so a
+  dynamic pool always remains.
+- SPS is net-positive when PDCCH is the bottleneck or bursts need latency
+  headroom; it is net-negative on a data-channel-overloaded link (fixed
+  allocation displaces the better adaptive scheduler). See the scheduler
+  study in NOTES.md.
+- `[OPEN]` Periodicity quantization: 5G NR allows specific values (1, 2, 4,
+  5, 8, 10, 16, 20, 32, 40, ... slots). Closest to 16.67 ms at μ=3
+  (0.125 ms/slot) is 128 slots = 16 ms or 136 slots = 17 ms. Over-provision
+  at 16 ms (never under-serves) or use staggered configs.
 
 ### Spillover mechanism
 When a frame exceeds its SPS grant, RLC buffer fills. Tier-2's gradient metric for that flow spikes (because GBR/delay debt grows), and the dynamic pool serves the overflow in the next available U-slot.
@@ -492,7 +557,10 @@ For each flow class:
 - GBR infeasibility: **soft penalty** (slack with `1e3` weight). Keeps LP feasible under any overload; admission control can layer on top later.
 - Tier-2 metric form: **drift-plus-penalty (Lyapunov virtual queues)**, not multiplicative urgency. Multiplier saturates and cannot enforce unequal targets.
 - Delay urgency: scaled by **max-system-Q**, not per-flow target. Allows small periodic flows to preempt bulk flows when near PDB.
-- SPS implementation: **per-slot PRB reservation, sized to (target_bps × safety_margin) averaged across direction-slots**. Right-size the actual SPS allocation to the buffer each slot (don't waste PRBs); release implicitly on empty buffer. SPS-eligible flows still participate in dynamic spillover for I-frame bursts; their dynamic-pool urgency is the buffer backlog (in bits), not the virtual queue Q (which stays small because SPS is keeping up on the average).
+- Tier-2 grants **per UE, not per flow**: one DCI per UE, one transport block, filled by a MAC logical-channel multiplexer across the UE's flows (`priority_level`, then drift-plus-penalty deficit). Mirrors the 5G MAC.
+- Virtual-queue clamp: a **windowed ceiling** (`min(target·W, arrived_W) − delivered_W` over a trailing Tier-1 window), not a clamp to instantaneous backlog — the latter zeroes a bursty flow's debt between frames.
+- Network slicing: **soft per-(slice, direction) RB-share floor** in the Tier-1 LP, capped at the slice's demand and work-conserving (a busy slice borrows an idle one's share).
+- SPS implementation: **per-UE configured grant, each flow's reservation sized to its contracted floor (GFBR / deterministic rate)**, allocated in `priority_level` tiers with proportional scale-back and a viability floor (drop a tier to dynamic when SPS would be undersized, unless PDCCH-bound). Right-sized to the buffer each slot, released on empty. SPS flows still spill I-frame bursts into the dynamic pool; their dynamic urgency is the real backlog, not Q.
 - SPS spillover bug to remember: SPS + dynamic-spillover for the same flow can double-drain the buffer if `bytes_capacity` is computed twice against the same backlog. The scheduler must track per-slot per-flow committed bytes and net them out before the dynamic pass.
 - **SPS only shows visible benefit when PDCCH is binding.** With unlimited PDCCH, the dynamic scheduler keeps up and SPS adds no value. The simulator now models PDCCH as a per-slot CCE budget; in the sensor-dense scenario (30 small periodic UEs), TwoTier+SPS hits 100% delivery while PF caps out at 88% because dynamic allocations exhaust the CCE budget. Without modeling PDCCH, the simulator would have led to the wrong conclusion that "SPS is unnecessary."
 

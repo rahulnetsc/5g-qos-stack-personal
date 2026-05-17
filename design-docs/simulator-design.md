@@ -205,14 +205,14 @@ class Scheduler(Protocol):
         self,
         flows: list[FlowConfig],
         slot_duration_s: float,
-        grid: ResourceGrid,
+        grid: GridView,
     ) -> None: ...
 
     def allocate(
         self,
-        slot: SlotGrid,
-        buffers: BufferModel,
-        channel: ChannelModel,
+        slot: SlotView,
+        buffers: BufferView,
+        channel: ChannelView,
     ) -> list[Allocation]: ...
 
 @dataclass
@@ -222,12 +222,19 @@ class Allocation:
     direction: str            # 'DL' or 'UL'
     prbs: int
     bytes_capacity: int       # MCS-derived bits → bytes for this allocation
-    cce_cost: int = 0         # 0 if SPS, else AL_i
+    cce_cost: int = 0         # the UE grant's DCI cost; 0 for SPS or a
+                              # follow-on flow of the same per-UE grant
     is_sps: bool = False
 ```
 
-`grid` is passed to `configure()` so schedulers (specifically TwoTier) can
-compute total per-direction PRB-symbol capacity for the LP.
+The contract lives in `scheduler/interfaces.py`. `GridView` / `SlotView` /
+`BufferView` / `ChannelView` are *structural* protocols — the simulator's
+concrete `ResourceGrid` / `SlotGrid` / `BufferModel` / `ChannelModel`
+satisfy them by shape, with no inheritance, so the `scheduler` library
+depends on nothing in `sim/`. `grid` is passed to `configure()` so the
+scheduler (TwoTier) can compute per-direction PRB-symbol capacity for the
+LP. A per-UE grant is emitted as one `Allocation` per flow that the MAC
+multiplexer fed; the grant's PRB count and DCI cost ride on the first.
 
 ### Reference implementations (baselines in [sim/baselines/](../sim/baselines/); TwoTier is the [scheduler/](../scheduler/) library)
 1. **`RoundRobin`** — sanity check; one flow per direction per slot.
@@ -239,8 +246,9 @@ compute total per-direction PRB-symbol capacity for the LP.
 4. **`TwoTier`** — the design under test:
    - `Tier1`: CVXPY LP every N slots ([scheduler/tier1.py](../scheduler/tier1.py))
      produces per-flow target rates.
-   - `Tier2`: drift-plus-penalty (Lyapunov virtual queues), with
-     max-system-Q-scaled delay urgency for deadline-pressed Delay flows.
+   - `Tier2`: per-UE drift-plus-penalty (Lyapunov virtual queues) -- one
+     grant per UE, the transport block filled by a MAC logical-channel
+     multiplexer; max-system-Q-scaled delay urgency for Delay flows.
 
 ### Why drift-plus-penalty in Tier-2
 
@@ -254,14 +262,15 @@ and works with no tuning of the deficit constant.
 
 ### SPS in the simulator
 
-SPS-eligible flows (deterministic and video_frame) get a per-slot PRB
-reservation sized to `target_bps × safety_margin` averaged across
-direction-slots in the TDD cycle. Each slot, the SPS reservation is
-right-sized to the buffer (so a steady-state P-frame doesn't waste PRBs),
-and SPS allocations don't consume PDCCH CCEs. SPS flows *also* participate
-in the dynamic pool for I-frame burst spillover; their dynamic urgency is
-the actual buffer backlog (bits), not the virtual queue Q (which stays
-small because SPS is keeping up on average).
+SPS-eligible flows (deterministic and video_frame) get a per-UE configured
+grant. Each flow's reservation is sized to its contracted floor (GFBR, or
+the deterministic rate); reservations are allocated per direction in
+`priority_level` tiers, scaled back proportionally if a tier over-commits,
+and a viability floor drops a tier to dynamic scheduling when SPS would be
+too undersized to help (unless that would overrun the CCE budget). Each
+slot the grant is right-sized to the buffer, and it consumes no PDCCH CCEs.
+SPS flows *also* spill I-frame bursts into the dynamic pool; their dynamic
+urgency is the real buffer backlog, not the virtual queue Q.
 
 **Two SPS-related bugs to know about:**
 1. *Double-allocation:* SPS + dynamic-spillover for the same flow can
@@ -449,9 +458,14 @@ mattered.)
 7. ✅ Variable DCI aggregation level (1, 2, 4, 8, 16 CCEs based on UE SNR).
 8. ✅ Per-slot time-series recording (opt-in) + matplotlib plotting script
       (`scripts/plot_timeseries.py`).
-9. ✅ Validation: 23 unit tests covering every scheduler + SPS accounting +
-      PDCCH cap + sensor-dense regression + AL monotonicity + ts shape.
-10. ⏳ Real 3GPP TBS table (current spectral efficiency is a fitted curve).
+9. ✅ Validation: 44 unit + scenario tests covering every scheduler, SPS
+      accounting, PDCCH cap, penalty knobs, deadline protection, and
+      every scenario YAML loading and running.
+10. ✅ Per-UE Tier-2: grants per UE, transport block filled by a MAC
+      logical-channel multiplexer.
+11. ✅ Network slicing: soft per-slice RB-share floors in Tier-1.
+12. ✅ `scheduler/` extracted as a standalone library (imports no `sim/`).
+13. ⏳ Real 3GPP TBS table (current spectral efficiency is a fitted curve).
 
 ---
 
@@ -461,7 +475,8 @@ mattered.)
 - **Buffer model:** fluid bytes with per-chunk arrival timestamps for HoL.
 - **Spectral efficiency:** fitted staircase keyed off SNR, BLER-discounted.
 - **LP solver:** CVXPY (flexible, easy to read; slow doesn't matter at 1 Hz).
-- **Output format:** JSON summary; per-slot time series not implemented yet.
+- **Output format:** JSON run summary, plus an opt-in per-slot time-series
+  dict (`record_timeseries=True`) for plotting.
 - **Channel model:** AR(1) with proper stationary innovation scaling
   (`σ × √(1 − α²)`). Without this, high-coherence configs walk off and ruin
   comparisons.
