@@ -404,3 +404,27 @@ window (measure from slot 4000 on) and/or average several windows. For
 scheduler-vs-scheduler comparison the standard horizon is fine as-is.
 Whether to raise the project-default horizon is left open — it would
 2–6× every test and study run.
+
+### Studies 2 and 3 are not transient benefits
+
+Same check over 60 windows (120 s) on the two scenarios where TwoTier
+shows a clear win, tracking on-time count and worst p99 HoL:
+
+| | TwoTier (window 1 → steady) | PF (window 1 → steady) |
+|---|---|---|
+| Study 2 — sensor_dense, on-time /30 | 30/30 → **30/30** (flat) | 1/30 → 1.2/30 |
+| Study 2 — worst p99 | 5.0 ms (flat) | 14.5 ms (flat) |
+| Study 3 — latency_bound, on-time /8 | 8/8 → **7.9/8** | 5/8 → 3.9/8 |
+| Study 3 — worst p99 | 9.5 → 9.4 ms | 12.0 → 11.5 ms |
+
+**Study 2.** TwoTier holds 30/30 on time at 5 ms p99 in *every one of the
+60 windows* — the SPS / PDCCH win is structural and permanent, not a
+warm-up artifact. PF stays at ~1/30 throughout.
+
+**Study 3.** TwoTier is stable at ~7.9/8. PF's window-1 reading of 5/8
+was a *mildly favourable* sample (+1.1, 1.6σ above its 3.9/8 steady-state
+mean) — so the standard 4000-slot run, if anything, **understated**
+TwoTier's edge: the on-time gap is 3 at window 1 but 4 at steady state.
+Neither study's TwoTier benefit is a transient. (Backlog on latency_bound
+does show a small ~0.3 MB warm-up ramp, but it does not move the on-time
+or p99 contract metrics.)
