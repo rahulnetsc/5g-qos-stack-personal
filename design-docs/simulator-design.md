@@ -237,11 +237,21 @@ LP. A per-UE grant is emitted as one `Allocation` per flow that the MAC
 multiplexer fed; the grant's PRB count and DCI cost ride on the first.
 
 ### Reference implementations (baselines in [sim/baselines/](../sim/baselines/); TwoTier is the [scheduler/](../scheduler/) library)
-1. **`RoundRobin`** — sanity check; one flow per direction per slot.
+
+All three baselines schedule **per UE**, matching Tier-2 and the 5G MAC:
+each granted UE draws one DCI and one transport block, which a shared MAC
+multiplexer ([sim/baselines/_mac.py](../sim/baselines/_mac.py)) fills
+across the UE's flows — by `priority_level`, then backlog. (The baselines
+keep no virtual queues, so the within-priority tiebreak is plain backlog;
+Tier-2 uses drift-plus-penalty deficit there.) `R_avg` is keyed per UE.
+
+1. **`RoundRobin`** — sanity check; one UE per direction per slot, picked
+   by a round-robin cursor over the backlogged UEs.
 2. **`ProportionalFair`** — standard PF: `r_inst(t) / R_avg(t)` with EWMA
-   smoothing. Multi-UE per slot via greedy fill.
-3. **`GradientScheduler`** — per-class urgency multipliers on top of PF
-   metric (PF / GBR-deficit / Delay-HoL). Hardcoded weights; no Tier-1.
+   smoothing, per UE. Multi-UE per slot via greedy fill.
+3. **`GradientScheduler`** — per-class urgency multipliers on top of the
+   PF metric (PF / GBR-deficit / Delay-HoL). A UE inherits the largest
+   multiplier among its backlogged flows. Hardcoded weights; no Tier-1.
    Useful as a "class-aware-but-no-Tier-1" baseline.
 4. **`TwoTier`** — the design under test:
    - `Tier1`: CVXPY LP every N slots ([scheduler/tier1.py](../scheduler/tier1.py))

@@ -680,3 +680,38 @@ unused share. Verified: under contention a 75/25 share splits capacity
 Tier-2 needs no slice logic — it tracks the (now slice-aware) Tier-1
 targets. Same constraint shape as the GBR floor — a contained Tier-1
 addition.
+
+---
+
+## 2026-05-17 — RR / PF / Gradient baselines converted to per-UE grants
+
+Closes the **Known gap** flagged in the per-UE Tier-2 entry above. The
+three comparison baselines previously scheduled **per flow** — each
+`(UE, QFI)` competed independently in the PRB pool and drew its own DCI —
+while Tier-2 had already moved to **per-UE** grants. That asymmetry made
+the DCI/CCE accounting awkward to explain. All three now grant **per UE**,
+matching Tier-2 and the 5G MAC:
+
+1. This direction's backlogged flows are grouped by UE.
+2. Each UE is ranked by the baseline's own metric (RR: round-robin cursor
+   over UEs; PF: `bits_per_rb / R_avg_ue`; Gradient: per-UE base PF × the
+   largest class-aware urgency multiplier among the UE's backlogged flows).
+3. The selected UE(s) get PRBs once (**one DCI**) → a transport block.
+4. A shared MAC multiplexer ([`sim/baselines/_mac.py`](sim/baselines/_mac.py),
+   `lcp_fill` / `emit_grant`) fills the TB across the UE's flows — by
+   `priority_level`, then backlog. The baselines carry no virtual queues,
+   so the within-priority tiebreak is plain backlog (Tier-2 uses
+   drift-plus-penalty deficit there instead).
+
+`R_avg` is now keyed per UE (was per `(UE, QFI)`). For Gradient's GBR
+urgency term this means the UE's smoothed rate is compared against a
+flow's GFBR — exact for a single-GBR-flow UE, an approximation for a
+multi-flow UE; acceptable for a baseline. `Allocation` stays per-flow
+(PRBs + `cce_cost` ride on the first filled flow), so the driver and
+metrics are untouched.
+
+**Validation.** 44 tests pass. Single-flow-per-UE scenarios
+(`sensor_dense`, `latency_bound`) are unchanged — per-UE ≡ per-flow there.
+`factory_robots` (multi-flow UEs) shifts, as expected: the baselines now
+draw one DCI per UE instead of one per flow, so all four schedulers are
+finally strictly comparable on PDCCH/CCE.

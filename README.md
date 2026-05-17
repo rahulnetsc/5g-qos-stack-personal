@@ -17,13 +17,17 @@ OAI integration is planned but not yet started.
 
 ## Documents
 
+- [design-docs/scheduler-study.md](design-docs/scheduler-study.md) — start
+  here: the scientific rationale — design goals, state of the art (incl. the
+  OAI default scheduler), the mathematical formulation, the comparative
+  results, and when the two-tier design earns its complexity.
 - [design-docs/scheduler-design.md](design-docs/scheduler-design.md) — the
   scheduler architecture (workload model, TDD/numerology, Tier-1 LP form,
   Tier-2 metric, OAI integration plan).
 - [design-docs/simulator-design.md](design-docs/simulator-design.md) — what
   the simulator models and (more importantly) what it deliberately doesn't.
 
-Both have `[OPEN]` markers on remaining decisions.
+The design docs have `[OPEN]` markers on remaining decisions.
 
 ## Quick start
 
@@ -83,6 +87,7 @@ required. Full results and a build/don't-build decision table are in
 ├── .python-version               pins CPython to 3.12
 ├── Makefile                      thin wrapper over uv (install / test / smoke / ...)
 ├── design-docs/                  scheduler + simulator design notes
+│   ├── scheduler-study.md        scientific rationale + comparative results
 │   ├── scheduler-design.md
 │   └── simulator-design.md
 ├── scheduler/                    the two-tier scheduler — a self-contained library
