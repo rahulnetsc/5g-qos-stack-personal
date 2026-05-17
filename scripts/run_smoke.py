@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sim.driver import run
 from sim.scenarios import smoke_scenario
-from sim.schedulers.round_robin import RoundRobin
+from sim.baselines.round_robin import RoundRobin
 
 
 def main() -> None:

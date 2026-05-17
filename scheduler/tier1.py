@@ -24,9 +24,9 @@ pattern.
 import cvxpy as cp
 import numpy as np
 
-from .channel import bits_per_prb
-from .config import FlowConfig
-from .resource import ResourceGrid
+from .flow import FlowConfig
+from .interfaces import GridView
+from .link import bits_per_prb
 
 
 def _utility_weight(flow_class: str) -> float:
@@ -36,7 +36,7 @@ def _utility_weight(flow_class: str) -> float:
     return 1.0
 
 
-def grid_capacity_prbsym_per_sec(grid: ResourceGrid) -> tuple[float, float]:
+def grid_capacity_prbsym_per_sec(grid: GridView) -> tuple[float, float]:
     """Return (DL, UL) PRB-symbol capacity per second for the grid's TDD cycle."""
     pattern_len = len(grid.pattern)
     cycle_duration_s = pattern_len * grid.slot_duration_s
@@ -54,7 +54,7 @@ def grid_capacity_prbsym_per_sec(grid: ResourceGrid) -> tuple[float, float]:
 def solve_tier1(
     flows: list[FlowConfig],
     snr_db_per_ue: dict[int, float],
-    grid: ResourceGrid,
+    grid: GridView,
     demand_bps: dict[tuple[int, int], float],
     gbr_slack_penalty: "float | dict[tuple[int, int], float]" = 1e3,
     capacity_safety_factor: float = 1.0,

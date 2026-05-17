@@ -1,5 +1,22 @@
+"""Simulator scenario configuration: the radio (carrier, TDD), the UEs, and
+the run window.
+
+The per-flow QoS descriptor ``FlowConfig`` belongs to the ``scheduler``
+library (it is a scheduler input); it is re-exported here so a scenario has
+a single config import surface.
+"""
+
 from dataclasses import dataclass, field
-from typing import Literal
+
+from scheduler.flow import FlowConfig
+
+__all__ = [
+    "TDDConfig",
+    "CarrierConfig",
+    "UEConfig",
+    "FlowConfig",
+    "ScenarioConfig",
+]
 
 
 @dataclass
@@ -20,22 +37,6 @@ class UEConfig:
     ue_id: int
     mean_snr_db: float = 20.0
     coherence_slots: int = 100
-
-
-@dataclass
-class FlowConfig:
-    ue_id: int
-    qfi: int
-    direction: Literal["DL", "UL"]
-    flow_class: Literal["PF", "GBR", "Delay"] = "PF"
-    pdb_ms: float = 100.0
-    gfbr_bps: float = 0.0
-    # Scheduling priority, 3GPP 5QI convention: lower value = higher priority.
-    # Used to tier SPS reservations. Default is a single neutral level; set
-    # per-flow once the workload is mapped to standardised 5QIs.
-    priority_level: int = 100
-    traffic_kind: str = "poisson"
-    traffic_params: dict = field(default_factory=dict)
 
 
 @dataclass

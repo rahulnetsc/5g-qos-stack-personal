@@ -25,8 +25,8 @@ from sim.channel import bits_per_prb
 from sim.driver import run
 from sim.resource import ResourceGrid
 from sim.scenarios import factory_robots_scenario
-from sim.schedulers.two_tier import TwoTier
-from sim.tier1 import grid_capacity_prbsym_per_sec
+from scheduler import TwoTier
+from scheduler import grid_capacity_prbsym_per_sec
 
 
 def main() -> None:

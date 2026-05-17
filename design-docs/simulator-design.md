@@ -229,7 +229,7 @@ class Allocation:
 `grid` is passed to `configure()` so schedulers (specifically TwoTier) can
 compute total per-direction PRB-symbol capacity for the LP.
 
-### Reference implementations (all in [sim/schedulers/](../sim/schedulers/))
+### Reference implementations (baselines in [sim/baselines/](../sim/baselines/); TwoTier is the [scheduler/](../scheduler/) library)
 1. **`RoundRobin`** — sanity check; one flow per direction per slot.
 2. **`ProportionalFair`** — standard PF: `r_inst(t) / R_avg(t)` with EWMA
    smoothing. Multi-UE per slot via greedy fill.
@@ -237,7 +237,7 @@ compute total per-direction PRB-symbol capacity for the LP.
    metric (PF / GBR-deficit / Delay-HoL). Hardcoded weights; no Tier-1.
    Useful as a "class-aware-but-no-Tier-1" baseline.
 4. **`TwoTier`** — the design under test:
-   - `Tier1`: CVXPY LP every N slots ([sim/tier1.py](../sim/tier1.py))
+   - `Tier1`: CVXPY LP every N slots ([scheduler/tier1.py](../scheduler/tier1.py))
      produces per-flow target rates.
    - `Tier2`: drift-plus-penalty (Lyapunov virtual queues), with
      max-system-Q-scaled delay urgency for deadline-pressed Delay flows.
@@ -401,35 +401,34 @@ How we know the simulator is trustworthy enough for comparative claims.
 
 ### Actual directory structure (as built)
 ```
-sim/
+scheduler/               # the two-tier scheduler -- self-contained library
+  __init__.py            # public API re-exports
+  flow.py                # FlowConfig (per-flow QoS / traffic descriptor)
+  link.py                # link adaptation: bits_per_prb, cce_aggregation_level
+  interfaces.py          # Allocation + Scheduler protocol + slot/buffer/channel views
+  tier1.py               # Tier-1 CVXPY LP solver
+  two_tier.py            # Tier-2 drift-plus-penalty + SPS + MAC multiplexer
+sim/                     # simulation harness
   __init__.py
   driver.py              # main simulation loop
-  config.py              # scenario config dataclasses
+  config.py              # scenario config dataclasses (re-exports FlowConfig)
   traffic.py             # TrafficModel and generators (incl. video_frame
                          # with i_frame_phase for staggering)
-  channel.py             # ChannelModel + bits_per_prb (link adaptation)
+  channel.py             # ChannelModel (re-exports link adaptation)
   buffer.py              # BufferModel
   resource.py            # ResourceGrid + TDD pattern + per-slot CCE budget
   metrics.py             # collectors and exporters (incl. CCE utilization)
   scenarios/             # ran / simulation / scenario YAML configs + loaders
-  tier1.py               # Tier-1 CVXPY LP solver
-  schedulers/
-    __init__.py          # Scheduler protocol + Allocation + DEFAULT_DCI_CCE_COST
-    round_robin.py
-    pf.py                # ProportionalFair baseline (PDCCH-aware)
-    gradient.py          # Class-aware multiplicative urgency (PDCCH-aware)
-    two_tier.py          # Tier-1 LP + Tier-2 drift-plus-penalty + SPS
+  baselines/             # RoundRobin / ProportionalFair / Gradient (comparison)
+  tests/                 # unit + scenario tests
 scripts/
   run_smoke.py           # one scheduler, one scenario, dump JSON
   compare_schedulers.py  # all schedulers x all scenarios, side-by-side
   scheduler_study.py     # overload-sweep / PDCCH / latency studies
   transient_check.py     # long-run windowed steady-state check
   plot_timeseries.py     # per-slot multi-panel matplotlib plots
-tests/
-  test_smoke.py          # buffer, channel, grid, all schedulers, SPS / PDCCH,
-                         # penalty knobs, latency-bound deadline protection
-  test_config_loader.py  # every scenario_config_<n>.yml loads and runs
 ```
+(Tests live in `sim/tests/` -- see the directory tree above.)
 
 Scenario files are YAML in [sim/scenarios/](../sim/scenarios/), split three
 ways — `ran_config_<id>.yml` (radio), `simulation_config.yml` (run window),

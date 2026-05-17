@@ -139,8 +139,8 @@ p_i(k+1) = min( p_max,  p_i(k) + b · slack_i(k) / GFBR_i )
   bounds the damage; a flow pinned at `p_max` and still missing is the
   signal for admission control to reject it.
 
-Implemented in [sim/tier1.py](../sim/tier1.py) (`solve_tier1` accepts a
-per-flow penalty dict) and [sim/schedulers/two_tier.py](../sim/schedulers/two_tier.py)
+Implemented in [scheduler/tier1.py](../scheduler/tier1.py) (`solve_tier1` accepts a
+per-flow penalty dict) and [scheduler/two_tier.py](../scheduler/two_tier.py)
 (`_update_gbr_penalties`, knobs `gbr_penalty_init / _lr / _max`).
 
 **When to use it.** The 2026-05-17 scheduler study (see [NOTES.md](../NOTES.md))

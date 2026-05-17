@@ -7,7 +7,7 @@ from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
 from .metrics import Metrics
 from .resource import ResourceGrid
-from .schedulers import Scheduler
+from scheduler import Scheduler
 from .traffic import TrafficModel
 
 

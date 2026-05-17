@@ -4,7 +4,7 @@ import pytest
 
 from sim import scenarios
 from sim.driver import run
-from sim.schedulers.round_robin import RoundRobin
+from sim.baselines.round_robin import RoundRobin
 
 _ALL_SCENARIOS = [
     scenarios.smoke_scenario,

@@ -34,10 +34,10 @@ from sim.buffer import BufferModel
 from sim.channel import ChannelModel, bits_per_prb
 from sim.resource import ResourceGrid
 from sim import scenarios as scenario_registry
-from sim.schedulers.gradient import GradientScheduler
-from sim.schedulers.pf import ProportionalFair
-from sim.schedulers.round_robin import RoundRobin
-from sim.schedulers.two_tier import TwoTier
+from sim.baselines.gradient import GradientScheduler
+from sim.baselines.pf import ProportionalFair
+from sim.baselines.round_robin import RoundRobin
+from scheduler import TwoTier
 from sim.traffic import TrafficModel
 
 WINDOW_SLOTS = 4000  # one window = the project's standard run horizon

@@ -85,32 +85,36 @@ required. Full results and a build/don't-build decision table are in
 ├── design-docs/                  scheduler + simulator design notes
 │   ├── scheduler-design.md
 │   └── simulator-design.md
-├── sim/                          simulator core
-│   ├── config.py                 scenario / flow / UE / TDD dataclasses
+├── scheduler/                    the two-tier scheduler — a self-contained library
+│   ├── flow.py                   FlowConfig: per-flow QoS / traffic descriptor
+│   ├── link.py                   link adaptation (SNR -> bits/PRB, PDCCH AL)
+│   ├── interfaces.py             Allocation + Scheduler / slot / buffer / channel views
+│   ├── tier1.py                  Tier-1 CVXPY LP solver
+│   └── two_tier.py               Tier-2 drift-plus-penalty + SPS + MAC multiplexer
+├── sim/                          simulation harness for comparative study
+│   ├── config.py                 scenario / UE / TDD dataclasses
 │   ├── config_loader.py          scenario YAML -> ScenarioConfig loader
 │   ├── resource.py               TDD pattern, per-slot grid
-│   ├── channel.py                stationary AR(1) SNR, MCS staircase
+│   ├── channel.py                stationary AR(1) SNR model
 │   ├── buffer.py                 fluid byte buffers w/ HoL timestamps
 │   ├── traffic.py                deterministic / Poisson / video-frame
 │   ├── metrics.py                per-flow stats, percentile latency
-│   ├── tier1.py                  CVXPY LP solver
-│   ├── scenarios/                ran / simulation / scenario YAML configs + loaders
 │   ├── driver.py                 main simulation loop
-│   └── schedulers/
-│       ├── round_robin.py        baseline
-│       ├── pf.py                 standard proportional fair
-│       ├── gradient.py           class-aware multiplicative urgency
-│       └── two_tier.py           Tier-1 LP + Tier-2 drift-plus-penalty
+│   ├── scenarios/                ran / simulation / scenario YAML configs + loaders
+│   ├── baselines/                RoundRobin / ProportionalFair / Gradient (comparison)
+│   └── tests/                    unit + scenario tests
 ├── scripts/                      entry points
 │   ├── run_smoke.py
 │   ├── compare_schedulers.py
 │   ├── scheduler_study.py        overload-sweep / PDCCH / latency studies
 │   ├── transient_check.py        long-run windowed steady-state check
 │   └── plot_timeseries.py
-└── tests/
-    ├── test_smoke.py             buffer, channel, grid, all schedulers
-    └── test_config_loader.py     YAML -> ScenarioConfig round-trip
+└── ...
 ```
+
+`scheduler/` is the deliverable — a self-contained library (it imports only
+cvxpy / numpy, never `sim/`) intended for OpenAirInterface integration.
+`sim/` is the harness that exercises and benchmarks it.
 
 ## What works today
 

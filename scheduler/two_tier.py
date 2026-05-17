@@ -1,12 +1,16 @@
 from collections import defaultdict, deque
 from dataclasses import dataclass
 
-from ..buffer import BufferModel
-from ..channel import ChannelModel, bits_per_prb, cce_aggregation_level
-from ..config import FlowConfig
-from ..resource import ResourceGrid, SlotGrid
-from ..tier1 import estimate_demand_bps, solve_tier1
-from . import Allocation
+from .flow import FlowConfig
+from .interfaces import (
+    Allocation,
+    BufferView,
+    ChannelView,
+    GridView,
+    SlotView,
+)
+from .link import bits_per_prb, cce_aggregation_level
+from .tier1 import estimate_demand_bps, solve_tier1
 
 
 @dataclass
@@ -106,7 +110,7 @@ class TwoTier:
         self._sps: list[_SPSReservation] = []
         self._sps_keys: set[tuple[int, int]] = set()
         self.slot_duration_s = 0.0
-        self._grid: ResourceGrid | None = None
+        self._grid: GridView | None = None
         self._last_solve_slot = -(10**9)
         self._tier1_solve_count = 0
 
@@ -299,7 +303,7 @@ class TwoTier:
                     remaining -= granted
                 remaining = max(0, remaining)
 
-    def _update_snr_ewma(self, channel: ChannelModel) -> None:
+    def _update_snr_ewma(self, channel: ChannelView) -> None:
         alpha = 1.0 - 1.0 / self.snr_window
         for f in self._flows:
             cur = channel.get_snr_db(f.ue_id)
@@ -307,7 +311,7 @@ class TwoTier:
             self._snr_avg[f.ue_id] = alpha * prev + (1.0 - alpha) * cur
 
     def allocate(
-        self, slot: SlotGrid, buffers: BufferModel, channel: ChannelModel
+        self, slot: SlotView, buffers: BufferView, channel: ChannelView
     ) -> list[Allocation]:
         self._update_snr_ewma(channel)
         if slot.slot_index - self._last_solve_slot >= self.tier1_period:
@@ -454,9 +458,9 @@ class TwoTier:
 
     def _allocate_sps(
         self,
-        slot: SlotGrid,
-        buffers: BufferModel,
-        channel: ChannelModel,
+        slot: SlotView,
+        buffers: BufferView,
+        channel: ChannelView,
         direction: str,
         committed_this_slot: dict[tuple[int, int], int],
     ) -> tuple[list[Allocation], int]:
@@ -513,9 +517,9 @@ class TwoTier:
 
     def _allocate_dynamic(
         self,
-        slot: SlotGrid,
-        buffers: BufferModel,
-        channel: ChannelModel,
+        slot: SlotView,
+        buffers: BufferView,
+        channel: ChannelView,
         direction: str,
         prb_budget: int,
         committed_this_slot: dict[tuple[int, int], int],

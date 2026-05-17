@@ -34,9 +34,9 @@ from sim.scenarios import (
     latency_bound_scenario,
     sensor_dense_scenario,
 )
-from sim.schedulers.pf import ProportionalFair
-from sim.schedulers.round_robin import RoundRobin
-from sim.schedulers.two_tier import TwoTier
+from sim.baselines.pf import ProportionalFair
+from sim.baselines.round_robin import RoundRobin
+from scheduler import TwoTier
 
 # GBR rate contract is "met" at >= this fraction of GFBR.
 GBR_CONTRACT_FRACTION = 0.95

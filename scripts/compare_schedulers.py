@@ -19,10 +19,10 @@ from sim.scenarios import (
     smoke_scenario,
     vision_scenario,
 )
-from sim.schedulers.gradient import GradientScheduler
-from sim.schedulers.pf import ProportionalFair
-from sim.schedulers.round_robin import RoundRobin
-from sim.schedulers.two_tier import TwoTier
+from sim.baselines.gradient import GradientScheduler
+from sim.baselines.pf import ProportionalFair
+from sim.baselines.round_robin import RoundRobin
+from scheduler import TwoTier
 
 
 SCHEDULERS = [

@@ -1,8 +1,7 @@
 from ..buffer import BufferModel
-from ..channel import ChannelModel, bits_per_prb, cce_aggregation_level
-from ..config import FlowConfig
+from ..channel import ChannelModel
+from scheduler import Allocation, FlowConfig, bits_per_prb, cce_aggregation_level
 from ..resource import SlotGrid
-from . import Allocation
 
 
 class RoundRobin:

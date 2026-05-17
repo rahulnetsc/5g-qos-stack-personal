@@ -27,10 +27,10 @@ from sim.channel import bits_per_prb
 from sim.config import CarrierConfig, FlowConfig, ScenarioConfig, TDDConfig, UEConfig
 from sim.driver import run
 from sim.resource import ResourceGrid
-from sim.schedulers.pf import ProportionalFair
-from sim.schedulers.round_robin import RoundRobin
-from sim.schedulers.two_tier import TwoTier
-from sim.tier1 import grid_capacity_prbsym_per_sec
+from sim.baselines.pf import ProportionalFair
+from sim.baselines.round_robin import RoundRobin
+from scheduler import TwoTier
+from scheduler import grid_capacity_prbsym_per_sec
 
 SNR = 20.0
 HORIZON = 40000  # numerology 1 (0.5 ms slots) -> 20 s, ~20 I-frame bursts

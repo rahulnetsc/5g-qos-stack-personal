@@ -7,11 +7,11 @@ from sim.config import (
 )
 from sim.driver import run
 from sim.resource import ResourceGrid
-from sim.schedulers.gradient import GradientScheduler
-from sim.schedulers.pf import ProportionalFair
-from sim.schedulers.round_robin import RoundRobin
-from sim.schedulers.two_tier import TwoTier
-from sim.tier1 import grid_capacity_prbsym_per_sec, solve_tier1
+from sim.baselines.gradient import GradientScheduler
+from sim.baselines.pf import ProportionalFair
+from sim.baselines.round_robin import RoundRobin
+from scheduler import TwoTier
+from scheduler import grid_capacity_prbsym_per_sec, solve_tier1
 
 
 def test_channel_stationary_variance():
@@ -394,7 +394,7 @@ def test_two_tier_beats_pf_under_pdcch_pressure():
     SPS, hits the DCI cap and drops packets.
     """
     from sim.scenarios import sensor_dense_scenario
-    from sim.schedulers.pf import ProportionalFair
+    from sim.baselines.pf import ProportionalFair
 
     sc = sensor_dense_scenario()
     pf_sum = run(sc, ProportionalFair(ewma_window_slots=200))
@@ -430,7 +430,7 @@ def test_latency_bound_two_tier_protects_deadlines():
     medium-rate interactive (Delay) flows within their PDB while PF, which
     is deadline-blind, misses some. Guards study 3 of scheduler_study.py."""
     from sim.scenarios import latency_bound_scenario
-    from sim.schedulers.pf import ProportionalFair
+    from sim.baselines.pf import ProportionalFair
 
     sc = latency_bound_scenario()
     pdb_ms = next(f.pdb_ms for f in sc.flows if f.flow_class == "Delay")
@@ -464,7 +464,7 @@ def test_pdcch_budget_caps_dynamic_allocations():
     """The dynamic scheduler must respect the per-slot CCE budget. With many
     flows and a tight budget, PF's allocation count per slot is bounded."""
     from sim.scenarios import sensor_dense_scenario
-    from sim.schedulers.pf import ProportionalFair
+    from sim.baselines.pf import ProportionalFair
 
     sc = sensor_dense_scenario()
     summary = run(sc, ProportionalFair(ewma_window_slots=200))
@@ -559,7 +559,7 @@ def test_two_tier_windowed_ceiling_protects_bursty_gbr():
     ceiling fixes that. TwoTier should serve the GBR flow at least as well
     as plain PF does."""
     from sim.config import TDDConfig
-    from sim.schedulers.pf import ProportionalFair
+    from sim.baselines.pf import ProportionalFair
 
     def scenario():
         return ScenarioConfig(
