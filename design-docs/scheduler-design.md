@@ -143,6 +143,17 @@ Implemented in [sim/tier1.py](../sim/tier1.py) (`solve_tier1` accepts a
 per-flow penalty dict) and [sim/schedulers/two_tier.py](../sim/schedulers/two_tier.py)
 (`_update_gbr_penalties`, knobs `gbr_penalty_init / _lr / _max`).
 
+**When to use it.** The 2026-05-17 scheduler study (see [NOTES.md](../NOTES.md))
+found dual ascent is the wrong *shape* under deep overload: equalising
+normalised shortfall parks every flow just below its floor, since a GBR
+contract is a step function. It raises worst-case *min* delivery but
+*lowers* the count of flows that actually meet GFBR (0/10, vs 3/10 for the
+fixed penalty, at 1x deep overload). Recommended default is
+`gbr_penalty_lr = 0`;
+genuine infeasibility calls for admission control, not penalty escalation.
+The adaptive penalty's role is narrow — fairness-of-shortfall reporting,
+not contract satisfaction.
+
 ### Spectral-efficiency tilt of the penalty (knob `k`)
 
 A second, *static* lever on the penalty: scale each flow's `p_i` by its
@@ -294,6 +305,14 @@ system. Under a 4.8× DL-overload scenario:
 
 Numbers in Mbps unless marked. The two-tier system trades best-effort
 throughput for GBR contract satisfaction, which is exactly the design intent.
+
+**Caveat — this is a single favourable scenario.** A 3-flow cell with no
+SNR diversity and no mixed-flow UEs flatters the two-tier system. The
+authoritative comparison is the contract-oriented scheduler study
+(`scripts/scheduler_study.py`, results in [NOTES.md](../NOTES.md)): the
+two-tier advantage is real but regime-dependent — it shows at moderate
+overload and in the PDCCH-limited and latency-bound regimes, and largely
+vanishes at deep overload or light load. Cite the study, not this table.
 
 ---
 

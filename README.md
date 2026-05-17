@@ -48,18 +48,29 @@ make smoke
 # Five scenarios x four schedulers, side-by-side
 make compare
 
+# Three contract-oriented studies: overload sweep, PDCCH-limited, latency-bound
+uv run python scripts/scheduler_study.py
+
 # Per-slot time-series plots
 uv run python scripts/plot_timeseries.py --scenario sensor --schedulers pf twotier
 uv run python scripts/plot_timeseries.py --scenario smoke --scheduler twotier
 ```
 
-## What `compare_schedulers.py` shows
+## Comparing schedulers
 
-Five scenarios (smoke / overload / vision / sensor-dense / YAML-driven),
-each run through four schedulers. The interesting comparison is on the
-overload scenario, where the two-tier system delivers 97% of GFBR vs 57%
-for plain PF, by sacrificing best-effort throughput. See the design doc
-for the full table.
+`scripts/compare_schedulers.py` (`make compare`) runs five scenarios
+(smoke / overload / vision / sensor-dense / YAML-driven) through four
+schedulers for a side-by-side per-flow view.
+
+`scripts/scheduler_study.py` runs three contract-oriented studies — an
+overload sweep, a PDCCH-limited regime, and a latency-bound regime — to
+establish *where* the two-tier scheduler changes outcomes users feel.
+Headline: the value of QoS-awareness is a hump — it shows at moderate
+overload, not at deep overload or light load; for dense periodic traffic
+SPS / Configured Grants is a structural win plain PF cannot match; and
+for medium-rate latency-critical flows a deadline-aware scheduler is
+required. Full results and a build/don't-build decision table are in
+[NOTES.md](NOTES.md).
 
 ## Layout
 
@@ -96,6 +107,7 @@ for the full table.
 ├── scripts/                      entry points
 │   ├── run_smoke.py
 │   ├── compare_schedulers.py
+│   ├── scheduler_study.py        overload-sweep / PDCCH / latency studies
 │   └── plot_timeseries.py
 └── tests/
     ├── test_smoke.py             buffer, channel, grid, all schedulers
@@ -120,16 +132,20 @@ for the full table.
 - YAML-driven scenarios via [configs/system_config.yml](configs/system_config.yml)
   and [configs/sim_config.yml](configs/sim_config.yml) — radio params and
   workload split into two files, loaded by [sim/config_loader.py](sim/config_loader.py).
-- 26 unit tests covering buffer mechanics, channel stationarity, GBR
-  protection under overload, fairness, Tier-1 feasibility, SPS
-  accounting, PDCCH-limited regime, AL monotonicity, time-series shape,
-  and the YAML loader.
+- Contract-oriented scheduler study ([scripts/scheduler_study.py](scripts/scheduler_study.py)):
+  overload-sweep, PDCCH-limited, and latency-bound regimes scored on
+  GBR/Delay contract satisfaction and p99 latency.
+- 31 unit tests covering buffer mechanics, channel stationarity, GBR
+  protection under overload, fairness, Tier-1 feasibility, adaptive and
+  SE-tilt penalty behaviour, windowed-ceiling protection, SPS accounting,
+  PDCCH-limited and latency-bound deadline protection, AL monotonicity,
+  time-series shape, and the YAML loader.
 
 ## Roadmap
 
 Near-term:
 - Real 3GPP TBS table extract (currently a fitted curve).
-- More scenarios beyond the four canned ones.
+- Deep dive on Findings 2 and 3 (see [NOTES.md](NOTES.md)).
 
 Longer-term:
 - OAI integration (see [scheduler-design.md §10](design-docs/scheduler-design.md)).

@@ -317,3 +317,51 @@ on-time within PDB, and p99 HoL. Those are the numbers a deployment owner
 feels. (Caveat: in study 1 the worst p99 saturates at the 30 ms PDB for
 every scheduler — a burst/PDB-bound ceiling, see the 05-16 side-finding —
 so there the GBR-contract count is the discriminator, not p99.)
+
+---
+
+## Next — deep dive: Findings 2 & 3
+
+Two open findings to take apart before the OAI work. Both bear on whether
+the GBR contracts in [configs/](configs/) are even dimensionable.
+
+### Finding 2 — Mixed-flow UE penalty (carried forward, still open)
+
+Recap: UEs carrying a GBR flow *plus* another flow on the same UE
+(ue8/9/10 in the 10-robot scenario) get worse GBR delivery under TwoTier
+than under plain PF. The 05-16 `k`-sweep sharpened it — ue8/9/10 are the
+consistent victims of every redistribution — but the root cause is still
+uninvestigated. Plan unchanged: dump per-flow Tier-1 target rates for
+ue8/9/10 vs the single-flow UEs ue1/2/3. If Tier-1 already under-allocates
+the mixed-flow GBR, the bug is in the LP; otherwise it is in Tier-2's
+per-UE handling. See the 05-13 hypotheses above.
+
+### Finding 3 — Burst/PDB loss ceiling (promoted from 05-16 side-finding)
+
+Across the Study 1 overload sweep, even at **3× capacity**: GBR *rate*
+contracts are all met (10/10 at ≥95% of GFBR), yet delivery ratio plateaus
+at ~85% — ~15% of offered GBR bytes are still dropped on PDB expiry — and
+worst-case p99 HoL pins at the 30 ms PDB. The loss is capacity-independent;
+tripling spectrum does not close it.
+
+Hypothesis: the binding constraint is the *burst*, not the average rate.
+The video_frame flows carry an I-frame multiplier — an I-frame is several×
+the average frame. If one I-frame's bytes exceed what the cell can deliver
+to that flow within a single PDB window, the tail of every I-frame expires
+no matter how much average capacity exists.
+
+Why it matters for engineering: a GFBR *rate* contract does not capture
+burst or latency integrity. "Contract met" at 3× still means ~15% of
+frames arrive with a dropped I-frame tail — visible video artifacts — and
+the latency tail sits at the PDB. If the hypothesis holds, these contracts
+as written (GFBR + 30 ms PDB for that burst profile) are **partly
+undimensionable**: the fix is not in the scheduler but in the contract
+(PDB that accounts for the burst), the source (frame-level pacing so an
+I-frame spreads over several slots), or admission shaping. This is a
+system-design finding, not a scheduler bug.
+
+How to investigate: `buffer.py` already tracks `bytes_dropped_pdb` per
+flow — surface it in the metrics summary and the study output. Then
+correlate drops with I-frame slots, and compare one I-frame's byte count
+against the bytes deliverable to that flow within one PDB at its SNR. If
+drops concentrate on I-frame arrivals, Finding 3 is confirmed.
