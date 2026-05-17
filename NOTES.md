@@ -596,3 +596,48 @@ Factory's deeper ~15 % loss adds *aggregate* burst coincidence: its 10
 video flows are not I-frame-staggered, unlike `vision`'s, so their bursts
 can land together and the summed burst demand exceeds capacity. That too is
 a source/dimensioning matter — stagger the encoders — not a scheduler one.)
+
+---
+
+## 2026-05-17 — Tier-2 refactored to per-UE grants + a MAC LCP multiplexer
+
+Restructured Tier-2 to match how the 5G MAC actually schedules — toward
+the OAI integration. Tier-2 previously allocated **per flow**: each
+`(UE, QFI)` competed independently in the PRB pool and got its own grant
+and its own DCI. It now allocates **per UE**:
+
+1. UEs are ranked by the summed drift-plus-penalty deficit of their
+   backlogged flows × spectral efficiency.
+2. Each granted UE gets PRBs once (**one DCI**) → a transport block size.
+3. A MAC logical-channel multiplexer (`_mac_lcp_fill`) fills the TB across
+   the UE's flows — by `priority_level`, then drift-plus-penalty deficit.
+
+This holds for both the dynamic pool and SPS (a UE's configured grants are
+pooled into one per-UE grant). `Allocation` stays per-flow — the buffer and
+metrics are per-flow — so the driver and the other schedulers are untouched.
+
+**What carried over unchanged:** the drift-plus-penalty virtual queues are
+now the multiplexer's fill weights (they generalise the LCP prioritised-bit-
+rate token bucket); `priority_level` is the logical-channel priority;
+`bits_per_prb` is the TBS calc.
+
+**Validation.** 42 tests pass. `sensor_dense` and `latency_bound` (one flow
+per UE) are byte-identical before/after — per-UE ≡ per-flow there — which
+confirms the refactor. `factory_robots` (multi-flow UEs) shifts, as it must:
+the per-UE model is a genuinely different, correct policy for multi-flow
+UEs, and it stops over-counting their DCIs (one per UE, not per flow).
+
+**Effect on the overload sweep (Study 1).** The per-UE model evens out GBR
+delivery across multi-flow UEs: mean and min GBR delivery stay about the
+same or slightly better, but the knife-edge "≥95 % of GFBR" contract count
+falls at 1×/1.5× — the old per-flow count was inflated because a multi-flow
+UE got several independent entries in the PRB competition. The qualitative
+study conclusions are unchanged: the value-of-QoS hump still peaks at
+moderate overload (2× is 10/10 vs PF 8/10). Finding 2 stays fixed
+(single-vs-mixed gap 1 pt).
+
+**Known gap.** The RR / PF / Gradient baselines still schedule per flow —
+a fidelity inconsistency, but low-impact in the current scenarios: the only
+multi-flow-UE scenario, `factory_robots`, is not CCE-bound, so the per-flow
+DCI over-count does not change its results. Flagged for a later pass if the
+baselines need to be strictly comparable on PDCCH.

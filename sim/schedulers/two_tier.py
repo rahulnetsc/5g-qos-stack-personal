@@ -42,13 +42,16 @@ class TwoTier:
     instantaneous (near-zero) backlog destroys the legitimate rate-tracking
     debt, letting continuous flows starve bursty GBR ones.
 
-    Per-slot metric:
-        metric_i = (Q_i + delay_urgency_bonus_i) * spectral_efficiency_i
-
-    For Delay-class flows, an HoL/PDB urgency term is added equivalent to a
-    multiple of the per-slot target inflow. Combined with channel-aware
-    spectral_efficiency weighting, the rule is opportunistic but rate-tracking:
-    a flow that is behind its target AND has a good channel wins.
+    Per-slot scheduling is per UE, mirroring the 5G MAC. Each UE is granted
+    PRBs once (one DCI), ranked by the summed drift-plus-penalty deficit of
+    its backlogged flows times its spectral efficiency:
+        ue_metric = (sum_f  Q_f + delay_urgency_f) * spectral_efficiency_ue
+    The grant's transport block is then filled by the MAC multiplexer
+    (_mac_lcp_fill) across the UE's flows -- logical-channel prioritization:
+    by priority_level, then by drift-plus-penalty deficit. For Delay-class
+    flows an HoL/PDB urgency term is folded into Q_f. The rule stays
+    opportunistic but rate-tracking: a UE whose flows are behind target and
+    which has a good channel wins the grant.
     """
 
     def __init__(
@@ -109,6 +112,7 @@ class TwoTier:
 
     def configure(self, flows, slot_duration_s, grid):
         self._flows = list(flows)
+        self._flow_by_key = {(f.ue_id, f.qfi): f for f in flows}
         self.slot_duration_s = slot_duration_s
         self._grid = grid
         self._snr_avg = {}
@@ -367,6 +371,87 @@ class TwoTier:
                 )
         return out
 
+    def _remaining_backlog(self, key, buffers, committed) -> int:
+        """Real bytes still queued for a flow, net of whatever has already
+        been committed to it this slot (so SPS then dynamic for the same
+        flow do not both allocate against the original backlog)."""
+        return max(0, buffers.state(*key).bytes_queued - committed.get(key, 0))
+
+    def _compute_flow_q(self, direction, buffers, committed, now_s):
+        """Per-flow effective virtual deficit for `direction`: the Tier-2
+        virtual queue (or, for an SPS flow's dynamic spillover, its real
+        backlog) plus an HoL/PDB urgency bonus for Delay-class flows."""
+        base = {}
+        for f in self._flows:
+            if f.direction != direction:
+                continue
+            key = (f.ue_id, f.qfi)
+            if key in self._sps_keys:
+                base[key] = self._remaining_backlog(key, buffers, committed) * 8.0
+            else:
+                base[key] = self._virtual_q[key]
+        max_q = max(base.values(), default=0.0)
+
+        q_by_key = {}
+        for f in self._flows:
+            if f.direction != direction:
+                continue
+            key = (f.ue_id, f.qfi)
+            q = base[key]
+            if f.flow_class == "Delay" and f.pdb_ms > 0:
+                hol = buffers.hol_delay_s(f.ue_id, f.qfi, now_s)
+                if hol > 0:
+                    urgency = min(1.0, hol / (f.pdb_ms / 1000.0)) ** self.delay_exp
+                    q += self.delay_w * urgency * max(max_q, 1.0)
+            q_by_key[key] = q
+        return q_by_key
+
+    def _mac_lcp_fill(self, ue_flows, tbs_bytes, q_by_key, buffers, committed):
+        """MAC logical-channel multiplexer: fill one UE's transport block
+        across its flows. Flows are served in priority order (lower
+        priority_level first), and within a priority tier by drift-plus-
+        penalty deficit -- the flow furthest behind its Tier-1 target first.
+        Returns [(flow_key, bytes), ...]."""
+        order = sorted(
+            ue_flows,
+            key=lambda f: (f.priority_level, -q_by_key.get((f.ue_id, f.qfi), 0.0)),
+        )
+        fills: list[tuple[tuple[int, int], int]] = []
+        remaining = tbs_bytes
+        for f in order:
+            if remaining <= 0:
+                break
+            key = (f.ue_id, f.qfi)
+            take = min(self._remaining_backlog(key, buffers, committed), remaining)
+            if take > 0:
+                fills.append((key, take))
+                remaining -= take
+        return fills
+
+    def _emit_grant(
+        self, ue_id, direction, prbs_used, tbs_bytes, bler, ue_flows,
+        q_by_key, buffers, committed, cce_cost, is_sps,
+    ) -> list[Allocation]:
+        """Fill a UE's transport block via the MAC multiplexer and emit one
+        per-flow Allocation per filled flow. The grant's PRB count and DCI
+        cost ride on the first Allocation -- one DCI per UE grant."""
+        fills = self._mac_lcp_fill(ue_flows, tbs_bytes, q_by_key, buffers, committed)
+        out: list[Allocation] = []
+        for i, (key, byts) in enumerate(fills):
+            delivered_bits = byts * 8 * (1.0 - bler)
+            self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
+            committed[key] += int(byts * (1.0 - bler))
+            out.append(
+                Allocation(
+                    ue_id=ue_id, qfi=key[1], direction=direction,
+                    prbs=prbs_used if i == 0 else 0,
+                    bytes_capacity=byts,
+                    cce_cost=cce_cost if i == 0 else 0,
+                    is_sps=is_sps,
+                )
+            )
+        return out
+
     def _allocate_sps(
         self,
         slot: SlotGrid,
@@ -375,55 +460,55 @@ class TwoTier:
         direction: str,
         committed_this_slot: dict[tuple[int, int], int],
     ) -> tuple[list[Allocation], int]:
+        """Serve the SPS configured grants for `direction`, per UE. A UE's
+        reservations (one per SPS-eligible flow) are pooled into a single
+        grant whose transport block the MAC multiplexer fills across the
+        UE's flows. SPS consumes no PDCCH."""
         symbols = slot.dl_symbols if direction == "DL" else slot.ul_symbols
+        now_s = slot.slot_index * self.slot_duration_s
+        q_by_key = self._compute_flow_q(
+            direction, buffers, committed_this_slot, now_s
+        )
+
+        ue_reservations: dict[int, list[_SPSReservation]] = defaultdict(list)
+        for sps in self._sps:
+            if sps.direction == direction:
+                ue_reservations[sps.ue_id].append(sps)
+
         out: list[Allocation] = []
         prbs_used_total = 0
-        for sps in self._sps:
-            if sps.direction != direction:
+        for ue_id, reservations in ue_reservations.items():
+            ue_flows = [self._flow_by_key[(s.ue_id, s.qfi)] for s in reservations]
+            ue_backlog = sum(
+                self._remaining_backlog((f.ue_id, f.qfi), buffers, committed_this_slot)
+                for f in ue_flows
+            )
+            if ue_backlog <= 0:
+                # Empty configured grant: a real gNB wastes the PRBs; the
+                # simulator releases them (release-on-empty CG).
                 continue
-            key = (sps.ue_id, sps.qfi)
-            backlog = buffers.state(*key).bytes_queued
-            if backlog <= 0:
-                # Real SPS would still occupy the PRBs (wasted). Simulator skips
-                # them, so other flows benefit. Conservative and matches what
-                # release-on-empty implementations do.
-                continue
-            snr = channel.get_snr_db(sps.ue_id)
-            bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
+            bits_per_rb, bler = bits_per_prb(
+                channel.get_snr_db(ue_id), symbols=symbols
+            )
             if bits_per_rb <= 0:
                 continue
 
-            prbs_avail = slot.prb_count - prbs_used_total
-            prbs_for_sps = min(sps.prbs_per_slot, prbs_avail)
+            reserved_prbs = sum(s.prbs_per_slot for s in reservations)
+            prbs_for_sps = min(reserved_prbs, slot.prb_count - prbs_used_total)
             if prbs_for_sps <= 0:
                 continue
-
-            # Right-size: don't reserve more PRBs than the buffer needs.
-            prbs_needed = (backlog * 8 + bits_per_rb - 1) // bits_per_rb
+            # Right-size the grant to the UE's actual backlog.
+            prbs_needed = (ue_backlog * 8 + bits_per_rb - 1) // bits_per_rb
             prbs_used = min(prbs_for_sps, max(1, prbs_needed))
-            bytes_capacity = min(backlog, (prbs_used * bits_per_rb) // 8)
-            if bytes_capacity <= 0:
+            tbs_bytes = min(ue_backlog, (prbs_used * bits_per_rb) // 8)
+            if tbs_bytes <= 0:
                 continue
-
-            expected_delivered_bits = bytes_capacity * 8 * (1.0 - bler)
-            self._virtual_q[key] = max(
-                0.0, self._virtual_q[key] - expected_delivered_bits
-            )
-            # Match the driver's drain accounting (int bytes after BLER).
-            committed_this_slot[key] += int(bytes_capacity * (1.0 - bler))
             prbs_used_total += prbs_used
 
-            out.append(
-                Allocation(
-                    ue_id=sps.ue_id,
-                    qfi=sps.qfi,
-                    direction=direction,
-                    prbs=prbs_used,
-                    bytes_capacity=bytes_capacity,
-                    cce_cost=0,  # SPS doesn't consume PDCCH per slot
-                    is_sps=True,
-                )
-            )
+            out.extend(self._emit_grant(
+                ue_id, direction, prbs_used, tbs_bytes, bler, ue_flows,
+                q_by_key, buffers, committed_this_slot, cce_cost=0, is_sps=True,
+            ))
         return out, prbs_used_total
 
     def _allocate_dynamic(
@@ -435,95 +520,64 @@ class TwoTier:
         prb_budget: int,
         committed_this_slot: dict[tuple[int, int], int],
     ) -> list[Allocation]:
+        """Per-UE dynamic scheduling. Each UE is granted PRBs once (one DCI),
+        sized to a transport block; the MAC multiplexer then fills the TB
+        across the UE's flows. UEs are ranked by the summed drift-plus-
+        penalty deficit of their backlogged flows times spectral efficiency."""
         symbols = slot.dl_symbols if direction == "DL" else slot.ul_symbols
         now_s = slot.slot_index * self.slot_duration_s
+        q_by_key = self._compute_flow_q(
+            direction, buffers, committed_this_slot, now_s
+        )
 
-        def remaining_backlog(key):
-            return max(
-                0,
-                buffers.state(*key).bytes_queued - committed_this_slot.get(key, 0),
-            )
-
-        # Reference scale for delay-urgency bonus: the largest "effective Q"
-        # across all flows. Includes SPS-flow buffer pressure so spillover for
-        # I-frame bursts can compete with bulk flows. Backlog used here is
-        # net of what SPS already committed this slot.
-        eff_q_by_key = {}
-        for f in self._flows:
-            key = (f.ue_id, f.qfi)
-            if key in self._sps_keys:
-                eff_q_by_key[key] = remaining_backlog(key) * 8.0
-            else:
-                eff_q_by_key[key] = self._virtual_q[key]
-        max_q = max(eff_q_by_key.values(), default=0.0)
-
-        scored: list[tuple[float, FlowConfig, int, float, tuple[int, int]]] = []
+        # Group this direction's backlogged flows by UE.
+        ue_flows: dict[int, list[FlowConfig]] = defaultdict(list)
         for f in self._flows:
             if f.direction != direction:
                 continue
-            key = (f.ue_id, f.qfi)
-            if remaining_backlog(key) <= 0:
-                continue
-            snr = channel.get_snr_db(f.ue_id)
-            bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
+            if self._remaining_backlog(
+                (f.ue_id, f.qfi), buffers, committed_this_slot
+            ) > 0:
+                ue_flows[f.ue_id].append(f)
+
+        # Rank UEs by total deficit x spectral efficiency.
+        scored: list[tuple[float, int, list, int, float]] = []
+        for ue_id, flows in ue_flows.items():
+            bits_per_rb, bler = bits_per_prb(
+                channel.get_snr_db(ue_id), symbols=symbols
+            )
             if bits_per_rb <= 0:
                 continue
-
-            q = eff_q_by_key[key]
-            # Delay urgency: layer on extra virtual deficit scaled to the
-            # max effective Q so deadline-pressed delay flows can preempt.
-            if f.flow_class == "Delay":
-                pdb_s = f.pdb_ms / 1000.0
-                if pdb_s > 0:
-                    hol = buffers.hol_delay_s(f.ue_id, f.qfi, now_s)
-                    if hol > 0:
-                        urgency = min(1.0, hol / pdb_s) ** self.delay_exp
-                        q += self.delay_w * urgency * max(max_q, 1.0)
-
-            metric = q * bits_per_rb
-            scored.append((metric, f, bits_per_rb, bler, key))
-
-        if not scored:
-            return []
+            ue_q = sum(q_by_key.get((f.ue_id, f.qfi), 0.0) for f in flows)
+            scored.append((ue_q * bits_per_rb, ue_id, flows, bits_per_rb, bler))
         scored.sort(key=lambda x: x[0], reverse=True)
 
         prbs_left = prb_budget
         cce_left = slot.pdcch_cce_budget
-        # SPS allocations made earlier consumed 0 CCEs by definition, so
-        # the slot's full budget is available for dynamic.
         out: list[Allocation] = []
-        for _metric, f, bits_per_rb, bler, key in scored:
+        for _metric, ue_id, flows, bits_per_rb, bler in scored:
             if prbs_left <= 0:
                 break
-            cce_cost = cce_aggregation_level(channel.get_snr_db(f.ue_id))
+            cce_cost = cce_aggregation_level(channel.get_snr_db(ue_id))
             if cce_left < cce_cost:
                 continue
-            avail_bytes = remaining_backlog(key)
-            if avail_bytes <= 0:
+            ue_backlog = sum(
+                self._remaining_backlog((f.ue_id, f.qfi), buffers, committed_this_slot)
+                for f in flows
+            )
+            if ue_backlog <= 0:
                 continue
-            prbs_needed = (avail_bytes * 8 + bits_per_rb - 1) // bits_per_rb
+            prbs_needed = (ue_backlog * 8 + bits_per_rb - 1) // bits_per_rb
             prbs_used = min(prbs_left, max(1, prbs_needed))
-            bytes_capacity = min(avail_bytes, (prbs_used * bits_per_rb) // 8)
-            if bytes_capacity <= 0:
+            tbs_bytes = min(ue_backlog, (prbs_used * bits_per_rb) // 8)
+            if tbs_bytes <= 0:
                 continue
             prbs_left -= prbs_used
             cce_left -= cce_cost
 
-            expected_delivered_bits = bytes_capacity * 8 * (1.0 - bler)
-            self._virtual_q[key] = max(
-                0.0, self._virtual_q[key] - expected_delivered_bits
-            )
-            committed_this_slot[key] += int(bytes_capacity * (1.0 - bler))
-
-            out.append(
-                Allocation(
-                    ue_id=f.ue_id,
-                    qfi=f.qfi,
-                    direction=direction,
-                    prbs=prbs_used,
-                    bytes_capacity=bytes_capacity,
-                    cce_cost=cce_cost,
-                    is_sps=False,
-                )
-            )
+            out.extend(self._emit_grant(
+                ue_id, direction, prbs_used, tbs_bytes, bler, flows,
+                q_by_key, buffers, committed_this_slot,
+                cce_cost=cce_cost, is_sps=False,
+            ))
         return out
