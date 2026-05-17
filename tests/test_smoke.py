@@ -329,6 +329,65 @@ def test_two_tier_sps_disabled_falls_back_to_dynamic():
         assert summary["flows"][f"ue{ue}_qfi2"]["bytes_delivered"] > 0
 
 
+def test_two_tier_sps_oversubscribed_tier_falls_back_to_dynamic():
+    """NOTES.md Finding 2: when SPS-eligible flows over-subscribe the carrier,
+    the viability floor sends the whole tier to dynamic rather than handing
+    out undersized reservations (or starving the last-listed flows). The
+    factory_robots UL video flows over-commit and the cell is not CCE-bound,
+    so the tier is all-or-nothing -- here, none get an SPS reservation."""
+    from sim.scenarios import factory_robots_scenario
+
+    scenario = factory_robots_scenario()
+    sched = TwoTier(tier1_period_slots=2000)
+    run(scenario, sched)
+    ul_video = {
+        (f.ue_id, f.qfi) for f in scenario.flows
+        if f.direction == "UL" and f.traffic_kind == "video_frame"
+    }
+    reserved = ul_video & sched._sps_keys
+    # All-or-nothing: never a list-order subset.
+    assert reserved == set(), (
+        f"over-subscribed UL tier should fall back to dynamic; got SPS for "
+        f"{sorted(reserved)}"
+    )
+
+
+def test_two_tier_sps_priority_tier_decides_the_winner():
+    """When two equally-sized SPS-eligible flows over-commit a carrier, the
+    one in the higher-priority tier (lower priority_level) is funded and the
+    other is left for dynamic. Swapping the priorities swaps the winner."""
+    from sim.config import TDDConfig
+
+    grid = ResourceGrid(
+        CarrierConfig(numerology=1, bandwidth_hz=10_000_000), TDDConfig()
+    )
+
+    def two_flows(pri1, pri2):
+        # Identical periodic DL flows; each alone nearly fills the SPS
+        # budget, so together they over-commit and only one can be funded.
+        return [
+            FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="Delay",
+                       priority_level=pri1, pdb_ms=20,
+                       traffic_kind="deterministic",
+                       traffic_params={"period_ms": 2.0,
+                                       "bytes_per_period": 700}),
+            FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="Delay",
+                       priority_level=pri2, pdb_ms=20,
+                       traffic_kind="deterministic",
+                       traffic_params={"period_ms": 2.0,
+                                       "bytes_per_period": 700}),
+        ]
+
+    def reserved(flows):
+        sched = TwoTier(tier1_period_slots=2000)
+        sched.configure(flows, grid.slot_duration_s, grid)
+        sched._update_sps_reservations({1: 20.0, 2: 20.0})
+        return {(s.ue_id, s.qfi) for s in sched._sps}
+
+    assert reserved(two_flows(1, 50)) == {(1, 1)}, "higher-priority ue1 wins"
+    assert reserved(two_flows(50, 1)) == {(2, 1)}, "higher-priority ue2 wins"
+
+
 def test_two_tier_beats_pf_under_pdcch_pressure():
     """30 small periodic sensors saturate the UL PDCCH budget. TwoTier with
     SPS should deliver every sensor's full demand with low latency; PF, lacking

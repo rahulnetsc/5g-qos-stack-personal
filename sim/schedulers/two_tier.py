@@ -59,6 +59,8 @@ class TwoTier:
         delay_exponent: float = 2.0,
         enable_sps: bool = True,
         sps_safety_margin: float = 1.10,
+        sps_budget_fraction: float = 0.85,
+        sps_min_scale: float = 0.75,
         gbr_penalty_init: float = 1e3,
         gbr_penalty_lr: float = 0.0,
         gbr_penalty_max: float = 1e6,
@@ -71,6 +73,13 @@ class TwoTier:
         # SPS: decide PRB reservation for periodic flows after each Tier-1 solve.
         self.enable_sps = enable_sps
         self.sps_safety_margin = sps_safety_margin
+        # SPS reserves at most this fraction of the carrier, leaving a
+        # dynamic pool for burst spillover.
+        self.sps_budget_fraction = sps_budget_fraction
+        # If a priority tier's SPS reservations would be scaled below this
+        # fraction of their desired size, the tier is run dynamically
+        # instead -- unless that would overrun the PDCCH/CCE budget.
+        self.sps_min_scale = sps_min_scale
         # Adaptive per-flow GBR slack penalty (dual ascent). gbr_penalty_lr=0
         # freezes the penalty at gbr_penalty_init -> identical to the old
         # uniform-scalar behaviour.
@@ -165,12 +174,26 @@ class TwoTier:
     def _is_sps_eligible(f: FlowConfig) -> bool:
         return f.traffic_kind in ("deterministic", "video_frame")
 
+    def _sps_floor_bps(self, f: FlowConfig) -> float:
+        """The contracted baseline an SPS reservation should carry: a GBR
+        flow's GFBR, otherwise a periodic flow's deterministic offered rate.
+        This is a Tier-1 *input* (the contract), not the LP's derived target,
+        so SPS sizing stays decoupled from the LP's overload arbitration."""
+        if f.flow_class == "GBR" and f.gfbr_bps > 0:
+            return f.gfbr_bps
+        return estimate_demand_bps(f)
+
     def _update_sps_reservations(self, snr_in: dict[int, float]) -> None:
         """Decide which periodic flows get SPS reservations and how big.
 
-        Sizes the per-slot PRB reservation so that, averaged across all slots
-        of the relevant direction in the TDD cycle, the reserved bandwidth
-        meets target_bps * sps_safety_margin.
+        Each SPS reservation is sized to the flow's contracted floor (see
+        _sps_floor_bps). Reservations are allocated per direction in priority
+        order (lower flow.priority_level first). Within a priority tier, if
+        the floors over-subscribe the remaining PRB budget, every reservation
+        in the tier is scaled back proportionally -- so no flow is dropped
+        merely for being late in the flow list (NOTES.md Finding 2). Leftover
+        budget carries to the next tier. SPS is capped at sps_budget_fraction
+        of the carrier, leaving a dynamic pool for burst spillover.
         """
         self._sps = []
         self._sps_keys = set()
@@ -178,65 +201,99 @@ class TwoTier:
             return
 
         pattern_len = len(self._grid.pattern)
-        # Per-direction slot counts and per-slot symbol counts in the cycle.
+        # Per-direction slot counts, per-slot symbol counts, and the per-slot
+        # PDCCH/CCE budget seen in the cycle.
         per_dir_slot_count = {"DL": 0, "UL": 0}
         per_dir_avg_symbols = {"DL": 0.0, "UL": 0.0}
+        per_dir_cce_budget = {"DL": 0, "UL": 0}
         for i in range(pattern_len):
             sg = self._grid.slot_grid(i)
             if sg.dl_symbols > 0:
                 per_dir_slot_count["DL"] += 1
                 per_dir_avg_symbols["DL"] += sg.dl_symbols
+                per_dir_cce_budget["DL"] = sg.pdcch_cce_budget
             if sg.ul_symbols > 0:
                 per_dir_slot_count["UL"] += 1
                 per_dir_avg_symbols["UL"] += sg.ul_symbols
+                per_dir_cce_budget["UL"] = sg.pdcch_cce_budget
         for d in ("DL", "UL"):
             n = per_dir_slot_count[d]
             per_dir_avg_symbols[d] = per_dir_avg_symbols[d] / n if n > 0 else 0
 
         cycle_duration_s = pattern_len * self.slot_duration_s
-        # Track per-direction PRBs reserved so far (for over-commit guard)
-        prbs_reserved_by_dir = {"DL": 0, "UL": 0}
+        budget = int(self._grid.prb_count * self.sps_budget_fraction)
 
-        for f in self._flows:
-            if not self._is_sps_eligible(f):
-                continue
-            key = (f.ue_id, f.qfi)
-            target_bps = self._targets_bps.get(key, 0.0)
-            if target_bps <= 0:
-                continue
-            n_dir_slots = per_dir_slot_count[f.direction]
-            avg_sym = per_dir_avg_symbols[f.direction]
+        for direction in ("DL", "UL"):
+            n_dir_slots = per_dir_slot_count[direction]
+            avg_sym = per_dir_avg_symbols[direction]
             if n_dir_slots == 0 or avg_sym == 0:
                 continue
 
-            snr = snr_in.get(f.ue_id, 20.0)
-            bits_per_rb_avg, bler = bits_per_prb(snr, symbols=int(avg_sym))
-            effective_bits = bits_per_rb_avg * (1 - bler)
-            if effective_bits <= 0:
-                continue
+            eligible = [
+                f for f in self._flows
+                if self._is_sps_eligible(f) and f.direction == direction
+            ]
+            remaining = budget
+            # Priority tiers: lower priority_level number == higher priority.
+            for plevel in sorted({f.priority_level for f in eligible}):
+                if remaining <= 0:
+                    break
+                tier = [f for f in eligible if f.priority_level == plevel]
 
-            # Bytes the flow needs per direction-slot to hit target avg rate.
-            bytes_per_dir_slot = (
-                target_bps * self.sps_safety_margin * cycle_duration_s
-                / n_dir_slots
-                / 8
-            )
-            prbs_needed = max(1, int(-(-bytes_per_dir_slot * 8 // effective_bits)))
+                # PRBs each flow wants to carry its contracted floor.
+                desired: list[tuple[FlowConfig, int]] = []
+                for f in tier:
+                    floor_bps = self._sps_floor_bps(f)
+                    if floor_bps <= 0:
+                        continue
+                    snr = snr_in.get(f.ue_id, 20.0)
+                    bits_per_rb, bler = bits_per_prb(snr, symbols=int(avg_sym))
+                    effective_bits = bits_per_rb * (1.0 - bler)
+                    if effective_bits <= 0:
+                        continue
+                    bytes_per_dir_slot = (
+                        floor_bps * self.sps_safety_margin * cycle_duration_s
+                        / n_dir_slots / 8
+                    )
+                    prbs = max(1, int(-(-bytes_per_dir_slot * 8 // effective_bits)))
+                    desired.append((f, prbs))
 
-            # Don't over-commit the carrier
-            if prbs_reserved_by_dir[f.direction] + prbs_needed > self._grid.prb_count:
-                continue
+                total = sum(p for _, p in desired)
+                if total <= 0:
+                    continue
+                # Scale the whole tier proportionally if it over-commits, so
+                # every flow keeps a (smaller) standing grant rather than the
+                # last-listed flows getting none.
+                scale = min(1.0, remaining / total)
 
-            self._sps.append(
-                _SPSReservation(
-                    ue_id=f.ue_id,
-                    qfi=f.qfi,
-                    direction=f.direction,
-                    prbs_per_slot=prbs_needed,
-                )
-            )
-            self._sps_keys.add(key)
-            prbs_reserved_by_dir[f.direction] += prbs_needed
+                # Viability floor. If SPS would be undersized (scale below
+                # sps_min_scale), a fixed reservation tends to lose to the
+                # adaptive dynamic scheduler, so drop the tier to dynamic.
+                # Exception: if running the tier dynamically would overrun
+                # the per-slot PDCCH/CCE budget, SPS's zero-DCI property
+                # still makes it the lesser evil, so keep it.
+                if scale < self.sps_min_scale:
+                    tier_cce = sum(
+                        cce_aggregation_level(snr_in.get(f.ue_id, 20.0))
+                        for f, _ in desired
+                    )
+                    if tier_cce <= per_dir_cce_budget[direction]:
+                        continue  # dynamic can absorb the tier -- skip SPS
+                    # else: keep the undersized reservation for CCE relief.
+
+                for f, prbs in desired:
+                    granted = max(1, round(prbs * scale))
+                    self._sps.append(
+                        _SPSReservation(
+                            ue_id=f.ue_id,
+                            qfi=f.qfi,
+                            direction=direction,
+                            prbs_per_slot=granted,
+                        )
+                    )
+                    self._sps_keys.add((f.ue_id, f.qfi))
+                    remaining -= granted
+                remaining = max(0, remaining)
 
     def _update_snr_ewma(self, channel: ChannelModel) -> None:
         alpha = 1.0 - 1.0 / self.snr_window

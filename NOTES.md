@@ -493,3 +493,58 @@ grant; or admit SPS flows in GBR-priority order with a per-flow cap. The
 deeper question the control raises: SPS as it stands is net-negative for
 worst-case GBR here (it helps 7 flows by +9 pt and hurts 3 by −29 pt) —
 the fix should be judged on min GBR delivery, not mean.
+
+---
+
+## 2026-05-17 — Finding 2 fixed: priority-tiered SPS reservation + viability floor
+
+`_update_sps_reservations` rewritten. SPS reservations are now sized to
+each flow's contracted floor (GFBR, or the deterministic rate), allocated
+per direction in priority order (new `FlowConfig.priority_level`, 5QI
+convention — lower = higher priority), and within a tier scaled back
+proportionally if they over-commit, so no flow is dropped for being late
+in the list. Capped at `sps_budget_fraction` (0.85) of the carrier.
+
+| | before | after |
+|---|---|---|
+| ue8 / ue9 / ue10 GBR delivery | 42% / 30% / 38% | 76% / 45% / 76% |
+| single (ue1–3) vs mixed (ue8–10) gap | 39 pt | **1 pt** |
+
+**Finding 2 is closed.** (ue9's residual 45% is its Tier-1 target — 60% of
+GFBR at SNR 17 — the SE/cell-edge effect of Finding 1, not a per-UE
+artifact.)
+
+### The viability floor — and a finding it exposed
+
+Shipping just the proportional rewrite first exposed something the old
+list-order lottery had hidden: **SPS is net-negative on factory's
+overloaded UL.** With every flow treated equally, SPS-on measured *below*
+SPS-off at every sizing/budget setting (47% GFBR-sized, 51% target-sized,
+vs 56% SPS-off). Cause: factory's UL GBR floors (92 Mbps) over-subscribe
+UL capacity (~75 Mbps), so the proportional scale-back shrinks every
+reservation to roughly half — and undersized-but-still-occupying SPS locks
+most of the carrier into fixed allocation, starving the (better)
+drift-plus-penalty dynamic scheduler.
+
+Fix: a **viability floor**. If a priority tier's reservations would be
+scaled below `sps_min_scale` (0.75), the tier runs dynamically instead —
+*unless* dropping it would overrun the per-slot PDCCH/CCE budget, in which
+case SPS's zero-DCI property keeps it the lesser evil. SPS is now
+self-gating:
+
+- factory UL — over-subscribed, only ~29% CCE-utilised → tier self-drops →
+  dynamic → 56% (= SPS-off, the right answer). SPS no longer hurts.
+- vision / sensor_dense — reservations fit → SPS engages as before.
+- factory at 1.5× carrier — fits → SPS engages, 77%, gap 1 pt.
+
+factory TwoTier mean GBR delivery: 52% (old lottery) → 56%. SPS engages
+where it helps (PDCCH-bound, or capacity ≥ demand) and stands aside where
+it would hurt (data-channel overload) — the same hump as the overload
+sweep.
+
+Knobs: `sps_budget_fraction` (0.85), `sps_min_scale` (0.75). Decision
+recorded: SPS is sized by the GFBR contract (a Tier-1 *input*), not the
+LP's derived target — the viability floor compensates for GFBR's tendency
+to over-subscribe under overload. Regression guards:
+`test_two_tier_sps_oversubscribed_tier_falls_back_to_dynamic`,
+`test_two_tier_sps_priority_tier_decides_the_winner`.

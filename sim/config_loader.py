@@ -81,6 +81,7 @@ def _flow_from_dict(ue_id: int, flow_dict: dict) -> FlowConfig:
         flow_class=flow_dict.get("flow_class", "PF"),
         pdb_ms=float(flow_dict.get("max_delay_budget_ms", 100.0)),
         gfbr_bps=float(flow_dict.get("min_data_rate_bps", 0.0)),
+        priority_level=int(flow_dict.get("priority_level", 100)),
         traffic_kind=traffic_kind,
         traffic_params=traffic_params,
     )

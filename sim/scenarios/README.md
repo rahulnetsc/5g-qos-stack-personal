@@ -39,6 +39,7 @@ ues:
         flow_class: GBR            # PF | GBR | Delay
         min_data_rate_bps: 8000000 # GFBR — guaranteed floor (GBR flows)
         max_delay_budget_ms: 30    # PDB
+        priority_level: 100        # optional; 5QI convention, lower = higher
         traffic:
           kind: video_frame        # poisson | deterministic | video_frame
           period_ms: 33.33
@@ -83,6 +84,10 @@ simulation:
   - `deterministic` — `period_ms`, `bytes_per_period`
   - `video_frame` — `period_ms`, `avg_bytes`, `i_frame_multiplier`,
     `i_frame_period_in_frames`, optional `i_frame_phase`
+- `priority_level` (optional, default 100) follows the 3GPP 5QI convention
+  — lower value = higher priority. It tiers SPS reservations: higher-priority
+  flows are reserved first, lower tiers take what is left. With every flow
+  at the default it is a single tier (the current scenarios do this).
 - Fields the simulator does not model are accepted and ignored (a flow's
   `max_data_rate_bps` / MFBR — no rate-cap enforcement yet).
 

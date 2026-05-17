@@ -30,6 +30,10 @@ class FlowConfig:
     flow_class: Literal["PF", "GBR", "Delay"] = "PF"
     pdb_ms: float = 100.0
     gfbr_bps: float = 0.0
+    # Scheduling priority, 3GPP 5QI convention: lower value = higher priority.
+    # Used to tier SPS reservations. Default is a single neutral level; set
+    # per-flow once the workload is mapped to standardised 5QIs.
+    priority_level: int = 100
     traffic_kind: str = "poisson"
     traffic_params: dict = field(default_factory=dict)
 
