@@ -428,3 +428,68 @@ TwoTier's edge: the on-time gap is 3 at window 1 but 4 at steady state.
 Neither study's TwoTier benefit is a transient. (Backlog on latency_bound
 does show a small ~0.3 MB warm-up ramp, but it does not move the on-time
 or p99 contract metrics.)
+
+---
+
+## 2026-05-17 — Finding 2 root cause: SPS reservation order, not within-UE cannibalisation
+
+Finding 2 was framed as "within-UE GBR cannibalisation" — UEs carrying a
+GBR flow *plus* another flow (ue8/9/10) lose GBR delivery. Root-caused
+with `scripts/diagnose_finding2.py`. **It is neither within-UE nor a
+Tier-1 issue — it is the SPS reservation policy.**
+
+### Evidence — per-flow dump, factory_robots / TwoTier
+
+| GBR flow | SNR | GFBR | Tier-1 target | SPS reservation | delivered |
+|---|---|---|---|---|---|
+| ue1–3 (single-flow) | 18–22 | 8 M | 77–100% | 8 PRB each | 71–79% |
+| ue8 (mixed) | 21 | 6 M | **6.0 M (100%)** | **none** | 42% |
+| ue9 (mixed) | 17 | 6 M | 3.6 M (60%) | **none** | 30% |
+| ue10 (mixed) | 20 | 6 M | **6.0 M (100%)** | **none** | 38% |
+
+Tier-1 gives ue8 and ue10 their *full* 6 Mbps GFBR target — the LP has no
+per-UE coupling, exactly as expected. But ue8/9/10 get **no SPS
+reservation** while ue1–7 do. The extra UL flow is not the culprit
+either: ue9's and ue10's PF flows deliver ~0 Mbps yet their GBR is still
+starved (ue8's PF flow does harvest 6.3 Mbps, but of *idle* inter-frame
+slots its own video was not using — leftovers, not contention).
+
+### Mechanism
+
+`_update_sps_reservations` grants SPS reservations greedily in
+flow-enumeration order, skipping a flow once the per-direction PRB budget
+is hit (`prbs_reserved + needed > prb_count`). The 10 UL video flows
+collectively want more PRBs than the 55-PRB carrier has — the first 7
+(ue1–7) already reserve 51 — so the **last-enumerated flows get nothing**
+and fall back to pure dynamic scheduling. A bursty video flow with no SPS
+cannot drain its I-frame bursts inside the 30 ms PDB → heavy PDB drops
+(ue8/9/10 drop 3.5–4.4 Mbps each). ue8/9/10 are the *mixed-flow* UEs only
+because the scenario author listed them last; the correlation is
+coincidental — the cause is list position.
+
+### Decisive control
+
+| config | ue1–3 single | ue8–10 mixed | gap |
+|---|---|---|---|
+| TwoTier, SPS on (default) | 75% | 37% | **39 pt** |
+| TwoTier, SPS off | 66% | 66% | **1 pt** |
+| TwoTier, SPS on, 1.5× carrier | 80% | 46% | 34 pt |
+
+With `enable_sps=False` the gap collapses to 1 pt — the mixed/single
+split is entirely an SPS-reservation artifact. Note SPS-on does not merely
+withhold a *bonus* from ue8/9/10: it makes them **worse than SPS-off**
+(66% → 37%), because the 7 reserved flows lock up 51 of 55 UL PRBs every
+slot and the unreserved flows scavenge only the remainder. And 1.5× the
+carrier does *not* fix it — higher Tier-1 targets inflate every SPS
+reservation in step, so the budget still over-commits. This is a policy
+bug, not a capacity shortage.
+
+### Fix direction (next step)
+
+SPS reservations must be allocated by need, not list order — e.g. size
+each flow to its GBR floor and, if the total over-commits, shrink all
+reservations proportionally so every eligible flow keeps *some* standing
+grant; or admit SPS flows in GBR-priority order with a per-flow cap. The
+deeper question the control raises: SPS as it stands is net-negative for
+worst-case GBR here (it helps 7 flows by +9 pt and hurts 3 by −29 pt) —
+the fix should be judged on min GBR delivery, not mean.
