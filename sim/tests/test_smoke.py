@@ -667,6 +667,73 @@ def test_tier1_se_penalty_exponent_tilts_allocation():
     assert rb_parity[(2, 2)] > base[(2, 2)] + 1.0
 
 
+def test_tier1_slice_floor_enforces_shares():
+    """A soft slice floor splits PRB capacity by the configured shares. Two
+    slices of equal-SNR PF flows: with no slicing the LP splits ~50/50; a
+    75/25 slice share shifts the allocation to ~75/25."""
+    from sim.config import TDDConfig
+
+    grid = ResourceGrid(
+        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
+    )
+    flows = [
+        FlowConfig(ue_id=u, qfi=9, direction="DL", flow_class="PF",
+                   slice_id=sid, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 50_000_000})
+        for u, sid in [(1, 1), (2, 1), (3, 2), (4, 2)]
+    ]
+    snr = {u: 20.0 for u in (1, 2, 3, 4)}
+    demand = {(f.ue_id, f.qfi): 50_000_000 for f in flows}
+    slice_of = {f.ue_id: f.slice_id for f in flows}
+
+    def slice_fraction(targets, sid):
+        total = sum(targets.values())
+        return sum(
+            v for (u, _q), v in targets.items() if slice_of[u] == sid
+        ) / total
+
+    base = solve_tier1(flows, snr, grid, demand)
+    sliced = solve_tier1(
+        flows, snr, grid, demand,
+        slice_shares={1: {"DL": 0.75}, 2: {"DL": 0.25}},
+    )
+    # Equal flows, no slicing -> the two slices split evenly.
+    assert abs(slice_fraction(base, 1) - 0.5) < 0.1
+    # A 75/25 share pulls slice 1 to ~three-quarters of the capacity.
+    assert slice_fraction(sliced, 1) > 0.65
+
+
+def test_tier1_slice_floor_allows_borrowing():
+    """The slice floor is a guarantee, not a cap: an under-utilised slice's
+    unused capacity is borrowed by a busy slice (work-conserving)."""
+    from sim.config import TDDConfig
+
+    grid = ResourceGrid(
+        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
+    )
+    # slice 1: heavy demand; slice 2: a single light flow.
+    flows = [
+        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF",
+                   slice_id=1, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 80_000_000}),
+        FlowConfig(ue_id=2, qfi=9, direction="DL", flow_class="PF",
+                   slice_id=2, traffic_kind="poisson",
+                   traffic_params={"rate_bps": 1_000_000}),
+    ]
+    snr = {1: 20.0, 2: 20.0}
+    demand = {(1, 9): 80_000_000, (2, 9): 1_000_000}
+    # 50/50 shares, but slice 2 only wants ~1 Mbps.
+    sliced = solve_tier1(
+        flows, snr, grid, demand,
+        slice_shares={1: {"DL": 0.5}, 2: {"DL": 0.5}},
+    )
+    total = sliced[(1, 9)] + sliced[(2, 9)]
+    # slice 1 borrows slice 2's idle half -> well above its own 50% share.
+    assert sliced[(1, 9)] / total > 0.6
+    # slice 2 still gets the little it asked for.
+    assert sliced[(2, 9)] > 0.5e6
+
+
 def _two_gbr_partial_infeasible_scenario():
     """Two GBR flows — one good-SNR, one poor-SNR — on a carrier that cannot
     meet both GFBRs at once. 6 Tier-1 solves over the horizon."""

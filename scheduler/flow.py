@@ -24,5 +24,8 @@ class FlowConfig:
     # Default is a single neutral level; set per-flow once the workload is
     # mapped to standardised 5QIs.
     priority_level: int = 100
+    # Network-slice id. Tier-1 can give each slice a guaranteed share of PRB
+    # capacity; default 0 puts every flow in one slice (no slicing).
+    slice_id: int = 0
     traffic_kind: str = "poisson"
     traffic_params: dict = field(default_factory=dict)

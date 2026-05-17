@@ -641,3 +641,42 @@ a fidelity inconsistency, but low-impact in the current scenarios: the only
 multi-flow-UE scenario, `factory_robots`, is not CCE-bound, so the per-flow
 DCI over-count does not change its results. Flagged for a later pass if the
 baselines need to be strictly comparable on PDCCH.
+
+---
+
+## 2026-05-17 — `scheduler/` library extraction + network slicing
+
+### Reorg — the two-tier scheduler is now a standalone library
+
+The two-tier scheduler is pulled out of the simulator into a top-level
+`scheduler/` package that imports only cvxpy / numpy — never `sim/` — so it
+can be lifted into OpenAirInterface. `scheduler/` holds Tier-1 (`tier1.py`),
+Tier-2 (`two_tier.py`), `FlowConfig` (`flow.py`), the link-adaptation model
+(`link.py`), and the I/O contract (`interfaces.py`: `Allocation`, the
+`Scheduler` protocol, and structural `SlotView` / `BufferView` /
+`ChannelView` / `GridView` views that a host satisfies without inheritance).
+`sim/` now depends on `scheduler/` (the correct direction); `sim/config.py`
+and `sim/channel.py` re-export `FlowConfig` / link adaptation so simulator
+code keeps one import surface. Baselines moved to `sim/baselines/`, tests to
+`sim/tests/`. Behaviour unchanged — all tests green.
+
+### Network slicing — a soft slice floor in Tier-1
+
+`FlowConfig.slice_id` tags each flow's network slice;
+`TwoTier(slice_shares={slice_id: {"DL": frac, "UL": frac}})` gives each
+slice a guaranteed share of per-direction PRB-symbol capacity. It is a
+**soft floor** in the Tier-1 LP, not a hard cap:
+
+```
+Σ_{slice s, dir d} r_i/SE_i  +  slice_slack_{s,d}  ≥  min(share·C_d, slice_demand_{s,d})
+```
+
+The floor is capped at the slice's own offered demand (an idle slice holds
+nothing), the slack is penalised (so the LP stays feasible when slice and
+GBR floors collide), and the existing per-direction capacity constraint
+keeps it **work-conserving** — a busy slice freely borrows an idle slice's
+unused share. Verified: under contention a 75/25 share splits capacity
+75/25; when a slice is under-utilised the other borrows past its own share.
+Tier-2 needs no slice logic — it tracks the (now slice-aware) Tier-1
+targets. Same constraint shape as the GBR floor — a contained Tier-1
+addition.

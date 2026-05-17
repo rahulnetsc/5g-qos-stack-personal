@@ -59,6 +59,8 @@ def solve_tier1(
     gbr_slack_penalty: "float | dict[tuple[int, int], float]" = 1e3,
     capacity_safety_factor: float = 1.0,
     se_penalty_exponent: float = 0.0,
+    slice_shares: "dict[int, dict[str, float]] | None" = None,
+    slice_slack_penalty: float = 1e3,
 ) -> dict[tuple[int, int], float]:
     """Solve Tier-1 LP. Returns target rate (bps) per (ue_id, qfi).
 
@@ -76,6 +78,13 @@ def solve_tier1(
         k < 0  -> boost poor-SE flows. k = -1 equalises the per-RB value of
                   closing a GBR gap (p_i * SE_i) across flows -- "RB-level"
                   parity rather than rate-level.
+
+    slice_shares ({slice_id: {"DL": frac, "UL": frac}}) adds a soft network-
+    slice floor: each (slice, direction) is guaranteed its fraction of
+    PRB-symbol capacity, capped at the slice's own offered demand. The floor
+    is soft (a penalised slack) and the per-direction capacity constraint
+    keeps it work-conserving -- a busy slice borrows an idle slice's unused
+    share. slice_slack_penalty weighs a missed slice floor.
     """
     n = len(flows)
     if n == 0:
@@ -128,12 +137,47 @@ def solve_tier1(
         else:
             constraints.append(slack[i] == 0)
 
+    # Soft network-slice floors. Each (slice, direction) is guaranteed its
+    # share of PRB-symbol capacity, capped at the slice's own offered demand
+    # so an idle slice holds nothing. The per-direction capacity constraints
+    # above keep this work-conserving -- a busy slice borrows the unused
+    # share of an idle one. The floor is soft (a penalised slack) so the LP
+    # stays feasible when slice and GBR floors cannot all be met.
+    slice_slack_terms: list = []
+    if slice_shares:
+        cap_by_dir = {"DL": cap_dl, "UL": cap_ul}
+        for sid, shares in slice_shares.items():
+            for direction, cap in cap_by_dir.items():
+                share = float(shares.get(direction, 0.0))
+                idx = [
+                    i for i, f in enumerate(flows)
+                    if f.slice_id == sid and f.direction == direction
+                ]
+                if share <= 0.0 or not idx:
+                    continue
+                slice_demand = sum(
+                    demand_bps.get((flows[i].ue_id, flows[i].qfi), 1e12) / se[i]
+                    for i in idx
+                )
+                floor = min(share * cap, slice_demand)
+                if floor <= 0.0:
+                    continue
+                ss = cp.Variable(nonneg=True)
+                usage = cp.sum(cp.hstack([r[i] / se[i] for i in idx]))
+                constraints.append(usage + ss >= floor)
+                slice_slack_terms.append(ss)
+
     # Objective
     epsilon = 1.0
     utility = cp.sum(
         [_utility_weight(f.flow_class) * cp.log(r[i] + epsilon) for i, f in enumerate(flows)]
     )
-    objective = cp.Maximize(utility - cp.sum(cp.multiply(penalty, slack)))
+    slice_penalty = (
+        slice_slack_penalty * sum(slice_slack_terms) if slice_slack_terms else 0
+    )
+    objective = cp.Maximize(
+        utility - cp.sum(cp.multiply(penalty, slack)) - slice_penalty
+    )
 
     problem = cp.Problem(objective, constraints)
     try:

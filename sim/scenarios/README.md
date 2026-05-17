@@ -40,6 +40,7 @@ ues:
         min_data_rate_bps: 8000000 # GFBR — guaranteed floor (GBR flows)
         max_delay_budget_ms: 30    # PDB
         priority_level: 100        # optional; 5QI convention, lower = higher
+        slice_id: 0                # optional; network slice for Tier-1 RB shares
         traffic:
           kind: video_frame        # poisson | deterministic | video_frame
           period_ms: 33.33
@@ -88,6 +89,10 @@ simulation:
   — lower value = higher priority. It tiers SPS reservations: higher-priority
   flows are reserved first, lower tiers take what is left. With every flow
   at the default it is a single tier (the current scenarios do this).
+- `slice_id` (optional, default 0) tags a flow's network slice. Tier-1 can
+  give each slice a guaranteed share of PRB capacity via
+  `TwoTier(slice_shares={slice_id: {"DL": frac, "UL": frac}})`; the share is
+  a soft, work-conserving floor. Default 0 puts every flow in one slice.
 - Fields the simulator does not model are accepted and ignored (a flow's
   `max_data_rate_bps` / MFBR — no rate-cap enforcement yet).
 

@@ -72,6 +72,8 @@ class TwoTier:
         gbr_penalty_lr: float = 0.0,
         gbr_penalty_max: float = 1e6,
         gbr_penalty_se_exponent: float = 0.0,
+        slice_shares: "dict[int, dict[str, float]] | None" = None,
+        slice_slack_penalty: float = 1e3,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -96,6 +98,10 @@ class TwoTier:
         # Spectral-efficiency tilt exponent k on the GBR slack penalty (see
         # solve_tier1): 0 = off, k>0 efficiency-first, k<0 RB-level parity.
         self.gbr_penalty_se_exponent = gbr_penalty_se_exponent
+        # Network-slice RB shares {slice_id: {"DL": frac, "UL": frac}};
+        # None disables slicing. Enforced as a soft Tier-1 floor.
+        self.slice_shares = slice_shares
+        self.slice_slack_penalty = slice_slack_penalty
 
         self._flows: list[FlowConfig] = []
         self._snr_avg: dict[int, float] = {}
@@ -144,6 +150,8 @@ class TwoTier:
             demand_bps=self._demand_bps,
             gbr_slack_penalty=self._gbr_penalty,
             se_penalty_exponent=self.gbr_penalty_se_exponent,
+            slice_shares=self.slice_shares,
+            slice_slack_penalty=self.slice_slack_penalty,
         )
         self._tier1_solve_count += 1
         self._update_gbr_penalties()
