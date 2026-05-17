@@ -62,28 +62,25 @@ uv run python scripts/plot_timeseries.py --scenario smoke --scheduler twotier
 `uv run` activates the venv transparently — no `source .venv/bin/activate`
 required (though that works too if you want a long-running shell session).
 
-## Configuration files
+## Scenario files
 
-Two YAML files in [configs/](configs/) drive a fifth scenario alongside the
-four hardcoded ones:
+Every simulation scenario is a self-contained YAML file in
+[sim/scenarios/](sim/scenarios/), named `scenario_config_<id>.yml`. One
+file carries the whole scenario: the radio (carrier, TDD), the run window
+(horizon, seed), and the per-UE / per-flow workload. A `defaults:` block
+lets each UE/flow stanza specify only its overrides.
 
-- [configs/system_config.yml](configs/system_config.yml) — radio side:
-  TDD pattern, S-slot symbol split, bandwidth (MHz), numerology, MU-MIMO
-  flag, gNodeB count, PDCCH CCE budget.
-- [configs/sim_config.yml](configs/sim_config.yml) — workload side:
-  simulation horizon, per-UE SNR / coherence, per-flow QFI / direction /
-  flow class / GFBR / PDB / traffic spec. Uses a `defaults:` block so each
-  UE/flow stanza only specifies overrides.
+- A loader function `<id>_scenario()` in the `sim/scenarios/` package's
+  `__init__.py` reads one file into a `ScenarioConfig` via
+  [sim/config_loader.py](sim/config_loader.py).
+- To add a scenario, drop a new `scenario_config_<id>.yml` file in that
+  directory and add a one-line loader function. See
+  [sim/scenarios/README.md](sim/scenarios/README.md) for the full file
+  structure and conventions.
 
-Both are loaded by [sim/config_loader.py](sim/config_loader.py), which maps
-them to a `ScenarioConfig`. The `yaml_scenario()` helper in
-[sim/scenarios.py](sim/scenarios.py) is the entry point — used by
-`compare_schedulers.py`. Fields the simulator doesn't yet model
-(MU-MIMO, multi-gNodeB, MFBR enforcement) are accepted and ignored; the
-loader docstring lists them.
-
-A few fields don't map directly to the simulator's model and are worth
-calling out:
+Fields the simulator doesn't yet model (a flow's MFBR / `max_data_rate_bps`)
+are accepted and ignored. A couple of fields don't map directly to the
+simulator's model and are worth calling out:
 
 - **Per-UE radio quality is `mean_snr_db`, not MCS.** The simulator is
   SNR-driven — MCS is derived from SNR via a 12-row staircase in

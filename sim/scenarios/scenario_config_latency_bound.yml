@@ -1,0 +1,65 @@
+# Latency-bound scenario: DL-congested factory teleoperation.
+#
+# 8 robots each receive a 5 Mbps interactive stream (control + operator
+# view) with a tight 12 ms PDB. 4 UEs pull bulk best-effort downloads
+# (20 Mbps offered each, 80 Mbps total) that flood the downlink.
+#
+# The interactive streams are feasible as a set if prioritised, but at
+# 5 Mbps they sit above PF's per-flow equal share, so a deadline-blind
+# scheduler throttles them like any bulk flow and their packets age past
+# the PDB. DL-heavy TDD (DDDSU) makes the downlink the contended resource.
+
+name: latency_bound
+
+simulation:
+  horizon_slots: 4000
+  seed: 29
+
+carrier:
+  bandwidth_mhz: 40
+  numerology: 1
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DDDSU
+  s_slot_split: {dl_symbols: 11, gap_symbols: 1, ul_symbols: 2}
+
+defaults:
+  ue:
+    coherence_slots: 2000
+  # defaults.flow is the interactive control stream; the bulk UEs below
+  # override it wholesale.
+  flow:
+    qfi: 1
+    direction: DL
+    flow_class: Delay
+    max_delay_budget_ms: 12
+    traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 3125}
+
+ues:
+  # 8 interactive control / teleoperation streams, mixed SNR.
+  - {ue_id: 1, mean_snr_db: 22.0, flows: [{}]}
+  - {ue_id: 2, mean_snr_db: 20.0, flows: [{}]}
+  - {ue_id: 3, mean_snr_db: 18.0, flows: [{}]}
+  - {ue_id: 4, mean_snr_db: 16.0, flows: [{}]}
+  - {ue_id: 5, mean_snr_db: 14.0, flows: [{}]}
+  - {ue_id: 6, mean_snr_db: 12.0, flows: [{}]}
+  - {ue_id: 7, mean_snr_db: 24.0, flows: [{}]}
+  - {ue_id: 8, mean_snr_db: 19.0, flows: [{}]}
+  # 4 bulk best-effort downloads (20 Mbps offered each) that flood the DL.
+  - ue_id: 9
+    mean_snr_db: 20.0
+    flows:
+      - {qfi: 9, direction: DL, flow_class: PF, max_delay_budget_ms: 300, traffic: {kind: poisson, rate_bps: 20_000_000}}
+  - ue_id: 10
+    mean_snr_db: 21.0
+    flows:
+      - {qfi: 9, direction: DL, flow_class: PF, max_delay_budget_ms: 300, traffic: {kind: poisson, rate_bps: 20_000_000}}
+  - ue_id: 11
+    mean_snr_db: 19.0
+    flows:
+      - {qfi: 9, direction: DL, flow_class: PF, max_delay_budget_ms: 300, traffic: {kind: poisson, rate_bps: 20_000_000}}
+  - ue_id: 12
+    mean_snr_db: 22.0
+    flows:
+      - {qfi: 9, direction: DL, flow_class: PF, max_delay_budget_ms: 300, traffic: {kind: poisson, rate_bps: 20_000_000}}

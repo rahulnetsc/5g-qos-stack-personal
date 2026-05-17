@@ -82,22 +82,19 @@ required. Full results and a build/don't-build decision table are in
 ├── uv.lock                       cross-platform pinned versions (37 packages)
 ├── .python-version               pins CPython to 3.12
 ├── Makefile                      thin wrapper over uv (install / test / smoke / ...)
-├── configs/                      YAML configs driving the yaml_scenario
-│   ├── system_config.yml         radio: TDD, bandwidth, numerology, MIMO
-│   └── sim_config.yml            workload: UEs, flows, GFBR/PDB, traffic
 ├── design-docs/                  scheduler + simulator design notes
 │   ├── scheduler-design.md
 │   └── simulator-design.md
 ├── sim/                          simulator core
 │   ├── config.py                 scenario / flow / UE / TDD dataclasses
-│   ├── config_loader.py          YAML -> ScenarioConfig loader
+│   ├── config_loader.py          scenario YAML -> ScenarioConfig loader
 │   ├── resource.py               TDD pattern, per-slot grid
 │   ├── channel.py                stationary AR(1) SNR, MCS staircase
 │   ├── buffer.py                 fluid byte buffers w/ HoL timestamps
 │   ├── traffic.py                deterministic / Poisson / video-frame
 │   ├── metrics.py                per-flow stats, percentile latency
 │   ├── tier1.py                  CVXPY LP solver
-│   ├── scenarios.py              reusable scenario definitions (incl. yaml_scenario)
+│   ├── scenarios/                one scenario_config_<id>.yml per scenario + loaders
 │   ├── driver.py                 main simulation loop
 │   └── schedulers/
 │       ├── round_robin.py        baseline
@@ -129,17 +126,18 @@ required. Full results and a build/don't-build decision table are in
   High-SNR UEs get cheap DCIs; edge UEs pay more, making PDCCH bind sooner.
 - Per-slot time-series recording (opt-in) and matplotlib plots for
   throughput, HoL latency, buffer occupancy, PRB and PDCCH utilization.
-- YAML-driven scenarios via [configs/system_config.yml](configs/system_config.yml)
-  and [configs/sim_config.yml](configs/sim_config.yml) — radio params and
-  workload split into two files, loaded by [sim/config_loader.py](sim/config_loader.py).
+- Every scenario is a self-contained YAML file in [sim/scenarios/](sim/scenarios/)
+  (`scenario_config_<id>.yml` — radio, run window, and UE/flow workload),
+  loaded by [sim/config_loader.py](sim/config_loader.py). See the
+  [scenarios README](sim/scenarios/README.md) for the file structure.
 - Contract-oriented scheduler study ([scripts/scheduler_study.py](scripts/scheduler_study.py)):
   overload-sweep, PDCCH-limited, and latency-bound regimes scored on
   GBR/Delay contract satisfaction and p99 latency.
-- 31 unit tests covering buffer mechanics, channel stationarity, GBR
+- 39 unit tests covering buffer mechanics, channel stationarity, GBR
   protection under overload, fairness, Tier-1 feasibility, adaptive and
   SE-tilt penalty behaviour, windowed-ceiling protection, SPS accounting,
   PDCCH-limited and latency-bound deadline protection, AL monotonicity,
-  time-series shape, and the YAML loader.
+  time-series shape, and every scenario YAML loading end to end.
 
 ## Roadmap
 

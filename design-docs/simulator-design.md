@@ -411,7 +411,7 @@ sim/
   buffer.py              # BufferModel
   resource.py            # ResourceGrid + TDD pattern + per-slot CCE budget
   metrics.py             # collectors and exporters (incl. CCE utilization)
-  scenarios.py           # reusable scenario definitions
+  scenarios/             # scenario_config_<id>.yml files + loader funcs
   tier1.py               # Tier-1 CVXPY LP solver
   schedulers/
     __init__.py          # Scheduler protocol + Allocation + DEFAULT_DCI_CCE_COST
@@ -422,17 +422,19 @@ sim/
 scripts/
   run_smoke.py           # one scheduler, one scenario, dump JSON
   compare_schedulers.py  # all schedulers x all scenarios, side-by-side
+  scheduler_study.py     # overload-sweep / PDCCH / latency studies
   plot_timeseries.py     # per-slot multi-panel matplotlib plots
 tests/
-  test_smoke.py          # 23 tests: buffer, channel (incl. AL monotonicity),
-                         # grid, all schedulers, SPS accounting, PDCCH cap,
-                         # sensor-dense regression, time-series shape
+  test_smoke.py          # buffer, channel, grid, all schedulers, SPS / PDCCH,
+                         # penalty knobs, latency-bound deadline protection
+  test_config_loader.py  # every scenario_config_<id>.yml loads and runs
 ```
 
-YAML scenario files (mentioned in the original sketch) deferred — Python
-scenario builders in [sim/scenarios.py](../sim/scenarios.py) are easier to
-parameterize for now. Switch to YAML when the scenario count grows past
-a handful.
+Scenario files are YAML — one self-contained `scenario_config_<id>.yml`
+per scenario in [sim/scenarios/](../sim/scenarios/), loaded by
+`config_loader.py`. (Earlier these were Python builders; they moved to
+YAML once the scenario count grew past a handful, as the original sketch
+anticipated.)
 
 ### Build status
 1. ✅ Skeleton + RoundRobin: driver loop, traffic, channel, buffer, grid, metrics.

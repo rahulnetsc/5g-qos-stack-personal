@@ -1,0 +1,60 @@
+# Smoke scenario: mixed workload, no overload. Every scheduler should
+# comfortably serve every flow -- a sanity baseline, not a stress test.
+
+name: smoke
+
+simulation:
+  horizon_slots: 4000   # numerology 1 -> 0.5 ms slots -> 2.0 s of wall time
+  seed: 7
+
+carrier:
+  bandwidth_mhz: 30
+  numerology: 1
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DSUUU
+  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+
+defaults:
+  ue:
+    coherence_slots: 2000
+
+ues:
+  - ue_id: 1
+    mean_snr_db: 22.0
+    flows:
+      - qfi: 9
+        direction: DL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 10_000_000}
+
+  - ue_id: 2
+    mean_snr_db: 18.0
+    flows:
+      - qfi: 9
+        direction: DL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 5_000_000}
+      - qfi: 1
+        direction: UL
+        flow_class: Delay
+        max_delay_budget_ms: 10
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 200}
+
+  - ue_id: 3
+    mean_snr_db: 25.0
+    flows:
+      - qfi: 2
+        direction: UL
+        flow_class: GBR
+        min_data_rate_bps: 20_000_000
+        max_delay_budget_ms: 30
+        traffic:
+          kind: video_frame
+          period_ms: 16.67
+          avg_bytes: 40_000
+          i_frame_multiplier: 4.0
+          i_frame_period_in_frames: 30

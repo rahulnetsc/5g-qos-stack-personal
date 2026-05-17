@@ -337,7 +337,7 @@ def test_two_tier_beats_pf_under_pdcch_pressure():
     from sim.scenarios import sensor_dense_scenario
     from sim.schedulers.pf import ProportionalFair
 
-    sc = sensor_dense_scenario(num_sensors=30)
+    sc = sensor_dense_scenario()
     pf_sum = run(sc, ProportionalFair(ewma_window_slots=200))
     tt_sum = run(sc, TwoTier(tier1_period_slots=2000))
 
@@ -407,7 +407,7 @@ def test_pdcch_budget_caps_dynamic_allocations():
     from sim.scenarios import sensor_dense_scenario
     from sim.schedulers.pf import ProportionalFair
 
-    sc = sensor_dense_scenario(num_sensors=30)
+    sc = sensor_dense_scenario()
     summary = run(sc, ProportionalFair(ewma_window_slots=200))
     # PDCCH utilization should be high (we're hitting the budget) but not
     # over 100% (the cap actually applies).

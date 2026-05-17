@@ -13,11 +13,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sim.config import ScenarioConfig
 from sim.driver import run
 from sim.scenarios import (
+    factory_robots_scenario,
     overload_scenario,
     sensor_dense_scenario,
     smoke_scenario,
     vision_scenario,
-    yaml_scenario,
 )
 from sim.schedulers.gradient import GradientScheduler
 from sim.schedulers.pf import ProportionalFair
@@ -119,8 +119,8 @@ def main() -> None:
     _print_scenario(smoke_scenario())
     _print_scenario(overload_scenario())
     _print_scenario(vision_scenario())
-    _print_scenario(sensor_dense_scenario(num_sensors=30))
-    _print_scenario(yaml_scenario())
+    _print_scenario(sensor_dense_scenario())
+    _print_scenario(factory_robots_scenario())
 
 
 if __name__ == "__main__":

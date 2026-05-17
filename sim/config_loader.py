@@ -1,13 +1,12 @@
-"""Load ScenarioConfig from the YAML pair in configs/.
+"""Load a ScenarioConfig from a single self-contained scenario YAML.
 
-system_config.yml carries the radio / gNodeB side (bandwidth, numerology, TDD).
-sim_config.yml carries the workload (UEs, flows, run horizon).
+Each scenario lives in one file, sim/scenarios/scenario_config_<id>.yml,
+carrying the radio (carrier, tdd), the run window (simulation), optional
+defaults, and the UE/flow workload. See sim/scenarios/README.md for the
+full file structure.
 
-Fields the simulator doesn't yet model are accepted and silently ignored:
-  - system: gnodeb.count > 1, mimo.mu_mimo_active, mimo.max_*_layers,
-            pdcch.cce_budget_per_slot (the sim derives PDCCH per slot-type
-            in sim/resource.py), duplex (only TDD supported)
-  - flow:   max_data_rate_bps (MFBR — no cap enforcement yet)
+Fields the simulator does not model are accepted and silently ignored
+(e.g. a flow's max_data_rate_bps / MFBR — there is no rate-cap enforcement).
 """
 
 from copy import deepcopy
@@ -29,20 +28,19 @@ def _load_yaml(path: str | Path) -> dict:
         return yaml.safe_load(f)
 
 
-def load_system(path: str | Path) -> tuple[CarrierConfig, TDDConfig]:
-    """Parse system_config.yml into (CarrierConfig, TDDConfig)."""
-    cfg = _load_yaml(path)
-
+def _carrier_from(cfg: dict) -> CarrierConfig:
     c = cfg["carrier"]
-    carrier = CarrierConfig(
+    return CarrierConfig(
         bandwidth_hz=int(c["bandwidth_mhz"] * 1_000_000),
         numerology=int(c["numerology"]),
         overhead_factor=float(c.get("overhead_factor", 0.85)),
     )
 
+
+def _tdd_from(cfg: dict) -> TDDConfig:
     t = cfg["tdd"]
     s = t["s_slot_split"]
-    tdd = TDDConfig(
+    return TDDConfig(
         pattern=str(t["pattern"]),
         s_slot_split=(
             int(s["dl_symbols"]),
@@ -50,14 +48,12 @@ def load_system(path: str | Path) -> tuple[CarrierConfig, TDDConfig]:
             int(s["ul_symbols"]),
         ),
     )
-    return carrier, tdd
 
 
 def _merge_flow(defaults: dict, override: dict) -> dict:
     """Shallow-merge a flow override on top of defaults. The `traffic` key is
-    treated atomically — if the override specifies any traffic field, the
-    override's traffic dict replaces the default's entirely.
-    """
+    treated atomically — if the override specifies a traffic block, it
+    replaces the default's entirely."""
     merged = deepcopy(defaults)
     for k, v in override.items():
         if k == "traffic":
@@ -83,33 +79,37 @@ def _flow_from_dict(ue_id: int, flow_dict: dict) -> FlowConfig:
     )
 
 
-def load_scenario(
-    system_path: str | Path,
-    sim_path: str | Path,
-    name: str = "yaml",
+def load_scenario_file(
+    path: str | Path, name: str | None = None
 ) -> ScenarioConfig:
-    """Build a ScenarioConfig from the system + sim YAML pair."""
-    carrier, tdd = load_system(system_path)
-    sim = _load_yaml(sim_path)
+    """Build a ScenarioConfig from one self-contained scenario YAML file.
 
-    run = sim.get("simulation", {})
-    defaults = sim.get("defaults", {})
+    `name` overrides the scenario name; otherwise the file's `name:` key is
+    used, falling back to the filename stem.
+    """
+    cfg = _load_yaml(path)
+
+    run = cfg.get("simulation", {})
+    defaults = cfg.get("defaults", {})
     ue_defaults = defaults.get("ue", {})
     flow_defaults = defaults.get("flow", {})
 
     ues: list[UEConfig] = []
     flows: list[FlowConfig] = []
-    for ue_block in sim["ues"]:
+    for ue_block in cfg["ues"]:
         ue_id = int(ue_block["ue_id"])
         ues.append(
             UEConfig(
                 ue_id=ue_id,
                 mean_snr_db=float(
-                    ue_block.get("mean_snr_db", ue_defaults.get("mean_snr_db", 20.0))
+                    ue_block.get(
+                        "mean_snr_db", ue_defaults.get("mean_snr_db", 20.0)
+                    )
                 ),
                 coherence_slots=int(
                     ue_block.get(
-                        "coherence_slots", ue_defaults.get("coherence_slots", 100)
+                        "coherence_slots",
+                        ue_defaults.get("coherence_slots", 100),
                     )
                 ),
             )
@@ -119,10 +119,10 @@ def load_scenario(
             flows.append(_flow_from_dict(ue_id, merged))
 
     return ScenarioConfig(
-        name=name,
+        name=str(name or cfg.get("name", Path(path).stem)),
         horizon_slots=int(run.get("horizon_slots", 4000)),
-        carrier=carrier,
-        tdd=tdd,
+        carrier=_carrier_from(cfg),
+        tdd=_tdd_from(cfg),
         ues=ues,
         flows=flows,
         seed=int(run.get("seed", 42)),

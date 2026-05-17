@@ -1,0 +1,65 @@
+# Sensor-dense scenario: 30 small periodic UL sensor flows.
+#
+# Each sensor: 5 ms reporting period, 200 bytes (~320 kbps), 15 ms PDB.
+# Total offered (~10 Mbps) is well under PRB capacity -- the binding
+# constraint is the per-slot PDCCH/CCE budget for dynamic grants. SNR 12 dB
+# puts every sensor at DCI aggregation level 2, which makes PDCCH bind and
+# lets SPS / Configured Grants (no per-slot DCI) shine.
+
+name: sensor_dense
+
+simulation:
+  horizon_slots: 4000
+  seed: 23
+
+carrier:
+  bandwidth_mhz: 30
+  numerology: 1
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DSUUU
+  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+
+defaults:
+  ue:
+    mean_snr_db: 12.0
+    coherence_slots: 2000
+  flow:
+    qfi: 1
+    direction: UL
+    flow_class: Delay
+    max_delay_budget_ms: 15
+    traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 200}
+
+ues:
+  - {ue_id: 1,  flows: [{}]}
+  - {ue_id: 2,  flows: [{}]}
+  - {ue_id: 3,  flows: [{}]}
+  - {ue_id: 4,  flows: [{}]}
+  - {ue_id: 5,  flows: [{}]}
+  - {ue_id: 6,  flows: [{}]}
+  - {ue_id: 7,  flows: [{}]}
+  - {ue_id: 8,  flows: [{}]}
+  - {ue_id: 9,  flows: [{}]}
+  - {ue_id: 10, flows: [{}]}
+  - {ue_id: 11, flows: [{}]}
+  - {ue_id: 12, flows: [{}]}
+  - {ue_id: 13, flows: [{}]}
+  - {ue_id: 14, flows: [{}]}
+  - {ue_id: 15, flows: [{}]}
+  - {ue_id: 16, flows: [{}]}
+  - {ue_id: 17, flows: [{}]}
+  - {ue_id: 18, flows: [{}]}
+  - {ue_id: 19, flows: [{}]}
+  - {ue_id: 20, flows: [{}]}
+  - {ue_id: 21, flows: [{}]}
+  - {ue_id: 22, flows: [{}]}
+  - {ue_id: 23, flows: [{}]}
+  - {ue_id: 24, flows: [{}]}
+  - {ue_id: 25, flows: [{}]}
+  - {ue_id: 26, flows: [{}]}
+  - {ue_id: 27, flows: [{}]}
+  - {ue_id: 28, flows: [{}]}
+  - {ue_id: 29, flows: [{}]}
+  - {ue_id: 30, flows: [{}]}

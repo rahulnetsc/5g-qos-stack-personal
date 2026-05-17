@@ -1,54 +1,65 @@
-"""End-to-end check that the YAML config pair builds a runnable scenario."""
+"""Every scenario_config_*.yml loads into a runnable ScenarioConfig."""
 
-from pathlib import Path
+import pytest
 
-from sim.config_loader import load_scenario, load_system
+from sim import scenarios
 from sim.driver import run
-from sim.scenarios import yaml_scenario
 from sim.schedulers.round_robin import RoundRobin
 
-
-_CONFIGS = Path(__file__).resolve().parent.parent / "configs"
-
-
-def test_load_system_translates_units_and_tdd():
-    carrier, tdd = load_system(_CONFIGS / "system_config.yml")
-    # 40 MHz -> 40_000_000 Hz, mu=2
-    assert carrier.bandwidth_hz == 40_000_000
-    assert carrier.numerology == 2
-    # TDD pattern + S-slot symbol split (sum to 14)
-    assert tdd.pattern == "DSUUU"
-    assert tdd.s_slot_split == (3, 2, 9)
-    assert sum(tdd.s_slot_split) == 14
+_ALL_SCENARIOS = [
+    scenarios.smoke_scenario,
+    scenarios.overload_scenario,
+    scenarios.vision_scenario,
+    scenarios.sensor_dense_scenario,
+    scenarios.latency_bound_scenario,
+    scenarios.factory_robots_scenario,
+]
 
 
-def test_load_scenario_flattens_ues_and_flows():
-    scen = load_scenario(
-        _CONFIGS / "system_config.yml",
-        _CONFIGS / "sim_config.yml",
-    )
-    # 10 robot UEs; mix of 2/3/4 flows each (24 total in the current scenario).
-    assert len(scen.ues) == 10
-    assert len(scen.flows) == 24
-    # Defaults propagate (every UE got a coherence_slots, every flow got a PDB)
-    assert all(ue.coherence_slots > 0 for ue in scen.ues)
-    assert all(f.pdb_ms > 0 for f in scen.flows)
-    # GBR / Delay overrides survived the merge
-    gbr_flows = [f for f in scen.flows if f.flow_class == "GBR"]
-    delay_flows = [f for f in scen.flows if f.flow_class == "Delay"]
-    assert gbr_flows and all(f.gfbr_bps > 0 for f in gbr_flows)
-    assert delay_flows and all(f.pdb_ms <= 30 for f in delay_flows)
-    # UL/DL split: this scenario is uplink-heavy (more UL flows than DL).
-    ul_flows = [f for f in scen.flows if f.direction == "UL"]
-    dl_flows = [f for f in scen.flows if f.direction == "DL"]
-    assert len(ul_flows) > len(dl_flows)
-
-
-def test_yaml_scenario_runs_end_to_end():
-    """The YAML-driven scenario must actually execute through the driver."""
-    scen = yaml_scenario()
+@pytest.mark.parametrize("factory", _ALL_SCENARIOS, ids=lambda f: f.__name__)
+def test_scenario_loads_and_runs(factory):
+    """Each scenario YAML must parse and execute end to end."""
+    scen = factory()
+    assert scen.ues and scen.flows
+    assert scen.horizon_slots > 0
+    assert scen.carrier.bandwidth_hz > 0
+    assert sum(scen.tdd.s_slot_split) == 14
     summary = run(scen, RoundRobin())
     assert summary["horizon_s"] > 0
-    assert len(summary["flows"]) == 24
-    # At least one flow should have delivered bytes (sanity, not correctness)
     assert any(f["throughput_bps"] > 0 for f in summary["flows"].values())
+
+
+def test_factory_robots_flattens_ues_and_flows():
+    """The factory scenario: 10 robot UEs, 24 flows, defaults propagated,
+    units translated (40 MHz -> 40e6 Hz)."""
+    scen = scenarios.factory_robots_scenario()
+    assert len(scen.ues) == 10
+    assert len(scen.flows) == 24
+    assert scen.carrier.bandwidth_hz == 40_000_000
+    assert scen.carrier.numerology == 2
+    # Defaults propagate: every UE got a coherence_slots, every flow a PDB.
+    assert all(ue.coherence_slots > 0 for ue in scen.ues)
+    assert all(f.pdb_ms > 0 for f in scen.flows)
+    # GBR / Delay overrides survived the merge.
+    gbr = [f for f in scen.flows if f.flow_class == "GBR"]
+    delay = [f for f in scen.flows if f.flow_class == "Delay"]
+    assert gbr and all(f.gfbr_bps > 0 for f in gbr)
+    assert delay and all(f.pdb_ms <= 30 for f in delay)
+    # Uplink-heavy: more UL flows than DL.
+    ul = [f for f in scen.flows if f.direction == "UL"]
+    dl = [f for f in scen.flows if f.direction == "DL"]
+    assert len(ul) > len(dl)
+
+
+def test_empty_flow_inherits_defaults():
+    """`flows: [{}]` must inherit the whole default flow (sensor_dense uses
+    this to stay compact)."""
+    scen = scenarios.sensor_dense_scenario()
+    assert len(scen.ues) == 30
+    assert len(scen.flows) == 30
+    for f in scen.flows:
+        assert f.qfi == 1
+        assert f.flow_class == "Delay"
+        assert f.direction == "UL"
+        assert f.traffic_kind == "deterministic"
+        assert f.traffic_params["bytes_per_period"] == 200

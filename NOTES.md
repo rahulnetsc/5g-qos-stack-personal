@@ -9,7 +9,7 @@ this but haven't acted on it yet."
 
 ## 2026-05-13 — Tier-1 LP behaviors surfaced by the 10-robot scenario
 
-The uplink-heavy factory scenario in [configs/sim_config.yml](configs/sim_config.yml)
+The uplink-heavy factory scenario in [sim/scenarios/scenario_config_factory_robots.yml](sim/scenarios/scenario_config_factory_robots.yml)
 (24 flows: 10 robots with UL camera/LIDAR + DL control, 3 with extra PF
 best-effort, 1 bidirectional TCP) exposes two TwoTier behaviors that
 the prior 3-flow overload scenario didn't surface. Reproduce with
@@ -323,7 +323,7 @@ so there the GBR-contract count is the discriminator, not p99.)
 ## Next — deep dive: Findings 2 & 3
 
 Two open findings to take apart before the OAI work. Both bear on whether
-the GBR contracts in [configs/](configs/) are even dimensionable.
+the GBR contracts in [sim/scenarios/](sim/scenarios/) are even dimensionable.
 
 ### Finding 2 — Mixed-flow UE penalty (carried forward, still open)
 

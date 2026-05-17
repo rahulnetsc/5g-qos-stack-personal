@@ -30,9 +30,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sim.config import ScenarioConfig
 from sim.driver import run
 from sim.scenarios import (
+    factory_robots_scenario,
     latency_bound_scenario,
     sensor_dense_scenario,
-    yaml_scenario,
 )
 from sim.schedulers.pf import ProportionalFair
 from sim.schedulers.round_robin import RoundRobin
@@ -120,12 +120,12 @@ def _hr(title: str) -> None:
 
 
 def study_overload_sweep() -> None:
-    _hr("STUDY 1 -- Overload sweep (10-robot yaml scenario)")
+    _hr("STUDY 1 -- Overload sweep (10-robot factory scenario)")
     print(
         "Carrier capacity scaled around the as-configured point (1.0x).\n"
         "GBR contract = delivered throughput >= 95% of GFBR.\n"
     )
-    base = yaml_scenario()
+    base = factory_robots_scenario()
     scheds = [
         ("PF", _pf),
         ("TwoTier", lambda: _tt()),
@@ -155,7 +155,7 @@ def study_pdcch_limited() -> None:
         "before the data channel does. Delay contract = >=99% on-time "
         "within the 15 ms PDB.\n"
     )
-    sc = sensor_dense_scenario(num_sensors=30)
+    sc = sensor_dense_scenario()
     scheds = [("RoundRobin", RoundRobin), ("PF", _pf), ("TwoTier", _tt)]
     print(
         f"{'scheduler':<14}{'total':>9}{'on-time':>10}"

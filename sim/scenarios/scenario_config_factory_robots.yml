@@ -1,42 +1,45 @@
-# Simulator workload configuration: UEs, flows, and run parameters.
+# Factory-robots scenario: 10 robots on a private 5G cell (the main study
+# scenario; was the configs/ YAML pair before the scenarios refactor).
 #
-# Scenario: 10 factory robots on a private 5G cell. Each robot uploads
-# video / sensor data to an edge server (UL-heavy GBR) and receives
-# control-loop commands (DL low-rate, tight delay). Three robots also do
-# best-effort UL uploads (logs / software backups) — those are the
-# sacrificable load that scheduler comparison should exercise. UE 10 is
-# an asymmetric TCP example to illustrate how a bidirectional app is
-# modeled as two flow entries with different QFIs.
+# Each robot uploads video / sensor data to an edge server (UL-heavy GBR)
+# and receives control-loop commands (DL low-rate, tight delay). Three
+# robots also do best-effort UL uploads (logs / backups) -- the sacrificable
+# load that scheduler comparison exercises. UE 10 is an asymmetric TCP
+# example: a bidirectional app modelled as two flow entries with different
+# QFIs (each flow is uni-directional by design, matching 3GPP).
 #
-# Each flow is uni-directional by design (matches 3GPP — UL and DL flows
-# have separate QFIs even when they share an application). For a
-# bidirectional app, write two flow entries; the simulator keys metrics
-# by (ue_id, qfi), so the UL and DL halves must use different QFIs.
-#
-# Aggregate offered load against the system_config.yml radio (40 MHz,
-# numerology=2, DSUUU + S-slot 3:2:9):
+# Aggregate offered load against the radio below (40 MHz, numerology 2,
+# DSUUU + S-slot 3:2:9):
 #   - UL capacity (~peak): ~112 Mbps; UL offered: ~110 Mbps  -> ~98% UL load
 #   - DL capacity (~peak): ~37 Mbps;  DL offered:  ~11 Mbps  -> ~30% DL load
-# UL is in the overload regime — the right pressure to expose TwoTier's
-# GBR protection vs PF's equal-share behavior on best-effort flows.
-#
-# A note on MCS vs SNR: the simulator is SNR-driven. Per-UE radio quality
-# is `mean_snr_db`; MCS is derived from a staircase in sim/channel.py.
+# UL is in the overload regime -- the pressure that exposes TwoTier's GBR
+# protection vs PF's equal-share behaviour on best-effort flows.
+
+name: factory_robots
 
 simulation:
-  horizon_slots: 4000   # at numerology=2 (0.25 ms slot) this is 1.0 s of wall time
+  horizon_slots: 4000   # at numerology 2 (0.25 ms slot) this is 1.0 s
   seed: 42
+
+carrier:
+  bandwidth_mhz: 40
+  numerology: 2         # SCS = 15 * 2^mu kHz; slot = 1 / 2^mu ms
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DSUUU
+  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
 
 defaults:
   ue:
     mean_snr_db: 20.0
     coherence_slots: 2000
   flow:
-    # `direction` is intentionally NOT defaulted — every flow declares UL or DL
-    # explicitly so the workload is unambiguous at a glance.
+    # `direction` is intentionally NOT defaulted -- every flow declares
+    # UL or DL explicitly so the workload is unambiguous at a glance.
     flow_class: PF
-    min_data_rate_bps: 0          # GFBR — guaranteed floor (0 = best effort)
-    max_data_rate_bps: 2_000_000  # MFBR — upper cap (not yet enforced in sim)
+    min_data_rate_bps: 0          # GFBR -- guaranteed floor (0 = best effort)
+    max_data_rate_bps: 2_000_000  # MFBR -- upper cap (not enforced in sim)
     max_delay_budget_ms: 30       # PDB
 
 ues:
@@ -48,7 +51,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 8_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -68,7 +70,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 8_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -88,7 +89,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 8_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -108,7 +108,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 8_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -129,7 +128,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 14_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -149,7 +147,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 14_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -169,7 +166,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 14_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -182,10 +178,10 @@ ues:
         max_delay_budget_ms: 10
         traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
 
-  # ---- Best-effort UL load on three of the camera robots ----
-  # These flows model on-robot logs, recordings, software updates being
-  # uploaded opportunistically. They share the UL pipe with the GBR video
-  # above and are what TwoTier should sacrifice under overload.
+  # ---- Best-effort UL load on three of the camera robots (UE 8-10) ----
+  # These model on-robot logs / recordings / software updates uploaded
+  # opportunistically. They share the UL pipe with the GBR video above and
+  # are what TwoTier should sacrifice under overload.
   - ue_id: 8
     mean_snr_db: 21.0
     flows:
@@ -193,7 +189,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 6_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -218,7 +213,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 6_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33
@@ -237,10 +231,9 @@ ues:
         traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 40}
 
   # ---- Robot 10: asymmetric TCP example ----
-  # Robot uploads camera (UL GBR) AND downloads a large training dataset
-  # / firmware over TCP (DL bulk + UL acks). The DL bulk + UL acks pair
-  # shows the canonical bidirectional-app pattern: two flow entries with
-  # different QFIs, rates expressed in their respective directions.
+  # Uploads camera (UL GBR) AND downloads a large dataset / firmware over
+  # TCP (DL bulk + UL acks) -- the canonical bidirectional-app pattern:
+  # two flow entries, different QFIs, rates in their respective directions.
   - ue_id: 10
     mean_snr_db: 20.0
     flows:
@@ -248,7 +241,6 @@ ues:
         direction: UL
         flow_class: GBR
         min_data_rate_bps: 6_000_000
-        max_delay_budget_ms: 30
         traffic:
           kind: video_frame
           period_ms: 33.33

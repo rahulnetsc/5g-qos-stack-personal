@@ -1,0 +1,50 @@
+# Overload scenario: severe DL overload (~5 Mbps capacity, ~24 Mbps
+# offered). Designed to expose how each scheduler enforces QoS under
+# contention -- a PF best-effort flow, a GBR flow, and a Delay flow all
+# competing on a deliberately small 10 MHz carrier.
+
+name: overload
+
+simulation:
+  horizon_slots: 4000
+  seed: 2
+
+carrier:
+  bandwidth_mhz: 10
+  numerology: 1
+  overhead_factor: 0.85
+
+tdd:
+  pattern: DSUUU
+  s_slot_split: {dl_symbols: 3, gap_symbols: 2, ul_symbols: 9}
+
+defaults:
+  ue:
+    mean_snr_db: 20.0
+    coherence_slots: 2000
+
+ues:
+  - ue_id: 1
+    flows:
+      - qfi: 9
+        direction: DL
+        flow_class: PF
+        max_delay_budget_ms: 300
+        traffic: {kind: poisson, rate_bps: 20_000_000}
+
+  - ue_id: 2
+    flows:
+      - qfi: 2
+        direction: DL
+        flow_class: GBR
+        min_data_rate_bps: 4_000_000
+        max_delay_budget_ms: 100
+        traffic: {kind: poisson, rate_bps: 4_000_000}
+
+  - ue_id: 3
+    flows:
+      - qfi: 1
+        direction: DL
+        flow_class: Delay
+        max_delay_budget_ms: 20
+        traffic: {kind: deterministic, period_ms: 5.0, bytes_per_period: 400}

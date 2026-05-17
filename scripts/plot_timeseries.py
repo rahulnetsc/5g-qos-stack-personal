@@ -20,6 +20,8 @@ import numpy as np
 
 from sim.driver import run
 from sim.scenarios import (
+    factory_robots_scenario,
+    latency_bound_scenario,
     overload_scenario,
     sensor_dense_scenario,
     smoke_scenario,
@@ -35,7 +37,9 @@ SCENARIOS = {
     "smoke": smoke_scenario,
     "overload": overload_scenario,
     "vision": vision_scenario,
-    "sensor": lambda: sensor_dense_scenario(num_sensors=30),
+    "sensor": sensor_dense_scenario,
+    "latency": latency_bound_scenario,
+    "factory": factory_robots_scenario,
 }
 
 SCHEDULERS = {
