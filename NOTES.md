@@ -548,3 +548,51 @@ LP's derived target — the viability floor compensates for GFBR's tendency
 to over-subscribe under overload. Regression guards:
 `test_two_tier_sps_oversubscribed_tier_falls_back_to_dynamic`,
 `test_two_tier_sps_priority_tier_decides_the_winner`.
+
+---
+
+## 2026-05-17 — Finding 3 confirmed: a contract-dimensioning problem, not a scheduler one
+
+Confirmed with `scripts/diagnose_finding3.py` — three independent lines of
+evidence, all pointing the same way.
+
+**Contract arithmetic.** An I-frame arrives as one chunk and has the PDB to
+drain, so it needs `I_frame_bytes·8 / PDB` of rate. For the factory video
+profiles:
+
+| profile | GFBR | I-frame | burst rate | burst / GFBR |
+|---|---|---|---|---|
+| camera 8M | 8 M | 132 KB | 35 M | 4.4× |
+| lidar 14M | 14 M | 174 KB | 46 M | 3.3× |
+| camera 6M | 6 M | 100 KB | 27 M | 4.4× |
+
+The I-frame burst rate is 3–4× the GFBR. At exactly the contracted GFBR
+only 22–30 % of an I-frame drains within the 30 ms PDB. **The contract
+(GFBR + 30 ms PDB) is internally inconsistent with a 4× I-frame source** —
+before any scheduler is involved.
+
+**Scheduler-independence.** One video flow, alone on a 20 MHz carrier (no
+contention at all): RoundRobin 98.0 %, PF 98.0 %, TwoTier 97.9 % delivery —
+identical. With a single flow there is nothing to schedule; every policy
+gives it every PRB. So the loss is provably *not* a scheduler artifact.
+Sweeping capacity, delivery is thresholded on the ~35 Mbps burst rate, not
+the ~9 Mbps average — it reaches 100 % only once peak capacity clears the
+burst, ~5–8× the average.
+
+**The fix is in the inputs.** On a fixed carrier where the lone flow drops,
+relaxing the PDB (30→60 ms) or shrinking the I-frame multiplier (4→2×, with
+1× = paced/CBR) takes delivery to ~100 %. Both are contract / source
+changes; neither touches the scheduler.
+
+**Verdict — Finding 3 confirmed: an admission / contract-dimensioning
+problem.** No scheduling policy fixes it. The levers are: dimension the
+cell for the *burst* rate not the average; relax the PDB to fit the burst;
+pace the source / cap I-frame inflation; or admission-control flows whose
+burst cannot be served within PDB. A "GFBR + tight PDB" contract for a
+bursty video source is a specification error.
+
+(The isolated test drops only ~2 % — the per-flow burst-vs-capacity tail.
+Factory's deeper ~15 % loss adds *aggregate* burst coincidence: its 10
+video flows are not I-frame-staggered, unlike `vision`'s, so their bursts
+can land together and the summed burst demand exceeds capacity. That too is
+a source/dimensioning matter — stagger the encoders — not a scheduler one.)
