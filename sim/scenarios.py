@@ -179,6 +179,62 @@ def sensor_dense_scenario(
     )
 
 
+def latency_bound_scenario() -> ScenarioConfig:
+    """DL-congested factory teleoperation. Medium-rate, tight-PDB interactive
+    flows compete with bulk best-effort downloads on a saturated downlink.
+
+    8 robots each receive a 12 ms-PDB interactive stream (control + operator
+    view, 5 Mbps each = 40 Mbps total) -- feasible as a set if prioritised,
+    leaving headroom on the ~57 Mbps downlink. 4 UEs pull bulk best-effort
+    downloads (20 Mbps offered each, 80 Mbps total) that flood the rest.
+
+    The point of differentiation is *latency*, and the design deliberately
+    defeats PF's accidental protection of small flows. PF schedules by
+    channel-relative throughput (rate / EWMA-rate) and equalises delivered
+    throughput across flows. At 5 Mbps the interactive flows sit above PF's
+    per-flow equal share, so PF throttles them like any other flow -- it has
+    no notion of PDB or backlog age. Throttled below their offered rate, the
+    interactive flows' buffers grow and packets age past the 12 ms PDB.
+    TwoTier (Delay class weighted 5x in Tier-1, HoL/PDB urgency in Tier-2)
+    should fund the interactive set in full and squeeze bulk instead.
+
+    DL-heavy TDD (DDDSU) so the downlink is the contended resource.
+    """
+    control_snrs = [22.0, 20.0, 18.0, 16.0, 14.0, 12.0, 24.0, 19.0]
+    bulk_snrs = [20.0, 21.0, 19.0, 22.0]
+    ues = [
+        UEConfig(ue_id=i + 1, mean_snr_db=snr, coherence_slots=2000)
+        for i, snr in enumerate(control_snrs)
+    ] + [
+        UEConfig(ue_id=9 + i, mean_snr_db=snr, coherence_slots=2000)
+        for i, snr in enumerate(bulk_snrs)
+    ]
+    flows = [
+        FlowConfig(
+            ue_id=i + 1, qfi=1, direction="DL", flow_class="Delay", pdb_ms=12,
+            traffic_kind="deterministic",
+            traffic_params={"period_ms": 5.0, "bytes_per_period": 3125},
+        )
+        for i in range(len(control_snrs))
+    ] + [
+        FlowConfig(
+            ue_id=9 + i, qfi=9, direction="DL", flow_class="PF", pdb_ms=300,
+            traffic_kind="poisson",
+            traffic_params={"rate_bps": 20_000_000},
+        )
+        for i in range(len(bulk_snrs))
+    ]
+    return ScenarioConfig(
+        name="latency_bound",
+        horizon_slots=4000,
+        carrier=CarrierConfig(bandwidth_hz=40_000_000, numerology=1),
+        tdd=TDDConfig(pattern="DDDSU", s_slot_split=(11, 1, 2)),
+        ues=ues,
+        flows=flows,
+        seed=29,
+    )
+
+
 def overload_scenario() -> ScenarioConfig:
     """Severe DL overload: ~5 Mbps capacity, ~24 Mbps offered. Designed to
     expose scheduler differences in QoS enforcement."""

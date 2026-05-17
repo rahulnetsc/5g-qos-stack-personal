@@ -37,6 +37,27 @@ UL utilization saturates at 100% for PF / Grad / TwoTier (overload regime
 as designed). DL is at 30–73% utilization (DL underloaded — Delay control
 and TCP bulk all met).
 
+### Aggregate summary
+
+Total delivered = sum of delivered throughput over all 24 flows. Mean /
+min GBR delivery = mean / min delivery ratio over the 10 GBR (qfi2) flows.
+
+| Scheduler | Total delivered | Mean GBR delivery | Min GBR delivery |
+|---|---|---|---|
+| RoundRobin | 58.6 Mbps | 43.0% | 17.6% |
+| ProportionalFair | 71.9 Mbps | 49.5% | 19.0% |
+| Gradient | 70.4 Mbps | 51.3% | **29.6%** |
+| TwoTier | **76.1 Mbps** | **51.7%** | 4.4% |
+| TwoTier (adaptive penalty, `lr=1e5`) | 70.6 Mbps | 47.5% | 19.8% |
+
+TwoTier wins every *aggregate* — highest total throughput and highest
+mean GBR delivery — yet has the **worst** min GBR delivery (4.4% vs
+Gradient's 29.6%). That gap is Finding 1: the aggregate win is bought by
+starving ue4/ue7. Mean GBR delivery hides it; min GBR delivery is the
+metric that exposes it. (The adaptive penalty, 05-16 section below,
+trades some of TwoTier's aggregate lead back for a higher floor:
+min GBR 4.4→19.8%.)
+
 ### Finding 1 — Cell-edge starvation under soft GBR floors
 
 UE 4 (16 dB SNR) and UE 7 (14 dB SNR) drop to 4–8% GBR delivery under
@@ -173,3 +194,126 @@ The `k<0` sweep makes Finding 2 sharper: ue8/9/10 (the mixed-flow UEs)
 are exactly the UEs that absorb relocated starvation under every
 redistribution we try. Root cause still uninvestigated — see the
 05-13 hypotheses and the per-flow LP-dump plan above.
+
+---
+
+## 2026-05-17 — Scheduler study: when does QoS-awareness earn its complexity?
+
+The 05-16 aggregate table made TwoTier (adaptive) look barely
+distinguishable from plain PF. Before committing engineering effort to
+the two-tier LP + drift-plus-penalty machinery — and the OAI work it
+implies — we need to know which deployments it actually changes outcomes
+*users feel*, and which it doesn't. Three studies, reproducible with
+`python scripts/scheduler_study.py`. Metrics are contract-oriented (a GBR
+flow's contract is its GFBR; a Delay flow's is on-time delivery within
+PDB) because mean delivery ratio hid every finding below.
+
+### Study 1 — Overload sweep: the value of QoS-awareness is a hump
+
+GBR contracts met (delivered throughput ≥ 95% of GFBR), 10-robot scenario
+with carrier capacity scaled around the as-shipped point (1.0×):
+
+| Capacity | PF | TwoTier | TwoTier + adaptive |
+|---|---|---|---|
+| 1.0× (deep overload) | 1/10 | 3/10 | 0/10 |
+| 1.5× | 4/10 | 5/10 | 4/10 |
+| 2.0× (moderate overload) | 8/10 | **10/10** | 10/10 |
+| 3.0× (light load) | 10/10 | 10/10 | 10/10 |
+
+The scenario as shipped (1.0×) sits in *deep* overload — GBR demand ≈ 2×
+capacity — where no scheduler can honor the contracts and PF ≈ TwoTier.
+At 3.0× everyone has slack and converges. The scheduler choice decides
+outcomes only in the **moderate band (1.5–2.0×)**: at 2.0× TwoTier honors
+10/10 contracts vs PF's 8/10, and carries +6.5 Mbps total.
+
+**Engineering implications.** Dimension cells for ~1.5–2× peak overload —
+that is the band where the two-tier scheduler earns its complexity. A cell
+that *systematically* runs at ≥2.5× overload has a capacity-planning
+problem no scheduler fixes; the answer is spectrum/cells or admission
+control, not a smarter MAC.
+
+### The adaptive penalty is the wrong shape for deep overload
+
+At 1.0× the adaptive penalty meets **0/10** contracts — worse than default
+TwoTier's 3/10 — even though it raised *min delivery* 4%→20% (05-16). Dual
+ascent drives toward equal normalized shortfall (PF among GBR flows), but
+a GBR contract is a **step function**: 94% of GFBR is a miss. Equalizing
+shortfall parks every flow just below the bar so none clears it.
+
+**Engineering implication.** In genuine infeasibility the right tool is
+**admission control** — defer/drop some flows, fully satisfy a feasible
+subset (a knapsack on contracts) — not penalty equalization. Keep
+`gbr_penalty_lr = 0` as the default; treat the adaptive penalty as a
+fairness-reporting knob, not a contract mechanism. A flow pinned at
+`p_max` and still missing is precisely the admission-control reject signal.
+
+### Study 2 — PDCCH-limited: a structural win PF cannot replicate
+
+30 dense periodic sensors; the per-slot DCI/CCE budget binds before the
+data channel. Delay contract = ≥99% on-time within the 15 ms PDB:
+
+| Scheduler | On-time | Worst p99 | Total |
+|---|---|---|---|
+| RoundRobin | 0/30 | 15.0 ms | 7.0M |
+| PF | 18/30 | 15.0 ms | 9.4M |
+| TwoTier | **30/30** | **5.0 ms** | 9.6M |
+
+The mechanism is SPS / Configured Grants — a periodic flow gets a standing
+allocation and consumes **zero PDCCH per slot**. PF-class schedulers have
+no equivalent; this is not tuning, it is a feature they structurally lack.
+
+**Engineering implications.** Any deployment with dense periodic
+small-payload traffic (sensors, PLCs, AGV telemetry) *requires* Configured
+Grants — put CG support firmly in OAI scope; it is the highest-leverage
+feature here. And the bottleneck is the *control* channel, not data:
+capacity planning that only counts PRBs/throughput will mis-size it.
+
+### Study 3 — Latency-bound: PF's deadline blindness is silent
+
+8 medium-rate (5 Mbps) interactive streams, 12 ms PDB, sharing a saturated
+DL with 80 Mbps of bulk. Delay contract = ≥99% packets on-time:
+
+| Scheduler | On-time | Worst p99 | Bulk DL |
+|---|---|---|---|
+| RoundRobin | 3/8 | 12.0 ms | 22.8M |
+| PF | 4/8 | 12.0 ms | 24.9M |
+| TwoTier | **8/8** | **7.5 ms** | 16.8M |
+
+PF schedules by channel-relative throughput and equalizes delivered rate —
+no notion of PDB or backlog age — so a healthy 5 Mbps deadline flow is
+throttled like any bulk flow. TwoTier funds the interactive set (Delay
+class 5× in Tier-1, HoL urgency in Tier-2) and squeezes bulk: an explicit,
+deliberate ~8 Mbps bulk trade to meet every deadline.
+
+The dangerous part: PF's failure is **silent**. Its control-flow mean
+delivery is 89% — that reads "fine" on a dashboard — but the missing 11%
+are aged-out packets, the late control commands, and in a teleoperation /
+motion-control loop those are the safety-relevant ones.
+
+**Engineering implication.** Deployments mixing medium-rate
+latency-critical flows (teleoperation, AR, motion-control video) with bulk
+*require* a deadline-aware scheduler. PF misses, and misses quietly.
+
+### Bottom line — build / don't build
+
+| Deployment characteristic | Scheduler needed | Why |
+|---|---|---|
+| Uniformly best-effort, or always deeply overloaded | PF | Two-tier LP adds no contract PF can't ~match — pure overhead |
+| Dense periodic sensors / PLCs | Two-tier **with SPS/CG** (mandatory) | PDCCH-bound; PF structurally cannot do configured grants |
+| Medium-rate latency-critical + bulk mix | Two-tier (deadline-aware Tier-2) | PF is deadline-blind; misses are silent |
+| GBR contracts at moderate (1.5–2×) overload | Two-tier (Tier-1 LP) | PF misses contracts the cell could honor |
+| GBR contracts at deep (≥2.5×) overload | Admission control, not a scheduler | Genuine infeasibility — satisfy a feasible subset |
+
+Net: the two-tier scheduler is worth building for this factory/warehouse
+target — but the load-bearing features are **Configured Grants** and a
+**deadline-aware Tier-2**, not the adaptive GBR penalty. The Tier-1 LP
+earns its place specifically in the moderate-overload GBR band.
+
+### Metric guidance for the rest of the project
+
+Stop using mean delivery ratio as a headline — it hid all three findings
+above. Report: count of GBR flows meeting GFBR, count of Delay flows
+on-time within PDB, and p99 HoL. Those are the numbers a deployment owner
+feels. (Caveat: in study 1 the worst p99 saturates at the 30 ms PDB for
+every scheduler — a burst/PDB-bound ceiling, see the 05-16 side-finding —
+so there the GBR-contract count is the discriminator, not p99.)

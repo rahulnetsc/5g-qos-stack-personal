@@ -366,6 +366,41 @@ def test_two_tier_beats_pf_under_pdcch_pressure():
     )
 
 
+def test_latency_bound_two_tier_protects_deadlines():
+    """In the DL-congested latency-bound scenario, TwoTier must hold the
+    medium-rate interactive (Delay) flows within their PDB while PF, which
+    is deadline-blind, misses some. Guards study 3 of scheduler_study.py."""
+    from sim.scenarios import latency_bound_scenario
+    from sim.schedulers.pf import ProportionalFair
+
+    sc = latency_bound_scenario()
+    pdb_ms = next(f.pdb_ms for f in sc.flows if f.flow_class == "Delay")
+    delay_keys = [
+        f"ue{f.ue_id}_qfi{f.qfi}" for f in sc.flows if f.flow_class == "Delay"
+    ]
+
+    pf = run(sc, ProportionalFair(ewma_window_slots=200))
+    tt = run(sc, TwoTier(tier1_period_slots=2000))
+
+    def on_time(summary):
+        return sum(
+            1 for k in delay_keys
+            if summary["flows"][k]["delivery_ratio"] >= 0.99
+            and summary["flows"][k]["hol_p99_ms"] <= pdb_ms
+        )
+
+    tt_worst_p99 = max(tt["flows"][k]["hol_p99_ms"] for k in delay_keys)
+    assert on_time(tt) > on_time(pf), (
+        f"TwoTier on-time {on_time(tt)} should beat PF {on_time(pf)}"
+    )
+    assert on_time(tt) == len(delay_keys), (
+        f"TwoTier should hold every deadline; got {on_time(tt)}/{len(delay_keys)}"
+    )
+    assert tt_worst_p99 <= pdb_ms, (
+        f"TwoTier worst p99 HoL {tt_worst_p99} ms exceeds PDB {pdb_ms} ms"
+    )
+
+
 def test_pdcch_budget_caps_dynamic_allocations():
     """The dynamic scheduler must respect the per-slot CCE budget. With many
     flows and a tight budget, PF's allocation count per slot is bounded."""
