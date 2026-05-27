@@ -9,7 +9,7 @@ from .interfaces import (
     GridView,
     SlotView,
 )
-from .link import bits_per_prb, cce_aggregation_level
+from .link import bits_per_prb, cce_aggregation_level, bler_sigmoid
 from .tier1 import estimate_demand_bps, solve_tier1
 
 
@@ -263,8 +263,10 @@ class TwoTier:
                     if floor_bps <= 0:
                         continue
                     snr = snr_in.get(f.ue_id, 20.0)
-                    bits_per_rb, bler = bits_per_prb(snr, symbols=int(avg_sym))
-                    effective_bits = bits_per_rb * (1.0 - bler)
+                    bits_per_rb, _ = bits_per_prb(snr, symbols=int(avg_sym))
+                    effective_bits = bits_per_rb * (
+                        1.0 - bler_sigmoid(snr - self._snr_avg.get(f.ue_id, snr))
+                    )
                     if effective_bits <= 0:
                         continue
                     bytes_per_dir_slot = (
@@ -335,7 +337,9 @@ class TwoTier:
         for f in self._flows:
             key = (f.ue_id, f.qfi)
             target_bps = self._targets_bps.get(key, 0.0)
-            self._virtual_q[key] += target_bps * self.slot_duration_s
+            total_prbs = self._grid.prb_count
+            capacity_fraction = slot.prb_count / max(1, total_prbs)
+            self._virtual_q[key] += target_bps * self.slot_duration_s * capacity_fraction
 
             arr_now = buffers.arrived_cum(*key) * 8
             del_now = buffers.delivered_cum(*key) * 8
@@ -452,7 +456,7 @@ class TwoTier:
         for i, (key, byts) in enumerate(fills):
             delivered_bits = byts * 8 * (1.0 - bler)
             self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
-            committed[key] += int(byts * (1.0 - bler))
+            committed[key] += byts
             out.append(
                 Allocation(
                     ue_id=ue_id, qfi=key[1], direction=direction,
@@ -499,9 +503,9 @@ class TwoTier:
                 # Empty configured grant: a real gNB wastes the PRBs; the
                 # simulator releases them (release-on-empty CG).
                 continue
-            bits_per_rb, bler = bits_per_prb(
-                channel.get_snr_db(ue_id), symbols=symbols
-            )
+            snr = channel.get_snr_db(ue_id)
+            bits_per_rb, _ = bits_per_prb(snr, symbols=symbols)
+            bler = bler_sigmoid(snr - self._snr_avg.get(ue_id, snr))
             if bits_per_rb <= 0:
                 continue
 
@@ -555,13 +559,14 @@ class TwoTier:
         # Rank UEs by total deficit x spectral efficiency.
         scored: list[tuple[float, int, list, int, float]] = []
         for ue_id, flows in ue_flows.items():
-            bits_per_rb, bler = bits_per_prb(
-                channel.get_snr_db(ue_id), symbols=symbols
-            )
+            snr = channel.get_snr_db(ue_id)
+            bits_per_rb, _ = bits_per_prb(snr, symbols=symbols)
+            bler = bler_sigmoid(snr - self._snr_avg.get(ue_id, snr))
             if bits_per_rb <= 0:
                 continue
             ue_q = sum(q_by_key.get((f.ue_id, f.qfi), 0.0) for f in flows)
-            scored.append((ue_q * bits_per_rb, ue_id, flows, bits_per_rb, bler))
+            effective_bits = bits_per_rb * (1.0 - bler)
+            scored.append((ue_q * effective_bits, ue_id, flows, bits_per_rb, bler))
         scored.sort(key=lambda x: x[0], reverse=True)
 
         prbs_left = prb_budget

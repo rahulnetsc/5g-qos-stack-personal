@@ -28,6 +28,7 @@ help:
 	@echo "  plot                 run scripts/plot_timeseries.py"
 	@echo "  export-requirements  generate requirements.txt for pip-only users"
 	@echo "  clean                remove .venv and caches"
+	@echo "  compare-harq         run scripts/compare_harq.py        (flat-BLER vs HARQ/IR)"
 
 install:
 	$(UV) sync
@@ -46,6 +47,9 @@ smoke:
 
 compare:
 	$(UV) run python scripts/compare_schedulers.py
+
+compare-harq:
+	$(UV) run python scripts/compare_harq.py 2>&1 | tee retx_compare.log
 
 plot:
 	$(UV) run python scripts/plot_timeseries.py

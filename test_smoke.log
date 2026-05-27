@@ -1,0 +1,94 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0 -- /home/smart/projects/5g-qos-stack/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/smart/projects/5g-qos-stack
+configfile: pyproject.toml
+collecting ... collected 26 items
+
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_true_completes[RoundRobin-sched0] PASSED [  3%]
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_true_completes[ProportionalFair-sched1] PASSED [  7%]
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_true_completes[TwoTier-sched2] PASSED [ 11%]
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_false_completes[RoundRobin-sched0] PASSED [ 15%]
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_false_completes[ProportionalFair-sched1] PASSED [ 19%]
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_false_completes[TwoTier-sched2] PASSED [ 23%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_harq_fields_present PASSED [ 26%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_harq_false_retx_bytes_zero PASSED [ 30%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_true[RoundRobin-sched0] PASSED [ 34%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_true[ProportionalFair-sched1] PASSED [ 38%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_true[TwoTier-sched2] FAILED [ 42%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_false[RoundRobin-sched0] PASSED [ 46%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_false[ProportionalFair-sched1] PASSED [ 50%]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_false[TwoTier-sched2] PASSED [ 53%]
+sim/tests/test_smoke_harq.py::TestRetxFired::test_some_retx_occurred FAILED [ 57%]
+sim/tests/test_smoke_harq.py::TestRetxFired::test_harq_loss_ratio_small PASSED [ 61%]
+sim/tests/test_smoke_harq.py::TestDeliveryRatio::test_harq_improves_delivery_ratio PASSED [ 65%]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_prb_utilisation_bounded[RoundRobin-sched0] PASSED [ 69%]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_prb_utilisation_bounded[ProportionalFair-sched1] PASSED [ 73%]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_prb_utilisation_bounded[TwoTier-sched2] PASSED [ 76%]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_no_overallocation[RoundRobin-sched0] PASSED [ 80%]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_no_overallocation[ProportionalFair-sched1] PASSED [ 84%]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_no_overallocation[TwoTier-sched2] PASSED [ 88%]
+sim/tests/test_smoke_harq.py::TestMultiScenario::test_scenario_completes[1] PASSED [ 92%]
+sim/tests/test_smoke_harq.py::TestMultiScenario::test_scenario_completes[2] PASSED [ 96%]
+sim/tests/test_smoke_harq.py::TestMultiScenario::test_scenario_completes[3] PASSED [100%]
+
+=================================== FAILURES ===================================
+_________ TestSummaryFields.test_flow_sanity_harq_true[TwoTier-sched2] _________
+
+self = <sim.tests.test_smoke_harq.TestSummaryFields object at 0x7fdfa151f1a0>
+name = 'TwoTier', sched = <scheduler.two_tier.TwoTier object at 0x7fdfa151db20>
+
+    @pytest.mark.parametrize("name,sched", _schedulers())
+    def test_flow_sanity_harq_true(self, name, sched):
+        summary = run(_load(1), sched, harq=True)
+        for flow in _all_flows(summary):
+>           _check_flow_sanity(flow, harq_enabled=True)
+
+sim/tests/test_smoke_harq.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+flow = {'bytes_arrived': 80000, 'bytes_delivered': 81376, 'bytes_dropped': 0, 'delivery_ratio': 1.0172, ...}
+harq_enabled = True
+
+    def _check_flow_sanity(flow, harq_enabled):
+        assert flow["bytes_delivered"] >= 0
+        assert flow["delivery_ratio"] >= 0.0
+>       assert flow["delivery_ratio"] <= 1.0
+E       assert 1.0172 <= 1.0
+
+sim/tests/test_smoke_harq.py:58: AssertionError
+____________________ TestRetxFired.test_some_retx_occurred _____________________
+
+self = <sim.tests.test_smoke_harq.TestRetxFired object at 0x7fdfa151f9e0>
+
+    def test_some_retx_occurred(self):
+        """With 10 % nominal BLER, retransmissions must occur over a long run."""
+        scenario = _load(1)
+        summary = run(scenario, RoundRobin(), harq=True)
+        total_retx = sum(f["harq_retx_bytes"] for f in _all_flows(summary))
+>       assert total_retx > 0, (
+            "No retransmissions recorded -- HARQ never fired. "
+            "Check bler_sigmoid and HARQEngine.process_outcome."
+        )
+E       AssertionError: No retransmissions recorded -- HARQ never fired. Check bler_sigmoid and HARQEngine.process_outcome.
+E       assert 0 > 0
+
+sim/tests/test_smoke_harq.py:132: AssertionError
+=============================== warnings summary ===============================
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_true_completes[TwoTier-sched2]
+sim/tests/test_smoke_harq.py::TestNocrash::test_harq_false_completes[TwoTier-sched2]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_true[TwoTier-sched2]
+sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_false[TwoTier-sched2]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_prb_utilisation_bounded[TwoTier-sched2]
+sim/tests/test_smoke_harq.py::TestPRBUtilisation::test_no_overallocation[TwoTier-sched2]
+sim/tests/test_smoke_harq.py::TestMultiScenario::test_scenario_completes[1]
+sim/tests/test_smoke_harq.py::TestMultiScenario::test_scenario_completes[2]
+sim/tests/test_smoke_harq.py::TestMultiScenario::test_scenario_completes[3]
+  /home/smart/projects/5g-qos-stack/scheduler/tier1.py:184: UserWarning: Solution may be inaccurate. Try another solver, adjusting the solver settings, or solve with verbose=True for more information.
+    problem.solve()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED sim/tests/test_smoke_harq.py::TestSummaryFields::test_flow_sanity_harq_true[TwoTier-sched2]
+FAILED sim/tests/test_smoke_harq.py::TestRetxFired::test_some_retx_occurred
+=================== 2 failed, 24 passed, 9 warnings in 3.07s ===================

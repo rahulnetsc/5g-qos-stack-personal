@@ -1,3 +1,26 @@
+"""Simulation metrics -- arrival, delivery, HARQ, HoL delay, PRB utilisation.
+
+HARQ additions (feat/harq-bler-retx)
+--------------------------------------
+Two new per-flow counters:
+
+    bytes_harq_retx  -- bytes that required at least one retransmission
+                        (first TX NACK'd; the bytes were eventually delivered
+                        or abandoned on a later attempt).
+    bytes_harq_lost  -- bytes abandoned after MAX_RETX failures.
+                        These were drained from the buffer on first TX but
+                        never confirmed as received.
+
+New summary keys per flow:
+    harq_retx_bytes   raw count
+    harq_loss_bytes   raw count
+    harq_retx_ratio   bytes_harq_retx / bytes_arrived  (retx pressure)
+    harq_loss_ratio   bytes_harq_lost  / bytes_arrived  (unrecoverable loss)
+
+New system-level summary key:
+    harq_enabled      bool -- True when the HARQEngine was active this run.
+"""
+
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -7,6 +30,9 @@ class FlowMetrics:
     bytes_arrived: int = 0
     bytes_delivered: int = 0
     bytes_dropped: int = 0
+    # HARQ counters (feat/harq-bler-retx)
+    bytes_harq_retx: int = 0   # bytes that needed ≥1 retransmission
+    bytes_harq_lost: int = 0   # bytes abandoned after MAX_RETX
     hol_delay_samples_s: list = field(default_factory=list)
 
 
@@ -19,6 +45,7 @@ class Metrics:
         self._ul_prbs_total = 0
         self._cce_used = 0
         self._cce_total = 0
+        self._harq_enabled: bool = False   # set by run() when HARQEngine active
 
         # Per-slot time series (opt-in to keep memory footprint small).
         self.record_ts = record_timeseries
@@ -33,6 +60,10 @@ class Metrics:
             "cce_used": [],
             "cce_budget": [],
         }
+
+    # ------------------------------------------------------------------
+    # Existing record methods (unchanged)
+    # ------------------------------------------------------------------
 
     def record_arrival(self, ue_id: int, qfi: int, byts: int) -> None:
         self._flow[(ue_id, qfi)].bytes_arrived += byts
@@ -61,6 +92,26 @@ class Metrics:
         self._cce_used += used
         self._cce_total += total
 
+    # ------------------------------------------------------------------
+    # HARQ record methods (feat/harq-bler-retx)
+    # ------------------------------------------------------------------
+
+    def set_harq_enabled(self, enabled: bool) -> None:
+        """Called once by run() so the summary can report harq_enabled."""
+        self._harq_enabled = enabled
+
+    def record_harq_retx(self, ue_id: int, qfi: int, byts: int) -> None:
+        """Record bytes that are being retransmitted (first TX NACK'd)."""
+        self._flow[(ue_id, qfi)].bytes_harq_retx += byts
+
+    def record_harq_loss(self, ue_id: int, qfi: int, byts: int) -> None:
+        """Record bytes abandoned after MAX_RETX failures."""
+        self._flow[(ue_id, qfi)].bytes_harq_lost += byts
+
+    # ------------------------------------------------------------------
+    # Snapshot (unchanged)
+    # ------------------------------------------------------------------
+
     def snapshot_slot(
         self,
         *,
@@ -75,7 +126,6 @@ class Metrics:
         ul_prbs_used: int,
         cce_used: int,
     ) -> None:
-        """Record one per-slot snapshot. No-op if record_timeseries is False."""
         if not self.record_ts:
             return
         self._ts_slot_index.append(slot_index)
@@ -108,7 +158,6 @@ class Metrics:
         self._ts_system["cce_budget"].append(slot_grid.pdcch_cce_budget)
 
     def timeseries(self) -> dict:
-        """Return recorded per-slot data. Empty dict if recording was disabled."""
         if not self.record_ts:
             return {}
         return {
@@ -132,6 +181,7 @@ class Metrics:
     def summary(self, horizon_s: float) -> dict:
         out = {
             "horizon_s": horizon_s,
+            "harq_enabled": self._harq_enabled,
             "dl_prb_utilization": self._dl_prbs_used / max(1, self._dl_prbs_total),
             "ul_prb_utilization": self._ul_prbs_used / max(1, self._ul_prbs_total),
             "cce_utilization": self._cce_used / max(1, self._cce_total),
@@ -139,18 +189,24 @@ class Metrics:
         }
         for (ue_id, qfi), m in sorted(self._flow.items()):
             tput_bps = (m.bytes_delivered * 8) / horizon_s if horizon_s > 0 else 0.0
-            arr_bps = (m.bytes_arrived * 8) / horizon_s if horizon_s > 0 else 0.0
+            arr_bps  = (m.bytes_arrived  * 8) / horizon_s if horizon_s > 0 else 0.0
+            arrived  = max(1, m.bytes_arrived)
             out["flows"][f"ue{ue_id}_qfi{qfi}"] = {
-                "bytes_arrived": m.bytes_arrived,
-                "bytes_delivered": m.bytes_delivered,
-                "bytes_dropped": m.bytes_dropped,
-                "throughput_bps": round(tput_bps, 1),
-                "offered_bps": round(arr_bps, 1),
-                "delivery_ratio": round(
-                    m.bytes_delivered / max(1, m.bytes_arrived), 4
-                ),
-                "hol_p50_ms": round(self._percentile(m.hol_delay_samples_s, 0.50) * 1000, 3),
-                "hol_p95_ms": round(self._percentile(m.hol_delay_samples_s, 0.95) * 1000, 3),
-                "hol_p99_ms": round(self._percentile(m.hol_delay_samples_s, 0.99) * 1000, 3),
+                "bytes_arrived":    m.bytes_arrived,
+                "bytes_delivered":  m.bytes_delivered,
+                "bytes_dropped":    m.bytes_dropped,
+                "harq_retx_bytes":  m.bytes_harq_retx,
+                "harq_loss_bytes":  m.bytes_harq_lost,
+                "throughput_bps":   round(tput_bps, 1),
+                "offered_bps":      round(arr_bps, 1),
+                "delivery_ratio":   round(m.bytes_delivered / arrived, 4),
+                "harq_retx_ratio":  round(m.bytes_harq_retx / arrived, 4),
+                "harq_loss_ratio":  round(m.bytes_harq_lost  / arrived, 4),
+                "hol_p50_ms":  round(
+                    self._percentile(m.hol_delay_samples_s, 0.50) * 1000, 3),
+                "hol_p95_ms":  round(
+                    self._percentile(m.hol_delay_samples_s, 0.95) * 1000, 3),
+                "hol_p99_ms":  round(
+                    self._percentile(m.hol_delay_samples_s, 0.99) * 1000, 3),
             }
         return out
