@@ -1,6 +1,0 @@
-test:
-  stringvalue: testvalue
-  stringlist:
-    - testvalue1
-    - testvalue2
-    - testvalue3
