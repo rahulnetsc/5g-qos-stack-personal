@@ -140,8 +140,95 @@ In the Uplink direction, the data flow originates directly from the client appli
                                         directly to the local data network or open internet.
 ```
 
-# 2. End-to-End QoS Flows: Layer-by-Layer Walkthrough
-Let’s trace your active network pipeline once more, explicitly highlighting how every single step maps to the exact layers 
+# End-to-End QoS Flows: Layer-by-Layer Walkthrough
+
+**Refined Downlink (DL) QoS Flow Layer-by-Layer Path**
+
+```
+[Application / Internet Server]
+                │
+                │  Plain IP Packet (e.g., Destination Port: 5001)
+                ▼
+      ┌───────────────────┐
+      │  UPF N6 Interface │ ──► Ingress plain IP packet arrival.
+      └─────────┬─────────┘
+                │
+                ▼
+      ┌───────────────────┐
+      │   PDR Evaluation  │ ──► Evaluated against Packet Detection Rules (PDRs) 
+      └─────────┬─────────┘     in strict increasing order of precedence.
+                │               Matches IP Packet Filter Set (5-tuple).
+                ▼
+      ┌───────────────────┐
+      │  QER Enforcement  │ ──► QoS Enforcement Rule (QER) assigns a specific 
+      └─────────┬─────────┘     QoS Flow Identifier (QFI: 0..63).
+                │               Applies maximum bitrate token-bucket policing.
+                ▼
+      ┌───────────────────┐
+      │   FAR Execution   │ ──► Forwarding Action Rule (FAR) executes packet encapsulation.
+      └─────────┬─────────┘     Wraps raw IP payload into N3 GTP-U headers.
+                │               Stamps the QFI into the outer tunnel extension header.
+                ▼ (Pushed over the N3 interface GTP-U tunnel to the gNB-CU)
+                │
+ ===============================▼=============================================================================
+ gNB-CU LAYER (gNB Central Unit — Control Plane terminates NGAP, User Plane evaluates DRB Maps)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │ gNB-CU SDAP Layer │ ──► Receives the GTP-U packet from the N3 interface tunnel.
+      └─────────┬─────────┘     Pulls the QFI directly from the extension header.
+                │               References "DRBs to QoS Flows Mapping List" (TS 38.413 9.3.1.34).
+                │               Maps the parsed QFI scalar item to a target DRB ID (1..32).
+                │               Prepends a 5G SDAP Data Header containing the active QFI tag.
+                ▼
+      ┌───────────────────┐
+      │ gNB-CU PDCP Layer │ ──► Terminates core network connectivity, maintains COUNT.
+      └───────────────────┘     Applies ciphering and header compression (ROHC/EHC) functions.
+                │
+                ▼ (Transferred to the DU over the F1-U User Plane Interface)
+                │
+ ===============================▼=============================================================================
+ gNB-DU LAYER (gNB Distributed Unit — Configured via F1AP Context, Controls Physical Scheduler)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │ gNB-DU RLC Layer  │ ──► Context initialized via F1AP "UE Context Setup Request" (TS 38.473 8.3.1).
+      └─────────┬─────────┘     Sets up RLC Mode (AM/UM channel properties via TS 38.473 9.3.1.27).
+                │               Maps incoming bearer directly to a target Logical Channel ID (LCID) queue.
+                ▼
+      ┌───────────────────┐
+      │ gNB-DU MAC Layer  │ ──► Downlink Logical Channel buffer configurations become visible to the scheduler.
+      └─────────┬─────────┘     • Stage 8 (ia_p5g_dl_lcid_alloc): Evaluates pending bytes per LCID,
+                │                 extracting underlying target profiles from `lc_config[lcid].fiveQI`.
+                │               • Stage 6 (ia_p5g_dl_rb_alloc): Custom Tier-2 scheduler hook hijacks loop,
+                │                 referencing TS 23.501 default metrics to calculate optimal PRB slicing.
+                ▼
+      ┌───────────────────┐
+      │ gNB-DU PHY Layer  │ ──► Compiles scheduling decisions into Downlink Control Information (DCI).
+      └───────────────────┘     Modulates digital payload blocks directly onto target frequency slots.
+                │
+                ▼ (Transmitted over the airwaves via the physical Uu interface)
+                │
+ ===============================▼=============================================================================
+ USER EQUIPMENT (UE) LAYER (Receives Waveforms, De-encapsulates Cell Stacks)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │ UE MAC/RLC/PDCP   │ ──► Phone lower layers decode raw radio parameters back into clear text.
+      └─────────┬─────────┘     Handles HARQ feedback loops and link-layer reassembly.
+                │
+                ▼ (Intermediate user-plane data frame delivered up to device SDAP)
+                │
+      ┌───────────────────┐
+      │   UE SDAP Layer   │ ──► Strips the Access Stratum SDAP data header wrapper.
+      └─────────┬─────────┘     Parses the embedded QFI to confirm target routing properties.
+                │
+                ▼
+      [ Client Application (iperf3) ] ──► Receives plain, unencapsulated IP packet payload.
+```
 
 ## **A. Downlink Path (From Internet down to the Phone)**
 
