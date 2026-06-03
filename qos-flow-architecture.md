@@ -139,3 +139,74 @@ In the Uplink direction, the data flow originates directly from the client appli
           [ UPF N6 Interface ]      ──► Plain IP packet leaves the cellular universe and is exposed 
                                         directly to the local data network or open internet.
 ```
+
+# 2. End-to-End QoS Flows: Layer-by-Layer Walkthrough
+Let’s trace your active network pipeline once more, explicitly highlighting how every single step maps to the exact layers 
+
+## **A. Downlink Path (From Internet down to the Phone)**
+
+## Step 1: The External Gateway Interface
+Layers Involved: Application → IP
+
+The Action: The application server generates an raw data packet wrapped inside a standard network IP layer container (e.g., matching a port number like 5001).
+
+## Step 2: Core Network Core Rules Execution (UPF)
+- Layers Involved: Core network routers (The UPF)
+
+- The Action: The UPF evaluates the incoming packet against its internal PDR (Packet Detection Rule) parameters. It matches the IP 5-tuple, passes it to a QER (QoS Enforcement Rule) to assign a target QFI, and wraps it into a GTP-U tunnel via a FAR (Forwarding Action Rule) to send over the wire to the base station.
+
+## Step 3: RAN Boundary Translation (gNB Central Unit)
+- Layers Involved: SDAP
+
+- The Action: The packet arrives at the gNB−CU. The SDAP layer un-encapsulates the N3 tunnel, reads the QFI tag, and uses its configuration matrix to select an active target Data Radio Bearer (DRB). SDAP then prepends a 5G data header containing this QFI tag onto the packet.
+
+## Step 4: Link Integrity and Queue Management (gNB Central & Distributed Units)
+- Layers Involved: PDCP → RLC
+
+- The Action: The PDCP layer applies ciphering protection and handles sequence number tracking. It then passes the frame down to the RLC layer. RLC translates the designated DRB profile directly into a specific software queue called a Logical Channel ID (LCID).  
+
+## Step 5: Resource Slicing & Scheduling (gNB Distributed Unit)
+- Layers Involved: MAC
+
+- The Action: The MAC layer sublayer is where your custom project codebase is actively injected:
+
+Your Stage 8 hook (ia_p5g_dl_lcid_alloc) inspects the RLC buffer depth queues, parsing their underlying fiveQI priority definitions.
+
+Your Stage 6 hook (ia_p5g_dl_rb_alloc) hijacks the allocation loop to decide how many time and frequency blocks are needed for that priority level.
+
+## Step 6: Over-The-Air Transmission
+-Layers Involved: PHY (gNB) → PHY (UE)
+
+- The Action: The physical PHY layer takes the scheduling blueprint from the MAC layer, modulates the digital bits onto high-frequency waves, and transmits them across the physical Uu air interface directly to the user equipment physical layer.
+
+## Step 7: Device Reception
+Layers Involved: MAC → RLC → PDCP → SDAP → IP → Application
+
+## The Action: The phone reassembles the waves up through its own lower layers (PHY → MAC → RLC → PDCP). The phone's SDAP layer strips away the 5G cellular headers, reads the embedded QFI tag, strips it, and passes a clean, standard IP packet to your local device client Application (iperf3 client).
+
+## B. Uplink Path (From the Phone back to the Core)
+
+## Step 1: Device-Side Core Data Mapping
+- Layers Involved: Application → IP → NAS
+
+- The Action: Your phone's application layer generates an upload packet. The IP layer stamps it with addressing. The internal NAS controller layer matches it against its stored configuration profiles to declare exactly what QFI this upload path deserves.
+
+## Step 2: Access Stratum Encapsulation
+- Layers Involved: SDAP (UE) → PDCP → RLC → MAC
+
+- The Action: The phone's SDAP sublayer stamps a header carrying the assigned QFI onto the packet and binds it to an active DRB. The lower layers (PDCP and RLC) move the data down to the MAC sublayer queue. The phone's MAC engine transmits a Buffer Status Report (BSR) across the physical PHY layer waves to tell the base station tower that it has data waiting to be pushed.
+
+## Step 3: Base Station Split Ingestion
+- Layers Involved: PHY → MAC → RLC (gNB-DU)
+
+- The Action: The gNB−DU receives the raw blocks at its PHY layer, processes them through the MAC sublayer scheduling loops, and passes them to the RLC layer. Here, the DU applies local aggregate bitrate policing to ensure the uplink stream complies with the configuration profiles established via F1AP signaling.
+
+## Step 4: Interface Delivery and Encapsulation
+- Layers Involved: PDCP → SDAP (gNB-CU)
+
+- The Action: The data is pushed over F1-U up to the Central Unit. The PDCP layer deciphers the radio stream, and passes it to the SDAP processing engine. The gNB-CU SDAP layer reads the QFI tag directly from the over-the-air protocol header, strips it away, and re-packages the plain IP payload into an Uplink GTP-U tunnel container. It copies the QFI into the standard N3 interface outer extension header to tunnel it back over IP to the 5G Core.
+
+## Step 5: Core Network Verification and Egress
+- Layers Involved: Gateway Processing (UPF)
+
+- The Action: The UPF reads the incoming packet from the N3 tunnel interface, strips the outer encapsulation wrappers, and passes it to its core engines. It ensures the incoming QFI aligns safely with verified session parameters, enforces aggregate limits, and exposes a plain, unencapsulated IP packet directly to the IP data network via the N6 local interface.
