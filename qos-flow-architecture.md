@@ -229,7 +229,82 @@ In the Uplink direction, the data flow originates directly from the client appli
                 ▼
       [ Client Application (iperf3) ] ──► Receives plain, unencapsulated IP packet payload.
 ```
+Refined Uplink (UL) QoS Flow Layer-by-Layer Path
 
+```
+[Client Application on Phone]
+                │
+                │  Generates Outgoing IP Packet (e.g., Destination Port: 5001)
+                ▼
+ ===============================▼=============================================================================
+ USER EQUIPMENT (UE) LAYER (Performs In-Device Classification and Radio Queue Enqueue)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │   UE NAS Layer    │ ──► Acts as an internal router, inspecting outbound IP packets.
+      └─────────┬─────────┘     Evaluates traffic filters against explicitly signaled rules in precedence order.
+                │               Matches the IP Packet Filter Set to map the packet to a unique QFI (0..63).
+                ▼
+      ┌───────────────────┐
+      │   UE SDAP Layer   │ ──► Prepends an SDAP Data Header stamped with the assigned QFI.
+      └─────────┬─────────┘     Uses internal RRC configuration rules to map that QFI to a target DRB ID.
+                │               Chunnels the payload into the corresponding RLC / LCID buffer queue.
+                ▼
+      ┌───────────────────┐
+      │   UE MAC Layer    │ ──► Tracks buffer occupancy across Logical Channel Groups (LCGs).
+      └───────────────────┘     Fires a Buffer Status Report (BSR) to request uplink grant resources.
+                                Enforces local maximum bitrates per PDU session using Session-AMBR.
+                │
+                ▼ (Grants received; transmits radio blocks on assigned PRBs over the Uu interface)
+                │
+ ===============================▼=============================================================================
+ gNB-DU LAYER (Distributed Unit — Terminates Radio Waves, Enforces Session AMBR)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │ gNB-DU PHY/MAC/RLC│ ──► L1/L2 hardware components decode over-the-air grids back into digital SDUs.
+      └───────────────────┘     Applies strict uplink traffic policing for non-GBR bearers using the stored 
+                                UL PDU Session Aggregate Maximum Bit Rate constraints (TS 38.473 8.3.1.2).
+                │
+                ▼ (Intermediate payload context pushed over the F1-U User Plane Interface)
+                │
+ ===============================▼=============================================================================
+ gNB-CU LAYER (Central Unit — Prepares private cellular network tunnel encapsulation)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │ gNB-CU PDCP Layer │ ──► Terminates radio link ciphering, integrity verification, and reordering.
+      └─────────┬─────────┘
+                │
+                ▼
+      ┌───────────────────┐
+      │ gNB-CU SDAP Layer │ ──► Reads the explicit QFI tag directly from the over-the-air SDAP header.
+      └─────────┬─────────┘     Strips the Access Stratum SDAP data header wrapper away.
+                │
+                ▼
+      ┌───────────────────┐
+      │ gNB-CU GTP-U Gen  │ ──► Encapsulates the clean IP payload into an Uplink GTP-U tunnel container.
+      └───────────────────┘     Stuffs the parsed QFI value into the UL PDU Session Container extension.
+                │
+                ▼ (Pushed over the N3 tunnel interface directly to the Core Network gateway)
+                │
+ ===============================▼=============================================================================
+ 5GC CORE LAYER (Gateway Routing Engine — Validates QFI rules & enforces Core AMBR)
+ =============================================================================================================
+                │
+                ▼
+      ┌───────────────────┐
+      │  UPF N3 / QER     │ ──► Terminates the incoming N3 tunnel interface, stripping the GTP-U layer.
+      └─────────┬─────────┘     QER verifies the incoming QFI aligns with the rules from N4 session management.
+                │               Enforces Session-AMBR and Uplink GBR/MBR token bucket constraints.
+                ▼
+      ┌───────────────────┐
+      │  UPF N6 Interface │ ──► Clear, unencapsulated IP packet leaves the cellular network universe.
+      └───────────────────┘     Pushed directly to the local data network or open internet.
+```
 ## **A. Downlink Path (From Internet down to the Phone)**
 
 ## Step 1: The External Gateway Interface
@@ -267,9 +342,9 @@ Your Stage 6 hook (ia_p5g_dl_rb_alloc) hijacks the allocation loop to decide how
 - The Action: The physical PHY layer takes the scheduling blueprint from the MAC layer, modulates the digital bits onto high-frequency waves, and transmits them across the physical Uu air interface directly to the user equipment physical layer.
 
 ## Step 7: Device Reception
-Layers Involved: MAC → RLC → PDCP → SDAP → IP → Application
+- Layers Involved: MAC → RLC → PDCP → SDAP → IP → Application
 
-## The Action: The phone reassembles the waves up through its own lower layers (PHY → MAC → RLC → PDCP). The phone's SDAP layer strips away the 5G cellular headers, reads the embedded QFI tag, strips it, and passes a clean, standard IP packet to your local device client Application (iperf3 client).
+- The Action: The phone reassembles the waves up through its own lower layers (PHY → MAC → RLC → PDCP). The phone's SDAP layer strips away the 5G cellular headers, reads the embedded QFI tag, strips it, and passes a clean, standard IP packet to your local device client Application (iperf3 client).
 
 ## B. Uplink Path (From the Phone back to the Core)
 
@@ -297,3 +372,70 @@ Layers Involved: MAC → RLC → PDCP → SDAP → IP → Application
 - Layers Involved: Gateway Processing (UPF)
 
 - The Action: The UPF reads the incoming packet from the N3 tunnel interface, strips the outer encapsulation wrappers, and passes it to its core engines. It ensures the incoming QFI aligns safely with verified session parameters, enforces aggregate limits, and exposes a plain, unencapsulated IP packet directly to the IP data network via the N6 local interface.
+
+# Implementation Roadmap
+
+- Implement probabilistic guarantees for QoS
+- Implement BLER based data transfer limits for system capacity (1-BLER)*R
+- Use multiple copies in the time freq grid to combat BLER
+- Implement UL power control with mitigator
+- Slicing
+- Preemptive sending for urllc
+  
+# Connection messages
+
+```
+[UE NAS / RRC Layer]
+          │
+          │ (1) UE triggers Random Access (RACH) at the PHY layer. 
+          │     Transmits "RRC Setup Request" over the CCCH logical channel.
+          ▼
+[ gNB-DU RLC / MAC / F1AP ]
+          │
+          │ (2) DU intercepts the request, wraps it inside an F1AP "Initial UL RRC Message Transfer",
+          │     and forwards it over the F1-C control plane interface to the Central Unit.
+          ▼
+[ gNB-CU RRC Processor ]
+          │
+          │ (3) CU processes the request and responds with an F1AP "DL RRC Message Transfer" 
+          │     containing the "RRC Setup" payload. The UE moves to RRC_CONNECTED state.
+          ▼
+[ UE NAS -> gNB-CU NGAP Engine ]
+          │
+          │ (4) UE sends "RRC Setup Complete" carrying an embedded NAS Registration Request.
+          │     gNB-CU extracts the NAS payload and packages it into an NGAP "Initial UE Message".
+          │     Pushes the message over the N1/N2 boundary to the Access and Mobility Management Function (AMF).
+          ▼
+[ 5GC Core (AMF / SMF) ]
+          │
+          │ (5) AMF authenticates the UE via the AUSF/UDM. Once approved, the SMF triggers 
+          │     PDU Session Establishment, selecting the UPF and creating the default QFI.
+          │     AMF issues an NGAP "Initial Context Setup Request" back to the gNB-CU.
+          ▼
+ =================================================================================================
+ gNB-CU LAYER (Central Unit — Processes Context Requests & Instantiated DRB Mappings)
+ =================================================================================================
+          │
+          │ (6) gNB-CU receives the NGAP "Initial Context Setup Request" containing the AS Security 
+          │     Context and the "PDU Session Resource Setup List" (including the target QFI and 5QI metrics).
+          │     CU generates the security keys and determines the initial DRB mapping scheme.
+          ▼
+ =================================================================================================
+ gNB-DU LAYER (Distributed Unit — Establishes Local Bearers & Scheduler Queues)
+ =================================================================================================
+          │
+          │ (7) CU transmits an F1AP "UE Context Setup Request" to the DU to instantiate the radio resources.
+          │     The DU processes the "DRB To Be Setup List", binds them to distinct Logical Channels (LCIDs),
+          │     and allocates local hardware resources for the UE context. DU replies with "UE Context Setup Response".
+          ▼
+ =================================================================================================
+ OVER-THE-AIR (Uu Interface — Reconfiguring the Device)
+ =================================================================================================
+          │
+          │ (8) gNB-CU sends an "RRC Reconfiguration" message to the UE to activate AS Security (Ciphering),
+          │     and provides the explicit `radioBearerConfig` and `packetFilterSet` parameters.
+          │     The UE configures its internal SDAP/PDCP layers and replies with "RRC Reconfiguration Complete".
+          ▼
+[ Connection Fully Established ] ──► The control plane architecture is anchored. User plane QoS flow 
+                                      pipelines (like those in qos-flow-architecture.md) can now pass data.
+```                                      
