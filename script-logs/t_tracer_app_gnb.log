@@ -1,0 +1,685 @@
+connecting to 127.0.0.1:2021
+turning ON GNB_PHY_UL_FD_PUSCH_IQ
+turning ON GNB_PHY_UL_FD_DMRS
+turning ON GNB_PHY_UL_FD_CHAN_EST_DMRS_POS
+turning ON GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL
+turning ON GNB_PHY_UL_PAYLOAD_RX_BITS
+
+========================================
+  [STATE: INIT]
+========================================
+  Data Collection Service: Initializing shared memory ...
+  Directory 1: /tmp/gnb_app1, Directory 2: /tmp/gnb_app2
+  Project ID: 2335
+Remove shared memory identifier successful
+Remove shared memory identifier successful
+
+========================================
+  [STATE: WAIT]
+========================================
+  Data Collection Service: Waiting for config message ...
+
+========================================
+  [STATE: CONFIG]
+========================================
+  Received config message. Time Stamp: 20260604174604882456
+  Parameters: IP Address length: 10, IP Address: 127.0.0.1, Port Number: 2021
+  Connected to nr-softmodem
+
+========================================
+  [STATE: WAIT]
+========================================
+  Data Collection Service: Waiting for record/stop message ...
+
+========================================
+  [STATE: RECORD]
+========================================
+  Received record message. Time Stamp: 20260604174605384031
+  Number of requested tracer messages: 5
+ msg_id: 28,  msg_id: 29,  msg_id: 30,  msg_id: 31,  msg_id: 32, num_records: 5, start_frame: 5
+  Activating tracer messages:
+    28: GNB_PHY_UL_FD_PUSCH_IQ
+    29: GNB_PHY_UL_FD_DMRS
+    30: GNB_PHY_UL_FD_CHAN_EST_DMRS_POS
+    31: GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL
+    32: GNB_PHY_UL_PAYLOAD_RX_BITS
+  Setup UL trace data done
+  Activated traces in nr-softmodem
+
+  Data Collection Service: Start reading messages ...
+
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 370.8, diff frame.slot: 10.0
+ Start recording from frame: 370, slot: 8 
+
+Record number: 0
+Buffer index in bytes: 0
+Unix TS: 1780575365.395832842
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 370, slot 8, unix_ts 1780575365.395832842
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 1
+Buffer index in bytes: 3170
+Unix TS: 1780575365.395833202
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 370, slot 8, unix_ts 1780575365.395833202
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 1
+Buffer index in bytes: 6340
+Unix TS: 1780575365.395833503
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 370, slot 8, unix_ts 1780575365.395833503
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 1
+Buffer index in bytes: 9510
+Unix TS: 1780575365.395833824
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 370, slot 8, unix_ts 1780575365.395833824
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 1
+Buffer index in bytes: 12680
+Unix TS: 1780575365.395874381
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 370, slot 8, unix_ts 1780575365.395874381
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 1
+Buffer index in bytes: 12750
+Unix TS: 1780575365.406434512
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 380, slot 8, unix_ts 1780575365.406434512
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 2
+Buffer index in bytes: 15920
+Unix TS: 1780575365.406434853
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 380, slot 8, unix_ts 1780575365.406434853
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 2
+Buffer index in bytes: 19090
+Unix TS: 1780575365.406435204
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 380, slot 8, unix_ts 1780575365.406435204
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 2
+Buffer index in bytes: 22260
+Unix TS: 1780575365.406435705
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 380, slot 8, unix_ts 1780575365.406435705
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 2
+Buffer index in bytes: 25430
+Unix TS: 1780575365.406466934
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 380, slot 8, unix_ts 1780575365.406466934
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 2
+Buffer index in bytes: 25500
+Unix TS: 1780575365.416709813
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 390, slot 8, unix_ts 1780575365.416709813
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 3
+Buffer index in bytes: 28670
+Unix TS: 1780575365.416710184
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 390, slot 8, unix_ts 1780575365.416710184
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 3
+Buffer index in bytes: 31840
+Unix TS: 1780575365.416710605
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 390, slot 8, unix_ts 1780575365.416710605
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 3
+Buffer index in bytes: 35010
+Unix TS: 1780575365.416710975
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 390, slot 8, unix_ts 1780575365.416710975
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 3
+Buffer index in bytes: 38180
+Unix TS: 1780575365.416744950
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 390, slot 8, unix_ts 1780575365.416744950
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 3
+Buffer index in bytes: 38250
+Unix TS: 1780575365.427194963
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 400, slot 8, unix_ts 1780575365.427194963
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 4
+Buffer index in bytes: 41420
+Unix TS: 1780575365.427195363
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 400, slot 8, unix_ts 1780575365.427195363
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 4
+Buffer index in bytes: 44590
+Unix TS: 1780575365.427195744
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 400, slot 8, unix_ts 1780575365.427195744
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 4
+Buffer index in bytes: 47760
+Unix TS: 1780575365.427196205
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 400, slot 8, unix_ts 1780575365.427196205
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 4
+Buffer index in bytes: 50930
+Unix TS: 1780575365.427233275
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 400, slot 8, unix_ts 1780575365.427233275
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 4
+Buffer index in bytes: 51000
+Unix TS: 1780575365.437759823
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 410, slot 8, unix_ts 1780575365.437759823
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 5
+Buffer index in bytes: 54170
+Unix TS: 1780575365.437760164
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 410, slot 8, unix_ts 1780575365.437760164
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 5
+Buffer index in bytes: 57340
+Unix TS: 1780575365.437760475
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 410, slot 8, unix_ts 1780575365.437760475
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 5
+Buffer index in bytes: 60510
+Unix TS: 1780575365.437760835
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 410, slot 8, unix_ts 1780575365.437760835
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 5
+Buffer index in bytes: 63680
+Unix TS: 1780575365.437808596
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 410, slot 8, unix_ts 1780575365.437808596
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 5
+Buffer index in bytes: 63750
+Unix TS: 1780575365.448171774
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 420, slot 8, unix_ts 1780575365.448171774
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 6
+Buffer index in bytes: 66920
+Unix TS: 1780575365.448171974
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 420, slot 8, unix_ts 1780575365.448171974
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 6
+Buffer index in bytes: 70090
+Unix TS: 1780575365.448172335
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 420, slot 8, unix_ts 1780575365.448172335
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 6
+Buffer index in bytes: 73260
+Unix TS: 1780575365.448172656
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 420, slot 8, unix_ts 1780575365.448172656
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 6
+Buffer index in bytes: 76430
+Unix TS: 1780575365.448208383
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 420, slot 8, unix_ts 1780575365.448208383
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 6
+Buffer index in bytes: 76500
+Unix TS: 1780575365.458672383
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 430, slot 8, unix_ts 1780575365.458672383
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 7
+Buffer index in bytes: 79670
+Unix TS: 1780575365.458672613
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 430, slot 8, unix_ts 1780575365.458672613
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 7
+Buffer index in bytes: 82840
+Unix TS: 1780575365.458673044
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 430, slot 8, unix_ts 1780575365.458673044
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 7
+Buffer index in bytes: 86010
+Unix TS: 1780575365.458673495
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 430, slot 8, unix_ts 1780575365.458673495
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 7
+Buffer index in bytes: 89180
+Unix TS: 1780575365.458716196
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 430, slot 8, unix_ts 1780575365.458716196
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 7
+Buffer index in bytes: 89250
+Unix TS: 1780575365.469265557
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 440, slot 8, unix_ts 1780575365.469265557
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 8
+Buffer index in bytes: 92420
+Unix TS: 1780575365.469265888
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 440, slot 8, unix_ts 1780575365.469265888
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 8
+Buffer index in bytes: 95590
+Unix TS: 1780575365.469266189
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 440, slot 8, unix_ts 1780575365.469266189
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 8
+Buffer index in bytes: 98760
+Unix TS: 1780575365.469266469
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 440, slot 8, unix_ts 1780575365.469266469
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 8
+Buffer index in bytes: 101930
+Unix TS: 1780575365.469316755
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 440, slot 8, unix_ts 1780575365.469316755
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 8
+Buffer index in bytes: 102000
+Unix TS: 1780575365.479750146
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 450, slot 8, unix_ts 1780575365.479750146
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 9
+Buffer index in bytes: 105170
+Unix TS: 1780575365.479750436
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 450, slot 8, unix_ts 1780575365.479750436
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 9
+Buffer index in bytes: 108340
+Unix TS: 1780575365.479750767
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 450, slot 8, unix_ts 1780575365.479750767
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 9
+Buffer index in bytes: 111510
+Unix TS: 1780575365.479751098
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 450, slot 8, unix_ts 1780575365.479751098
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 9
+Buffer index in bytes: 114680
+Unix TS: 1780575365.479798768
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 450, slot 8, unix_ts 1780575365.479798768
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 9
+Buffer index in bytes: 114750
+Unix TS: 1780575365.490182184
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 460, slot 8, unix_ts 1780575365.490182184
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 10
+Buffer index in bytes: 117920
+Unix TS: 1780575365.490182575
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_POS (30) 
+frame 460, turning OFF GNB_PHY_UL_FD_PUSCH_IQ
+turning OFF GNB_PHY_UL_FD_DMRS
+turning OFF GNB_PHY_UL_FD_CHAN_EST_DMRS_POS
+turning OFF GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL
+turning OFF GNB_PHY_UL_PAYLOAD_RX_BITS
+slot 8, unix_ts 1780575365.490182575
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 10
+Buffer index in bytes: 121090
+Unix TS: 1780575365.490182896
+Message Info: msg_id GNB_PHY_UL_FD_PUSCH_IQ (28) 
+frame 460, slot 8, unix_ts 1780575365.490182896
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 10
+Buffer index in bytes: 124260
+Unix TS: 1780575365.490183176
+Message Info: msg_id GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL (31) 
+frame 460, slot 8, unix_ts 1780575365.490183176
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+
+Record number: 10
+Buffer index in bytes: 127430
+Unix TS: 1780575365.490218994
+Message Info: msg_id GNB_PHY_UL_PAYLOAD_RX_BITS (32) 
+frame 460, slot 8, unix_ts 1780575365.490218994
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 160, data size 20
+
+
+Record number: 10
+Buffer index in bytes: 127500
+Unix TS: 1780575365.500525234
+Message Info: msg_id GNB_PHY_UL_FD_DMRS (29) 
+frame 470, slot 8, unix_ts 1780575365.500525234
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_rx 1, number_of_bits 0, data size 3120
+
+  De-activating tracer messages
+  De-activated traces
+  Total time: 116.91 ms
+  Time per record: 10.63 ms
+30283132
+========================================
+  [STATE: STOP]
+========================================
+  Received 'stop' command. Exiting...

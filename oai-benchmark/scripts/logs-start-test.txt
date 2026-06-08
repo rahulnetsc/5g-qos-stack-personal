@@ -1,0 +1,90 @@
+[0;32m[INFO] 2026-06-04 15:07:28 Performing pre-flight cleanup of legacy modems and performance test instances...[0m
+[0;32m[INFO] 2026-06-04 15:07:33 Starting OAI 5G Core Network via Docker Compose...[0m
+[0;32m[INFO] 2026-06-04 15:07:33 Waiting for Core Network containers to reach 'healthy' state (2 min timeout)...[0m
+[0;32m[INFO] 2026-06-04 15:07:33 All core network containers are HEALTHY![0m
+[0;32m[INFO] 2026-06-04 15:07:33 Launching gNB in rfsimulator mode...[0m
+[0;32m[INFO] 2026-06-04 15:07:33 Checking gNB health alignment and NGAP connection to AMF...[0m
+[0;32m[INFO] 2026-06-04 15:07:37 gNB successfully initialized and registered with AMF![0m
+[0;32m[INFO] 2026-06-04 15:07:37 Launching nrUE in rfsimulator mode...[0m
+[0;32m[INFO] 2026-06-04 15:07:37 Waiting for nrUE network registration and PDU Session Activation...[0m
+[0;32m[INFO] 2026-06-04 15:07:39 nrUE connected! Dynamic IP assigned: 10.0.0.5[0m
+[0;32m[INFO] 2026-06-04 15:07:39 Extracted Data Network (oai-ext-dn) Target Core IP: 192.168.70.135[0m
+[0;32m[INFO] 2026-06-04 15:07:39 Initializing iperf3 host endpoint context inside oai-ext-dn...[0m
+[0;32m[INFO] 2026-06-04 15:07:42 Executing 10-Second Downstream (DL) Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+Reverse mode, remote host 192.168.70.135 is sending
+[  5] local 10.0.0.5 port 39567 connected to 192.168.70.135 port 5201
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-1.00   sec  53.4 MBytes   448 Mbits/sec                  
+[  5]   1.00-2.00   sec  62.9 MBytes   527 Mbits/sec                  
+[  5]   2.00-3.00   sec  63.8 MBytes   535 Mbits/sec                  
+[  5]   3.00-4.00   sec  62.2 MBytes   522 Mbits/sec                  
+[  5]   4.00-5.00   sec  63.8 MBytes   535 Mbits/sec                  
+[  5]   5.00-6.00   sec  63.2 MBytes   531 Mbits/sec                  
+[  5]   6.00-7.00   sec  60.9 MBytes   511 Mbits/sec                  
+[  5]   7.00-8.00   sec  62.0 MBytes   520 Mbits/sec                  
+[  5]   8.00-9.00   sec  38.2 MBytes   321 Mbits/sec                  
+[  5]   9.00-10.00  sec  53.5 MBytes   449 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.04  sec   587 MBytes   491 Mbits/sec  3463             sender
+[  5]   0.00-10.00  sec   584 MBytes   490 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO] 2026-06-04 15:07:52 Allowing socket resources to recycle...[0m
+[0;32m[INFO] 2026-06-04 15:07:55 Executing 10-Second Upstream (UL) Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+[  5] local 10.0.0.5 port 37449 connected to 192.168.70.135 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  27.4 MBytes   229 Mbits/sec    0   1.23 MBytes       
+[  5]   1.00-2.00   sec  30.1 MBytes   253 Mbits/sec    0   2.74 MBytes       
+[  5]   2.00-3.00   sec  30.9 MBytes   259 Mbits/sec  142   2.83 MBytes       
+[  5]   3.00-4.00   sec  30.5 MBytes   256 Mbits/sec  483   2.09 MBytes       
+[  5]   4.00-5.00   sec  30.0 MBytes   252 Mbits/sec    0   2.19 MBytes       
+[  5]   5.00-6.00   sec  30.1 MBytes   253 Mbits/sec    0   2.27 MBytes       
+[  5]   6.00-7.00   sec  31.4 MBytes   263 Mbits/sec    0   2.32 MBytes       
+[  5]   7.00-8.00   sec  30.1 MBytes   253 Mbits/sec    0   2.36 MBytes       
+[  5]   8.00-9.00   sec  30.1 MBytes   253 Mbits/sec    0   2.39 MBytes       
+[  5]   9.00-10.00  sec  31.4 MBytes   263 Mbits/sec    0   2.40 MBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec   302 MBytes   253 Mbits/sec  625             sender
+[  5]   0.00-10.11  sec   301 MBytes   250 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO] 2026-06-04 15:08:06 Allowing socket resources to recycle...[0m
+[0;32m[INFO] 2026-06-04 15:08:09 Executing 10-Second Bidirectional Concurrent Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+[  5] local 10.0.0.5 port 34625 connected to 192.168.70.135 port 5201
+[  7] local 10.0.0.5 port 44857 connected to 192.168.70.135 port 5201
+[ ID][Role] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5][TX-C]   0.00-1.00   sec  9.88 MBytes  82.8 Mbits/sec    9    143 KBytes       
+[  7][RX-C]   0.00-1.00   sec  48.8 MBytes   409 Mbits/sec                  
+[  5][TX-C]   1.00-2.00   sec  21.9 MBytes   184 Mbits/sec    0    230 KBytes       
+[  7][RX-C]   1.00-2.00   sec  57.0 MBytes   478 Mbits/sec                  
+[  5][TX-C]   2.00-3.00   sec  25.5 MBytes   214 Mbits/sec    0    304 KBytes       
+[  7][RX-C]   2.00-3.00   sec  39.2 MBytes   329 Mbits/sec                  
+[  5][TX-C]   3.00-4.00   sec  30.2 MBytes   254 Mbits/sec    0    372 KBytes       
+[  7][RX-C]   3.00-4.00   sec  29.0 MBytes   243 Mbits/sec                  
+[  5][TX-C]   4.00-5.00   sec  32.1 MBytes   269 Mbits/sec    0    433 KBytes       
+[  7][RX-C]   4.00-5.00   sec  18.0 MBytes   151 Mbits/sec                  
+[  5][TX-C]   5.00-6.00   sec  32.6 MBytes   274 Mbits/sec    0    486 KBytes       
+[  7][RX-C]   5.00-6.00   sec  19.2 MBytes   161 Mbits/sec                  
+[  5][TX-C]   6.00-7.00   sec  32.0 MBytes   268 Mbits/sec    0    536 KBytes       
+[  7][RX-C]   6.00-7.00   sec  20.4 MBytes   171 Mbits/sec                  
+[  5][TX-C]   7.00-8.00   sec  33.6 MBytes   282 Mbits/sec    0    581 KBytes       
+[  7][RX-C]   7.00-8.00   sec  21.2 MBytes   178 Mbits/sec                  
+[  5][TX-C]   8.00-9.00   sec  33.9 MBytes   284 Mbits/sec    0    625 KBytes       
+[  7][RX-C]   8.00-9.00   sec  23.4 MBytes   196 Mbits/sec                  
+[  5][TX-C]   9.00-10.00  sec  32.0 MBytes   268 Mbits/sec    0    665 KBytes       
+[  7][RX-C]   9.00-10.00  sec  19.6 MBytes   165 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID][Role] Interval           Transfer     Bitrate         Retr
+[  5][TX-C]   0.00-10.00  sec   284 MBytes   238 Mbits/sec    9             sender
+[  5][TX-C]   0.00-10.05  sec   282 MBytes   235 Mbits/sec                  receiver
+[  7][RX-C]   0.00-10.00  sec   299 MBytes   251 Mbits/sec  367             sender
+[  7][RX-C]   0.00-10.05  sec   296 MBytes   247 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO] 2026-06-04 15:08:19 Benchmarks completed successfully! Retaining background execution units.[0m
+[0;32m[INFO] 2026-06-04 15:08:19 To clean up execution stack, execute: sudo kill 302626 302880[0m

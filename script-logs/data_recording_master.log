@@ -1,0 +1,40 @@
+/home/smart/projects/5g-qos-stack/openairinterface5g/common/utils/data_recording/lib/shared_memory_interface.py:18: Warning: Use of ftok() is not recommended; see sysv_ipc documentation
+  key = ipc.ftok(shm_path, project_id)
+Requested Traces IDs:  [28, 29, 30, 31, 32]
+Requested Traces IDs:  [353, 352]
+  [Shared Memory] Write action: config
+  [T-Tracer] Config: IP=b'127.0.0.1', port=2021
+  [Shared Memory] Write action: config
+  [T-Tracer] Config: IP=b'127.0.0.1', port=2023
+Args:
+  gnb_0 args:  Namespace(node_id='gnb_0', type='gnb', requested_tracer_messages=['GNB_PHY_UL_FD_PUSCH_IQ', 'GNB_PHY_UL_FD_DMRS', 'GNB_PHY_UL_FD_CHAN_EST_DMRS_POS', 'GNB_PHY_UL_FD_CHAN_EST_DMRS_INTERPL', 'GNB_PHY_UL_PAYLOAD_RX_BITS'], num_records=5, start_frame_number=5, req_tracer_msgs_indices=[28, 29, 30, 31, 32], num_requested_tracer_msgs=5, IPaddress='127.0.0.1', port='2021', bytes_IPaddress=b'127.0.0.1', action='record')
+  ue_0 args:  Namespace(node_id='ue_0', type='ue', requested_tracer_messages=['UE_PHY_UL_SCRAMBLED_TX_BITS', 'UE_PHY_UL_PAYLOAD_TX_BITS'], num_records=5, start_frame_number=5, req_tracer_msgs_indices=[353, 352], num_requested_tracer_msgs=2, IPaddress='127.0.0.1', port='2023', bytes_IPaddress=b'127.0.0.1', action='record')
+Send data logging request us: 20260604-174605383242
+  [Shared Memory] Write action: record
+  [T-Tracer] Record: num_msgs=2, msg_ids=[353, 352], num_records=5, start_frame=5
+  [Shared Memory] Write action: record
+  [T-Tracer] Record: num_msgs=5, msg_ids=[28, 29, 30, 31, 32], num_records=5, start_frame=5
+Data Recording App: Waiting for Measurements!
+Traceback (most recent call last):
+  File "/home/smart/projects/5g-qos-stack/openairinterface5g/common/utils/data_recording/data_recording_app_v1.1.py", line 494, in <module>
+    common_utils.write_config_data_recording_app_json(config_meta_data)
+  File "/home/smart/projects/5g-qos-stack/openairinterface5g/common/utils/data_recording/lib/common_utils.py", line 39, in write_config_data_recording_app_json
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+  File "<frozen os>", line 215, in makedirs
+  File "<frozen os>", line 215, in makedirs
+  File "<frozen os>", line 225, in makedirs
+PermissionError: [Errno 13] Permission denied: '/home/user'
+
+Cleaning up resources...
+  [Shared Memory] Write action: quit
+  [T-Tracer] Quit
+Shared memory detached successfully.
+Shared memory detached successfully.
+Shared memory removed successfully.
+Shared memory removed successfully.
+  [Shared Memory] Write action: quit
+  [T-Tracer] Quit
+Shared memory detached successfully.
+Shared memory detached successfully.
+Shared memory removed successfully.
+Shared memory removed successfully.

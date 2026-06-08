@@ -1,0 +1,260 @@
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m STAGE 1 — CN5G: Start → Health → Network Discovery → Subscriber Check → Stop[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;34m[INFO][0m  Starting CN5G docker stack...
+ Container ims Starting 
+ Container oai-ext-dn Starting 
+ Container mysql Starting 
+ Container oai-nrf Starting 
+ Container oai-nrf Started 
+ Container ims Started 
+ Container oai-ext-dn Started 
+ Container mysql Started 
+ Container oai-udr Starting 
+ Container oai-udr Started 
+ Container oai-udm Starting 
+ Container oai-udm Started 
+ Container oai-ausf Starting 
+ Container oai-ausf Started 
+ Container oai-amf Starting 
+ Container oai-amf Started 
+ Container oai-smf Starting 
+ Container oai-smf Started 
+ Container oai-upf Starting 
+ Container oai-upf Started 
+[0;32m[  OK][0m  Docker compose started
+[0;34m[INFO][0m  Waiting for all CN5G containers to be healthy (timeout 120s)...
+[1;33m[WAIT][0m  2s elapsed...[1;33m[WAIT][0m  4s elapsed...[1;33m[WAIT][0m  6s elapsed...[1;33m[WAIT][0m  8s elapsed...[1;33m[WAIT][0m  10s elapsed...[1;33m[WAIT][0m  12s elapsed...[1;33m[WAIT][0m  14s elapsed...[1;33m[WAIT][0m  16s elapsed...[1;33m[WAIT][0m  18s elapsed...[1;33m[WAIT][0m  20s elapsed...[0;32m[  OK][0m  All containers healthy
+
+[0;34m[INFO][0m  Container status:
+NAMES       STATUS  PORTS                                                                           
+oai-upf     Up      20     seconds  (healthy)  2152/udp,  8805/udp,       5342-5344/tcp             
+oai-smf     Up      20     seconds  (healthy)  80/tcp,    5342-5344/tcp,  8080/tcp,      9090/tcp,  8805/udp
+oai-amf     Up      20     seconds  (healthy)  80/tcp,    5342-5344/tcp,  8080/tcp,      9090/tcp,  38412/sctp
+oai-ausf    Up      20     seconds  (healthy)  80/tcp,    5342-5344/tcp,  8080/tcp                  
+oai-udm     Up      21     seconds  (healthy)  80/tcp,    5342-5344/tcp,  8080/tcp                  
+oai-udr     Up      21     seconds  (healthy)  80/tcp,    8080/tcp                                  
+mysql       Up      21     seconds  (healthy)  3306/tcp,  33060/tcp                                 
+oai-nrf     Up      21     seconds  (healthy)  80/tcp,    5342-5344/tcp,  8080/tcp                  
+oai-ext-dn  Up      21     seconds  (healthy)                                                       
+ims         Up      21     seconds  (healthy)                                                       
+
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m Network Discovery[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;32m[  OK][0m  oai-amf          IP=192.168.70.132      health=healthy
+[0;32m[  OK][0m  oai-smf          IP=192.168.70.133      health=healthy
+[0;32m[  OK][0m  oai-upf          IP=192.168.70.134      health=healthy
+[0;32m[  OK][0m  oai-nrf          IP=192.168.70.130      health=healthy
+[0;32m[  OK][0m  oai-udr          IP=192.168.70.136      health=healthy
+[0;32m[  OK][0m  oai-udm          IP=192.168.70.137      health=healthy
+[0;32m[  OK][0m  oai-ausf         IP=192.168.70.138      health=healthy
+[0;32m[  OK][0m  oai-ext-dn       IP=192.168.70.135      health=healthy
+[0;32m[  OK][0m  ims              IP=192.168.70.139      health=healthy
+[0;32m[  OK][0m  Host bridge IP : 192.168.70.129
+[0;34m[INFO][0m  Network env    : /tmp/ia-p5g-logs/discovered_network.env
+[0;32m[  OK][0m  gNB AMF IP     : 192.168.70.132 matches Docker AMF ✓
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m Subscriber Database Verification (IMSI 208990100001100)[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;32m[  OK][0m  AuthenticationSubscription : found  algo=milenage  key=fec86ba6...
+[0;32m[  OK][0m  SessionManagementData      : found  plmn=20899  nssai={"sd": "FFFFFF", "sst": 1}
+[0;34m[INFO][0m  Auth SQN                   : 000000000020 (auto-increments on each attach)
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m STAGE 2 — gNB: Start → Verify N2/F1/GTP/T-tracer → Stop/Restart Test[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;34m[INFO][0m  Starting gNB -> /tmp/ia-p5g-logs/gnb.log
+[0;32m[  OK][0m  gNB started (PID 911198)
+[1;33m[WAIT][0m  N2 Setup (NGSetupResponse) ..... [0;32mOK (2s)[0m
+[1;33m[WAIT][0m  T tracer port 2021 ... [0;32mOK (0s)[0m
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m gNB Verification[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;32m[  OK][0m  N2 Setup   : NGSetupResponse received ✓
+[0;32m[  OK][0m  F1 Setup   : CU-DU F1 exchange complete ✓
+[0;32m[  OK][0m  Cell       : PLMN 208.99 in service ✓
+[0;32m[  OK][0m  SDAP       : enabled ✓
+[0;32m[  OK][0m  GTP-U (N3): Configuring GTPu address : 192.168.70.129, port : 2152 ✓
+[0;32m[  OK][0m  T Tracer  : port 2021 listening ✓
+[0;32m[  OK][0m  rfsim     : server listening on port 4043 ✓
+[0;34m[INFO][0m  UE hint   : -C 3319680000 -r 106 --numerology 1 --band 78 --ssb 516 
+
+[0;34m[INFO][0m  gNB radio configuration:
+     Configuring GTPu address : 192.168.70.129, port : 2152
+      DL frequency 3319680000 Hz, UL frequency 3319680000 Hz: uldl offset 0 Hz
+      fp->N_RB_DL=106
+   SDAP layer is enabled
+     Supported PLMN 0: MCC=208 MNC=99
+   TDD period index = 6, based on the sum of dl_UL_TransmissionPeriodicity from Pattern1 (5.000000 ms) and Pattern2 (0.000000 ms): Total = 5.000000 ms
+
+[0;32m[  OK][0m  gNB verified and staying alive for Stage 3 → 4 data plane tests ✓
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m STAGE 3 — Core + gNB + T tracer: Metrics Pipeline[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;34m[INFO][0m  Starting T tracer collector -> /tmp/ia-p5g-logs
+[0;32m[  OK][0m  T tracer collector running (PID 911325)
+  Found 5 target events (total event slots: 816)
+    numeric ID  53: GNB_MAC_PUSCH_POWER_CONTROL  [int rnti, int frame, int slot, int snrx10, int phr, int tpc, int tb_size, int txpower_calc, int rbSize, int mcs, int rssi]
+    numeric ID  61: GNB_MAC_DL  [int rnti, int frame, int slot, int mcs, int tbs]
+    numeric ID  62: GNB_MAC_LCID_DL  [int rnti, int frame, int slot, int lcid, int data_size, int tx_list_occupancy]
+    numeric ID  63: GNB_MAC_UL  [int rnti, int frame, int slot, int mcs, int tbs]
+    numeric ID  64: GNB_MAC_LCID_UL  [int rnti, int frame, int slot, int lcid, int data_size]
+  Connected. Sending activation mask ...
+  Collecting. Press Ctrl+C to stop.
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m T Tracer — CSV File Check[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;32m[  OK][0m  gnb_mac_dl: [timestamp,rnti,frame,slot,mcs,tbs]
+[0;32m[  OK][0m  gnb_mac_lcid_dl: [timestamp,rnti,frame,slot,lcid,data_size,tx_list_occupancy]
+[0;32m[  OK][0m  gnb_mac_ul: [timestamp,rnti,frame,slot,mcs,tbs]
+[0;32m[  OK][0m  gnb_mac_lcid_ul: [timestamp,rnti,frame,slot,lcid,data_size]
+[0;32m[  OK][0m  gnb_mac_pusch_power_control: [timestamp,rnti,frame,slot,snrx10,phr,tpc,tb_size,txpower_calc,rbSize,mcs,rssi]
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m STAGE 4 — UE: Attach → Protocols → Ping → iperf3 DL/UL → T tracer Data[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;34m[INFO][0m  UE config : /home/smart/projects/5g-qos-stack/oai-benchmark/config/ue/ue_smoke.conf
+[0;34m[INFO][0m  UE IMSI   : 208990100001100
+[0;34m[INFO][0m  Pre-attach subscriber check...
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m Subscriber Database Verification (IMSI 208990100001100)[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;32m[  OK][0m  AuthenticationSubscription : found  algo=milenage  key=fec86ba6...
+[0;32m[  OK][0m  SessionManagementData      : found  plmn=20899  nssai={"sd": "FFFFFF", "sst": 1}
+[0;34m[INFO][0m  Auth SQN                   : 000000000020 (auto-increments on each attach)
+[0;34m[INFO][0m  T tracer snapshot 'pre_attach' saved (5 files)
+[0;34m[INFO][0m  Starting UE  conf=ue_smoke.conf -> /tmp/ia-p5g-logs/ue.log
+[0;32m[  OK][0m  UE started (PID 911767)
+[1;33m[WAIT][0m  PDU Session Established ..... [0;32mOK (2s)[0m
+[0;34m[INFO][0m  Data plane stabilisation (5s) ...
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m UE Protocol Verification[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;32m[  OK][0m  Cell sync       : SIB1 decoded ✓
+[0;32m[  OK][0m  RACH            : 4-step RA complete ✓
+[0;32m[  OK][0m  RRC             : RRC Connected ✓
+[0;32m[  OK][0m  Auth            : Authentication done ✓
+[0;32m[  OK][0m  Registration    : Registration Accept ✓
+[0;32m[  OK][0m  PDU Session     : PDU session established ✓
+[0;32m[  OK][0m  TUN interface   : oaitun_ue1 IP=10.0.0.2 ✓
+[0;32m[  OK][0m  UE TUN IP : 10.0.0.2
+[0;32m[  OK][0m  RNTI map : RNTI=52179 (0xcbd3)  IMSI=208990100001100  IP=10.0.0.2
+[0;34m[INFO][0m  RNTI map : /tmp/ia-p5g-logs/rnti_map.csv
+[0;34m[INFO][0m  Setting up policy routing: from 10.0.0.2 → oaitun_ue1 (table 100)
+[0;32m[  OK][0m  Policy routing active: 10.0.0.2 sources exit via oaitun_ue1 ✓
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m Ping Test (ICMP)[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;34m[INFO][0m  Sending 4 ICMP pings: oai-ext-dn -> UE (10.0.0.2)
+  PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+  64 bytes from 10.0.0.2: icmp_seq=1 ttl=63 time=4.01 ms
+  64 bytes from 10.0.0.2: icmp_seq=2 ttl=63 time=3.42 ms
+  64 bytes from 10.0.0.2: icmp_seq=3 ttl=63 time=3.86 ms
+  64 bytes from 10.0.0.2: icmp_seq=4 ttl=63 time=3.77 ms
+  
+  --- 10.0.0.2 ping statistics ---
+  4 packets transmitted, 4 received, 0% packet loss, time 3004ms
+  rtt min/avg/max/mdev = 3.421/3.767/4.013/0.217 ms
+[0;32m[  OK][0m  Ping : 0% loss ✓
+[0;34m[INFO][0m  T tracer snapshot 'pre_traffic' saved (5 files)
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m iperf3 Uplink (UE → ext-dn via 5G stack)[0m
+[1m[0;34m════════════════════════════════════════[0m
+[0;34m[INFO][0m  Duration: 10s  UE IP: 10.0.0.2
+[0;34m[INFO][0m  Approach: server in ext-dn (3.9), host client (3.16) sends, -B 10.0.0.2
+[0;34m[INFO][0m  ext-dn IP: 192.168.70.135
+[0;32m[  OK][0m  ext-dn iperf3 server :5201 listening ✓
+[0;34m[INFO][0m  Starting 10s UL test (host client -B 10.0.0.2 → ext-dn) ...
+
+[1m[0;34m════════════════════════════════════════[0m
+[1m[0;34m Verification Summary[0m
+[1m[0;34m════════════════════════════════════════[0m
+  [0;32mPASS[0m: 15
+  [0;31mFAIL[0m: 0
+
+[0;34m[INFO][0m  T tracer CSV files:
+  gnb_mac_dl_raw.csv                                         0 rows
+  gnb_mac_lcid_dl_raw.csv                                    0 rows
+  gnb_mac_lcid_ul_raw.csv                                    0 rows
+  gnb_mac_pusch_power_control_raw.csv                        0 rows
+  gnb_mac_ul_raw.csv                                         0 rows
+[0;34m[INFO][0m  T tracer collector log (last 15 lines):
+    numeric ID  53: GNB_MAC_PUSCH_POWER_CONTROL  [int rnti, int frame, int slot, int snrx10, int phr, int tpc, int tb_size, int txpower_calc, int rbSize, int mcs, int rssi]
+    numeric ID  61: GNB_MAC_DL  [int rnti, int frame, int slot, int mcs, int tbs]
+    numeric ID  62: GNB_MAC_LCID_DL  [int rnti, int frame, int slot, int lcid, int data_size, int tx_list_occupancy]
+    numeric ID  63: GNB_MAC_UL  [int rnti, int frame, int slot, int mcs, int tbs]
+    numeric ID  64: GNB_MAC_LCID_UL  [int rnti, int frame, int slot, int lcid, int data_size]
+    -> /tmp/ia-p5g-logs/gnb_mac_pusch_power_control_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'snrx10', 'phr', 'tpc', 'tb_size', 'txpower_calc', 'rbSize', 'mcs', 'rssi']
+    -> /tmp/ia-p5g-logs/gnb_mac_dl_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'mcs', 'tbs']
+    -> /tmp/ia-p5g-logs/gnb_mac_lcid_dl_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'lcid', 'data_size', 'tx_list_occupancy']
+    -> /tmp/ia-p5g-logs/gnb_mac_ul_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'mcs', 'tbs']
+    -> /tmp/ia-p5g-logs/gnb_mac_lcid_ul_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'lcid', 'data_size']
+  
+  Connecting to 127.0.0.1:2021 ...
+  Connected. Sending activation mask ...
+  Collecting. Press Ctrl+C to stop.
+  
+
+[0;32m[  OK][0m  All checks passed — stack verified and ready for benchmarking.
+
+[1;33m[WARN][0m  Cleanup triggered — stopping all components...
+[0;32m[  OK][0m  T tracer collector stopped
+[0;34m[INFO][0m  Stopping UE (PID 911767)...
+[0;32m[  OK][0m  UE stopped
+[0;34m[INFO][0m  Stopping gNB (PID 911198)...
+[0;32m[  OK][0m  gNB stopped
+[0;34m[INFO][0m  Stopping CN5G docker stack...
+ Container oai-ext-dn Stopping 
+ Container ims Stopping 
+ Container oai-upf Stopping 
+ Container oai-ext-dn Stopped 
+ Container oai-ext-dn Removing 
+ Container ims Stopped 
+ Container ims Removing 
+ Container oai-ext-dn Removed 
+ Container ims Removed 
+ Container oai-upf Stopped 
+ Container oai-upf Removing 
+ Container oai-upf Removed 
+ Container oai-smf Stopping 
+ Container oai-smf Stopped 
+ Container oai-smf Removing 
+ Container oai-smf Removed 
+ Container oai-amf Stopping 
+ Container oai-amf Stopped 
+ Container oai-amf Removing 
+ Container oai-amf Removed 
+ Container oai-ausf Stopping 
+ Container oai-ausf Stopped 
+ Container oai-ausf Removing 
+ Container oai-ausf Removed 
+ Container oai-udm Stopping 
+ Container oai-udm Stopped 
+ Container oai-udm Removing 
+ Container oai-udm Removed 
+ Container oai-udr Stopping 
+ Container oai-udr Stopped 
+ Container oai-udr Removing 
+ Container oai-udr Removed 
+ Container mysql Stopping 
+ Container oai-nrf Stopping 
+ Container oai-nrf Stopped 
+ Container oai-nrf Removing 
+ Container oai-nrf Removed 
+ Container mysql Stopped 
+ Container mysql Removing 
+ Container mysql Removed 
+ Network oai-cn5g-public-net Removing 
+ Network oai-cn5g-public-net Removed 
+[0;32m[  OK][0m  CN5G stopped

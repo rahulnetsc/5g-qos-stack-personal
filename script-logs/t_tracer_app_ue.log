@@ -1,0 +1,317 @@
+connecting to 127.0.0.1:2023
+turning ON UE_PHY_UL_SCRAMBLED_TX_BITS
+turning ON UE_PHY_UL_PAYLOAD_TX_BITS
+
+========================================
+  [STATE: INIT]
+========================================
+  Data Collection Service: Initializing shared memory ...
+  Directory 1: /tmp/ue_app1, Directory 2: /tmp/ue_app2
+  Project ID: 2336
+Error: shared memory already exists
+reference shm_id = 65536
+Error: shared memory already exists
+reference shm_id = 65537
+Remove shared memory identifier successful
+Remove shared memory identifier successful
+
+========================================
+  [STATE: WAIT]
+========================================
+  Data Collection Service: Waiting for config message ...
+
+========================================
+  [STATE: CONFIG]
+========================================
+  Received config message. Time Stamp: 20260604174604882456
+  Parameters: IP Address length: 10, IP Address: 127.0.0.1, Port Number: 2023
+  Connected to nr-uesoftmodem
+
+========================================
+  [STATE: WAIT]
+========================================
+  Data Collection Service: Waiting for record/stop message ...
+
+========================================
+  [STATE: RECORD]
+========================================
+  Received record message. Time Stamp: 20260604174605383933
+  Number of requested tracer messages: 2
+ msg_id: 353,  msg_id: 352, num_records: 5, start_frame: 5
+  Activating tracer messages:
+    353: UE_PHY_UL_SCRAMBLED_TX_BITS
+    352: UE_PHY_UL_PAYLOAD_TX_BITS
+  Setup UL trace data done
+  Activated traces in nr-uesoftmodem
+
+  Data Collection Service: Start reading messages ...
+
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 360.8, diff frame.slot: 0.0
+ First frame.slot: 360.8, current frame.slot: 370.8, diff frame.slot: 10.0
+ Start recording from frame: 370, slot: 8 
+
+Record number: 0
+Buffer index in bytes: 0
+Unix TS: 1780575365.395525959
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 370, slot 8, unix_ts 1780575365.395525959
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 1
+Buffer index in bytes: 70
+Unix TS: 1780575365.395552639
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 370, slot 8, unix_ts 1780575365.395552639
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 1
+Buffer index in bytes: 292
+Unix TS: 1780575365.406094136
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 380, slot 8, unix_ts 1780575365.406094136
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 2
+Buffer index in bytes: 362
+Unix TS: 1780575365.406125455
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 380, slot 8, unix_ts 1780575365.406125455
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 2
+Buffer index in bytes: 584
+Unix TS: 1780575365.416383814
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 390, slot 8, unix_ts 1780575365.416383814
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 3
+Buffer index in bytes: 654
+Unix TS: 1780575365.416427837
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 390, slot 8, unix_ts 1780575365.416427837
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 3
+Buffer index in bytes: 876
+Unix TS: 1780575365.426854005
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 400, slot 8, unix_ts 1780575365.426854005
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 4
+Buffer index in bytes: 946
+Unix TS: 1780575365.426881247
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 400, slot 8, unix_ts 1780575365.426881247
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 4
+Buffer index in bytes: 1168
+Unix TS: 1780575365.437417062
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 410, slot 8, unix_ts 1780575365.437417062
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 5
+Buffer index in bytes: 1238
+Unix TS: 1780575365.437439785
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 410, slot 8, unix_ts 1780575365.437439785
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 5
+Buffer index in bytes: 1460
+Unix TS: 1780575365.447831958
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 420, slot 8, unix_ts 1780575365.447831958
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 6
+Buffer index in bytes: 1530
+Unix TS: 1780575365.447858779
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 420, slot 8, unix_ts 1780575365.447858779
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 6
+Buffer index in bytes: 1752
+Unix TS: 1780575365.458340442
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 430, slot 8, unix_ts 1780575365.458340442
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 7
+Buffer index in bytes: 1822
+Unix TS: 1780575365.458366471
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 430, slot 8, unix_ts 1780575365.458366471
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 7
+Buffer index in bytes: 2044
+Unix TS: 1780575365.468949407
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 440, slot 8, unix_ts 1780575365.468949407
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 8
+Buffer index in bytes: 2114
+Unix TS: 1780575365.469006786
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 440, slot 8, unix_ts 1780575365.469006786
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 8
+Buffer index in bytes: 2336
+Unix TS: 1780575365.479406894
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 450, slot 8, unix_ts 1780575365.479406894
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 9
+Buffer index in bytes: 2406
+Unix TS: 1780575365.479432853
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 450, slot 8, unix_ts 1780575365.479432853
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 9
+Buffer index in bytes: 2628
+Unix TS: 1780575365.489839824
+Message Info: msg_id UE_turning OFF UE_PHY_UL_SCRAMBLED_TX_BITS
+turning OFF UE_PHY_UL_PAYLOAD_TX_BITS
+PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 460, slot 8, unix_ts 1780575365.489839824
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+
+Record number: 10
+Buffer index in bytes: 2698
+Unix TS: 1780575365.489865693
+Message Info: msg_id UE_PHY_UL_SCRAMBLED_TX_BITS (353) 
+frame 460, slot 8, unix_ts 1780575365.489865693
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 1380, data size 172
+
+
+Record number: 10
+Buffer index in bytes: 2920
+Unix TS: 1780575365.500189887
+Message Info: msg_id UE_PHY_UL_PAYLOAD_TX_BITS (352) 
+frame 470, slot 8, unix_ts 1780575365.500189887
+frame_type 1, freq_range 0, subcarrier_spacing 1, cyclic_prefix 0, symbols_per_slot 14
+Nid_cell 0, rnti 63393, rb_size 5, rb_start 0, start_symbol_index 0, nr_of_symbols 13
+qam_mod_order 2, mcs_index 0, mcs_table 0, nrOfLayers 1, transform_precoding 1
+dmrs_config_type 0, ul_dmrs_symb_pos 1057, number_dmrs_symbols 3, dmrs_port 0, dmrs_nscid 0
+nb_antennas_tx 1, number_of_bits 160, data size 20
+
+  De-activating tracer messages
+  De-activated traces
+  Total time: 116.25 ms
+  Time per record: 10.57 ms
+353
+========================================
+  [STATE: STOP]
+========================================
+  Received 'stop' command. Exiting...

@@ -1,0 +1,99 @@
+[0;32m[INFO] 2026-06-04 17:30:54 Performing pre-flight cleanup of modems, tracers, and shared memory daemons...[0m
+[0;32m[INFO] 2026-06-04 17:30:54 Starting OAI 5G Core Network via Docker Compose...[0m
+[0;32m[INFO] 2026-06-04 17:30:54 Waiting for Core Network containers to reach 'healthy' state (2 min timeout)...[0m
+[0;32m[INFO] 2026-06-04 17:30:54 All core network containers are HEALTHY![0m
+[0;32m[INFO] 2026-06-04 17:30:54 Launching gNB softmodem with active T-Tracer hooks...[0m
+[0;32m[INFO] 2026-06-04 17:30:54 Checking gNB registration and NGAP link connection stability...[0m
+[0;32m[INFO] 2026-06-04 17:31:00 gNB successfully initialized and registered with AMF![0m
+[0;32m[INFO] 2026-06-04 17:31:00 Spawning compiled C-based Data Collection T-Tracer services...[0m
+[0;32m[INFO] 2026-06-04 17:31:00 Starting gNB baseband collection service (Port 2021)...[0m
+[0;32m[INFO] 2026-06-04 17:31:00 Starting nrUE baseband collection service (Port 2023)...[0m
+[0;32m[INFO] 2026-06-04 17:31:02 C collection daemons securely mounted onto their respective network interfaces.[0m
+[0;32m[INFO] 2026-06-04 17:31:02 Launching nrUE softmodem with dynamic T-Tracer port reassignment...[0m
+[0;32m[INFO] 2026-06-04 17:31:02 Waiting for nrUE network registration and PDU Session Activation...[0m
+[0;32m[INFO] 2026-06-04 17:31:04 nrUE connected! Dynamic IP assigned: 10.0.0.21[0m
+[0;32m[INFO] 2026-06-04 17:31:04 Initializing the Master Data Recording Application supervisor script...[0m
+[0;32m[INFO] 2026-06-04 17:31:06 SigMF data compilation supervisor active.[0m
+[0;32m[INFO] 2026-06-04 17:31:06 Extracted Data Network (oai-ext-dn) Target Core IP: 192.168.70.135[0m
+[0;32m[INFO] 2026-06-04 17:31:06 Initializing iperf3 host endpoint context inside oai-ext-dn...[0m
+[0;32m[INFO] 2026-06-04 17:31:09 Executing 10-Second Downstream (DL) Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+Reverse mode, remote host 192.168.70.135 is sending
+[  5] local 10.0.0.21 port 55447 connected to 192.168.70.135 port 5201
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-1.00   sec  61.9 MBytes   519 Mbits/sec                  
+[  5]   1.00-2.00   sec  70.1 MBytes   588 Mbits/sec                  
+[  5]   2.00-3.00   sec  63.1 MBytes   530 Mbits/sec                  
+[  5]   3.00-4.00   sec  61.4 MBytes   515 Mbits/sec                  
+[  5]   4.00-5.00   sec  59.2 MBytes   497 Mbits/sec                  
+[  5]   5.00-6.00   sec  59.4 MBytes   498 Mbits/sec                  
+[  5]   6.00-7.00   sec  58.9 MBytes   494 Mbits/sec                  
+[  5]   7.00-8.00   sec  54.1 MBytes   454 Mbits/sec                  
+[  5]   8.00-9.00   sec  36.5 MBytes   306 Mbits/sec                  
+[  5]   9.00-10.00  sec  55.5 MBytes   466 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.04  sec   584 MBytes   488 Mbits/sec  2637             sender
+[  5]   0.00-10.00  sec   580 MBytes   487 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO] 2026-06-04 17:31:19 Allowing socket resources to recycle...[0m
+[0;32m[INFO] 2026-06-04 17:31:22 Executing 10-Second Upstream (UL) Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+[  5] local 10.0.0.21 port 57453 connected to 192.168.70.135 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  24.9 MBytes   208 Mbits/sec    0   1.14 MBytes       
+[  5]   1.00-2.00   sec  30.1 MBytes   253 Mbits/sec    0   2.60 MBytes       
+[  5]   2.00-3.00   sec  28.2 MBytes   237 Mbits/sec    0   4.04 MBytes       
+[  5]   3.00-4.00   sec  28.9 MBytes   242 Mbits/sec  1192   1.57 MBytes       
+[  5]   4.00-5.00   sec  30.1 MBytes   253 Mbits/sec    0   1.67 MBytes       
+[  5]   5.00-6.00   sec  28.6 MBytes   240 Mbits/sec    0   1.74 MBytes       
+[  5]   6.00-7.00   sec  28.8 MBytes   241 Mbits/sec    0   1.80 MBytes       
+[  5]   7.00-8.00   sec  28.8 MBytes   241 Mbits/sec    0   1.84 MBytes       
+[  5]   8.00-9.00   sec  28.6 MBytes   240 Mbits/sec    0   1.86 MBytes       
+[  5]   9.00-10.00  sec  28.8 MBytes   241 Mbits/sec    0   1.87 MBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec   286 MBytes   240 Mbits/sec  1192             sender
+[  5]   0.00-10.10  sec   284 MBytes   236 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO] 2026-06-04 17:31:33 Allowing socket resources to recycle...[0m
+[0;32m[INFO] 2026-06-04 17:31:36 Executing 10-Second Bidirectional Concurrent Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+[  5] local 10.0.0.21 port 38791 connected to 192.168.70.135 port 5201
+[  7] local 10.0.0.21 port 45565 connected to 192.168.70.135 port 5201
+[ ID][Role] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5][TX-C]   0.00-1.00   sec  22.1 MBytes   185 Mbits/sec    0   1022 KBytes       
+[  7][RX-C]   0.00-1.00   sec  27.6 MBytes   232 Mbits/sec                  
+[  5][TX-C]   1.00-2.00   sec  27.5 MBytes   231 Mbits/sec    0   2.37 MBytes       
+[  7][RX-C]   1.00-2.00   sec  9.88 MBytes  82.8 Mbits/sec                  
+[  5][TX-C]   2.00-3.00   sec  28.6 MBytes   240 Mbits/sec    0   3.77 MBytes       
+[  7][RX-C]   2.00-3.00   sec  4.75 MBytes  39.8 Mbits/sec                  
+[  5][TX-C]   3.00-4.00   sec  27.1 MBytes   228 Mbits/sec   72   2.85 MBytes       
+[  7][RX-C]   3.00-4.00   sec  3.25 MBytes  27.3 Mbits/sec                  
+[  5][TX-C]   4.00-5.00   sec  27.1 MBytes   228 Mbits/sec    0   3.06 MBytes       
+[  7][RX-C]   4.00-5.00   sec  4.12 MBytes  34.6 Mbits/sec                  
+[  5][TX-C]   5.00-6.00   sec  28.5 MBytes   239 Mbits/sec    0   3.24 MBytes       
+[  7][RX-C]   5.00-6.00   sec  3.50 MBytes  29.4 Mbits/sec                  
+[  5][TX-C]   6.00-7.00   sec  27.0 MBytes   226 Mbits/sec    0   3.39 MBytes       
+[  7][RX-C]   6.00-7.00   sec  3.12 MBytes  26.2 Mbits/sec                  
+[  5][TX-C]   7.00-8.00   sec  28.2 MBytes   237 Mbits/sec    0   3.51 MBytes       
+[  7][RX-C]   7.00-8.00   sec  3.38 MBytes  28.3 Mbits/sec                  
+[  5][TX-C]   8.00-9.00   sec  27.2 MBytes   229 Mbits/sec    0   3.60 MBytes       
+[  7][RX-C]   8.00-9.00   sec  3.38 MBytes  28.3 Mbits/sec                  
+[  5][TX-C]   9.00-10.00  sec  28.5 MBytes   239 Mbits/sec  554   1.82 MBytes       
+[  7][RX-C]   9.00-10.00  sec  3.00 MBytes  25.2 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID][Role] Interval           Transfer     Bitrate         Retr
+[  5][TX-C]   0.00-10.00  sec   272 MBytes   228 Mbits/sec  626             sender
+[  5][TX-C]   0.00-10.10  sec   271 MBytes   225 Mbits/sec                  receiver
+[  7][RX-C]   0.00-10.00  sec  68.7 MBytes  57.6 Mbits/sec  864             sender
+[  7][RX-C]   0.00-10.10  sec  66.0 MBytes  54.8 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO] 2026-06-04 17:31:46 Traffic cycles finished. Disabling radio elements...[0m
+[0;32m[INFO] 2026-06-04 17:31:46 Allowing the Data Conversion service to serialize remaining shared memory frames...[0m
+
+[0;32m[INFO] 2026-06-04 17:31:51 SigMF Data Recording File Status Matrix Summary:[0m
+[0;31m[ERR] 2026-06-04 17:31:51 Data Recording validation failed: No SigMF files detected inside /home/smart/workarea/oai_recorded_data[0m

@@ -1,0 +1,25 @@
+Parsing T_messages.txt...
+Found 5 target events (total event slots: 816)
+  numeric ID  53: GNB_MAC_PUSCH_POWER_CONTROL  [int rnti, int frame, int slot, int snrx10, int phr, int tpc, int tb_size, int txpower_calc, int rbSize, int mcs, int rssi]
+  numeric ID  61: GNB_MAC_DL  [int rnti, int frame, int slot, int mcs, int tbs]
+  numeric ID  62: GNB_MAC_LCID_DL  [int rnti, int frame, int slot, int lcid, int data_size, int tx_list_occupancy]
+  numeric ID  63: GNB_MAC_UL  [int rnti, int frame, int slot, int mcs, int tbs]
+  numeric ID  64: GNB_MAC_LCID_UL  [int rnti, int frame, int slot, int lcid, int data_size]
+  -> /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_pusch_power_control_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'snrx10', 'phr', 'tpc', 'tb_size', 'txpower_calc', 'rbSize', 'mcs', 'rssi']
+  -> /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_dl_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'mcs', 'tbs']
+  -> /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_lcid_dl_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'lcid', 'data_size', 'tx_list_occupancy']
+  -> /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_ul_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'mcs', 'tbs']
+  -> /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_lcid_ul_raw.csv  cols: ['timestamp', 'rnti', 'frame', 'slot', 'lcid', 'data_size']
+
+Connecting to 127.0.0.1:2021 ...
+Connected. Sending activation mask ...
+Collecting. Press Ctrl+C to stop.
+
+gNB closed the connection.
+
+Done. Total events captured: 0
+  /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_pusch_power_control_raw.csv: 0 rows
+  /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_dl_raw.csv: 0 rows
+  /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_lcid_dl_raw.csv: 0 rows
+  /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_ul_raw.csv: 0 rows
+  /home/smart/projects/5g-qos-stack/script-logs/gnb_mac_lcid_ul_raw.csv: 0 rows

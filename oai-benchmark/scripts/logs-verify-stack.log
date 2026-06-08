@@ -1,0 +1,6 @@
+[0;32m[INFO]2026-06-04 12:30:13 Starting OAI 5G Core Network via Docker Compose...[0m
+[0;32m[INFO]2026-06-04 12:30:13 Waiting for Core Network containers to reach 'healthy' state (2 min timeout)...[0m
+[0;32m[INFO]2026-06-04 12:30:13 All core network containers are HEALTHY![0m
+[0;32m[INFO]2026-06-04 12:30:13 Launching gNB in rfsimulator mode...[0m
+[0;32m[INFO]2026-06-04 12:30:13 Checking gNB health alignment and NGAP connection to AMF...[0m
+[0;31m[ERR] 2026-06-04 12:30:59 gNB failed to establish an active link with AMF. Check /home/smart/projects/5g-qos-stack/script-logs/gnb.log[0m

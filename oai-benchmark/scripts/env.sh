@@ -1,3 +1,23 @@
+# #!/usr/bin/env bash
+# # ==============================================================================
+# # 5G QoS Stack Validation Framework Environment Setup Configuration
+# # Codifies network interfaces, execution timers, and network namespaces.
+# # ==============================================================================
+
+# # Network Topological IPs
+# export UE_IP_ADDR="10.0.0.2"
+# export EXT_DN_IP_ADDR="192.168.70.135"
+# export UPF_N6_IP_ADDR="192.168.70.134"
+
+# # Traffic Profiling Parameters
+# export TRAFFIC_DURATION=60
+# export IPERF_UL_PORT=5202
+# export IPERF_DL_PORT=5201
+
+# # Disaggregated Layer Interface Properties
+# export F1_U_INTERFACE="lo"
+# export N3_GTPU_INTERFACE="eth0"
+
 #!/usr/bin/env bash
 # =============================================================================
 # env.sh — IA-P5G environment configuration
@@ -46,7 +66,7 @@ export NGAP_PORT=38412         # N2 SCTP port (AMF)
 export CORE_WAIT_TIMEOUT=120   # max wait for all CN5G containers to be healthy
 export GNB_N2_TIMEOUT=30      # max wait for gNB N2 setup complete
 export UE_PDU_TIMEOUT=60      # max wait for UE PDU session established
-export TRAFFIC_DURATION=60    # iperf3 test duration per run (seconds)
+export TRAFFIC_DURATION=10    # iperf3 test duration per run (seconds)
 export WARMUP_DURATION=10     # discard first N seconds of metrics
 
 # --------------- Results -----------------------------------------------------
@@ -60,3 +80,4 @@ export C_YELLOW='\033[1;33m'
 export C_BLUE='\033[0;34m'
 export C_BOLD='\033[1m'
 export C_RESET='\033[0m'
+

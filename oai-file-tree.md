@@ -1,35 +1,51 @@
 .
+├── amf-logs.log
+├── data_recording.md
 ├── design-doc.md
+├── gnb.log
 ├── ia_p5g_oai_reading_notes.md
+├── installation-instructions.md
+├── NR_SA_Tutorial_OAI_CN5G.md
+├── NR_SA_Tutorial_OAI_multi_UE.md
+├── NR_SA_Tutorial_OAI_nrUE.md
+├── oai-benchmark
+│   ├── collect
+│   │   └── t_tracer_collector.py
+│   ├── config
+│   │   ├── core
+│   │   ├── gnb
+│   │   │   └── gnb.sa.band78.106prb.rfsim.conf
+│   │   └── ue
+│   │       └── ue_smoke.conf
+│   ├── results
+│   └── scripts
+│       ├── debug_datapath.sh
+│       ├── env.sh
+│       ├── lib.sh
+│       ├── nrL1_UE_stats-0.log
+│       ├── scripts-results.log
+│       ├── verify_stack.log
+│       ├── verify_stack-log.log
+│       ├── verify_stack.sh
+│       ├── verify_stack_stage1.log
+│       ├── verify_stack_stage2.log
+│       └── verify_stack_stage4.log
 ├── oai-file-structure.md
+├── oai-file-tree.md
 ├── openairinterface5g
+│   ├── build_final.log
+│   ├── build_ttracer.log
 │   ├── CHANGELOG.md
 │   ├── charts
 │   │   ├── physims-4g
 │   │   │   ├── charts
-│   │   │   │   └── physims.4g
-│   │   │   │       ├── Chart.yaml
-│   │   │   │       ├── templates
-│   │   │   │       │   ├── _helpers.tpl
-│   │   │   │       │   └── job.yaml
-│   │   │   │       └── values.yaml
 │   │   │   ├── Chart.yaml
 │   │   │   ├── templates
-│   │   │   │   ├── rbac.yaml
-│   │   │   │   └── serviceaccount.yaml
 │   │   │   └── values.yaml
 │   │   └── physims-5g
 │   │       ├── charts
-│   │       │   └── physims.5g
-│   │       │       ├── Chart.yaml
-│   │       │       ├── templates
-│   │       │       │   ├── _helpers.tpl
-│   │       │       │   └── job.yaml
-│   │       │       └── values.yaml
 │   │       ├── Chart.yaml
 │   │       ├── templates
-│   │       │   ├── rbac.yaml
-│   │       │   └── serviceaccount.yaml
 │   │       └── values.yaml
 │   ├── ci-scripts
 │   │   ├── args_parse.py
@@ -165,54 +181,6 @@
 │   │   │   ├── README.md
 │   │   │   ├── ue.sa.conf
 │   │   │   └── untested
-│   │   │       ├── benetel-4g.conf
-│   │   │       ├── benetel-5g.conf
-│   │   │       ├── enb.band13.tm1.25PRB.usrpb210.conf
-│   │   │       ├── enb.band13.tm1.50PRB.emtc.conf
-│   │   │       ├── enb.band17.tm1.25PRB.usrpb210.conf
-│   │   │       ├── enb.band17.tm1.mbms.25PRB.usrpb210.conf
-│   │   │       ├── enb.band38.nsa_2x2.100prb.usrpn310.conf
-│   │   │       ├── enb.band40.tm1.100PRB.FairScheduler.usrpb210.conf
-│   │   │       ├── enb.band40.tm1.25PRB.FairScheduler.usrpb210.conf
-│   │   │       ├── enb.band40.tm1.50PRB.FairScheduler.usrpb210.conf
-│   │   │       ├── enb.band40.tm2.25PRB.FairScheduler.usrpb210.conf
-│   │   │       ├── enb.band7.tm1.100PRB.usrpb210.conf
-│   │   │       ├── enb.band7.tm1.25PRB.slave.usrpb210.conf
-│   │   │       ├── enb.band7.tm1.25PRB.usrpb210.conf
-│   │   │       ├── enb.band7.tm1.50prb.usrpb210.conf
-│   │   │       ├── enb.band7.tm1.fr1.25PRB.usrpb210.conf
-│   │   │       ├── enb.band7.tm2.25PRB.usrpb210.conf
-│   │   │       ├── enb.slave.band13.tm1.25PRB.usrpb210.conf
-│   │   │       ├── episci
-│   │   │       │   ├── episci_nr-ue.nfapi.conf
-│   │   │       │   ├── episci_rcc.band78.tm1.106PRB.nfapi.conf
-│   │   │       │   ├── episci_rcc.band7.tm1.nfapi.conf
-│   │   │       │   ├── episci_ue.nfapi.conf
-│   │   │       │   ├── episci_ue_test_sfr.conf
-│   │   │       │   ├── gnb_band78.sa.fr1.106PRB.2x2.l2sim.conf
-│   │   │       │   ├── proxy_nr-ue.nfapi.conf
-│   │   │       │   ├── proxy_rcc.band78.tm1.106PRB.nfapi.conf
-│   │   │       │   ├── proxy_rcc.band7.tm1.nfapi.conf
-│   │   │       │   └── proxy_ue.nfapi.conf
-│   │   │       ├── gnb.band78.sa.fr1.106PRB.usrpn310.conf
-│   │   │       ├── gnb.band78.tm1.fr1.106PRB.usrpb210.conf
-│   │   │       ├── gnb.band78.tm1.fr1.106PRB.usrpn310.conf
-│   │   │       ├── gnb.nsa.band78.106prb.usrpn310.2x2.conf
-│   │   │       ├── gnb.sa.band66.fr1.106PRB.usrpn300.conf
-│   │   │       ├── gnb.sa.band78.106prb.usrp310.2x2.conf
-│   │   │       ├── gnb.sa.band78.106prb.usrpn310.ddsuu-2x2.conf
-│   │   │       ├── gnb.sa.band78.162prb.usrpn310.2x2.conf
-│   │   │       ├── gnb.sa.band78.fr1.51PRB.usrpb210.conf
-│   │   │       ├── gNB_SA_n78_106PRB.2x2_usrpn310.conf
-│   │   │       ├── gNB_SA_n78_133PRB.2x2_usrpn310.conf
-│   │   │       ├── lte-tdd-basic-sim.conf
-│   │   │       ├── proxy_gnb.band78.sa.fr1.106PRB.usrpn310.conf
-│   │   │       ├── rcc.band38.tm1.50PRB.multi.rru.conf
-│   │   │       ├── rcc.band7.tm1.mbms.if4p5.50PRB.lo.conf
-│   │   │       ├── rcc.band7.tm1.mbms-s1ap.if4p5.50PRB.lo.conf
-│   │   │       ├── rcc.band7.tm1.nfapi.conf
-│   │   │       ├── rru.band38.tm1.master.conf
-│   │   │       └── rru.band38.tm1.slave.conf
 │   │   ├── constants.py
 │   │   ├── datalog_rt_stats.100.2x2.fhi72.cacofonix.yaml
 │   │   ├── datalog_rt_stats.100.2x2.yaml
@@ -267,15 +235,16 @@
 │   │   │   ├── vvdn-activate-carriers.sh
 │   │   │   └── vvdn-inactivate-carriers.sh
 │   │   ├── tests
+│   │   │   ├── analysis
 │   │   │   ├── analysis.py
+│   │   │   ├── build.py
 │   │   │   ├── cmd.py
 │   │   │   ├── config
-│   │   │   │   ├── infra_ping_iperf.yaml
-│   │   │   │   ├── test_core_infra.yaml
-│   │   │   │   └── test_module_infra.yaml
 │   │   │   ├── corenetwork.py
 │   │   │   ├── deployment.py
 │   │   │   ├── iperf-analysis.py
+│   │   │   ├── log
+│   │   │   ├── log-analysis
 │   │   │   ├── log-analysis.py
 │   │   │   ├── module.py
 │   │   │   ├── ping-iperf.py
@@ -283,22 +252,11 @@
 │   │   │   ├── README.md
 │   │   │   ├── script-deployment.py
 │   │   │   ├── scripts
-│   │   │   │   ├── deploy-core.sh
-│   │   │   │   ├── deploy-with-script.sh
-│   │   │   │   ├── hello-fail.sh
-│   │   │   │   ├── hello-world.sh
-│   │   │   │   └── undeploy-with-script.sh
 │   │   │   ├── simple-dep
-│   │   │   │   └── docker-compose.yml
 │   │   │   ├── simple-fail
-│   │   │   │   └── docker-compose.yml
 │   │   │   ├── simple-fail-2svc
-│   │   │   │   └── docker-compose.yml
 │   │   │   ├── simple-undep
-│   │   │   │   └── docker-compose.yml
 │   │   │   └── test-runner
-│   │   │       ├── run.sh
-│   │   │       └── test.xml
 │   │   ├── xml_class_list.yml
 │   │   ├── xml_files
 │   │   │   ├── cluster_image_build.xml
@@ -418,254 +376,104 @@
 │   │   │   └── test_physim_cuda_gracehopper.xml
 │   │   └── yaml_files
 │   │       ├── 4g_l2sim_fdd
-│   │       │   └── docker-compose.yml
 │   │       ├── 4g_rfsimulator_fdd_05MHz
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── entrypoint.sh
-│   │       │   ├── mme.conf
-│   │       │   ├── mme_fd.sprint.conf
-│   │       │   ├── oai_db.cql
-│   │       │   ├── README.md
-│   │       │   └── redis_extern.conf
 │   │       ├── 4g_rfsimulator_fdd_05MHz_noS1
-│   │       │   └── docker-compose.yml
 │   │       ├── 4g_rfsimulator_fdd_10MHz
-│   │       │   └── docker-compose.yml
 │   │       ├── 4g_rfsimulator_fdd_20MHz
-│   │       │   └── docker-compose.yml
 │   │       ├── 4g_rfsimulator_fembms
-│   │       │   └── docker-compose.yml
 │   │       ├── 4g_rfsimulator_mbms
-│   │       │   └── docker-compose.yml
 │   │       ├── 4g_rfsimulator_tdd_05MHz
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_f1_rfsimulator
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_fdd_rfsimulator
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator
-│   │       │   ├── docker-compose.yaml
-│   │       │   ├── local-override-ue-gdb.yaml
-│   │       │   ├── local-override.yaml
-│   │       │   ├── mini_nonrf_config.yaml
-│   │       │   ├── mysql-healthcheck.sh
-│   │       │   ├── oai_db.sql
-│   │       │   ├── oai-end-to-end.jpg
-│   │       │   └── README.md
 │   │       ├── 5g_rfsimulator_24prb
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_2x2
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_e1
-│   │       │   ├── docker-compose.yaml
-│   │       │   ├── mini_nonrf_config_3slices.yaml
-│   │       │   └── README.md
 │   │       ├── 5g_rfsimulator_fdd_phytest
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_flexric
-│   │       │   ├── conf
-│   │       │   │   └── flexric.conf
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_rfsimulator_fr2_66prb
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_multiue
-│   │       │   ├── docker-compose.yaml
-│   │       │   └── nrue.uicc.conf
 │   │       ├── 5g_rfsimulator_n2_ho
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_ntn_geo
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_ntn_leo
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_prs
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_sidelink
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_rfsimulator_tdd_dora
-│   │       │   ├── docker-compose.yaml
-│   │       │   └── local-override.yaml
 │   │       ├── 5g_rfsimulator_u0_25prb
-│   │       │   ├── docker-compose.yaml
-│   │       │   └── policies
-│   │       │       ├── pcc_rules
-│   │       │       │   └── pcc_rules.yaml
-│   │       │       ├── policy_decisions
-│   │       │       │   └── policy_decision.yaml
-│   │       │       └── qos_data
-│   │       │           └── qos_data.yaml
 │   │       ├── 5g_sa_f1_b210_ho
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_sa_n2_ho_b210
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_sa_n310_2x2_100MHz
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_sa_n310_2x2_60MHz
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_sa_n310_4x4_60MHz
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_sa_n310_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_sa_n310_nrue
-│   │       │   └── docker-compose.yml
 │   │       ├── 5g_vrtsim_chanmod
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_vrtsim_cirdb
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_vrtsim_multiue
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_zmq_radio_1x1_ocudu
-│   │       │   ├── docker-compose.yaml
-│   │       │   └── ocudu.yml
 │   │       ├── 5g_zmq_radio_2x2
-│   │       │   └── docker-compose.yaml
 │   │       ├── 5g_zmq_radio_2x2_ocudu
-│   │       │   ├── docker-compose.yaml
-│   │       │   └── ocudu.yml
 │   │       ├── fr1_epc_20897
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── entrypoint.sh
-│   │       │   └── mme.conf
 │   │       ├── local_common_overrides
-│   │       │   └── rebuild_nr_softmodems.yaml
 │   │       ├── lte_b200_fdd_05Mhz_if4.5
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_05Mhz_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_05Mhz_tm1_no_rrc_activity
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_10Mhz_oai_ue_magma
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_10Mhz_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_10Mhz_tm1_cdrx
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_10Mhz_tm1_magma
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_fdd_20Mhz_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_tdd_05Mhz_if4.5
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_tdd_05Mhz_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_tdd_05Mhz_tm2
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_tdd_10Mhz_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_tdd_20Mhz_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_b200_tdd_20Mhz_tm1_default_scheduler
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_n3xx_tdd_2x2_tm1
-│   │       │   └── docker-compose.yml
 │   │       ├── lte_n3xx_tdd_2x2_tm2
-│   │       │   └── docker-compose.yml
 │   │       ├── magma_lte_20892
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── entrypoint.sh
-│   │       │   ├── mme.conf
-│   │       │   ├── mme_fd.sprint.conf
-│   │       │   └── redis_extern.conf
 │   │       ├── magma_nsa_20897
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── entrypoint.sh
-│   │       │   ├── mme.conf
-│   │       │   ├── mme_fd.sprint.conf
-│   │       │   ├── oai_db.cql
-│   │       │   └── redis_extern.conf
 │   │       ├── nsa_b200_enb
-│   │       │   └── docker-compose.yml
 │   │       ├── nsa_b200_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── phytest_fhi72
-│   │       │   ├── docker-compose.yaml
-│   │       │   └── setup_sriov_dummy.sh
 │   │       ├── phytest_fhi72_cacofonix
-│   │       │   ├── docker-compose.yaml
-│   │       │   ├── setup_cleanup.sh
-│   │       │   ├── setup_config.sh
-│   │       │   └── setup_sriov_dummy.sh
 │   │       ├── sa_aw2s_2x2_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── sa_aw2s_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── sa_b200_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── sa_b200_jetson_nrue
-│   │       │   └── docker-compose.yml
 │   │       ├── sa_e1_b200_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── sa_f1_b200_gnb
-│   │       │   └── docker-compose.yml
 │   │       ├── sa_fhi_7.2_benetel_4x4_du
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_benetel.sh
 │   │       ├── sa_fhi_7.2_benetel550_2x2_100MHz_9b_mplane_gnb
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── setup_cleanup.sh
-│   │       │   ├── setup_config.sh
-│   │       │   └── setup_sriov_benetel.sh
 │   │       ├── sa_fhi_7.2_benetel550_4x4_40MHz_9b_mplane_gnb
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── setup_cleanup.sh
-│   │       │   ├── setup_config.sh
-│   │       │   └── setup_sriov_benetel.sh
 │   │       ├── sa_fhi_7.2_benetel_8x8_du
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_benetel650_650.sh
 │   │       ├── sa_fhi_7.2_liteon_4x4_gnb
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_liteon.sh
 │   │       ├── sa_fhi_7.2_metanoia_4x4_gnb
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_metanoia.sh
 │   │       ├── sa_fhi_7.2_vvdn_4x4_du
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_vvdn.sh
 │   │       ├── sa_fhi_7.2_vvdn_4x4_monolithic_gnb
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_vvdn.sh
 │   │       ├── sa_fhi_7.2_vvdn_4x4_nfapi
-│   │       │   ├── docker-compose.yml
-│   │       │   └── setup_sriov_vvdn.sh
 │   │       ├── sa_fhi_7.2_vvdn_gnb
-│   │       │   ├── docker-compose.yml
-│   │       │   ├── README.md
-│   │       │   ├── setup_config.sh
-│   │       │   └── setup_sriov_vvdn.sh
 │   │       ├── sa_gnb_aerial
-│   │       │   ├── aerial_l1_entrypoint.sh
-│   │       │   ├── cuphycontroller_P5G_WNC_GH.yaml
-│   │       │   ├── docker-compose-ue.yaml
-│   │       │   └── docker-compose.yaml
 │   │       ├── sa_gnb_aerial_30MHz
-│   │       │   ├── aerial_l1_entrypoint.sh
-│   │       │   ├── cuphycontroller_P5G_WNC_GH.yaml
-│   │       │   └── docker-compose.yaml
 │   │       ├── sa_gnb_aerial_ul
-│   │       │   ├── aerial_l1_entrypoint.sh
-│   │       │   ├── cuphycontroller_P5G_WNC_GH_ul.yaml
-│   │       │   └── docker-compose.yaml
 │   │       └── sa_sc_b200_gnb
-│   │           └── docker-compose.yml
 │   ├── CMakeLists.txt
 │   ├── CMakePresets.json
 │   ├── cmake_targets
 │   │   ├── at_commands
 │   │   │   └── CMakeLists.txt
+│   │   ├── build_oai
 │   │   ├── CPM.cmake
 │   │   ├── cross-arm.cmake
 │   │   ├── macros.cmake
+│   │   ├── ran_build
+│   │   │   └── build
 │   │   └── tools
+│   │       ├── build_helper
 │   │       ├── install_libraries_to_system.patch
 │   │       ├── install_wls_lib.patch
 │   │       ├── MODULES
-│   │       │   ├── Findarmral.cmake
-│   │       │   ├── FindGnuTLS.cmake
-│   │       │   ├── Findsctp.cmake
-│   │       │   └── Findxran.cmake
 │   │       ├── oran_fhi_integration_patches
-│   │       │   └── F
-│   │       │       └── oaioran_F.patch
 │   │       ├── test_helper
 │   │       ├── uhd-3.15-tdd-patch.diff
 │   │       ├── uhd-4.5plus-tdd-patch.diff
@@ -684,40 +492,9 @@
 │   │   │   ├── config_userapi.c
 │   │   │   ├── config_userapi.h
 │   │   │   ├── DOC
-│   │   │   │   ├── config
-│   │   │   │   │   ├── arch.md
-│   │   │   │   │   ├── devusage
-│   │   │   │   │   │   ├── addaparam.md
-│   │   │   │   │   │   ├── addparamset.md
-│   │   │   │   │   │   ├── api.md
-│   │   │   │   │   │   └── struct.md
-│   │   │   │   │   ├── devusage.md
-│   │   │   │   │   └── rtusage.md
-│   │   │   │   └── config.md
 │   │   │   ├── libconfig
-│   │   │   │   ├── config_libconfig.c
-│   │   │   │   ├── config_libconfig.h
-│   │   │   │   └── config_libconfig_private.h
 │   │   │   ├── tests
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── test_config_cmdline.cpp
-│   │   │   │   └── test_config.conf
 │   │   │   └── yaml
-│   │   │       ├── CMakeLists.txt
-│   │   │       ├── config_yaml.cpp
-│   │   │       └── tests
-│   │   │           ├── CMakeLists.txt
-│   │   │           ├── malformed.yaml
-│   │   │           ├── test1.yaml
-│   │   │           ├── test_int_array.yaml
-│   │   │           ├── test_ipv4.yaml
-│   │   │           ├── test_list_of_mappings.yml
-│   │   │           ├── test_list.yaml
-│   │   │           ├── test_read_mapping_as_list.yaml
-│   │   │           ├── test_read_str_as_int.yaml
-│   │   │           ├── test_recursion.yaml
-│   │   │           ├── test_string.yaml
-│   │   │           └── test_yaml_config.cpp
 │   │   ├── instrumentation.h
 │   │   ├── ngran_types.h
 │   │   ├── oai_version.h.in
@@ -727,350 +504,38 @@
 │   │   ├── ran_context.h
 │   │   └── utils
 │   │       ├── actor
-│   │       │   ├── actor.c
-│   │       │   ├── actor.h
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── README.md
-│   │       │   └── tests
-│   │       │       ├── CMakeLists.txt
-│   │       │       └── test_actor.cpp
 │   │       ├── alg
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── find.c
-│   │       │   ├── find.h
-│   │       │   ├── foreach.c
-│   │       │   └── foreach.h
 │   │       ├── assertions.h
 │   │       ├── barrier
-│   │       │   ├── barrier.c
-│   │       │   ├── barrier.h
-│   │       │   ├── CMakeLists.txt
-│   │       │   └── tests
-│   │       │       ├── CMakeLists.txt
-│   │       │       └── test_barrier.cpp
 │   │       ├── bits.c
 │   │       ├── bits.h
 │   │       ├── CMakeLists.txt
 │   │       ├── collection
-│   │       │   ├── linear_alloc.h
-│   │       │   ├── queue.h
-│   │       │   └── tree.h
 │   │       ├── config.h
 │   │       ├── data_recording
-│   │       │   ├── config
-│   │       │   │   ├── config_data_recording.json
-│   │       │   │   └── wireless_link_parameter_map.yaml
-│   │       │   ├── data_recording_app_v1.1.py
-│   │       │   ├── lib
-│   │       │   │   ├── common_utils.py
-│   │       │   │   ├── config_interface.py
-│   │       │   │   ├── data_recording_messages_def.py
-│   │       │   │   ├── __init__.py
-│   │       │   │   ├── shared_memory_interface.py
-│   │       │   │   ├── sigmf_interface.py
-│   │       │   │   ├── sync_service.py
-│   │       │   │   └── wireless_parameters_mapper.py
-│   │       │   ├── requirements.txt
-│   │       │   └── sync_validation_demo.py
 │   │       ├── DOC
-│   │       │   ├── loader
-│   │       │   │   ├── arch.md
-│   │       │   │   ├── devusage
-│   │       │   │   │   ├── api.md
-│   │       │   │   │   ├── loading.md
-│   │       │   │   │   └── struct.md
-│   │       │   │   ├── devusage.md
-│   │       │   │   └── rtusage.md
-│   │       │   └── loader.md
 │   │       ├── ds
-│   │       │   ├── byte_array.c
-│   │       │   ├── byte_array.h
-│   │       │   ├── byte_array_producer.c
-│   │       │   ├── byte_array_producer.h
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── hashtable.c
-│   │       │   ├── hashtable.h
-│   │       │   ├── obj_hashtable.c
-│   │       │   ├── obj_hashtable.h
-│   │       │   ├── seq_arr.c
-│   │       │   ├── seq_arr.h
-│   │       │   ├── spsc_q.c
-│   │       │   ├── spsc_q.h
-│   │       │   └── tests
-│   │       │       ├── CMakeLists.txt
-│   │       │       ├── test_hashtable.cpp
-│   │       │       ├── test_seq_array.c
-│   │       │       ├── test_spsc_q.cpp
-│   │       │       └── test_spsc_q_perf.cpp
 │   │       ├── eq_check.h
 │   │       ├── fsn.c
 │   │       ├── fsn.h
 │   │       ├── load_module_shlib.c
 │   │       ├── load_module_shlib.h
 │   │       ├── LOG
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── DOC
-│   │       │   │   ├── addconsoletrace.md
-│   │       │   │   ├── arch.md
-│   │       │   │   ├── configurelog.md
-│   │       │   │   ├── devusage.md
-│   │       │   │   ├── log.md
-│   │       │   │   ├── lttng_logs.md
-│   │       │   │   └── rtusage.md
-│   │       │   ├── log.c
-│   │       │   ├── log.h
-│   │       │   ├── lttng-log.h
-│   │       │   ├── lttng-tp.c
-│   │       │   ├── lttng-tp.h
-│   │       │   ├── README.txt
-│   │       │   ├── vcd_signal_dumper.c
-│   │       │   └── vcd_signal_dumper.h
 │   │       ├── lte
-│   │       │   ├── prach_utils.c
-│   │       │   ├── prach_utils.h
-│   │       │   └── ue_power.c
 │   │       ├── mem
-│   │       │   ├── memory.c
-│   │       │   └── oai_memory.h
 │   │       ├── minimal_stub.c
 │   │       ├── nr
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── nr_common.c
-│   │       │   ├── nr_common.h
-│   │       │   └── tests
-│   │       │       ├── CMakeLists.txt
-│   │       │       └── test_nr_common.cpp
 │   │       ├── oai_asn1.h
 │   │       ├── ocp_itti
-│   │       │   ├── all_msg.h
-│   │       │   ├── intertask_interface.cpp
-│   │       │   ├── intertask_interface.h
-│   │       │   └── itti.md
 │   │       ├── shm_iq_channel
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── shm_td_iq_channel.c
-│   │       │   ├── shm_td_iq_channel.h
-│   │       │   └── tests
-│   │       │       ├── CMakeLists.txt
-│   │       │       └── test_shm_td_iq_channel.c
 │   │       ├── simple_executable.h
 │   │       ├── system.c
 │   │       ├── system.h
 │   │       ├── T
-│   │       │   ├── check_vcd.c
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── defs.h
-│   │       │   ├── DOC
-│   │       │   │   ├── T
-│   │       │   │   │   ├── basic.md
-│   │       │   │   │   ├── csv.md
-│   │       │   │   │   ├── enb.md
-│   │       │   │   │   ├── enb_trace.odp
-│   │       │   │   │   ├── enb_trace.png
-│   │       │   │   │   ├── example.raw
-│   │       │   │   │   ├── howto_new_trace.md
-│   │       │   │   │   ├── howto_new_trace.patch
-│   │       │   │   │   ├── multi.md
-│   │       │   │   │   ├── record_db.md
-│   │       │   │   │   ├── record.md
-│   │       │   │   │   ├── replay.md
-│   │       │   │   │   ├── to_vcd.md
-│   │       │   │   │   ├── wireshark.md
-│   │       │   │   │   └── wireshark.png
-│   │       │   │   └── T.md
-│   │       │   ├── generate_Txx.c
-│   │       │   ├── genids.c
-│   │       │   ├── local_tracer.c
-│   │       │   ├── Makefile
-│   │       │   ├── plot.c
-│   │       │   ├── README
-│   │       │   ├── T.c
-│   │       │   ├── T_defs.h
-│   │       │   ├── T.h
-│   │       │   ├── T_messages_creator.c
-│   │       │   ├── T_messages_creator.h
-│   │       │   ├── T_messages.txt
-│   │       │   ├── tracee
-│   │       │   │   ├── common
-│   │       │   │   │   └── config
-│   │       │   │   │       └── config_userapi.h
-│   │       │   │   ├── Makefile
-│   │       │   │   ├── README
-│   │       │   │   └── tracee.c
-│   │       │   └── tracer
-│   │       │       ├── CMakeLists.txt
-│   │       │       ├── configuration.c
-│   │       │       ├── configuration.h
-│   │       │       ├── csv.c
-│   │       │       ├── database.c
-│   │       │       ├── database.h
-│   │       │       ├── defs.h
-│   │       │       ├── enb.c
-│   │       │       ├── event.c
-│   │       │       ├── event.h
-│   │       │       ├── event_selector.c
-│   │       │       ├── event_selector.h
-│   │       │       ├── extract.c
-│   │       │       ├── extract_config.c
-│   │       │       ├── extract_input_subframe.c
-│   │       │       ├── extract_output_subframe.c
-│   │       │       ├── extract_prs_dumps.sh
-│   │       │       ├── filter
-│   │       │       │   ├── CMakeLists.txt
-│   │       │       │   ├── filter.c
-│   │       │       │   ├── filter.h
-│   │       │       │   └── Makefile
-│   │       │       ├── gnb.c
-│   │       │       ├── gnb_mac.c
-│   │       │       ├── gui
-│   │       │       │   ├── CMakeLists.txt
-│   │       │       │   ├── container.c
-│   │       │       │   ├── event.c
-│   │       │       │   ├── gui.c
-│   │       │       │   ├── gui_defs.h
-│   │       │       │   ├── gui.h
-│   │       │       │   ├── image.c
-│   │       │       │   ├── init.c
-│   │       │       │   ├── label.c
-│   │       │       │   ├── loop.c
-│   │       │       │   ├── Makefile
-│   │       │       │   ├── notify.c
-│   │       │       │   ├── positioner.c
-│   │       │       │   ├── space.c
-│   │       │       │   ├── test.c
-│   │       │       │   ├── textarea.c
-│   │       │       │   ├── textlist.c
-│   │       │       │   ├── timeline.c
-│   │       │       │   ├── toplevel_window.c
-│   │       │       │   ├── widget.c
-│   │       │       │   ├── x.c
-│   │       │       │   ├── x_defs.h
-│   │       │       │   ├── x.h
-│   │       │       │   └── xy_plot.c
-│   │       │       ├── gui.c
-│   │       │       ├── hacks
-│   │       │       │   ├── ant0.c
-│   │       │       │   ├── dump_nack_signal.c
-│   │       │       │   ├── Makefile
-│   │       │       │   ├── multi-rru-clean.c
-│   │       │       │   ├── pilot_timeplot.sh
-│   │       │       │   ├── plot-ofdm.c
-│   │       │       │   ├── time_meas.c
-│   │       │       │   └── timeplot.c
-│   │       │       ├── handler.c
-│   │       │       ├── handler.h
-│   │       │       ├── logger
-│   │       │       │   ├── CMakeLists.txt
-│   │       │       │   ├── framelog.c
-│   │       │       │   ├── iqdotlog.c
-│   │       │       │   ├── iqlog.c
-│   │       │       │   ├── logger.c
-│   │       │       │   ├── logger_defs.h
-│   │       │       │   ├── logger.h
-│   │       │       │   ├── Makefile
-│   │       │       │   ├── textlog.c
-│   │       │       │   ├── throughputlog.c
-│   │       │       │   ├── ticked_ttilog.c
-│   │       │       │   ├── ticklog.c
-│   │       │       │   ├── timelog.c
-│   │       │       │   └── ttilog.c
-│   │       │       ├── macpdu2wireshark.c
-│   │       │       ├── Makefile
-│   │       │       ├── multi.c
-│   │       │       ├── openair_logo.h
-│   │       │       ├── openair_logo.png
-│   │       │       ├── packet-mac-lte.h
-│   │       │       ├── plot.c
-│   │       │       ├── record.c
-│   │       │       ├── record_db.cpp
-│   │       │       ├── replay.c
-│   │       │       ├── shared_memory_config.h
-│   │       │       ├── textlog.c
-│   │       │       ├── to_vcd.c
-│   │       │       ├── t_tracer_app_gnb.c
-│   │       │       ├── t_tracer_app_ue.c
-│   │       │       ├── ue.c
-│   │       │       ├── utils.c
-│   │       │       ├── utils.h
-│   │       │       ├── vcd.c
-│   │       │       └── view
-│   │       │           ├── CMakeLists.txt
-│   │       │           ├── Makefile
-│   │       │           ├── scrolltti.c
-│   │       │           ├── stdout.c
-│   │       │           ├── textlist.c
-│   │       │           ├── ticktime.c
-│   │       │           ├── time.c
-│   │       │           ├── tti.c
-│   │       │           ├── view.h
-│   │       │           └── xy.c
 │   │       ├── telnetsrv
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── DOC
-│   │       │   │   ├── telnetaddcmd.md
-│   │       │   │   ├── telnetarch.md
-│   │       │   │   ├── telnetgetset.md
-│   │       │   │   ├── telnethelp.md
-│   │       │   │   ├── telnethist.md
-│   │       │   │   ├── telnetloader.md
-│   │       │   │   ├── telnetlog.md
-│   │       │   │   ├── telnetloop.md
-│   │       │   │   ├── telnetmeasur.md
-│   │       │   │   ├── telneto1.md
-│   │       │   │   ├── telnetsrv.md
-│   │       │   │   └── telnetusage.md
-│   │       │   ├── telnetsrv_5Gue_measurements.c
-│   │       │   ├── telnetsrv_bearer.c
-│   │       │   ├── telnetsrv.c
-│   │       │   ├── telnetsrv_ci.c
-│   │       │   ├── telnetsrv_ciUE.c
-│   │       │   ├── telnetsrv_cpumeasur_def.h
-│   │       │   ├── telnetsrv_enb_measurements.c
-│   │       │   ├── telnetsrv_enb_phycmd.c
-│   │       │   ├── telnetsrv.h
-│   │       │   ├── telnetsrv_loader.c
-│   │       │   ├── telnetsrv_loader.h
-│   │       │   ├── telnetsrv_ltemeasur_def.h
-│   │       │   ├── telnetsrv_measurements.c
-│   │       │   ├── telnetsrv_measurements.h
-│   │       │   ├── telnetsrv_o1.c
-│   │       │   ├── telnetsrv_phycmd.h
-│   │       │   ├── telnetsrv_proccmd.c
-│   │       │   ├── telnetsrv_proccmd.h
-│   │       │   └── telnetsrv_rrc.c
 │   │       ├── tests
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── test_fsn.cpp
-│   │       │   └── test_tpool_vs_actors.c
 │   │       ├── threadPool
-│   │       │   ├── bounded_notified_fifo.h
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── measurement_display.c
-│   │       │   ├── notified_fifo.h
-│   │       │   ├── pthread_utils.h
-│   │       │   ├── task_ans.c
-│   │       │   ├── task_ans.h
-│   │       │   ├── task.h
-│   │       │   ├── test
-│   │       │   │   ├── CMakeLists.txt
-│   │       │   │   └── test_thread-pool.c
-│   │       │   ├── thread-pool.c
-│   │       │   ├── thread-pool.h
-│   │       │   └── thread-pool.md
 │   │       ├── time_manager
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── tests
-│   │       │   │   ├── CMakeLists.txt
-│   │       │   │   ├── test_auto.c
-│   │       │   │   └── test_manual.c
-│   │       │   ├── time_client.c
-│   │       │   ├── time_client.h
-│   │       │   ├── time_manager.c
-│   │       │   ├── time_manager.h
-│   │       │   ├── time_server.c
-│   │       │   ├── time_server.h
-│   │       │   ├── time_source.c
-│   │       │   └── time_source.h
 │   │       ├── time_meas.c
 │   │       ├── time_meas.h
 │   │       ├── time_stat.c
@@ -1081,116 +546,6 @@
 │   │       ├── utils.h
 │   │       ├── var_array.h
 │   │       └── websrv
-│   │           ├── CMakeLists.txt
-│   │           ├── DOC
-│   │           │   ├── logscfg.png
-│   │           │   ├── main.png
-│   │           │   ├── scope.png
-│   │           │   ├── websrvarch.md
-│   │           │   ├── websrvdev.md
-│   │           │   ├── websrv.md
-│   │           │   └── websrvuse.md
-│   │           ├── frontend
-│   │           │   ├── angular.json
-│   │           │   ├── e2e
-│   │           │   │   ├── protractor-ci.conf.js
-│   │           │   │   ├── protractor.conf.js
-│   │           │   │   ├── src
-│   │           │   │   │   ├── app.e2e-spec.ts
-│   │           │   │   │   └── app.po.ts
-│   │           │   │   └── tsconfig.json
-│   │           │   ├── package.json
-│   │           │   ├── package-lock.json
-│   │           │   ├── README.md
-│   │           │   ├── src
-│   │           │   │   ├── app
-│   │           │   │   │   ├── api
-│   │           │   │   │   │   ├── commands.api.ts
-│   │           │   │   │   │   ├── help.api.ts
-│   │           │   │   │   │   ├── info.api.ts
-│   │           │   │   │   │   └── scope.api.ts
-│   │           │   │   │   ├── app.component.css
-│   │           │   │   │   ├── app.component.html
-│   │           │   │   │   ├── app.component.ts
-│   │           │   │   │   ├── app.module.ts
-│   │           │   │   │   ├── app-routing.module.ts
-│   │           │   │   │   ├── components
-│   │           │   │   │   │   ├── commands
-│   │           │   │   │   │   │   ├── commands.component.html
-│   │           │   │   │   │   │   ├── commands.component.scss
-│   │           │   │   │   │   │   └── commands.component.ts
-│   │           │   │   │   │   ├── confirm
-│   │           │   │   │   │   │   ├── confirm.component.css
-│   │           │   │   │   │   │   ├── confirm.component.html
-│   │           │   │   │   │   │   └── confirm.component.ts
-│   │           │   │   │   │   ├── dialog
-│   │           │   │   │   │   │   ├── dialog.component.css
-│   │           │   │   │   │   │   ├── dialog.component.html
-│   │           │   │   │   │   │   └── dialog.component.ts
-│   │           │   │   │   │   ├── info
-│   │           │   │   │   │   │   ├── info.component.html
-│   │           │   │   │   │   │   ├── info.component.scss
-│   │           │   │   │   │   │   └── info.component.ts
-│   │           │   │   │   │   ├── question
-│   │           │   │   │   │   │   ├── question.component.css
-│   │           │   │   │   │   │   ├── question.component.html
-│   │           │   │   │   │   │   └── question.component.ts
-│   │           │   │   │   │   └── scope
-│   │           │   │   │   │       ├── scope.component.css
-│   │           │   │   │   │       ├── scope.component.html
-│   │           │   │   │   │       └── scope.component.ts
-│   │           │   │   │   ├── controls
-│   │           │   │   │   │   ├── cmd.control.ts
-│   │           │   │   │   │   ├── info.control.ts
-│   │           │   │   │   │   ├── module.control.ts
-│   │           │   │   │   │   ├── param.control.ts
-│   │           │   │   │   │   ├── row.control.ts
-│   │           │   │   │   │   └── var.control.ts
-│   │           │   │   │   ├── interceptors
-│   │           │   │   │   │   ├── error.interceptor.ts
-│   │           │   │   │   │   ├── interceptors.ts
-│   │           │   │   │   │   └── spinner.interceptor.ts
-│   │           │   │   │   └── services
-│   │           │   │   │       ├── dialog.service.ts
-│   │           │   │   │       ├── download.service.ts
-│   │           │   │   │       ├── loading.service.ts
-│   │           │   │   │       └── websocket.service.ts
-│   │           │   │   ├── assets
-│   │           │   │   ├── commondefs.ts
-│   │           │   │   ├── environments
-│   │           │   │   │   ├── environment.prod.ts
-│   │           │   │   │   └── environment.ts
-│   │           │   │   ├── favicon.ico
-│   │           │   │   ├── index.html
-│   │           │   │   ├── main.ts
-│   │           │   │   ├── polyfills.ts
-│   │           │   │   ├── styles.css
-│   │           │   │   └── test.ts
-│   │           │   ├── tsconfig.app.json
-│   │           │   ├── tsconfig.json
-│   │           │   └── tsconfig.spec.json
-│   │           ├── helpfiles
-│   │           │   ├── cmd_channelmod_show_channelid.html
-│   │           │   ├── cmd_channelmod_show_current.html
-│   │           │   ├── cmd_channelmod_show_predef.html
-│   │           │   ├── question_setdistance_input.html
-│   │           │   ├── question_show_channelid_input.html
-│   │           │   ├── rfsimu_show_models_algorithm.html
-│   │           │   ├── rfsimu_show_models_model_index.html
-│   │           │   ├── rfsimu_show_models_model_name.html
-│   │           │   ├── rfsimu_show_models_module_owner.html
-│   │           │   ├── scope_control_dataack.html
-│   │           │   ├── softmodem_show_threadsched_nice.html
-│   │           │   ├── softmodem_show_threadsched_oai_priority.html
-│   │           │   ├── softmodem_show_threadsched_priority.html
-│   │           │   └── softmodem_show_threadsched_sched_policy.html
-│   │           ├── websrv.c
-│   │           ├── websrv.h
-│   │           ├── websrv_noforms.c
-│   │           ├── websrv_noforms.h
-│   │           ├── websrv_scope.c
-│   │           ├── websrv_utils.c
-│   │           └── websrv_websockets.c
 │   ├── CONTRIBUTING.md
 │   ├── doc
 │   │   ├── 5Gnas.md
@@ -1212,18 +567,13 @@
 │   │   │   ├── e1ap_procedures.md
 │   │   │   ├── E1-design.md
 │   │   │   └── images
-│   │   │       ├── e1-archi.pdf
-│   │   │       ├── e1-archi.png
-│   │   │       └── e1-archi.tex
 │   │   ├── environment-variables.md
 │   │   ├── episys
 │   │   │   ├── Channel_Abstraction_UE_Handling_LTE.PNG
 │   │   │   ├── functional_diagram_proxy_lte.png
 │   │   │   ├── functional_diagram_proxy_nsa.png
 │   │   │   ├── lte_mode_l2_emulator
-│   │   │   │   └── README.md
 │   │   │   ├── nsa_mode_l2_emulator
-│   │   │   │   └── README.md
 │   │   │   └── Proxy_Interface_Diagram.PNG
 │   │   ├── F1AP
 │   │   │   ├── F1AP-lib.md
@@ -1323,23 +673,14 @@
 │   │   ├── testing_oai_nsa_w_cots_ue_resources
 │   │   │   ├── enb.conf
 │   │   │   ├── gnb.conf
-│   │   │   └── oai_fr1_setup.vsdx
+│   │   │   ├── oai_enb.log
+│   │   │   ├── oai_fr1_setup.vsdx
+│   │   │   └── oai_gnb.log
 │   │   ├── time_management.md
 │   │   ├── tuning_and_security.md
 │   │   ├── tutorial_resources
 │   │   │   ├── oai-cn5g
-│   │   │   │   ├── conf
-│   │   │   │   │   ├── config.yaml
-│   │   │   │   │   ├── sip.conf
-│   │   │   │   │   └── users.conf
-│   │   │   │   ├── database
-│   │   │   │   │   └── oai_db.sql
-│   │   │   │   ├── docker-compose-positioning.yaml
-│   │   │   │   ├── docker-compose.yaml
-│   │   │   │   └── healthscripts
-│   │   │   │       └── mysql-healthcheck.sh
 │   │   │   └── positioning
-│   │   │       └── InputData.json
 │   │   ├── UL_MIMO.md
 │   │   └── UnitTests.md
 │   ├── docker
@@ -1441,12 +782,6 @@
 │   │   │   ├── fh_timer.h
 │   │   │   ├── README.md
 │   │   │   └── tests
-│   │   │       ├── CMakeLists.txt
-│   │   │       ├── test_fh_recv.c
-│   │   │       ├── test_fh_recv_drift.c
-│   │   │       ├── test_fh_send.c
-│   │   │       ├── test_fh_timer.c
-│   │   │       └── test_fh_timer_drift.c
 │   │   ├── oru
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── oru_fh.c
@@ -1456,24 +791,17 @@
 │   │   │   ├── oru_packet_processor.c
 │   │   │   ├── oru_packet_processor.h
 │   │   │   └── tests
-│   │   │       ├── CMakeLists.txt
-│   │   │       ├── run_oru_pcap_test.sh
-│   │   │       ├── test_oru_fh.c
-│   │   │       ├── test_oru_io.c
-│   │   │       ├── test_oru_packet_processor.c
-│   │   │       └── test_oru_pcap.c
 │   │   ├── README.md
 │   │   └── xran_pkt
 │   │       ├── CMakeLists.txt
 │   │       ├── tests
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── test_xran_pkt.c
-│   │       │   └── xran_pcap_dump.c
 │   │       ├── xran_pkt_api.c
 │   │       ├── xran_pkt_api.h
 │   │       ├── xran_pkt_cp.h
 │   │       ├── xran_pkt.h
 │   │       └── xran_pkt_up.h
+│   ├── gnb.log
+│   ├── grep-tracer.log
 │   ├── LICENSE
 │   ├── LICENSES
 │   │   ├── deprecated
@@ -1486,17 +814,13 @@
 │   │       ├── CC-BY-4.0.txt
 │   │       ├── CSSL-v1.0.txt
 │   │       └── MIT.txt
+│   ├── logs-build-oai.log
 │   ├── maketags
 │   ├── nfapi
 │   │   ├── CHANGES.md
 │   │   ├── CMakeLists.txt
 │   │   ├── oai_integration
 │   │   │   ├── aerial
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── fapi_nvIPC.c
-│   │   │   │   ├── fapi_nvIPC.h
-│   │   │   │   ├── fapi_vnf_p7.c
-│   │   │   │   └── fapi_vnf_p7.h
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── gnb_ind_vars.c
 │   │   │   ├── gnb_ind_vars.h
@@ -1506,385 +830,44 @@
 │   │   │   ├── nfapi_vnf.c
 │   │   │   ├── nfapi_vnf.h
 │   │   │   ├── socket
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── include
-│   │   │   │   │   ├── socket_common.h
-│   │   │   │   │   ├── socket_pnf.h
-│   │   │   │   │   └── socket_vnf.h
-│   │   │   │   ├── socket_common.c
-│   │   │   │   ├── socket_pnf.c
-│   │   │   │   └── socket_vnf.c
 │   │   │   ├── vendor_ext.h
 │   │   │   └── wls_integration
-│   │   │       ├── CMakeLists.txt
-│   │   │       ├── include
-│   │   │       │   ├── wls_common.h
-│   │   │       │   ├── wls_pnf.h
-│   │   │       │   └── wls_vnf.h
-│   │   │       ├── wls_common.c
-│   │   │       ├── wls_pnf.c
-│   │   │       └── wls_vnf.c
 │   │   ├── open-nFAPI
 │   │   │   ├── CHANGELOG.md
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── common
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── Makefile.am
-│   │   │   │   ├── public_inc
-│   │   │   │   │   ├── debug.h
-│   │   │   │   │   └── nfapi.h
-│   │   │   │   └── src
-│   │   │   │       ├── debug.c
-│   │   │   │       └── nfapi.c
 │   │   │   ├── configure.ac
 │   │   │   ├── docs
-│   │   │   │   ├── Doxyfile
-│   │   │   │   ├── Doxyfile.in
-│   │   │   │   ├── doxygen.h
-│   │   │   │   └── Makefile.am
 │   │   │   ├── fapi
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── inc
-│   │   │   │   │   ├── nr_fapi.h
-│   │   │   │   │   ├── nr_fapi_p5.h
-│   │   │   │   │   ├── nr_fapi_p5_utils.h
-│   │   │   │   │   ├── nr_fapi_p7.h
-│   │   │   │   │   └── nr_fapi_p7_utils.h
-│   │   │   │   └── src
-│   │   │   │       ├── nr_fapi.c
-│   │   │   │       ├── nr_fapi_p5.c
-│   │   │   │       ├── nr_fapi_p5_utils.c
-│   │   │   │       ├── nr_fapi_p7.c
-│   │   │   │       └── nr_fapi_p7_utils.c
 │   │   │   ├── integration_tests
-│   │   │   │   ├── main.cpp
-│   │   │   │   └── Makefile.am
 │   │   │   ├── LICENSE.md
 │   │   │   ├── Makefile.am
 │   │   │   ├── nfapi
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── Makefile.am
-│   │   │   │   ├── public_inc
-│   │   │   │   │   ├── fapi_nr_ue_constants.h
-│   │   │   │   │   ├── fapi_nr_ue_interface.h
-│   │   │   │   │   ├── nfapi_common_interface.h
-│   │   │   │   │   ├── nfapi_interface.h
-│   │   │   │   │   ├── nfapi_nr_interface.h
-│   │   │   │   │   ├── nfapi_nr_interface_scf.h
-│   │   │   │   │   ├── nr_nfapi_p7.h
-│   │   │   │   │   └── sidelink_nr_ue_interface.h
-│   │   │   │   ├── src
-│   │   │   │   │   ├── nfapi_lte_p5.c
-│   │   │   │   │   ├── nfapi_lte_p7.c
-│   │   │   │   │   ├── nfapi_nr_p5.c
-│   │   │   │   │   ├── nfapi_nr_p7.c
-│   │   │   │   │   └── nfapi_p4.c
-│   │   │   │   └── tests
-│   │   │   │       ├── Makefile.am
-│   │   │   │       └── nfapi_cunit_main.c
 │   │   │   ├── pnf
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── inc
-│   │   │   │   │   ├── pnf.h
-│   │   │   │   │   └── pnf_p7.h
-│   │   │   │   ├── Makefile.am
-│   │   │   │   ├── public_inc
-│   │   │   │   │   └── nfapi_pnf_interface.h
-│   │   │   │   ├── src
-│   │   │   │   │   ├── pnf.c
-│   │   │   │   │   ├── pnf_interface.c
-│   │   │   │   │   ├── pnf_p7.c
-│   │   │   │   │   └── pnf_p7_interface.c
-│   │   │   │   └── tests
-│   │   │   │       ├── Makefile.am
-│   │   │   │       └── pnf_cunit_main.c
 │   │   │   ├── pnf_sim
-│   │   │   │   ├── inc
-│   │   │   │   │   ├── fapi_interface.h
-│   │   │   │   │   └── fapi_stub.h
-│   │   │   │   ├── Makefile.am
-│   │   │   │   └── src
-│   │   │   │       ├── fapi_stub.cpp
-│   │   │   │       └── main.cpp
 │   │   │   ├── README.md
 │   │   │   ├── sim_common
-│   │   │   │   ├── inc
-│   │   │   │   │   ├── pool.h
-│   │   │   │   │   └── vendor_ext.h
-│   │   │   │   ├── Makefile.am
-│   │   │   │   └── src
-│   │   │   │       └── pool.cpp
 │   │   │   ├── utils
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── examples.md
-│   │   │   │   └── nfapi_hex_parser.c
 │   │   │   ├── vnf
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── inc
-│   │   │   │   │   ├── vnf.h
-│   │   │   │   │   └── vnf_p7.h
-│   │   │   │   ├── Makefile.am
-│   │   │   │   ├── public_inc
-│   │   │   │   │   └── nfapi_vnf_interface.h
-│   │   │   │   ├── src
-│   │   │   │   │   ├── vnf.c
-│   │   │   │   │   ├── vnf_interface.c
-│   │   │   │   │   ├── vnf_p7.c
-│   │   │   │   │   └── vnf_p7_interface.c
-│   │   │   │   └── tests
-│   │   │   │       ├── Makefile.am
-│   │   │   │       └── vnf_cunit_main.c
 │   │   │   ├── vnf_sim
-│   │   │   │   ├── inc
-│   │   │   │   │   └── mac.h
-│   │   │   │   ├── Makefile.am
-│   │   │   │   └── src
-│   │   │   │       ├── mac.cpp
-│   │   │   │       └── main.cpp
 │   │   │   └── xml
-│   │   │       ├── pnf_phy_1_A_ws.xml
-│   │   │       ├── pnf_phy_1_A.xml
-│   │   │       ├── pnf_phy_1_B.xml
-│   │   │       ├── pnf_phy_2_A.xml
-│   │   │       ├── vnf_A_ws.xml
-│   │   │       └── vnf_A.xml
 │   │   ├── README
 │   │   └── tests
 │   │       ├── CMakeLists.txt
 │   │       ├── nr_fapi_test.h
 │   │       ├── p5
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── nr_fapi_config_request_test.c
-│   │       │   ├── nr_fapi_config_response_test.c
-│   │       │   ├── nr_fapi_error_indication_test.c
-│   │       │   ├── nr_fapi_param_request_test.c
-│   │       │   ├── nr_fapi_param_response_test.c
-│   │       │   ├── nr_fapi_start_request_test.c
-│   │       │   ├── nr_fapi_start_response_test.c
-│   │       │   ├── nr_fapi_stop_indication_test.c
-│   │       │   └── nr_fapi_stop_request_test.c
 │   │       └── p7
-│   │           ├── CMakeLists.txt
-│   │           ├── dci_payload_utils.h
-│   │           ├── nr_fapi_common_util_test.h
-│   │           ├── nr_fapi_crc_indication_test.c
-│   │           ├── nr_fapi_dci_inversion_test.c
-│   │           ├── nr_fapi_dl_tti_request_test.c
-│   │           ├── nr_fapi_rach_indication_test.c
-│   │           ├── nr_fapi_rx_data_indication_test.c
-│   │           ├── nr_fapi_slot_indication_test.c
-│   │           ├── nr_fapi_srs_indication_test.c
-│   │           ├── nr_fapi_tx_data_request_test.c
-│   │           ├── nr_fapi_uci_indication_test.c
-│   │           ├── nr_fapi_ul_dci_request_test.c
-│   │           └── nr_fapi_ul_tti_request_test.c
 │   ├── NOTICE
+│   ├── nrL1_stats.log
+│   ├── nrL1_UE_stats-0.log
+│   ├── nrMAC_stats.log
+│   ├── nrRRC_stats.log
 │   ├── oaienv
 │   ├── openair1
 │   │   ├── CMakeLists.txt
 │   │   ├── PHY
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── CODING
-│   │   │   │   ├── 3gpplte.c
-│   │   │   │   ├── 3gpplte_sse.c
-│   │   │   │   ├── 3gpplte_turbo_decoder_avx2_16bit.c
-│   │   │   │   ├── 3gpplte_turbo_decoder.c
-│   │   │   │   ├── 3gpplte_turbo_decoder_sse_16bit.c
-│   │   │   │   ├── 3gpplte_turbo_decoder_sse_8bit.c
-│   │   │   │   ├── 3gpplte_turbo_decoder_sse.c
-│   │   │   │   ├── ccoding_byte.c
-│   │   │   │   ├── ccoding_byte_lte.c
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── coding_defs.h
-│   │   │   │   ├── coding_extern.h
-│   │   │   │   ├── coding_load.c
-│   │   │   │   ├── crc_byte.c
-│   │   │   │   ├── crcext.h
-│   │   │   │   ├── crc.h
-│   │   │   │   ├── defs_NB_IoT.h
-│   │   │   │   ├── DOC
-│   │   │   │   │   └── LDPCImplementation.md
-│   │   │   │   ├── lte_interleaver_inline.h
-│   │   │   │   ├── lte_rate_matching.c
-│   │   │   │   ├── lte_segmentation.c
-│   │   │   │   ├── lte_tf.m
-│   │   │   │   ├── Makefile
-│   │   │   │   ├── Makefile.arm
-│   │   │   │   ├── nrLDPC_coding
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── nrLDPC_coding_aal
-│   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   ├── nrLDPC_coding_aal.c
-│   │   │   │   │   │   ├── nrLDPC_coding_aal.h
-│   │   │   │   │   │   └── README.md
-│   │   │   │   │   ├── nrLDPC_coding_interface.h
-│   │   │   │   │   ├── nrLDPC_coding_interface_load.c
-│   │   │   │   │   └── nrLDPC_coding_segment
-│   │   │   │   │       ├── CMakeLists.txt
-│   │   │   │   │       ├── nrLDPC_coding_segment_decoder.c
-│   │   │   │   │       ├── nrLDPC_coding_segment_encoder.c
-│   │   │   │   │       ├── nr_rate_matching.c
-│   │   │   │   │       └── nr_rate_matching.h
-│   │   │   │   ├── nrLDPC_decoder
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── doc
-│   │   │   │   │   │   └── nrLDPC
-│   │   │   │   │   │       ├── logo.png
-│   │   │   │   │   │       └── nrLDPC.tex
-│   │   │   │   │   ├── nrLDPC_bnProc.h
-│   │   │   │   │   ├── nrLDPC_cnProc_avx512.h
-│   │   │   │   │   ├── nrLDPC_cnProc.h
-│   │   │   │   │   ├── nrLDPC_decoder.c
-│   │   │   │   │   ├── nrLDPCdecoder_defs.h
-│   │   │   │   │   ├── nrLDPC_init.h
-│   │   │   │   │   ├── nrLDPC_lut.h
-│   │   │   │   │   ├── nrLDPC_mPass.h
-│   │   │   │   │   ├── nrLDPC_tools
-│   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   ├── generator_bnProc
-│   │   │   │   │   │   │   ├── bnProc_gen_BG1_128.c
-│   │   │   │   │   │   │   ├── bnProc_gen_BG1_avx2.c
-│   │   │   │   │   │   │   ├── bnProc_gen_BG2_128.c
-│   │   │   │   │   │   │   ├── bnProc_gen_BG2_avx2.c
-│   │   │   │   │   │   │   ├── bnProcPc_gen_BG1_128.c
-│   │   │   │   │   │   │   ├── bnProcPc_gen_BG1_avx2.c
-│   │   │   │   │   │   │   ├── bnProcPc_gen_BG2_128.c
-│   │   │   │   │   │   │   ├── bnProcPc_gen_BG2_avx2.c
-│   │   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   │   ├── main128.c
-│   │   │   │   │   │   │   └── main.c
-│   │   │   │   │   │   ├── generator_bnProc_avx512
-│   │   │   │   │   │   │   ├── bnProc_gen_BG1_avx512.c
-│   │   │   │   │   │   │   ├── bnProc_gen_BG2_avx512.c
-│   │   │   │   │   │   │   ├── bnProcPc_gen_BG1_avx512.c
-│   │   │   │   │   │   │   ├── bnProcPc_gen_BG2_avx512.c
-│   │   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   │   └── main.c
-│   │   │   │   │   │   ├── generator_cnProc
-│   │   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   │   ├── cnProc_gen_BG1_128.c
-│   │   │   │   │   │   │   ├── cnProc_gen_BG1_avx2.c
-│   │   │   │   │   │   │   ├── cnProc_gen_BG2_128.c
-│   │   │   │   │   │   │   ├── cnProc_gen_BG2_avx2.c
-│   │   │   │   │   │   │   ├── main128.c
-│   │   │   │   │   │   │   └── main.c
-│   │   │   │   │   │   ├── generator_cnProc_avx512
-│   │   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   │   ├── cnProc_gen_BG1_avx512.c
-│   │   │   │   │   │   │   ├── cnProc_gen_BG2_avx512.c
-│   │   │   │   │   │   │   └── main.c
-│   │   │   │   │   │   ├── nrLDPC_debug.h
-│   │   │   │   │   │   └── run_ldpc_generators.sh
-│   │   │   │   │   └── nrLDPC_types.h
-│   │   │   │   ├── nrLDPC_defs.h
-│   │   │   │   ├── nrLDPC_encoder
-│   │   │   │   │   ├── Gen_shift_value.h
-│   │   │   │   │   ├── ldpc176_byte.c
-│   │   │   │   │   ├── ldpc192_byte_128.c
-│   │   │   │   │   ├── ldpc192_byte.c
-│   │   │   │   │   ├── ldpc208_byte.c
-│   │   │   │   │   ├── ldpc224_byte_128.c
-│   │   │   │   │   ├── ldpc224_byte.c
-│   │   │   │   │   ├── ldpc240_byte_128.c
-│   │   │   │   │   ├── ldpc240_byte.c
-│   │   │   │   │   ├── ldpc256_byte_128.c
-│   │   │   │   │   ├── ldpc256_byte.c
-│   │   │   │   │   ├── ldpc288_byte_128.c
-│   │   │   │   │   ├── ldpc288_byte.c
-│   │   │   │   │   ├── ldpc320_byte_128.c
-│   │   │   │   │   ├── ldpc320_byte.c
-│   │   │   │   │   ├── ldpc352_byte_128.c
-│   │   │   │   │   ├── ldpc352_byte.c
-│   │   │   │   │   ├── ldpc384_alignr_byte_128.c
-│   │   │   │   │   ├── ldpc384_byte_128.c
-│   │   │   │   │   ├── ldpc384_byte.c
-│   │   │   │   │   ├── ldpc384_simd512_alignr_byte.c
-│   │   │   │   │   ├── ldpc384_simd512_byte.c
-│   │   │   │   │   ├── ldpc384_simd512_permutex_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc104_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc112_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc120_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc128_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc128_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc144_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc160_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc160_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc16_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc176_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc192_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc192_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc208_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc224_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc224_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc240_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc256_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc256_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc288_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc288_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc2_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc320_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc320_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc32_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc32_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc352_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc352_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc384_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc384_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc4_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc64_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc64_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc72_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc80_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc88_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc8_byte.c
-│   │   │   │   │   ├── ldpc_BG2_Zc96_byte_128.c
-│   │   │   │   │   ├── ldpc_BG2_Zc96_byte.c
-│   │   │   │   │   ├── ldpc_encode_parity_check.c
-│   │   │   │   │   ├── ldpc_encoder.c
-│   │   │   │   │   ├── ldpc_encoder_optim8segmulti.c
-│   │   │   │   │   └── ldpc_generate_coefficient.c
-│   │   │   │   ├── nrLDPC_extern.h
-│   │   │   │   ├── nrLDPC_load.c
-│   │   │   │   ├── nrPolar_tools
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── nr_bitwise_operations.c
-│   │   │   │   │   ├── nr_crc_byte.c
-│   │   │   │   │   ├── nr_polar_dci_defs.h
-│   │   │   │   │   ├── nr_polar_decoder.c
-│   │   │   │   │   ├── nr_polar_decoding_tools.c
-│   │   │   │   │   ├── nr_polar_defs.h
-│   │   │   │   │   ├── nr_polar_encoder.c
-│   │   │   │   │   ├── nr_polar_init.c
-│   │   │   │   │   ├── nr_polar_interleaving_pattern.c
-│   │   │   │   │   ├── nr_polar_kernal_operation.c
-│   │   │   │   │   ├── nr_polar_kronecker_power_matrices.c
-│   │   │   │   │   ├── nr_polar_matrix_and_array.c
-│   │   │   │   │   ├── nr_polar_pbch_defs.h
-│   │   │   │   │   ├── nr_polar_procedures.c
-│   │   │   │   │   ├── nr_polar_psbch_defs.h
-│   │   │   │   │   ├── nr_polar_pucch_defs.h
-│   │   │   │   │   ├── nr_polar_sequence_pattern.c
-│   │   │   │   │   └── nr_polar_uci_defs.h
-│   │   │   │   ├── nr_segmentation.c
-│   │   │   │   ├── nrSmallBlock
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── decodeSmallBlock.c
-│   │   │   │   │   ├── encodeSmallBlock.c
-│   │   │   │   │   └── nr_small_block_defs.h
-│   │   │   │   ├── README.txt
-│   │   │   │   ├── TESTBENCH
-│   │   │   │   │   ├── coding_unitary_defs.h
-│   │   │   │   │   ├── ldpctest.c
-│   │   │   │   │   ├── ltetest.c
-│   │   │   │   │   ├── Makefile
-│   │   │   │   │   ├── pdcch_test.c
-│   │   │   │   │   ├── polartest.c
-│   │   │   │   │   ├── README.txt
-│   │   │   │   │   ├── smallblocktest.c
-│   │   │   │   │   └── viterbi_test.c
-│   │   │   │   ├── types.h
-│   │   │   │   ├── viterbi.c
-│   │   │   │   └── viterbi_lte.c
 │   │   │   ├── defs_common.h
 │   │   │   ├── defs_eNB.h
 │   │   │   ├── defs_gNB.h
@@ -1902,259 +885,17 @@
 │   │   │   ├── impl_defs_top.h
 │   │   │   ├── impl_defs_top_NB_IoT.h
 │   │   │   ├── INIT
-│   │   │   │   ├── defs_NB_IoT.h
-│   │   │   │   ├── init_top.c
-│   │   │   │   ├── lte_init.c
-│   │   │   │   ├── lte_init_ru.c
-│   │   │   │   ├── lte_init_ue.c
-│   │   │   │   ├── lte_param_init.c
-│   │   │   │   ├── lte_parms.c
-│   │   │   │   ├── nr_init.c
-│   │   │   │   ├── nr_init_ru.c
-│   │   │   │   ├── nr_init_ue.c
-│   │   │   │   ├── nr_parms.c
-│   │   │   │   ├── nr_parms.h
-│   │   │   │   ├── nr_phy_init.h
-│   │   │   │   ├── phy_init.h
-│   │   │   │   ├── README.txt
-│   │   │   │   └── tests
-│   │   │   │       ├── CMakeLists.txt
-│   │   │   │       └── test_nr_frame_params.cpp
 │   │   │   ├── LTE_ESTIMATION
-│   │   │   │   ├── adjust_gain.c
-│   │   │   │   ├── bf_freq_domain_filters.m
-│   │   │   │   ├── filt16_32.h
-│   │   │   │   ├── filt96_32.h
-│   │   │   │   ├── filt96_32_khz_1dot25.h
-│   │   │   │   ├── freq_domain_filters.m
-│   │   │   │   ├── freq_equalization.c
-│   │   │   │   ├── lte_adjust_sync_eNB.c
-│   │   │   │   ├── lte_adjust_sync_ue.c
-│   │   │   │   ├── lte_dl_bf_channel_estimation.c
-│   │   │   │   ├── lte_dl_channel_estimation.c
-│   │   │   │   ├── lte_dl_mbsfn_channel_estimation.c
-│   │   │   │   ├── lte_eNB_measurements.c
-│   │   │   │   ├── lte_est_freq_offset.c
-│   │   │   │   ├── lte_estimation.h
-│   │   │   │   ├── lte_sync_time.c
-│   │   │   │   ├── lte_sync_timefreq.c
-│   │   │   │   ├── lte_sync_timefreq.m
-│   │   │   │   ├── lte_ue_measurements.c
-│   │   │   │   ├── lte_ul_channel_estimation.c
-│   │   │   │   ├── pss6144.h
-│   │   │   │   └── README.txt
 │   │   │   ├── LTE_REFSIG
-│   │   │   │   ├── defs_NB_IoT.h
-│   │   │   │   ├── gen_mod_table.m
-│   │   │   │   ├── lte_dl_cell_spec.c
-│   │   │   │   ├── lte_dl_mbsfn.c
-│   │   │   │   ├── lte_dl_uespec.c
-│   │   │   │   ├── lte_gold.c
-│   │   │   │   ├── lte_gold_mbsfn.c
-│   │   │   │   ├── lte_refsig.h
-│   │   │   │   ├── lte_ul.m
-│   │   │   │   ├── lte_ul_ref.c
-│   │   │   │   ├── mod_table.h
-│   │   │   │   ├── primary_synch.m
-│   │   │   │   └── README.txt
 │   │   │   ├── LTE_TRANSPORT
-│   │   │   │   ├── dci.c
-│   │   │   │   ├── dci.h
-│   │   │   │   ├── dci_NB_IoT.h
-│   │   │   │   ├── dci_tools.c
-│   │   │   │   ├── dci_tools_common.c
-│   │   │   │   ├── dci_tools_common_extern.h
-│   │   │   │   ├── defs_NB_IoT.h
-│   │   │   │   ├── dlsch_coding.c
-│   │   │   │   ├── dlsch_modulation.c
-│   │   │   │   ├── dlsch_scrambling.c
-│   │   │   │   ├── dlsch_tbs_full.h
-│   │   │   │   ├── dlsch_tbs.h
-│   │   │   │   ├── edci.c
-│   │   │   │   ├── group_hopping.c
-│   │   │   │   ├── lte_mcs.c
-│   │   │   │   ├── mdci.h
-│   │   │   │   ├── pbch.c
-│   │   │   │   ├── pcfich.c
-│   │   │   │   ├── pcfich_common.c
-│   │   │   │   ├── phich.c
-│   │   │   │   ├── phich_common.c
-│   │   │   │   ├── pilots.c
-│   │   │   │   ├── pilots_mbsfn.c
-│   │   │   │   ├── pmch.c
-│   │   │   │   ├── pmch_common.c
-│   │   │   │   ├── power_control.c
-│   │   │   │   ├── prach.c
-│   │   │   │   ├── prach_common.c
-│   │   │   │   ├── prach_extern.h
-│   │   │   │   ├── proto_NB_IoT.h
-│   │   │   │   ├── pss.c
-│   │   │   │   ├── pucch.c
-│   │   │   │   ├── pucch_common.c
-│   │   │   │   ├── pucch_extern.h
-│   │   │   │   ├── rar_tools.c
-│   │   │   │   ├── README.txt
-│   │   │   │   ├── sss.c
-│   │   │   │   ├── sss_gen.c
-│   │   │   │   ├── transport_common.h
-│   │   │   │   ├── transport_common_proto.h
-│   │   │   │   ├── transport_eNB.h
-│   │   │   │   ├── transport_proto.h
-│   │   │   │   ├── transport_vars.h
-│   │   │   │   ├── uci_common.h
-│   │   │   │   ├── uci_NB_IoT.h
-│   │   │   │   ├── uci_tools.c
-│   │   │   │   ├── ulsch_decoding.c
-│   │   │   │   ├── ulsch_demodulation.c
-│   │   │   │   └── vrb_maps.m
 │   │   │   ├── LTE_UE_TRANSPORT
-│   │   │   │   ├── dci_tools_ue.c
-│   │   │   │   ├── dci_ue.c
-│   │   │   │   ├── dlsch_decoding.c
-│   │   │   │   ├── dlsch_demodulation.c
-│   │   │   │   ├── dlsch_llr_computation_avx2.c
-│   │   │   │   ├── dlsch_llr_computation.c
-│   │   │   │   ├── drs_modulation.c
-│   │   │   │   ├── get_pmi.c
-│   │   │   │   ├── initial_sync.c
-│   │   │   │   ├── pbch_ue.c
-│   │   │   │   ├── pcfich_ue.c
-│   │   │   │   ├── pch_ue.c
-│   │   │   │   ├── phich_ue.c
-│   │   │   │   ├── pmch_ue.c
-│   │   │   │   ├── prach_ue.c
-│   │   │   │   ├── pucch_ue.c
-│   │   │   │   ├── rar_tools_ue.c
-│   │   │   │   ├── sldch.c
-│   │   │   │   ├── slsch.c
-│   │   │   │   ├── slss.c
-│   │   │   │   ├── srs_modulation.c
-│   │   │   │   ├── sss_ue.c
-│   │   │   │   ├── transport_proto_ue.h
-│   │   │   │   ├── transport_ue.h
-│   │   │   │   ├── uci_tools_ue.c
-│   │   │   │   ├── ulsch_coding.c
-│   │   │   │   └── ulsch_modulation.c
 │   │   │   ├── MODULATION
-│   │   │   │   ├── beamforming.c
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── compute_bf_weights.c
-│   │   │   │   ├── gen_75KHz.cpp
-│   │   │   │   ├── modulation_common.h
-│   │   │   │   ├── modulation_eNB.h
-│   │   │   │   ├── modulation_extern.h
-│   │   │   │   ├── modulation_UE.h
-│   │   │   │   ├── nr_beamforming.c
-│   │   │   │   ├── nr_modulation.c
-│   │   │   │   ├── nr_modulation.h
-│   │   │   │   ├── ofdm_mod.c
-│   │   │   │   ├── slot_fep.c
-│   │   │   │   ├── slot_fep_mbsfn.c
-│   │   │   │   ├── slot_fep_nr.c
-│   │   │   │   ├── slot_fep_ul.c
-│   │   │   │   ├── tests
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   └── test_nr_modulation.cpp
-│   │   │   │   ├── ul_7_5_kHz.c
-│   │   │   │   └── ul_7_5_kHz_ue.c
 │   │   │   ├── NR_ESTIMATION
-│   │   │   │   ├── nr_freq_equalization.c
-│   │   │   │   ├── nr_measurements_gNB.c
-│   │   │   │   ├── nr_ul_channel_estimation.c
-│   │   │   │   └── nr_ul_estimation.h
 │   │   │   ├── nr_phy_common
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── inc
-│   │   │   │   │   ├── nr_phy_common.h
-│   │   │   │   │   └── nr_ue_phy_meas.h
-│   │   │   │   └── src
-│   │   │   │       ├── nr_phy_common.c
-│   │   │   │       ├── nr_phy_common_csirs.c
-│   │   │   │       ├── nr_phy_common_srs.c
-│   │   │   │       └── nr_ue_phy_meas.c
 │   │   │   ├── NR_REFSIG
-│   │   │   │   ├── dmrs_nr.c
-│   │   │   │   ├── dmrs_nr.h
-│   │   │   │   ├── nr_dmrs_rx.c
-│   │   │   │   ├── nr_gen_mod_table.c
-│   │   │   │   ├── nr_gen_mod_table.m
-│   │   │   │   ├── nr_gold_ue.c
-│   │   │   │   ├── nr_mod_table.h
-│   │   │   │   ├── nr_refsig.h
-│   │   │   │   ├── pss_nr.h
-│   │   │   │   ├── ptrs_nr.c
-│   │   │   │   ├── ptrs_nr.h
-│   │   │   │   ├── README
-│   │   │   │   ├── refsig.c
-│   │   │   │   ├── sl_refsig_defs.h
-│   │   │   │   ├── ss_pbch_nr.h
-│   │   │   │   ├── sss_nr.h
-│   │   │   │   ├── ul_ref_seq_nr.c
-│   │   │   │   └── ul_ref_seq_nr.h
 │   │   │   ├── NR_TRANSPORT
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── nr_dci.c
-│   │   │   │   ├── nr_dci.h
-│   │   │   │   ├── nr_dci_tools.c
-│   │   │   │   ├── nr_dlsch.c
-│   │   │   │   ├── nr_dlsch_coding.c
-│   │   │   │   ├── nr_dlsch.h
-│   │   │   │   ├── nr_pbch.c
-│   │   │   │   ├── nr_prach.c
-│   │   │   │   ├── nr_prach_common.c
-│   │   │   │   ├── nr_prach.h
-│   │   │   │   ├── nr_prs.c
-│   │   │   │   ├── nr_pss.c
-│   │   │   │   ├── nr_sch_dmrs.c
-│   │   │   │   ├── nr_sch_dmrs.h
-│   │   │   │   ├── nr_scrambling.c
-│   │   │   │   ├── nr_sss.c
-│   │   │   │   ├── nr_tbs_tools.c
-│   │   │   │   ├── nr_transport_common_proto.h
-│   │   │   │   ├── nr_transport_proto.h
-│   │   │   │   ├── nr_uci_tools_common.c
-│   │   │   │   ├── nr_ulsch.c
-│   │   │   │   ├── nr_ulsch_decoding.c
-│   │   │   │   ├── nr_ulsch_demodulation.c
-│   │   │   │   ├── nr_ulsch.h
-│   │   │   │   ├── nr_ulsch_llr_computation.c
-│   │   │   │   ├── pucch_rx.c
-│   │   │   │   ├── README
-│   │   │   │   ├── srs_rx.c
-│   │   │   │   └── tests
-│   │   │   │       ├── CMakeLists.txt
-│   │   │   │       └── test_llr.cpp
 │   │   │   ├── NR_UE_ESTIMATION
-│   │   │   │   ├── filt16a_32.h
-│   │   │   │   ├── nr_adjust_gain.c
-│   │   │   │   ├── nr_adjust_synch_ue.c
-│   │   │   │   ├── nr_dl_channel_estimation.c
-│   │   │   │   ├── nr_estimation.h
-│   │   │   │   ├── nr_ue_measurements.c
-│   │   │   │   └── plot_prs_Ttracer_dumps.m
 │   │   │   ├── NR_UE_TRANSPORT
-│   │   │   │   ├── cic_filter_nr.c
-│   │   │   │   ├── cic_filter_nr.h
-│   │   │   │   ├── csi_rx.c
-│   │   │   │   ├── dci_nr.c
-│   │   │   │   ├── nr_dlsch_decoding.c
-│   │   │   │   ├── nr_dlsch_demodulation.c
-│   │   │   │   ├── nr_initial_sync.c
-│   │   │   │   ├── nr_initial_sync_sl.c
-│   │   │   │   ├── nr_ntn_l1.c
-│   │   │   │   ├── nr_pbch.c
-│   │   │   │   ├── nr_prach.c
-│   │   │   │   ├── nr_psbch_rx.c
-│   │   │   │   ├── nr_psbch_tx.c
-│   │   │   │   ├── nr_transport_proto_ue.h
-│   │   │   │   ├── nr_transport_ue.h
-│   │   │   │   ├── nr_ue_rf_helpers.c
-│   │   │   │   ├── nr_ulsch_coding.c
-│   │   │   │   ├── nr_ulsch_ue.c
-│   │   │   │   ├── pss_nr.c
-│   │   │   │   ├── pucch_nr.c
-│   │   │   │   ├── pucch_nr.h
-│   │   │   │   └── sss_nr.c
 │   │   │   ├── phy_extern.h
 │   │   │   ├── phy_extern_nr_ue.h
 │   │   │   ├── phy_extern_ue.h
@@ -2163,68 +904,6 @@
 │   │   │   ├── phy_vars_ue.h
 │   │   │   ├── sse_intrin.h
 │   │   │   ├── TOOLS
-│   │   │   │   ├── alaw_lut.h
-│   │   │   │   ├── angle.c
-│   │   │   │   ├── calibration_scope.c
-│   │   │   │   ├── calibration_scope.h
-│   │   │   │   ├── calibration_test.c
-│   │   │   │   ├── cdot_prod.c
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── costable.h
-│   │   │   │   ├── dB_routines.c
-│   │   │   │   ├── dfts_load.c
-│   │   │   │   ├── file_output.c
-│   │   │   │   ├── get_sin_cos.c
-│   │   │   │   ├── imscope
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── imgui.ini
-│   │   │   │   │   ├── imscope_common.cpp
-│   │   │   │   │   ├── imscope.cpp
-│   │   │   │   │   ├── imscope_init.cpp
-│   │   │   │   │   ├── imscope_internal.h
-│   │   │   │   │   ├── imscope_iq_file_viewer.cpp
-│   │   │   │   │   ├── imscope_record.cpp
-│   │   │   │   │   └── imscope_screenshot.png
-│   │   │   │   ├── invSqrt.c
-│   │   │   │   ├── log2_approx.c
-│   │   │   │   ├── lte_enb_scope.c
-│   │   │   │   ├── lte_phy_scope.c
-│   │   │   │   ├── lte_phy_scope.h
-│   │   │   │   ├── lte_phy_scope_tm4.c
-│   │   │   │   ├── lte_ue_scope.c
-│   │   │   │   ├── Makefile
-│   │   │   │   ├── nr_phy_scope.c
-│   │   │   │   ├── nr_phy_scope.h
-│   │   │   │   ├── oai_arith_operations.c
-│   │   │   │   ├── oai_dfts.c
-│   │   │   │   ├── oai_dfts_neon.c
-│   │   │   │   ├── phy_scope.h
-│   │   │   │   ├── phy_scope_interface.c
-│   │   │   │   ├── phy_scope_interface.h
-│   │   │   │   ├── phy_test_tools.hpp
-│   │   │   │   ├── readme.md
-│   │   │   │   ├── signal_energy.c
-│   │   │   │   ├── smbv.c
-│   │   │   │   ├── smbv.h
-│   │   │   │   ├── sqrt.c
-│   │   │   │   ├── tests
-│   │   │   │   │   ├── benchmark_channel_pipeline.cpp
-│   │   │   │   │   ├── benchmark_rotate_vector.cpp
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── test_channel_pipeline.cpp
-│   │   │   │   │   ├── test_channel_pipeline_tools.c
-│   │   │   │   │   ├── test_channel_pipeline_tools.h
-│   │   │   │   │   ├── test_channel_scalability.c
-│   │   │   │   │   ├── test_channel_simulation.c
-│   │   │   │   │   ├── test_dft.c
-│   │   │   │   │   ├── test_log2_approx.cpp
-│   │   │   │   │   ├── test_multipath.c
-│   │   │   │   │   ├── test_noise.c
-│   │   │   │   │   ├── test_oai_arith_operations.cpp
-│   │   │   │   │   ├── test_signal_energy.cpp
-│   │   │   │   │   ├── test_sse_intrinsics.cpp
-│   │   │   │   │   └── test_vector_op.cpp
-│   │   │   │   └── tools_defs.h
 │   │   │   ├── types.h
 │   │   │   └── types_NB_IoT.h
 │   │   ├── README.TXT
@@ -2267,282 +946,10 @@
 │   │   └── SIMULATION
 │   │       ├── CMakeLists.txt
 │   │       ├── LTE_PHY
-│   │       │   ├── Abstraction
-│   │       │   │   ├── beta_training_EESM.m
-│   │       │   │   ├── data_collection_mode5.m
-│   │       │   │   ├── data_extraction.m
-│   │       │   │   ├── delta_BLER_1.m
-│   │       │   │   ├── delta_BLER.m
-│   │       │   │   ├── demap_q.m
-│   │       │   │   ├── opposite_q.m
-│   │       │   │   └── Training
-│   │       │   │       ├── bare_adv.tex
-│   │       │   │       ├── bare_jrnl_compsoc.tex
-│   │       │   │       ├── bare_jrnl.tex
-│   │       │   │       ├── create_plots.m
-│   │       │   │       ├── delta_BLER_1.m
-│   │       │   │       ├── IEEEtran.cls
-│   │       │   │       ├── polyfit_beta_training.m
-│   │       │   │       ├── polyfit_delta_BLER.m
-│   │       │   │       ├── sinr_Eff_Calc.m
-│   │       │   │       ├── training_abstraction.m
-│   │       │   │       └── training_top_script.m
-│   │       │   ├── blerCurvesTemplate.tex
-│   │       │   ├── BLER_SIMULATIONS
-│   │       │   │   ├── AWGN
-│   │       │   │   │   ├── AWGN_results
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs0.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs10.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs11.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs12.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs13.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs14.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs15.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs16.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs17.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs18.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs19.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs1.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs20.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs21.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs22.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs23.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs24.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs25.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs26.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs27.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs28.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs2.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs3.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs4.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs5.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs6.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs7.csv
-│   │       │   │   │   │   ├── bler_tx1_chan18_nrx1_mcs8.csv
-│   │       │   │   │   │   └── bler_tx1_chan18_nrx1_mcs9.csv
-│   │       │   │   │   └── Perf_Curves_Abs
-│   │       │   │   │       ├── awgn_bler_tx1_mcs0.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs10.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs11.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs12.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs13.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs14.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs15.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs16.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs17.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs18.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs19.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs1.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs20.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs21.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs22.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs23.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs24.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs25.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs26.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs27.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs2.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs3.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs4.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs5.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs6.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs7.csv
-│   │       │   │   │       ├── awgn_bler_tx1_mcs8.csv
-│   │       │   │   │       └── awgn_bler_tx1_mcs9.csv
-│   │       │   │   ├── bler_0.m
-│   │       │   │   ├── bler_100.m
-│   │       │   │   ├── bler_119.m
-│   │       │   │   ├── bler_150.m
-│   │       │   │   ├── bler_200.m
-│   │       │   │   ├── bler_250.m
-│   │       │   │   ├── bler_300.m
-│   │       │   │   ├── bler_350.m
-│   │       │   │   ├── bler_400.m
-│   │       │   │   ├── bler_450.m
-│   │       │   │   ├── bler_500.m
-│   │       │   │   ├── bler_550.m
-│   │       │   │   ├── bler_66.m
-│   │       │   │   ├── bler_80.m
-│   │       │   │   └── eval_results.m
-│   │       │   ├── blerSimus.zip
-│   │       │   ├── common_sim.h
-│   │       │   ├── dlsim.c
-│   │       │   ├── dlsim_tm4.c
-│   │       │   ├── dlsim_tm7.c
-│   │       │   ├── dummy_functions.c
-│   │       │   ├── fancyheadings.sty
-│   │       │   ├── framegen.c
-│   │       │   ├── gpib_send.c
-│   │       │   ├── gpib_send.h
-│   │       │   ├── launch_sim.sh
-│   │       │   ├── LTE_Configuration.c
-│   │       │   ├── LTE_Configuration.h
-│   │       │   ├── mat2wv.m
-│   │       │   ├── mbmssim.c
-│   │       │   ├── pbch_awgn_interp.txt
-│   │       │   ├── pbch_awgn.txt
-│   │       │   ├── pbchsim.c
-│   │       │   ├── pbsPhyProcSim.sh
-│   │       │   ├── pdcch_eval_results.m
-│   │       │   ├── pdcchsim.c
-│   │       │   ├── plotTools
-│   │       │   │   ├── p
-│   │       │   │   ├── plot_channel_PePu.m
-│   │       │   │   ├── plot_channel_SePu.m
-│   │       │   │   ├── plot_channels.m
-│   │       │   │   ├── plot_constellations.m
-│   │       │   │   ├── plot_dl_ce_prec_ul.m
-│   │       │   │   ├── plot_dl_ch_est.m
-│   │       │   │   ├── plot_floating_point_signals.m
-│   │       │   │   ├── plot_srs_ce.m
-│   │       │   │   ├── plot_srs_ce_.m
-│   │       │   │   ├── plot_srs_prec_dl.m
-│   │       │   │   ├── plot_srs_rxF.m
-│   │       │   │   ├── plotTool.m
-│   │       │   │   ├── plot_tx_bf.m
-│   │       │   │   └── plot_txdata.m
-│   │       │   ├── prachsim.c
-│   │       │   ├── pucchsignalgegerator.h
-│   │       │   ├── pucchsignalgenerator.c
-│   │       │   ├── pucchsim.c
-│   │       │   ├── README.txt
-│   │       │   ├── REFERENCE_DATA
-│   │       │   │   ├── embms_20_25.m
-│   │       │   │   ├── embms.m
-│   │       │   │   ├── oai_embms_r39-1.png
-│   │       │   │   ├── pdcch_20MHz_awgn.m
-│   │       │   │   └── pdsch.txt
-│   │       │   ├── scansim.c
-│   │       │   ├── signalanalyzer.c
-│   │       │   ├── signalanalyzer.h
-│   │       │   ├── syncsim.c
-│   │       │   ├── test.c
-│   │       │   ├── ulsignalgenerator.c
-│   │       │   ├── ulsignalgenerator.h
-│   │       │   ├── ulsim2.c
-│   │       │   ├── ulsim.c
-│   │       │   └── unitary_defs.h
 │   │       ├── NR_PHY
-│   │       │   ├── BLER_SIMULATIONS
-│   │       │   │   └── AWGN
-│   │       │   │       ├── AWGN_MIMO2x2_results
-│   │       │   │       │   ├── mcs0_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs10_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs11_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs12_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs13_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs14_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs15_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs16_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs17_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs18_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs19_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs1_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs20_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs21_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs22_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs23_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs24_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs25_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs26_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs27_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs28_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs2_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs3_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs4_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs5_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs6_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs7_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   ├── mcs8_cdlc_mimo2x2_dl.csv
-│   │       │   │       │   └── mcs9_cdlc_mimo2x2_dl.csv
-│   │       │   │       ├── AWGN_results
-│   │       │   │       │   ├── mcs0_awgn_5G.csv
-│   │       │   │       │   ├── mcs10_awgn_5G.csv
-│   │       │   │       │   ├── mcs11_awgn_5G.csv
-│   │       │   │       │   ├── mcs12_awgn_5G.csv
-│   │       │   │       │   ├── mcs13_awgn_5G.csv
-│   │       │   │       │   ├── mcs14_awgn_5G.csv
-│   │       │   │       │   ├── mcs15_awgn_5G.csv
-│   │       │   │       │   ├── mcs16_awgn_5G.csv
-│   │       │   │       │   ├── mcs17_awgn_5G.csv
-│   │       │   │       │   ├── mcs18_awgn_5G.csv
-│   │       │   │       │   ├── mcs19_awgn_5G.csv
-│   │       │   │       │   ├── mcs1_awgn_5G.csv
-│   │       │   │       │   ├── mcs20_awgn_5G.csv
-│   │       │   │       │   ├── mcs21_awgn_5G.csv
-│   │       │   │       │   ├── mcs22_awgn_5G.csv
-│   │       │   │       │   ├── mcs23_awgn_5G.csv
-│   │       │   │       │   ├── mcs24_awgn_5G.csv
-│   │       │   │       │   ├── mcs25_awgn_5G.csv
-│   │       │   │       │   ├── mcs26_awgn_5G.csv
-│   │       │   │       │   ├── mcs27_awgn_5G.csv
-│   │       │   │       │   ├── mcs28_awgn_5G.csv
-│   │       │   │       │   ├── mcs2_awgn_5G.csv
-│   │       │   │       │   ├── mcs3_awgn_5G.csv
-│   │       │   │       │   ├── mcs4_awgn_5G.csv
-│   │       │   │       │   ├── mcs5_awgn_5G.csv
-│   │       │   │       │   ├── mcs6_awgn_5G.csv
-│   │       │   │       │   ├── mcs7_awgn_5G.csv
-│   │       │   │       │   ├── mcs8_awgn_5G.csv
-│   │       │   │       │   └── mcs9_awgn_5G.csv
-│   │       │   │       └── README.md
-│   │       │   ├── dlschsim.c
-│   │       │   ├── dlsim.c
-│   │       │   ├── nr_unitary_common.c
-│   │       │   ├── nr_unitary_defs.h
-│   │       │   ├── pbchsim.c
-│   │       │   ├── prachsim.c
-│   │       │   ├── psbchsim.c
-│   │       │   ├── pucchsim.c
-│   │       │   ├── reconfig.raw
-│   │       │   ├── srssim.c
-│   │       │   ├── ulschsim.c
-│   │       │   └── ulsim.c
 │   │       ├── RF
-│   │       │   ├── adc.c
-│   │       │   ├── dac.c
-│   │       │   ├── Makefile
-│   │       │   ├── README.txt
-│   │       │   ├── rf.c
-│   │       │   └── rf.h
 │   │       ├── tests
-│   │       │   ├── analyze-timing.sh
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── RunTimedTest.cmake
-│   │       │   ├── ThresholdsCuda.cmake
-│   │       │   ├── ThresholdsGracehopper.cmake
-│   │       │   └── ThresholdsOffload.cmake
 │   │       └── TOOLS
-│   │           ├── abstraction.c
-│   │           ├── channel_pipeline.c
-│   │           ├── channel_pipeline.cu
-│   │           ├── channel_pipeline.h
-│   │           ├── channel_pipeline_v2.cu
-│   │           ├── channel_sim.c
-│   │           ├── ch_desc_proto.c
-│   │           ├── CMakeLists.txt
-│   │           ├── corr_mat.m
-│   │           ├── DOC
-│   │           │   ├── channel_simulation.md
-│   │           │   └── gpu_acceleration.md
-│   │           ├── gauss.c
-│   │           ├── llr_quantization.c
-│   │           ├── multipath_channel.c
-│   │           ├── multipath_channel.cu
-│   │           ├── multipath_tv_channel.c
-│   │           ├── noise_device.c
-│   │           ├── noise_device.h
-│   │           ├── oai_cuda.h
-│   │           ├── phase_noise.c
-│   │           ├── phase_noise.cu
-│   │           ├── random_channel.c
-│   │           ├── rangen_double.c
-│   │           ├── scm_corrmat.h
-│   │           ├── scm.m
-│   │           ├── sim.h
-│   │           ├── taus.c
-│   │           ├── uci_on_pusch_decode.m
-│   │           └── uci_on_pusch_encode.m
 │   ├── openair2
 │   │   ├── CMakeLists.txt
 │   │   ├── COMMON
@@ -2593,59 +1000,15 @@
 │   │   │   ├── e1ap.h
 │   │   │   ├── e1ap_setup.c
 │   │   │   ├── lib
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── e1ap_bearer_context_management.c
-│   │   │   │   ├── e1ap_bearer_context_management.h
-│   │   │   │   ├── e1ap_interface_management.c
-│   │   │   │   ├── e1ap_interface_management.h
-│   │   │   │   ├── e1ap_lib_common.c
-│   │   │   │   ├── e1ap_lib_common.h
-│   │   │   │   └── e1ap_lib_includes.h
 │   │   │   ├── MESSAGES
-│   │   │   │   ├── ASN.1
-│   │   │   │   │   ├── 38463-g80.R16.78.0.asn
-│   │   │   │   │   └── 38463-g80.R16.78.0.cmake
-│   │   │   │   └── CMakeLists.txt
 │   │   │   └── tests
-│   │   │       ├── CMakeLists.txt
-│   │   │       └── e1ap_lib_test.c
 │   │   ├── E2AP
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── e2_agent_arg.c
 │   │   │   ├── e2_agent_arg.h
 │   │   │   ├── e2_agent_paramdef.h
+│   │   │   ├── flexric
 │   │   │   ├── RAN_FUNCTION
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── CUSTOMIZED
-│   │   │   │   │   ├── ran_func_gtp.c
-│   │   │   │   │   ├── ran_func_gtp.h
-│   │   │   │   │   ├── ran_func_mac.c
-│   │   │   │   │   ├── ran_func_mac.h
-│   │   │   │   │   ├── ran_func_pdcp.c
-│   │   │   │   │   ├── ran_func_pdcp.h
-│   │   │   │   │   ├── ran_func_rlc.c
-│   │   │   │   │   ├── ran_func_rlc.h
-│   │   │   │   │   ├── ran_func_slice.c
-│   │   │   │   │   ├── ran_func_slice.h
-│   │   │   │   │   ├── ran_func_tc.c
-│   │   │   │   │   └── ran_func_tc.h
-│   │   │   │   ├── init_ran_func.c
-│   │   │   │   ├── init_ran_func.h
-│   │   │   │   ├── O-RAN
-│   │   │   │   │   ├── ran_e2sm_ue_id.c
-│   │   │   │   │   ├── ran_e2sm_ue_id.h
-│   │   │   │   │   ├── ran_func_kpm.c
-│   │   │   │   │   ├── ran_func_kpm.h
-│   │   │   │   │   ├── ran_func_kpm_subs.c
-│   │   │   │   │   ├── ran_func_kpm_subs.h
-│   │   │   │   │   ├── ran_func_rc.c
-│   │   │   │   │   ├── ran_func_rc_extern.h
-│   │   │   │   │   ├── ran_func_rc.h
-│   │   │   │   │   ├── ran_func_rc_subs.c
-│   │   │   │   │   ├── ran_func_rc_subs.h
-│   │   │   │   │   └── README.md
-│   │   │   │   ├── read_setup_ran.c
-│   │   │   │   └── read_setup_ran.h
 │   │   │   └── README.md
 │   │   ├── ENB_APP
 │   │   │   ├── enb_app.c
@@ -2700,53 +1063,8 @@
 │   │   │   ├── f1ap_itti_messaging.c
 │   │   │   ├── f1ap_itti_messaging.h
 │   │   │   ├── lib
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── f1ap_interface_management.c
-│   │   │   │   ├── f1ap_interface_management.h
-│   │   │   │   ├── f1ap_lib_common.c
-│   │   │   │   ├── f1ap_lib_common.h
-│   │   │   │   ├── f1ap_lib_includes.h
-│   │   │   │   ├── f1ap_paging.c
-│   │   │   │   ├── f1ap_paging.h
-│   │   │   │   ├── f1ap_positioning.c
-│   │   │   │   ├── f1ap_positioning.h
-│   │   │   │   ├── f1ap_rrc_message_transfer.c
-│   │   │   │   ├── f1ap_rrc_message_transfer.h
-│   │   │   │   ├── f1ap_ue_context.c
-│   │   │   │   └── f1ap_ue_context.h
 │   │   │   ├── MESSAGES
-│   │   │   │   ├── ASN1
-│   │   │   │   │   ├── f1ap-16.21.0.cmake
-│   │   │   │   │   ├── f1ap-16.3.1.cmake
-│   │   │   │   │   ├── R15.1.1
-│   │   │   │   │   │   ├── asn1_constants.h
-│   │   │   │   │   │   ├── F1AP-CommonDataTypes.asn
-│   │   │   │   │   │   ├── F1AP-Constants.asn
-│   │   │   │   │   │   ├── F1AP-Containers.asn
-│   │   │   │   │   │   ├── F1AP-IEs.asn
-│   │   │   │   │   │   ├── F1AP-PDU-Contents.asn
-│   │   │   │   │   │   └── F1AP-PDU-Descriptions.asn
-│   │   │   │   │   ├── R15.2.1
-│   │   │   │   │   │   ├── F1AP-CommonDataTypes.asn
-│   │   │   │   │   │   ├── F1AP-Constants.asn
-│   │   │   │   │   │   ├── F1AP-Containers.asn
-│   │   │   │   │   │   ├── F1AP-IEs.asn
-│   │   │   │   │   │   ├── F1AP-PDU-Contents.asn
-│   │   │   │   │   │   └── F1AP-PDU-Descriptions.asn
-│   │   │   │   │   ├── R16.21.0
-│   │   │   │   │   │   └── f1ap-16.21.0.asn
-│   │   │   │   │   └── R16.3.1
-│   │   │   │   │       ├── 38473-g31.asn
-│   │   │   │   │       ├── F1AP-CommonDataTypes.asn
-│   │   │   │   │       ├── F1AP-Constants.asn
-│   │   │   │   │       ├── F1AP-Containers.asn
-│   │   │   │   │       ├── F1AP-IEs.asn
-│   │   │   │   │       ├── F1AP-PDU-Contents.asn
-│   │   │   │   │       └── F1AP-PDU-Descriptions.asn
-│   │   │   │   └── CMakeLists.txt
 │   │   │   └── tests
-│   │   │       ├── CMakeLists.txt
-│   │   │       └── f1ap_lib_test.c
 │   │   ├── GNB_APP
 │   │   │   ├── gnb_app.c
 │   │   │   ├── gnb_app.h
@@ -2763,332 +1081,15 @@
 │   │   ├── LAYER2
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── MAC
-│   │   │   │   ├── config.c
-│   │   │   │   ├── config_NB_IoT.h
-│   │   │   │   ├── config_ue.c
-│   │   │   │   ├── defs_NB_IoT.h
-│   │   │   │   ├── dummy_functions.c
-│   │   │   │   ├── eNB_scheduler_bch.c
-│   │   │   │   ├── eNB_scheduler.c
-│   │   │   │   ├── eNB_scheduler_dlsch.c
-│   │   │   │   ├── eNB_scheduler_fairRR.c
-│   │   │   │   ├── eNB_scheduler_fairRR.h
-│   │   │   │   ├── eNB_scheduler_mch.c
-│   │   │   │   ├── eNB_scheduler_phytest.c
-│   │   │   │   ├── eNB_scheduler_primitives.c
-│   │   │   │   ├── eNB_scheduler_RA.c
-│   │   │   │   ├── eNB_scheduler_ulsch.c
-│   │   │   │   ├── l1_helpers.c
-│   │   │   │   ├── mac_extern.h
-│   │   │   │   ├── mac.h
-│   │   │   │   ├── mac_proto.h
-│   │   │   │   ├── main.c
-│   │   │   │   ├── main_ue.c
-│   │   │   │   ├── pre_processor.c
-│   │   │   │   ├── proto_NB_IoT.h
-│   │   │   │   ├── ra_procedures.c
-│   │   │   │   ├── rar_tools.c
-│   │   │   │   ├── rar_tools_ue.c
-│   │   │   │   ├── slicing
-│   │   │   │   │   ├── slicing.c
-│   │   │   │   │   ├── slicing.h
-│   │   │   │   │   └── slicing_internal.h
-│   │   │   │   └── ue_procedures.c
 │   │   │   ├── NR_MAC_COMMON
-│   │   │   │   ├── nr_compute_tbs_common.c
-│   │   │   │   ├── nr_mac_common.c
-│   │   │   │   ├── nr_mac_common.h
-│   │   │   │   ├── nr_mac_common_tdd.c
-│   │   │   │   ├── nr_mac.h
-│   │   │   │   └── nr_prach_config.h
 │   │   │   ├── NR_MAC_gNB
-│   │   │   │   ├── config.c
-│   │   │   │   ├── gNB_scheduler_bch.c
-│   │   │   │   ├── gNB_scheduler.c
-│   │   │   │   ├── gNB_scheduler_dlsch.c
-│   │   │   │   ├── gNB_scheduler_dlsch_default_policies.c
-│   │   │   │   ├── gNB_scheduler_dlsch_default_policies.h
-│   │   │   │   ├── gNB_scheduler_phytest.c
-│   │   │   │   ├── gNB_scheduler_primitives.c
-│   │   │   │   ├── gNB_scheduler_RA.c
-│   │   │   │   ├── gNB_scheduler_srs.c
-│   │   │   │   ├── gNB_scheduler_uci.c
-│   │   │   │   ├── gNB_scheduler_ulsch.c
-│   │   │   │   ├── gNB_scheduler_ulsch_default_policies.c
-│   │   │   │   ├── gNB_scheduler_ulsch_default_policies.h
-│   │   │   │   ├── mac_config.h
-│   │   │   │   ├── mac_proto.h
-│   │   │   │   ├── mac_rrc_dl_handler.c
-│   │   │   │   ├── mac_rrc_dl_handler.h
-│   │   │   │   ├── mac_rrc_ul_direct.c
-│   │   │   │   ├── mac_rrc_ul_f1ap.c
-│   │   │   │   ├── mac_rrc_ul.h
-│   │   │   │   ├── main.c
-│   │   │   │   ├── nr_mac_gNB.h
-│   │   │   │   ├── nr_radio_config.c
-│   │   │   │   └── nr_radio_config.h
 │   │   │   ├── NR_MAC_UE
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── config_ue.c
-│   │   │   │   ├── config_ue_sl.c
-│   │   │   │   ├── mac_defs.h
-│   │   │   │   ├── mac_defs_sl.h
-│   │   │   │   ├── mac_proto.h
-│   │   │   │   ├── mac_tables.c
-│   │   │   │   ├── main_ue_nr.c
-│   │   │   │   ├── nr_ra_procedures.c
-│   │   │   │   ├── nr_ue_dci_configuration.c
-│   │   │   │   ├── nr_ue_power_procedures.c
-│   │   │   │   ├── nr_ue_procedures.c
-│   │   │   │   ├── nr_ue_procedures_sl.c
-│   │   │   │   ├── nr_ue_scheduler.c
-│   │   │   │   ├── nr_ue_scheduler_sl.c
-│   │   │   │   └── tests
-│   │   │   │       ├── CMakeLists.txt
-│   │   │   │       ├── test_nr_ue_power_procedures.cpp
-│   │   │   │       └── test_nr_ue_ra_procedures.cpp
 │   │   │   ├── nr_pdcp
-│   │   │   │   ├── asn1_utils.c
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── cucp_cuup_handler.c
-│   │   │   │   ├── cucp_cuup_handler.h
-│   │   │   │   ├── cuup_cucp_direct.c
-│   │   │   │   ├── cuup_cucp_e1ap.c
-│   │   │   │   ├── cuup_cucp_if.c
-│   │   │   │   ├── cuup_cucp_if.h
-│   │   │   │   ├── nr_pdcp_asn1_utils.h
-│   │   │   │   ├── nr_pdcp_configuration.h
-│   │   │   │   ├── nr_pdcp_entity.c
-│   │   │   │   ├── nr_pdcp_entity.h
-│   │   │   │   ├── nr_pdcp.h
-│   │   │   │   ├── nr_pdcp_integrity_data.h
-│   │   │   │   ├── nr_pdcp_integrity_nia1.c
-│   │   │   │   ├── nr_pdcp_integrity_nia1.h
-│   │   │   │   ├── nr_pdcp_integrity_nia2.c
-│   │   │   │   ├── nr_pdcp_integrity_nia2.h
-│   │   │   │   ├── nr_pdcp_oai_api.c
-│   │   │   │   ├── nr_pdcp_oai_api.h
-│   │   │   │   ├── nr_pdcp_sdu.c
-│   │   │   │   ├── nr_pdcp_sdu.h
-│   │   │   │   ├── nr_pdcp_security_nea1.c
-│   │   │   │   ├── nr_pdcp_security_nea1.h
-│   │   │   │   ├── nr_pdcp_security_nea2.c
-│   │   │   │   ├── nr_pdcp_security_nea2.h
-│   │   │   │   ├── nr_pdcp_timer_thread.c
-│   │   │   │   ├── nr_pdcp_timer_thread.h
-│   │   │   │   ├── nr_pdcp_ue_manager.c
-│   │   │   │   ├── nr_pdcp_ue_manager.h
-│   │   │   │   └── tests
-│   │   │   │       ├── CMakeLists.txt
-│   │   │   │       └── snow3g_tests.c
 │   │   │   ├── nr_rlc
-│   │   │   │   ├── asn1_utils.c
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── Makefile
-│   │   │   │   ├── nr_rlc_asn1_utils.h
-│   │   │   │   ├── nr_rlc_configuration.h
-│   │   │   │   ├── nr_rlc_entity_am.c
-│   │   │   │   ├── nr_rlc_entity_am.h
-│   │   │   │   ├── nr_rlc_entity.c
-│   │   │   │   ├── nr_rlc_entity.h
-│   │   │   │   ├── nr_rlc_entity_tm.c
-│   │   │   │   ├── nr_rlc_entity_tm.h
-│   │   │   │   ├── nr_rlc_entity_um.c
-│   │   │   │   ├── nr_rlc_entity_um.h
-│   │   │   │   ├── nr_rlc_oai_api.c
-│   │   │   │   ├── nr_rlc_oai_api.h
-│   │   │   │   ├── nr_rlc_pdu.c
-│   │   │   │   ├── nr_rlc_pdu.h
-│   │   │   │   ├── nr_rlc_rx_manager.c
-│   │   │   │   ├── nr_rlc_rx_manager.h
-│   │   │   │   ├── nr_rlc_sdu.c
-│   │   │   │   ├── nr_rlc_sdu.h
-│   │   │   │   ├── nr_rlc_ue_manager.c
-│   │   │   │   ├── nr_rlc_ue_manager.h
-│   │   │   │   ├── test.c
-│   │   │   │   ├── tests
-│   │   │   │   │   ├── benchmark_nr_rlc_am_entity.cpp
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── exec_nr_rlc_test.sh
-│   │   │   │   │   ├── LOG
-│   │   │   │   │   │   └── log.h
-│   │   │   │   │   ├── Makefile
-│   │   │   │   │   ├── run_tests.sh
-│   │   │   │   │   ├── test10.h
-│   │   │   │   │   ├── test10.txt.gz
-│   │   │   │   │   ├── test11.h
-│   │   │   │   │   ├── test11.txt.gz
-│   │   │   │   │   ├── test12.h
-│   │   │   │   │   ├── test12.txt.gz
-│   │   │   │   │   ├── test13.h
-│   │   │   │   │   ├── test13.txt.gz
-│   │   │   │   │   ├── test14.h
-│   │   │   │   │   ├── test14.txt.gz
-│   │   │   │   │   ├── test15.h
-│   │   │   │   │   ├── test15.txt.gz
-│   │   │   │   │   ├── test16.h
-│   │   │   │   │   ├── test16.txt.gz
-│   │   │   │   │   ├── test17.h
-│   │   │   │   │   ├── test17.txt.gz
-│   │   │   │   │   ├── test1.h
-│   │   │   │   │   ├── test1.txt.gz
-│   │   │   │   │   ├── test2.h
-│   │   │   │   │   ├── test2.txt.gz
-│   │   │   │   │   ├── test3.h
-│   │   │   │   │   ├── test3.txt.gz
-│   │   │   │   │   ├── test4.h
-│   │   │   │   │   ├── test4.txt.gz
-│   │   │   │   │   ├── test5.h
-│   │   │   │   │   ├── test5.txt.gz
-│   │   │   │   │   ├── test6.h
-│   │   │   │   │   ├── test6.txt.gz
-│   │   │   │   │   ├── test7.h
-│   │   │   │   │   ├── test7.txt.gz
-│   │   │   │   │   ├── test8.h
-│   │   │   │   │   ├── test8.txt.gz
-│   │   │   │   │   ├── test9.h
-│   │   │   │   │   ├── test9.txt.gz
-│   │   │   │   │   ├── test.c
-│   │   │   │   │   ├── test_nr_rlc_am_entity.cpp
-│   │   │   │   │   └── time_stat.c
-│   │   │   │   └── TODO
 │   │   │   ├── openair2_proc.c
 │   │   │   ├── PDCP_v10.1.0
-│   │   │   │   ├── pdcp.c
-│   │   │   │   ├── pdcp_fifo.c
-│   │   │   │   ├── pdcp.h
-│   │   │   │   ├── pdcp_primitives.c
-│   │   │   │   ├── pdcp_primitives.h
-│   │   │   │   ├── pdcp_security.c
-│   │   │   │   ├── pdcp_sequence_manager.c
-│   │   │   │   ├── pdcp_sequence_manager.h
-│   │   │   │   ├── pdcp_util.c
-│   │   │   │   └── pdcp_util.h
 │   │   │   ├── RLC
-│   │   │   │   └── rlc.h
 │   │   │   └── rlc_v2
-│   │   │       ├── asn1_utils.c
-│   │   │       ├── rlc_asn1_utils.h
-│   │   │       ├── rlc_entity_am.c
-│   │   │       ├── rlc_entity_am.h
-│   │   │       ├── rlc_entity.c
-│   │   │       ├── rlc_entity.h
-│   │   │       ├── rlc_entity_um.c
-│   │   │       ├── rlc_entity_um.h
-│   │   │       ├── rlc_oai_api.c
-│   │   │       ├── rlc_pdu.c
-│   │   │       ├── rlc_pdu.h
-│   │   │       ├── rlc_sdu.c
-│   │   │       ├── rlc_sdu.h
-│   │   │       ├── rlc_ue_manager.c
-│   │   │       ├── rlc_ue_manager.h
-│   │   │       ├── tests
-│   │   │       │   ├── LOG
-│   │   │       │   │   └── log.h
-│   │   │       │   ├── Makefile
-│   │   │       │   ├── make_pdu.c
-│   │   │       │   ├── README
-│   │   │       │   ├── run_tests.sh
-│   │   │       │   ├── test10.h
-│   │   │       │   ├── test10.txt.gz
-│   │   │       │   ├── test11.h
-│   │   │       │   ├── test11.txt.gz
-│   │   │       │   ├── test12.h
-│   │   │       │   ├── test12.txt.gz
-│   │   │       │   ├── test13.h
-│   │   │       │   ├── test13.txt.gz
-│   │   │       │   ├── test14.h
-│   │   │       │   ├── test14.txt.gz
-│   │   │       │   ├── test15.h
-│   │   │       │   ├── test15.txt.gz
-│   │   │       │   ├── test16.h
-│   │   │       │   ├── test16.txt.gz
-│   │   │       │   ├── test17.h
-│   │   │       │   ├── test17.txt.gz
-│   │   │       │   ├── test18.h
-│   │   │       │   ├── test18.txt.gz
-│   │   │       │   ├── test19.h
-│   │   │       │   ├── test19.txt.gz
-│   │   │       │   ├── test1.h
-│   │   │       │   ├── test1.txt.gz
-│   │   │       │   ├── test20.h
-│   │   │       │   ├── test20.txt.gz
-│   │   │       │   ├── test21.h
-│   │   │       │   ├── test21.txt.gz
-│   │   │       │   ├── test22.h
-│   │   │       │   ├── test22.txt.gz
-│   │   │       │   ├── test23.h
-│   │   │       │   ├── test23.txt.gz
-│   │   │       │   ├── test24.h
-│   │   │       │   ├── test24.txt.gz
-│   │   │       │   ├── test25.h
-│   │   │       │   ├── test25.txt.gz
-│   │   │       │   ├── test26.h
-│   │   │       │   ├── test26.txt.gz
-│   │   │       │   ├── test27.h
-│   │   │       │   ├── test27.txt.gz
-│   │   │       │   ├── test28.h
-│   │   │       │   ├── test28.txt.gz
-│   │   │       │   ├── test29.h
-│   │   │       │   ├── test29.txt.gz
-│   │   │       │   ├── test2.h
-│   │   │       │   ├── test2.txt.gz
-│   │   │       │   ├── test30.h
-│   │   │       │   ├── test30.txt.gz
-│   │   │       │   ├── test31.h
-│   │   │       │   ├── test31.txt.gz
-│   │   │       │   ├── test32.h
-│   │   │       │   ├── test32.txt.gz
-│   │   │       │   ├── test33.h
-│   │   │       │   ├── test33.txt.gz
-│   │   │       │   ├── test34.h
-│   │   │       │   ├── test34.txt.gz
-│   │   │       │   ├── test35.h
-│   │   │       │   ├── test35.txt.gz
-│   │   │       │   ├── test36.h
-│   │   │       │   ├── test36.txt.gz
-│   │   │       │   ├── test37.h
-│   │   │       │   ├── test37.txt.gz
-│   │   │       │   ├── test38.h
-│   │   │       │   ├── test38.txt.gz
-│   │   │       │   ├── test39.h
-│   │   │       │   ├── test39.txt.gz
-│   │   │       │   ├── test3.h
-│   │   │       │   ├── test3.txt.gz
-│   │   │       │   ├── test40.h
-│   │   │       │   ├── test40.txt.gz
-│   │   │       │   ├── test41.h
-│   │   │       │   ├── test41.txt.gz
-│   │   │       │   ├── test42.h
-│   │   │       │   ├── test42.txt.gz
-│   │   │       │   ├── test43.h
-│   │   │       │   ├── test43.txt.gz
-│   │   │       │   ├── test44.h
-│   │   │       │   ├── test44.txt.gz
-│   │   │       │   ├── test45.h
-│   │   │       │   ├── test45.txt.gz
-│   │   │       │   ├── test46.h
-│   │   │       │   ├── test46.txt.gz
-│   │   │       │   ├── test47.h
-│   │   │       │   ├── test47.txt.gz
-│   │   │       │   ├── test48.h
-│   │   │       │   ├── test48.txt.gz
-│   │   │       │   ├── test49.h
-│   │   │       │   ├── test49.txt.gz
-│   │   │       │   ├── test4.h
-│   │   │       │   ├── test4.txt.gz
-│   │   │       │   ├── test5.h
-│   │   │       │   ├── test5.txt.gz
-│   │   │       │   ├── test6.h
-│   │   │       │   ├── test6.txt.gz
-│   │   │       │   ├── test7.h
-│   │   │       │   ├── test7.txt.gz
-│   │   │       │   ├── test8.h
-│   │   │       │   ├── test8.txt.gz
-│   │   │       │   ├── test9.h
-│   │   │       │   ├── test9.txt.gz
-│   │   │       │   └── test.c
-│   │   │       └── TODO
 │   │   ├── M2AP
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── m2ap_common.c
@@ -3129,10 +1130,6 @@
 │   │   │   ├── m2ap_timers.c
 │   │   │   ├── m2ap_timers.h
 │   │   │   └── MESSAGES
-│   │   │       ├── ASN1
-│   │   │       │   ├── m2ap-14.0.0.asn
-│   │   │       │   └── m2ap-14.0.0.cmake
-│   │   │       └── CMakeLists.txt
 │   │   ├── MCE_APP
 │   │   │   ├── mce_app.c
 │   │   │   ├── mce_app.h
@@ -3163,268 +1160,22 @@
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── common.h
 │   │   │   ├── L2_INTERFACE
-│   │   │   │   └── openair_rrc_L2_interface.h
 │   │   │   ├── LTE
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── defs_NB_IoT.h
-│   │   │   │   ├── extern_NB_IoT.h
-│   │   │   │   ├── L2_interface.c
-│   │   │   │   ├── L2_interface_common.c
-│   │   │   │   ├── L2_interface_ue.c
-│   │   │   │   ├── MESSAGES
-│   │   │   │   │   ├── ASN.1
-│   │   │   │   │   │   ├── extract_asn1_from_spec.pl
-│   │   │   │   │   │   ├── lte-rrc-10.21.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-11.18.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-12.16.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-13.9.1.asn1
-│   │   │   │   │   │   ├── lte-rrc-14.4.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-14.6.2.asn1
-│   │   │   │   │   │   ├── lte-rrc-14.7.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-15.1.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-15.2.1.asn1
-│   │   │   │   │   │   ├── lte-rrc-15.2.2.asn1
-│   │   │   │   │   │   ├── lte-rrc-15.3.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-15.6.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-15.6.0.cmake
-│   │   │   │   │   │   ├── lte-rrc-16.13.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-16.13.0.cmake
-│   │   │   │   │   │   ├── lte-rrc-8.21.0.asn1
-│   │   │   │   │   │   ├── lte-rrc-9.18.0.asn1
-│   │   │   │   │   │   ├── RRC-36331-f22.asn
-│   │   │   │   │   │   └── RRC-e30.asn
-│   │   │   │   │   ├── asn1_msg.c
-│   │   │   │   │   ├── asn1_msg.h
-│   │   │   │   │   ├── asn1_msg_NB_IoT.c
-│   │   │   │   │   ├── asn1_msg_NB_IoT.h
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   └── README.md
-│   │   │   │   ├── plmn_data.h
-│   │   │   │   ├── proto_NB_IoT.h
-│   │   │   │   ├── rrc_common.c
-│   │   │   │   ├── rrc_defs.h
-│   │   │   │   ├── rrc_eNB.c
-│   │   │   │   ├── rrc_eNB_endc.c
-│   │   │   │   ├── rrc_eNB_GTPV1U.c
-│   │   │   │   ├── rrc_eNB_GTPV1U.h
-│   │   │   │   ├── rrc_eNB_M2AP.c
-│   │   │   │   ├── rrc_eNB_M2AP.h
-│   │   │   │   ├── rrc_eNB_S1AP.c
-│   │   │   │   ├── rrc_eNB_S1AP.h
-│   │   │   │   ├── rrc_eNB_UE_context.c
-│   │   │   │   ├── rrc_eNB_UE_context.h
-│   │   │   │   ├── rrc_extern.h
-│   │   │   │   ├── rrc_proto.h
-│   │   │   │   ├── rrc_types.h
-│   │   │   │   ├── rrc_types_NB_IoT.h
-│   │   │   │   ├── rrc_UE.c
-│   │   │   │   └── rrc_vars.h
 │   │   │   ├── NR
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── cucp_cuup_direct.c
-│   │   │   │   ├── cucp_cuup_e1ap.c
-│   │   │   │   ├── cucp_cuup_if.h
-│   │   │   │   ├── mac_rrc_dl_direct.c
-│   │   │   │   ├── mac_rrc_dl_f1ap.c
-│   │   │   │   ├── mac_rrc_dl.h
-│   │   │   │   ├── MESSAGES
-│   │   │   │   │   ├── ASN.1
-│   │   │   │   │   │   ├── extract_asn1_from_spce.pl
-│   │   │   │   │   │   ├── nr-rrc-15.2.1.asn1
-│   │   │   │   │   │   ├── nr-rrc-15.3.0.asn1
-│   │   │   │   │   │   ├── nr-rrc-15.6.0.asn1
-│   │   │   │   │   │   ├── nr-rrc-16.1.0.asn1
-│   │   │   │   │   │   ├── nr-rrc-16.4.1.asn1
-│   │   │   │   │   │   ├── nr-rrc-16.4.1.cmake
-│   │   │   │   │   │   ├── nr-rrc-17.3.0.asn1
-│   │   │   │   │   │   ├── nr-rrc-17.3.0.cmake
-│   │   │   │   │   │   ├── NR-RRC-38331-f10.asn
-│   │   │   │   │   │   └── NR-RRC-38331-f21.asn
-│   │   │   │   │   ├── asn1_msg.c
-│   │   │   │   │   ├── asn1_msg.h
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   └── tests
-│   │   │   │   │       ├── CMakeLists.txt
-│   │   │   │   │       └── test_asn1_msg.cpp
-│   │   │   │   ├── nr_rrc_common.h
-│   │   │   │   ├── nr_rrc_defs.h
-│   │   │   │   ├── nr_rrc_proto.h
-│   │   │   │   ├── rrc_cell_management.c
-│   │   │   │   ├── rrc_cell_management.h
-│   │   │   │   ├── rrc_gNB_asn1.c
-│   │   │   │   ├── rrc_gNB_asn1.h
-│   │   │   │   ├── rrc_gNB.c
-│   │   │   │   ├── rrc_gNB_cuup.c
-│   │   │   │   ├── rrc_gNB_du.c
-│   │   │   │   ├── rrc_gNB_du.h
-│   │   │   │   ├── rrc_gNB_mobility.c
-│   │   │   │   ├── rrc_gNB_mobility.h
-│   │   │   │   ├── rrc_gNB_NGAP.c
-│   │   │   │   ├── rrc_gNB_NGAP.h
-│   │   │   │   ├── rrc_gNB_nsa.c
-│   │   │   │   ├── rrc_gNB_radio_bearers.c
-│   │   │   │   ├── rrc_gNB_radio_bearers.h
-│   │   │   │   ├── rrc_gNB_UE_context.c
-│   │   │   │   ├── rrc_gNB_UE_context.h
-│   │   │   │   └── tests
-│   │   │   │       ├── CMakeLists.txt
-│   │   │   │       ├── rrc_bearers_test.c
-│   │   │   │       └── rrc_cell_management_test.c
 │   │   │   └── NR_UE
-│   │   │       ├── L2_interface_ue.c
-│   │   │       ├── L2_interface_ue.h
-│   │   │       ├── main_ue.c
-│   │   │       ├── rrc_defs.h
-│   │   │       ├── rrc_proto.h
-│   │   │       ├── rrc_sl_preconfig.c
-│   │   │       ├── rrc_timers_and_constants.c
-│   │   │       ├── rrc_UE.c
-│   │   │       ├── sl_preconfig_paramvalues.h
-│   │   │       ├── verify_RRC.c
-│   │   │       └── verify_RRC.h
 │   │   ├── SDAP
 │   │   │   └── nr_sdap
-│   │   │       ├── nr_sdap.c
-│   │   │       ├── nr_sdap_configuration.h
-│   │   │       ├── nr_sdap_entity.c
-│   │   │       ├── nr_sdap_entity.h
-│   │   │       └── nr_sdap.h
 │   │   ├── UTIL
 │   │   │   ├── CLI
-│   │   │   │   ├── cli.c
-│   │   │   │   ├── cli_cmd.c
-│   │   │   │   ├── cli.h
-│   │   │   │   ├── cli_if.h
-│   │   │   │   └── cli_server.c
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── MATH
-│   │   │   │   ├── oml.c
-│   │   │   │   └── oml.h
 │   │   │   ├── OMG
-│   │   │   │   ├── common.c
-│   │   │   │   ├── defs.h
-│   │   │   │   ├── grid.c
-│   │   │   │   ├── grid.h
-│   │   │   │   ├── job.c
-│   │   │   │   ├── makefile
-│   │   │   │   ├── makefile_standalone
-│   │   │   │   ├── mobility_parser.c
-│   │   │   │   ├── mobility_parser.h
-│   │   │   │   ├── mobility.txt
-│   │   │   │   ├── omg.c
-│   │   │   │   ├── omg_constants.h
-│   │   │   │   ├── omg.h
-│   │   │   │   ├── omg_hashtable.c
-│   │   │   │   ├── omg_hashtable.h
-│   │   │   │   ├── OMG_TRACE_DESCRIPTION.pdf
-│   │   │   │   ├── omg_vars.h
-│   │   │   │   ├── README.TXT
-│   │   │   │   ├── rwalk.c
-│   │   │   │   ├── rwalk.h
-│   │   │   │   ├── rwp.c
-│   │   │   │   ├── rwp.h
-│   │   │   │   ├── static.c
-│   │   │   │   ├── static.h
-│   │   │   │   ├── steadystaterwp.c
-│   │   │   │   ├── steadystaterwp.h
-│   │   │   │   ├── TRACE
-│   │   │   │   │   ├── example_trace.tr
-│   │   │   │   │   ├── handover_1ue.tr
-│   │   │   │   │   ├── handover.tr
-│   │   │   │   │   ├── hexagonal_eNBs.tr
-│   │   │   │   │   ├── mobility_2ues.tr
-│   │   │   │   │   ├── mobility_3ues.tr
-│   │   │   │   │   ├── OMG_TRACE_update.pdf
-│   │   │   │   │   ├── README.TXT
-│   │   │   │   │   ├── regular.tr
-│   │   │   │   │   ├── static_1enb.tr
-│   │   │   │   │   ├── static_2ues.tr
-│   │   │   │   │   └── zero_speed.tr
-│   │   │   │   ├── trace.c
-│   │   │   │   ├── trace.h
-│   │   │   │   ├── trace_hashtable.c
-│   │   │   │   └── trace_hashtable.h
 │   │   │   ├── OMV
-│   │   │   │   ├── blue.png
-│   │   │   │   ├── communicationthread.cpp
-│   │   │   │   ├── communicationthread.h
-│   │   │   │   ├── green.png
-│   │   │   │   ├── jpg.jpeg
-│   │   │   │   ├── mus.png
-│   │   │   │   ├── mywindow.cpp
-│   │   │   │   ├── mywindow.h
-│   │   │   │   ├── new2.jpg
-│   │   │   │   ├── new.jpg
-│   │   │   │   ├── omv.cpp
-│   │   │   │   ├── openglwidget.cpp
-│   │   │   │   ├── openglwidget.h
-│   │   │   │   ├── README.txt
-│   │   │   │   ├── red.png
-│   │   │   │   ├── structures.h
-│   │   │   │   ├── white.png
-│   │   │   │   └── wow.png
 │   │   │   ├── OPT
-│   │   │   │   ├── mac_pcap.h
-│   │   │   │   ├── opt.h
-│   │   │   │   ├── packet-rohc.h
-│   │   │   │   ├── probe.c
-│   │   │   │   ├── README.txt
-│   │   │   │   └── wireshark_headers.h
 │   │   │   └── OTG
-│   │   │       ├── Doxyfile
-│   │   │       ├── help_OTGplot.txt
-│   │   │       ├── main.c
-│   │   │       ├── makefile
-│   │   │       ├── otg.c
-│   │   │       ├── otg_config.h
-│   │   │       ├── otg_defs.h
-│   │   │       ├── otg_externs.h
-│   │   │       ├── otg_form.c
-│   │   │       ├── otg_form.h
-│   │   │       ├── otg.h
-│   │   │       ├── otg_kpi.c
-│   │   │       ├── otg_kpi.h
-│   │   │       ├── otg_models.c
-│   │   │       ├── otg_models.h
-│   │   │       ├── OTGplot
-│   │   │       ├── otg_rx.c
-│   │   │       ├── otg_rx.h
-│   │   │       ├── otg_rx_socket.c
-│   │   │       ├── otg_rx_socket.h
-│   │   │       ├── otg_tx.c
-│   │   │       ├── otg_tx.h
-│   │   │       ├── otg_tx_socket.c
-│   │   │       ├── otg_tx_socket.h
-│   │   │       ├── otg_vars.h
-│   │   │       └── traffic_config.h
 │   │   ├── X2AP
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── MESSAGES
-│   │   │   │   ├── ASN1
-│   │   │   │   │   ├── R10
-│   │   │   │   │   │   └── x2ap-10.7.0.asn1
-│   │   │   │   │   ├── R11
-│   │   │   │   │   │   └── x2ap-11.9.0.asn1
-│   │   │   │   │   ├── R12
-│   │   │   │   │   │   └── x2ap-12.8.0.asn1
-│   │   │   │   │   ├── R13
-│   │   │   │   │   │   └── x2ap-13.7.0.asn1
-│   │   │   │   │   ├── R14
-│   │   │   │   │   │   ├── x2ap-14.6.0.asn1
-│   │   │   │   │   │   └── x2ap-14.7.0.asn1
-│   │   │   │   │   ├── R14.5
-│   │   │   │   │   │   └── x2ap-14.5.0.asn1
-│   │   │   │   │   ├── R15
-│   │   │   │   │   │   ├── x2ap-15.1.0.asn1
-│   │   │   │   │   │   ├── x2ap-15.2.0.asn1
-│   │   │   │   │   │   ├── x2ap-15.3.0.asn1
-│   │   │   │   │   │   ├── x2ap-15.6.0.asn1
-│   │   │   │   │   │   └── x2ap-15.6.0.cmake
-│   │   │   │   │   ├── R8
-│   │   │   │   │   │   └── x2ap-8.9.0.asn1
-│   │   │   │   │   └── R9
-│   │   │   │   │       └── x2ap-9.6.0.asn1
-│   │   │   │   └── CMakeLists.txt
 │   │   │   ├── x2ap_common.c
 │   │   │   ├── x2ap_common.h
 │   │   │   ├── x2ap_eNB.c
@@ -3449,22 +1200,8 @@
 │   │   └── XNAP
 │   │       ├── CMakeLists.txt
 │   │       ├── lib
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── xnap_gNB_interface_management.c
-│   │       │   ├── xnap_gNB_interface_management.h
-│   │       │   ├── xnap_gNB_mobility_management.c
-│   │       │   ├── xnap_gNB_mobility_management.h
-│   │       │   ├── xnap_lib_common.c
-│   │       │   ├── xnap_lib_common.h
-│   │       │   └── xnap_lib_includes.h
 │   │       ├── MESSAGES
-│   │       │   ├── ASN1
-│   │       │   │   ├── xnap_R16.2.0.asn
-│   │       │   │   └── xnap_R16.2.0.cmake
-│   │       │   └── CMakeLists.txt
 │   │       ├── tests
-│   │       │   ├── CMakeLists.txt
-│   │       │   └── xnap_lib_test.c
 │   │       ├── xnap_common.c
 │   │       └── xnap_common.h
 │   ├── openair3
@@ -3475,17 +1212,10 @@
 │   │   │   └── security_types.h
 │   │   ├── DOCS
 │   │   │   ├── Latex
-│   │   │   │   └── DefaultBearer
-│   │   │   │       ├── DefaultBearer.pdf
-│   │   │   │       └── DefaultBearer.tex
 │   │   │   └── Makefile.am
 │   │   ├── LPP
 │   │   │   ├── CMakeLists.txt
 │   │   │   └── MESSAGES
-│   │   │       ├── ASN1
-│   │   │       │   ├── 37355-g60.asn
-│   │   │       │   └── 37355-g60.cmake
-│   │   │       └── CMakeLists.txt
 │   │   ├── M3AP
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── m3ap_common.c
@@ -3526,10 +1256,6 @@
 │   │   │   ├── m3ap_timers.c
 │   │   │   ├── m3ap_timers.h
 │   │   │   └── MESSAGES
-│   │   │       ├── ASN1
-│   │   │       │   ├── m3ap-14.0.0.asn
-│   │   │       │   └── m3ap-14.0.0.cmake
-│   │   │       └── CMakeLists.txt
 │   │   ├── MME_APP
 │   │   │   ├── mme_app.c
 │   │   │   ├── mme_app.h
@@ -3538,577 +1264,13 @@
 │   │   ├── NAS
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── COMMON
-│   │   │   │   ├── API
-│   │   │   │   │   └── NETWORK
-│   │   │   │   │       ├── as_message.c
-│   │   │   │   │       ├── Makefile
-│   │   │   │   │       ├── nas_message.c
-│   │   │   │   │       ├── nas_message.h
-│   │   │   │   │       ├── network_api.c
-│   │   │   │   │       └── network_api.h
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── EMM
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   └── MSG
-│   │   │   │   │       ├── AttachAccept.c
-│   │   │   │   │       ├── AttachAccept.h
-│   │   │   │   │       ├── AttachComplete.c
-│   │   │   │   │       ├── AttachComplete.h
-│   │   │   │   │       ├── AttachReject.c
-│   │   │   │   │       ├── AttachReject.h
-│   │   │   │   │       ├── AttachRequest.c
-│   │   │   │   │       ├── AttachRequest.h
-│   │   │   │   │       ├── AuthenticationFailure.c
-│   │   │   │   │       ├── AuthenticationFailure.h
-│   │   │   │   │       ├── AuthenticationReject.c
-│   │   │   │   │       ├── AuthenticationReject.h
-│   │   │   │   │       ├── AuthenticationRequest.c
-│   │   │   │   │       ├── AuthenticationRequest.h
-│   │   │   │   │       ├── AuthenticationResponse.c
-│   │   │   │   │       ├── AuthenticationResponse.h
-│   │   │   │   │       ├── CsServiceNotification.c
-│   │   │   │   │       ├── CsServiceNotification.h
-│   │   │   │   │       ├── DetachAccept.c
-│   │   │   │   │       ├── DetachAccept.h
-│   │   │   │   │       ├── DetachRequest.c
-│   │   │   │   │       ├── DetachRequest.h
-│   │   │   │   │       ├── DownlinkNasTransport.c
-│   │   │   │   │       ├── DownlinkNasTransport.h
-│   │   │   │   │       ├── emm_cause.h
-│   │   │   │   │       ├── EmmInformation.c
-│   │   │   │   │       ├── EmmInformation.h
-│   │   │   │   │       ├── emm_msg.c
-│   │   │   │   │       ├── emm_msgDef.h
-│   │   │   │   │       ├── emm_msg.h
-│   │   │   │   │       ├── EmmStatus.c
-│   │   │   │   │       ├── EmmStatus.h
-│   │   │   │   │       ├── ExtendedServiceRequest.c
-│   │   │   │   │       ├── ExtendedServiceRequest.h
-│   │   │   │   │       ├── GutiReallocationCommand.c
-│   │   │   │   │       ├── GutiReallocationCommand.h
-│   │   │   │   │       ├── GutiReallocationComplete.c
-│   │   │   │   │       ├── GutiReallocationComplete.h
-│   │   │   │   │       ├── IdentityRequest.c
-│   │   │   │   │       ├── IdentityRequest.h
-│   │   │   │   │       ├── IdentityResponse.c
-│   │   │   │   │       ├── IdentityResponse.h
-│   │   │   │   │       ├── Makefile
-│   │   │   │   │       ├── NASSecurityModeCommand.h
-│   │   │   │   │       ├── NASSecurityModeComplete.h
-│   │   │   │   │       ├── SecurityModeCommand.c
-│   │   │   │   │       ├── SecurityModeComplete.c
-│   │   │   │   │       ├── SecurityModeReject.c
-│   │   │   │   │       ├── SecurityModeReject.h
-│   │   │   │   │       ├── ServiceReject.c
-│   │   │   │   │       ├── ServiceReject.h
-│   │   │   │   │       ├── ServiceRequest.c
-│   │   │   │   │       ├── ServiceRequest.h
-│   │   │   │   │       ├── TrackingAreaUpdateAccept.c
-│   │   │   │   │       ├── TrackingAreaUpdateAccept.h
-│   │   │   │   │       ├── TrackingAreaUpdateComplete.c
-│   │   │   │   │       ├── TrackingAreaUpdateComplete.h
-│   │   │   │   │       ├── TrackingAreaUpdateReject.c
-│   │   │   │   │       ├── TrackingAreaUpdateReject.h
-│   │   │   │   │       ├── TrackingAreaUpdateRequest.c
-│   │   │   │   │       ├── TrackingAreaUpdateRequest.h
-│   │   │   │   │       ├── UplinkNasTransport.c
-│   │   │   │   │       └── UplinkNasTransport.h
-│   │   │   │   ├── ESM
-│   │   │   │   │   └── MSG
-│   │   │   │   │       ├── ActivateDedicatedEpsBearerContextAccept.c
-│   │   │   │   │       ├── ActivateDedicatedEpsBearerContextAccept.h
-│   │   │   │   │       ├── ActivateDedicatedEpsBearerContextReject.c
-│   │   │   │   │       ├── ActivateDedicatedEpsBearerContextReject.h
-│   │   │   │   │       ├── ActivateDedicatedEpsBearerContextRequest.c
-│   │   │   │   │       ├── ActivateDedicatedEpsBearerContextRequest.h
-│   │   │   │   │       ├── ActivateDefaultEpsBearerContextAccept.c
-│   │   │   │   │       ├── ActivateDefaultEpsBearerContextAccept.h
-│   │   │   │   │       ├── ActivateDefaultEpsBearerContextReject.c
-│   │   │   │   │       ├── ActivateDefaultEpsBearerContextReject.h
-│   │   │   │   │       ├── ActivateDefaultEpsBearerContextRequest.c
-│   │   │   │   │       ├── ActivateDefaultEpsBearerContextRequest.h
-│   │   │   │   │       ├── BearerResourceAllocationReject.c
-│   │   │   │   │       ├── BearerResourceAllocationReject.h
-│   │   │   │   │       ├── BearerResourceAllocationRequest.c
-│   │   │   │   │       ├── BearerResourceAllocationRequest.h
-│   │   │   │   │       ├── BearerResourceModificationReject.c
-│   │   │   │   │       ├── BearerResourceModificationReject.h
-│   │   │   │   │       ├── BearerResourceModificationRequest.c
-│   │   │   │   │       ├── BearerResourceModificationRequest.h
-│   │   │   │   │       ├── DeactivateEpsBearerContextAccept.c
-│   │   │   │   │       ├── DeactivateEpsBearerContextAccept.h
-│   │   │   │   │       ├── DeactivateEpsBearerContextRequest.c
-│   │   │   │   │       ├── DeactivateEpsBearerContextRequest.h
-│   │   │   │   │       ├── esm_cause.h
-│   │   │   │   │       ├── EsmInformationRequest.c
-│   │   │   │   │       ├── EsmInformationRequest.h
-│   │   │   │   │       ├── EsmInformationResponse.c
-│   │   │   │   │       ├── EsmInformationResponse.h
-│   │   │   │   │       ├── esm_msg.c
-│   │   │   │   │       ├── esm_msgDef.h
-│   │   │   │   │       ├── esm_msg.h
-│   │   │   │   │       ├── EsmStatus.c
-│   │   │   │   │       ├── EsmStatus.h
-│   │   │   │   │       ├── Makefile
-│   │   │   │   │       ├── ModifyEpsBearerContextAccept.c
-│   │   │   │   │       ├── ModifyEpsBearerContextAccept.h
-│   │   │   │   │       ├── ModifyEpsBearerContextReject.c
-│   │   │   │   │       ├── ModifyEpsBearerContextReject.h
-│   │   │   │   │       ├── ModifyEpsBearerContextRequest.c
-│   │   │   │   │       ├── ModifyEpsBearerContextRequest.h
-│   │   │   │   │       ├── PdnConnectivityReject.c
-│   │   │   │   │       ├── PdnConnectivityReject.h
-│   │   │   │   │       ├── PdnConnectivityRequest.c
-│   │   │   │   │       ├── PdnConnectivityRequest.h
-│   │   │   │   │       ├── PdnDisconnectReject.c
-│   │   │   │   │       ├── PdnDisconnectReject.h
-│   │   │   │   │       ├── PdnDisconnectRequest.c
-│   │   │   │   │       └── PdnDisconnectRequest.h
-│   │   │   │   ├── IES
-│   │   │   │   │   ├── AccessPointName.c
-│   │   │   │   │   ├── AccessPointName.h
-│   │   │   │   │   ├── AdditionalUpdateResult.c
-│   │   │   │   │   ├── AdditionalUpdateResult.h
-│   │   │   │   │   ├── AdditionalUpdateType.c
-│   │   │   │   │   ├── AdditionalUpdateType.h
-│   │   │   │   │   ├── ApnAggregateMaximumBitRate.c
-│   │   │   │   │   ├── ApnAggregateMaximumBitRate.h
-│   │   │   │   │   ├── AuthenticationFailureParameter.c
-│   │   │   │   │   ├── AuthenticationFailureParameter.h
-│   │   │   │   │   ├── AuthenticationParameterAutn.c
-│   │   │   │   │   ├── AuthenticationParameterAutn.h
-│   │   │   │   │   ├── AuthenticationParameterRand.c
-│   │   │   │   │   ├── AuthenticationParameterRand.h
-│   │   │   │   │   ├── AuthenticationResponseParameter.c
-│   │   │   │   │   ├── AuthenticationResponseParameter.h
-│   │   │   │   │   ├── CipheringKeySequenceNumber.c
-│   │   │   │   │   ├── CipheringKeySequenceNumber.h
-│   │   │   │   │   ├── Cli.c
-│   │   │   │   │   ├── Cli.h
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── CsfbResponse.c
-│   │   │   │   │   ├── CsfbResponse.h
-│   │   │   │   │   ├── DaylightSavingTime.c
-│   │   │   │   │   ├── DaylightSavingTime.h
-│   │   │   │   │   ├── DetachType.c
-│   │   │   │   │   ├── DetachType.h
-│   │   │   │   │   ├── DrxParameter.c
-│   │   │   │   │   ├── DrxParameter.h
-│   │   │   │   │   ├── EmergencyNumberList.c
-│   │   │   │   │   ├── EmergencyNumberList.h
-│   │   │   │   │   ├── EmmCause.c
-│   │   │   │   │   ├── EmmCause.h
-│   │   │   │   │   ├── EpsAttachResult.c
-│   │   │   │   │   ├── EpsAttachResult.h
-│   │   │   │   │   ├── EpsAttachType.c
-│   │   │   │   │   ├── EpsAttachType.h
-│   │   │   │   │   ├── EpsBearerContextStatus.c
-│   │   │   │   │   ├── EpsBearerContextStatus.h
-│   │   │   │   │   ├── EpsBearerIdentity.c
-│   │   │   │   │   ├── EpsBearerIdentity.h
-│   │   │   │   │   ├── EpsMobileIdentity.c
-│   │   │   │   │   ├── EpsMobileIdentity.h
-│   │   │   │   │   ├── EpsNetworkFeatureSupport.c
-│   │   │   │   │   ├── EpsNetworkFeatureSupport.h
-│   │   │   │   │   ├── EpsQualityOfService.c
-│   │   │   │   │   ├── EpsQualityOfService.h
-│   │   │   │   │   ├── EpsUpdateResult.c
-│   │   │   │   │   ├── EpsUpdateResult.h
-│   │   │   │   │   ├── EpsUpdateType.c
-│   │   │   │   │   ├── EpsUpdateType.h
-│   │   │   │   │   ├── EsmCause.c
-│   │   │   │   │   ├── EsmCause.h
-│   │   │   │   │   ├── EsmInformationTransferFlag.c
-│   │   │   │   │   ├── EsmInformationTransferFlag.h
-│   │   │   │   │   ├── EsmMessageContainer.c
-│   │   │   │   │   ├── EsmMessageContainer.h
-│   │   │   │   │   ├── GprsTimer.c
-│   │   │   │   │   ├── GprsTimer.h
-│   │   │   │   │   ├── GutiType.c
-│   │   │   │   │   ├── GutiType.h
-│   │   │   │   │   ├── IdentityType2.c
-│   │   │   │   │   ├── IdentityType2.h
-│   │   │   │   │   ├── ImeisvRequest.c
-│   │   │   │   │   ├── ImeisvRequest.h
-│   │   │   │   │   ├── KsiAndSequenceNumber.c
-│   │   │   │   │   ├── KsiAndSequenceNumber.h
-│   │   │   │   │   ├── LcsClientIdentity.c
-│   │   │   │   │   ├── LcsClientIdentity.h
-│   │   │   │   │   ├── LcsIndicator.c
-│   │   │   │   │   ├── LcsIndicator.h
-│   │   │   │   │   ├── LinkedEpsBearerIdentity.c
-│   │   │   │   │   ├── LinkedEpsBearerIdentity.h
-│   │   │   │   │   ├── LlcServiceAccessPointIdentifier.c
-│   │   │   │   │   ├── LlcServiceAccessPointIdentifier.h
-│   │   │   │   │   ├── LocationAreaIdentification.c
-│   │   │   │   │   ├── LocationAreaIdentification.h
-│   │   │   │   │   ├── Makefile
-│   │   │   │   │   ├── MessageType.c
-│   │   │   │   │   ├── MessageType.h
-│   │   │   │   │   ├── MobileIdentity.c
-│   │   │   │   │   ├── MobileIdentity.h
-│   │   │   │   │   ├── MobileStationClassmark2.c
-│   │   │   │   │   ├── MobileStationClassmark2.h
-│   │   │   │   │   ├── MobileStationClassmark3.c
-│   │   │   │   │   ├── MobileStationClassmark3.h
-│   │   │   │   │   ├── MsNetworkCapability.c
-│   │   │   │   │   ├── MsNetworkCapability.h
-│   │   │   │   │   ├── MsNetworkFeatureSupport.c
-│   │   │   │   │   ├── MsNetworkFeatureSupport.h
-│   │   │   │   │   ├── NasKeySetIdentifier.c
-│   │   │   │   │   ├── NasKeySetIdentifier.h
-│   │   │   │   │   ├── NasMessageContainer.c
-│   │   │   │   │   ├── NasMessageContainer.h
-│   │   │   │   │   ├── NasPagingIdentity.h
-│   │   │   │   │   ├── NasRequestType.c
-│   │   │   │   │   ├── NasRequestType.h
-│   │   │   │   │   ├── NasSecurityAlgorithms.c
-│   │   │   │   │   ├── NasSecurityAlgorithms.h
-│   │   │   │   │   ├── NetworkName.c
-│   │   │   │   │   ├── NetworkName.h
-│   │   │   │   │   ├── Nonce.c
-│   │   │   │   │   ├── Nonce.h
-│   │   │   │   │   ├── PacketFlowIdentifier.c
-│   │   │   │   │   ├── PacketFlowIdentifier.h
-│   │   │   │   │   ├── PagingIdentity.c
-│   │   │   │   │   ├── PagingIdentity.h
-│   │   │   │   │   ├── PdnAddress.c
-│   │   │   │   │   ├── PdnAddress.h
-│   │   │   │   │   ├── PdnType.c
-│   │   │   │   │   ├── PdnType.h
-│   │   │   │   │   ├── PlmnList.c
-│   │   │   │   │   ├── PlmnList.h
-│   │   │   │   │   ├── ProcedureTransactionIdentity.c
-│   │   │   │   │   ├── ProcedureTransactionIdentity.h
-│   │   │   │   │   ├── ProtocolConfigurationOptions.c
-│   │   │   │   │   ├── ProtocolConfigurationOptions.h
-│   │   │   │   │   ├── ProtocolDiscriminator.c
-│   │   │   │   │   ├── ProtocolDiscriminator.h
-│   │   │   │   │   ├── PTmsiSignature.c
-│   │   │   │   │   ├── PTmsiSignature.h
-│   │   │   │   │   ├── QualityOfService.c
-│   │   │   │   │   ├── QualityOfService.h
-│   │   │   │   │   ├── RadioPriority.c
-│   │   │   │   │   ├── RadioPriority.h
-│   │   │   │   │   ├── SecurityHeaderType.c
-│   │   │   │   │   ├── SecurityHeaderType.h
-│   │   │   │   │   ├── ServiceType.c
-│   │   │   │   │   ├── ServiceType.h
-│   │   │   │   │   ├── ShortMac.c
-│   │   │   │   │   ├── ShortMac.h
-│   │   │   │   │   ├── SsCode.c
-│   │   │   │   │   ├── SsCode.h
-│   │   │   │   │   ├── SupportedCodecList.c
-│   │   │   │   │   ├── SupportedCodecList.h
-│   │   │   │   │   ├── TimeZoneAndTime.c
-│   │   │   │   │   ├── TimeZoneAndTime.h
-│   │   │   │   │   ├── TimeZone.c
-│   │   │   │   │   ├── TimeZone.h
-│   │   │   │   │   ├── TmsiStatus.c
-│   │   │   │   │   ├── TmsiStatus.h
-│   │   │   │   │   ├── TrackingAreaIdentity.c
-│   │   │   │   │   ├── TrackingAreaIdentity.h
-│   │   │   │   │   ├── TrackingAreaIdentityList.c
-│   │   │   │   │   ├── TrackingAreaIdentityList.h
-│   │   │   │   │   ├── TrafficFlowAggregateDescription.c
-│   │   │   │   │   ├── TrafficFlowAggregateDescription.h
-│   │   │   │   │   ├── TrafficFlowTemplate.c
-│   │   │   │   │   ├── TrafficFlowTemplate.h
-│   │   │   │   │   ├── TransactionIdentifier.c
-│   │   │   │   │   ├── TransactionIdentifier.h
-│   │   │   │   │   ├── UeNetworkCapability.c
-│   │   │   │   │   ├── UeNetworkCapability.h
-│   │   │   │   │   ├── UeRadioCapabilityInformationUpdateNeeded.c
-│   │   │   │   │   ├── UeRadioCapabilityInformationUpdateNeeded.h
-│   │   │   │   │   ├── UeSecurityCapability.c
-│   │   │   │   │   ├── UeSecurityCapability.h
-│   │   │   │   │   ├── VoiceDomainPreferenceAndUeUsageSetting.c
-│   │   │   │   │   └── VoiceDomainPreferenceAndUeUsageSetting.h
-│   │   │   │   ├── milenage.h
-│   │   │   │   ├── securityDef.h
-│   │   │   │   ├── userDef.h
-│   │   │   │   └── UTIL
-│   │   │   │       ├── CMakeLists.txt
-│   │   │   │       ├── device.c
-│   │   │   │       ├── device.h
-│   │   │   │       ├── Makefile
-│   │   │   │       ├── nas_log.h
-│   │   │   │       ├── nas_timer.c
-│   │   │   │       ├── nas_timer.h
-│   │   │   │       ├── OctetString.c
-│   │   │   │       ├── OctetString.h
-│   │   │   │       ├── parser.c
-│   │   │   │       ├── parser.h
-│   │   │   │       ├── socket.c
-│   │   │   │       ├── socket.h
-│   │   │   │       ├── stty.c
-│   │   │   │       ├── TLVDecoder.c
-│   │   │   │       ├── TLVDecoder.h
-│   │   │   │       ├── TLVEncoder.h
-│   │   │   │       └── tst
-│   │   │   │           ├── Makefile
-│   │   │   │           ├── timer.c
-│   │   │   │           └── timer_debug.txt
 │   │   │   ├── NR_UE
-│   │   │   │   ├── 5GS
-│   │   │   │   │   ├── 5GMM
-│   │   │   │   │   │   ├── IES
-│   │   │   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   │   │   ├── FGCNasMessageContainer.c
-│   │   │   │   │   │   │   ├── FGCNasMessageContainer.h
-│   │   │   │   │   │   │   ├── FGMMCapability.c
-│   │   │   │   │   │   │   ├── FGMMCapability.h
-│   │   │   │   │   │   │   ├── FGSDeregistrationType.h
-│   │   │   │   │   │   │   ├── FGSMobileIdentity.c
-│   │   │   │   │   │   │   ├── FGSMobileIdentity.h
-│   │   │   │   │   │   │   ├── FGSRegistrationType.c
-│   │   │   │   │   │   │   ├── FGSRegistrationType.h
-│   │   │   │   │   │   │   ├── NrUESecurityCapability.c
-│   │   │   │   │   │   │   ├── NrUESecurityCapability.h
-│   │   │   │   │   │   │   ├── SORTransparentContainer.c
-│   │   │   │   │   │   │   └── SORTransparentContainer.h
-│   │   │   │   │   │   └── MSG
-│   │   │   │   │   │       ├── CMakeLists.txt
-│   │   │   │   │   │       ├── fgmm_authentication_failure.c
-│   │   │   │   │   │       ├── fgmm_authentication_failure.h
-│   │   │   │   │   │       ├── fgmm_authentication_reject.c
-│   │   │   │   │   │       ├── fgmm_authentication_reject.h
-│   │   │   │   │   │       ├── fgmm_authentication_request.h
-│   │   │   │   │   │       ├── fgmm_identity_request.c
-│   │   │   │   │   │       ├── fgmm_identity_request.h
-│   │   │   │   │   │       ├── fgmm_lib.c
-│   │   │   │   │   │       ├── fgmm_lib.h
-│   │   │   │   │   │       ├── fgmm_service_accept.c
-│   │   │   │   │   │       ├── fgmm_service_accept.h
-│   │   │   │   │   │       ├── fgmm_service_reject.c
-│   │   │   │   │   │       ├── fgmm_service_reject.h
-│   │   │   │   │   │       ├── FGSAuthenticationResponse.c
-│   │   │   │   │   │       ├── FGSAuthenticationResponse.h
-│   │   │   │   │   │       ├── FGSDeregistrationRequestUEOriginating.c
-│   │   │   │   │   │       ├── FGSDeregistrationRequestUEOriginating.h
-│   │   │   │   │   │       ├── FGSIdentityResponse.c
-│   │   │   │   │   │       ├── FGSIdentityResponse.h
-│   │   │   │   │   │       ├── FGSNASSecurityModeComplete.c
-│   │   │   │   │   │       ├── FGSNASSecurityModeComplete.h
-│   │   │   │   │   │       ├── FGSNASSecurityModeReject.c
-│   │   │   │   │   │       ├── FGSNASSecurityModeReject.h
-│   │   │   │   │   │       ├── fgs_service_request.c
-│   │   │   │   │   │       ├── fgs_service_request.h
-│   │   │   │   │   │       ├── FGSUplinkNasTransport.c
-│   │   │   │   │   │       ├── FGSUplinkNasTransport.h
-│   │   │   │   │   │       ├── RegistrationAccept.c
-│   │   │   │   │   │       ├── RegistrationAccept.h
-│   │   │   │   │   │       ├── RegistrationComplete.c
-│   │   │   │   │   │       ├── RegistrationComplete.h
-│   │   │   │   │   │       ├── RegistrationRequest.c
-│   │   │   │   │   │       └── RegistrationRequest.h
-│   │   │   │   │   ├── 5GSM
-│   │   │   │   │   │   └── MSG
-│   │   │   │   │   │       ├── CMakeLists.txt
-│   │   │   │   │   │       ├── PduSessionEstablishmentAccept.c
-│   │   │   │   │   │       ├── PduSessionEstablishmentAccept.h
-│   │   │   │   │   │       ├── PduSessionEstablishRequest.c
-│   │   │   │   │   │       └── PduSessionEstablishRequest.h
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── fgs_nas_lib.c
-│   │   │   │   │   ├── fgs_nas_utils.h
-│   │   │   │   │   ├── NR_NAS_defs.h
-│   │   │   │   │   └── tests
-│   │   │   │   │       ├── CMakeLists.txt
-│   │   │   │   │       └── nas_lib_test.c
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── nr_nas_msg.c
-│   │   │   │   └── nr_nas_msg.h
 │   │   │   ├── TEST
-│   │   │   │   ├── AS_SIMULATOR
-│   │   │   │   │   ├── as_data.c
-│   │   │   │   │   ├── as_data.h
-│   │   │   │   │   ├── as_process.c
-│   │   │   │   │   ├── as_process.h
-│   │   │   │   │   ├── as_simulator.c
-│   │   │   │   │   ├── as_simulator_parser.c
-│   │   │   │   │   ├── as_simulator_parser.h
-│   │   │   │   │   ├── Makefile
-│   │   │   │   │   ├── nas_data.c
-│   │   │   │   │   ├── nas_data.h
-│   │   │   │   │   ├── nas_process.c
-│   │   │   │   │   └── nas_process.h
-│   │   │   │   ├── NETWORK
-│   │   │   │   │   ├── Makefile
-│   │   │   │   │   ├── network_parser.c
-│   │   │   │   │   ├── network_parser.h
-│   │   │   │   │   ├── network_simulator.c
-│   │   │   │   │   └── README
-│   │   │   │   └── USER
-│   │   │   │       ├── Makefile
-│   │   │   │       ├── user_parser.c
-│   │   │   │       ├── user_parser.h
-│   │   │   │       └── user_simulator.c
 │   │   │   ├── TOOLS
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── conf2uedata.c
-│   │   │   │   ├── conf2uedata.h
-│   │   │   │   ├── conf_emm.c
-│   │   │   │   ├── conf_emm.h
-│   │   │   │   ├── conf_network.c
-│   │   │   │   ├── conf_network.h
-│   │   │   │   ├── conf_parser.c
-│   │   │   │   ├── conf_parser.h
-│   │   │   │   ├── conf_user_data.c
-│   │   │   │   ├── conf_user_data.h
-│   │   │   │   ├── conf_user_plmn.c
-│   │   │   │   ├── conf_user_plmn.h
-│   │   │   │   ├── conf_usim.c
-│   │   │   │   ├── conf_usim.h
-│   │   │   │   ├── display.c
-│   │   │   │   ├── display.h
-│   │   │   │   ├── fs.c
-│   │   │   │   ├── fs.h
-│   │   │   │   ├── nvram.c
-│   │   │   │   ├── ue_bcom_test.conf
-│   │   │   │   ├── ue_eurecom_test_sfr.conf
-│   │   │   │   ├── ue_tcl_test.conf
-│   │   │   │   └── usim.c
 │   │   │   └── UE
-│   │   │       ├── API
-│   │   │       │   ├── CMakeLists.txt
-│   │   │       │   ├── USER
-│   │   │       │   │   ├── at_command.c
-│   │   │       │   │   ├── at_command.h
-│   │   │       │   │   ├── at_error.c
-│   │   │       │   │   ├── at_error.h
-│   │   │       │   │   ├── at_response.c
-│   │   │       │   │   ├── at_response.h
-│   │   │       │   │   ├── tst
-│   │   │       │   │   │   ├── at_parser.c
-│   │   │       │   │   │   ├── at_parser.in
-│   │   │       │   │   │   ├── at_parser.in.bis
-│   │   │       │   │   │   ├── at_parser.out.bis
-│   │   │       │   │   │   └── smartcom.txt
-│   │   │       │   │   ├── user_api.c
-│   │   │       │   │   ├── user_api_defs.h
-│   │   │       │   │   ├── user_api.h
-│   │   │       │   │   ├── user_indication.c
-│   │   │       │   │   └── user_indication.h
-│   │   │       │   └── USIM
-│   │   │       │       ├── aka_functions.c
-│   │   │       │       ├── aka_functions.h
-│   │   │       │       ├── CMakeLists.txt
-│   │   │       │       ├── usim_api.c
-│   │   │       │       └── usim_api.h
-│   │   │       ├── CMakeLists.txt
-│   │   │       ├── EMM
-│   │   │       │   ├── Attach.c
-│   │   │       │   ├── Authentication.c
-│   │   │       │   ├── Authentication.h
-│   │   │       │   ├── Detach.c
-│   │   │       │   ├── emmData.h
-│   │   │       │   ├── emm_fsm_defs.h
-│   │   │       │   ├── emm_main.c
-│   │   │       │   ├── emm_main.h
-│   │   │       │   ├── emm_proc_defs.h
-│   │   │       │   ├── emm_proc.h
-│   │   │       │   ├── EmmStatusHdl.c
-│   │   │       │   ├── emm_timers.h
-│   │   │       │   ├── Identification.c
-│   │   │       │   ├── IdleMode.c
-│   │   │       │   ├── IdleMode_defs.h
-│   │   │       │   ├── IdleMode.h
-│   │   │       │   ├── LowerLayer.c
-│   │   │       │   ├── LowerLayer_defs.h
-│   │   │       │   ├── LowerLayer.h
-│   │   │       │   ├── SAP
-│   │   │       │   │   ├── emm_as.c
-│   │   │       │   │   ├── emm_asDef.h
-│   │   │       │   │   ├── emm_as.h
-│   │   │       │   │   ├── EmmDeregisteredAttachNeeded.c
-│   │   │       │   │   ├── EmmDeregisteredAttemptingToAttach.c
-│   │   │       │   │   ├── EmmDeregistered.c
-│   │   │       │   │   ├── EmmDeregisteredInitiated.c
-│   │   │       │   │   ├── EmmDeregisteredLimitedService.c
-│   │   │       │   │   ├── EmmDeregisteredNoCellAvailable.c
-│   │   │       │   │   ├── EmmDeregisteredNoImsi.c
-│   │   │       │   │   ├── EmmDeregisteredNormalService.c
-│   │   │       │   │   ├── EmmDeregisteredPlmnSearch.c
-│   │   │       │   │   ├── emm_esm.c
-│   │   │       │   │   ├── emm_esmDef.h
-│   │   │       │   │   ├── emm_esm.h
-│   │   │       │   │   ├── emm_fsm.c
-│   │   │       │   │   ├── emm_fsm.h
-│   │   │       │   │   ├── EmmNull.c
-│   │   │       │   │   ├── emm_recv.c
-│   │   │       │   │   ├── emm_recv.h
-│   │   │       │   │   ├── emm_reg.c
-│   │   │       │   │   ├── emm_regDef.h
-│   │   │       │   │   ├── emm_reg.h
-│   │   │       │   │   ├── EmmRegisteredAttemptingToUpdate.c
-│   │   │       │   │   ├── EmmRegistered.c
-│   │   │       │   │   ├── EmmRegisteredImsiDetachInitiated.c
-│   │   │       │   │   ├── EmmRegisteredInitiated.c
-│   │   │       │   │   ├── EmmRegisteredLimitedService.c
-│   │   │       │   │   ├── EmmRegisteredNoCellAvailable.c
-│   │   │       │   │   ├── EmmRegisteredNormalService.c
-│   │   │       │   │   ├── EmmRegisteredPlmnSearch.c
-│   │   │       │   │   ├── EmmRegisteredUpdateNeeded.c
-│   │   │       │   │   ├── emm_sap.c
-│   │   │       │   │   ├── emm_sap.h
-│   │   │       │   │   ├── emm_send.c
-│   │   │       │   │   ├── emm_send.h
-│   │   │       │   │   ├── EmmServiceRequestInitiated.c
-│   │   │       │   │   └── EmmTrackingAreaUpdatingInitiated.c
-│   │   │       │   ├── SecurityModeControl.c
-│   │   │       │   ├── SecurityModeControl.h
-│   │   │       │   ├── ServiceRequestHdl.c
-│   │   │       │   └── TrackingAreaUpdate.c
-│   │   │       ├── ESM
-│   │   │       │   ├── DedicatedEpsBearerContextActivation.c
-│   │   │       │   ├── DefaultEpsBearerContextActivation.c
-│   │   │       │   ├── EpsBearerContextDeactivation.c
-│   │   │       │   ├── esmData.h
-│   │   │       │   ├── esm_ebr.c
-│   │   │       │   ├── esm_ebr_context.c
-│   │   │       │   ├── esm_ebr_context.h
-│   │   │       │   ├── esm_ebr.h
-│   │   │       │   ├── esm_ip.c
-│   │   │       │   ├── esm_main.c
-│   │   │       │   ├── esm_main.h
-│   │   │       │   ├── esm_proc.h
-│   │   │       │   ├── esm_pt.c
-│   │   │       │   ├── esm_pt_defs.h
-│   │   │       │   ├── esm_pt.h
-│   │   │       │   ├── EsmStatusHdl.c
-│   │   │       │   ├── PdnConnectivity.c
-│   │   │       │   ├── PdnDisconnect.c
-│   │   │       │   └── SAP
-│   │   │       │       ├── esm_recv.c
-│   │   │       │       ├── esm_recv.h
-│   │   │       │       ├── esm_sap.c
-│   │   │       │       ├── esm_sapDef.h
-│   │   │       │       ├── esm_sap.h
-│   │   │       │       ├── esm_send.c
-│   │   │       │       └── esm_send.h
-│   │   │       ├── nas_itti_messaging.c
-│   │   │       ├── nas_itti_messaging.h
-│   │   │       ├── nas_network.c
-│   │   │       ├── nas_network.h
-│   │   │       ├── nas_parser.c
-│   │   │       ├── nas_parser.h
-│   │   │       ├── nas_proc.c
-│   │   │       ├── nas_proc_defs.h
-│   │   │       ├── nas_proc.h
-│   │   │       ├── nas_ue_task.c
-│   │   │       ├── nas_ue_task.h
-│   │   │       ├── nas_user.c
-│   │   │       ├── nas_user.h
-│   │   │       ├── UEprocess.c
-│   │   │       └── user_defs.h
 │   │   ├── NGAP
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── MESSAGES
-│   │   │   │   ├── ASN1
-│   │   │   │   │   ├── ngap-15.8.0.asn1
-│   │   │   │   │   └── ngap-15.8.0.cmake
-│   │   │   │   └── CMakeLists.txt
 │   │   │   ├── ngap_common.c
 │   │   │   ├── ngap_common.h
 │   │   │   ├── ngap_gNB.c
@@ -4146,15 +1308,9 @@
 │   │   │   ├── ngap_msg_includes.h
 │   │   │   ├── ngap_utils.h
 │   │   │   └── tests
-│   │   │       ├── CMakeLists.txt
-│   │   │       └── ngap_lib_test.c
 │   │   ├── NRPPA
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── MESSAGES
-│   │   │   │   ├── ASN1
-│   │   │   │   │   ├── 38455.asn
-│   │   │   │   │   └── 38455.cmake
-│   │   │   │   └── CMakeLists.txt
 │   │   │   ├── nrppa_common.h
 │   │   │   ├── nrppa_gNB.c
 │   │   │   ├── nrppa_gNB_config.c
@@ -4181,38 +1337,9 @@
 │   │   │   ├── gtpu_extensions.c
 │   │   │   ├── gtpu_extensions.h
 │   │   │   └── tests
-│   │   │       ├── CMakeLists.txt
-│   │   │       └── test_gtp.cpp
 │   │   ├── S1AP
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── MESSAGES
-│   │   │   │   ├── ASN1
-│   │   │   │   │   ├── R10
-│   │   │   │   │   │   └── s1ap-10.9.0.asn1
-│   │   │   │   │   ├── R11
-│   │   │   │   │   │   └── s1ap-11.8.0.asn1
-│   │   │   │   │   ├── R12
-│   │   │   │   │   │   └── s1ap-12.7.0.asn1
-│   │   │   │   │   ├── R13
-│   │   │   │   │   │   └── s1ap-13.6.0.asn1
-│   │   │   │   │   ├── R14
-│   │   │   │   │   │   ├── s1ap-14.5.0.asn1
-│   │   │   │   │   │   ├── s1ap-14.6.0.asn1
-│   │   │   │   │   │   └── s1ap-14.7.0.asn1
-│   │   │   │   │   ├── R14.4
-│   │   │   │   │   │   └── s1ap-14.4.0.asn1
-│   │   │   │   │   ├── R15
-│   │   │   │   │   │   ├── s1ap-15.1.0.asn1
-│   │   │   │   │   │   ├── s1ap-15.2.0.asn1
-│   │   │   │   │   │   ├── s1ap-15.3.0.asn1
-│   │   │   │   │   │   ├── s1ap-15.6.0.asn1
-│   │   │   │   │   │   └── s1ap-15.6.0.cmake
-│   │   │   │   │   ├── R8
-│   │   │   │   │   │   └── s1ap-8.10.0.asn1
-│   │   │   │   │   ├── R9
-│   │   │   │   │   │   └── s1ap-9.10.0.asn1
-│   │   │   │   │   └── README
-│   │   │   │   └── CMakeLists.txt
 │   │   │   ├── s1ap_common.h
 │   │   │   ├── s1ap_eNB.c
 │   │   │   ├── s1ap_eNB_context_management_procedures.c
@@ -4366,49 +1493,6 @@
 │   │   │   ├── armral_bfp_compression.h
 │   │   │   ├── CMakeLists.txt
 │   │   │   ├── mplane
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── config-mplane.c
-│   │   │   │   ├── config-mplane.h
-│   │   │   │   ├── connect-mplane.c
-│   │   │   │   ├── connect-mplane.h
-│   │   │   │   ├── get-mplane.c
-│   │   │   │   ├── get-mplane.h
-│   │   │   │   ├── init-mplane.c
-│   │   │   │   ├── init-mplane.h
-│   │   │   │   ├── rpc-send-recv.c
-│   │   │   │   ├── rpc-send-recv.h
-│   │   │   │   ├── ru-mplane-api.c
-│   │   │   │   ├── ru-mplane-api.h
-│   │   │   │   ├── subscribe-mplane.c
-│   │   │   │   ├── subscribe-mplane.h
-│   │   │   │   ├── xml
-│   │   │   │   │   ├── get-xml.c
-│   │   │   │   │   └── get-xml.h
-│   │   │   │   └── yang
-│   │   │   │       ├── create-yang-config.c
-│   │   │   │       ├── create-yang-config.h
-│   │   │   │       ├── get-yang.c
-│   │   │   │       ├── get-yang.h
-│   │   │   │       └── models
-│   │   │   │           ├── iana-hardware.yang
-│   │   │   │           ├── iana-if-type.yang
-│   │   │   │           ├── ietf-crypto-types.yang
-│   │   │   │           ├── ietf-hardware.yang
-│   │   │   │           ├── ietf-interfaces.yang
-│   │   │   │           ├── ietf-ip.yang
-│   │   │   │           ├── ietf-netconf-acm.yang
-│   │   │   │           ├── o-ran-common-yang-types.yang
-│   │   │   │           ├── o-ran-compression-factors.yang
-│   │   │   │           ├── o-ran-delay-management.yang
-│   │   │   │           ├── o-ran-file-management.yang
-│   │   │   │           ├── o-ran-hardware.yang
-│   │   │   │           ├── o-ran-interfaces.yang
-│   │   │   │           ├── o-ran-module-cap.yang
-│   │   │   │           ├── o-ran-performance-management.yang
-│   │   │   │           ├── o-ran-processing-element.yang
-│   │   │   │           ├── o-ran-uplane-conf.yang
-│   │   │   │           ├── o-ran-usermgmt.yang
-│   │   │   │           └── o-ran-wg4-features.yang
 │   │   │   ├── oaioran.c
 │   │   │   ├── oaioran.h
 │   │   │   ├── oran-config.c
@@ -4422,7 +1506,6 @@
 │   │   │   └── README.md
 │   │   ├── iqplayer
 │   │   │   ├── DOC
-│   │   │   │   └── iqrecordplayer_usage.md
 │   │   │   └── iqplayer_lib.c
 │   │   ├── IRIS
 │   │   │   ├── CMakeLists.txt
@@ -4457,10 +1540,6 @@
 │   │   │   ├── taps_client.cpp
 │   │   │   ├── taps_client.h
 │   │   │   ├── tests
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── test_vrtsim_cirdb.cpp
-│   │   │   │   ├── test_vrtsim.cpp
-│   │   │   │   └── test_vrtsim_taps.cpp
 │   │   │   └── vrtsim.c
 │   │   └── zmq
 │   │       ├── CMakeLists.txt
@@ -4468,13 +1547,12 @@
 │   │       ├── ring_buffer.cpp
 │   │       ├── ring_buffer.h
 │   │       ├── tests
-│   │       │   ├── CMakeLists.txt
-│   │       │   ├── test_ring_buffer.cpp
-│   │       │   └── test_zmq_radio.cpp
 │   │       ├── zmq_imported.cpp
 │   │       ├── zmq_imported.h
 │   │       └── zmq_radio.cpp
+│   ├── rbconfig.raw
 │   ├── README.md
+│   ├── reconfig.raw
 │   ├── targets
 │   │   ├── DOCS
 │   │   │   ├── E-UTRAN_User_Guide.docx
@@ -4496,167 +1574,13 @@
 │   │   │   └── ue_usrp.gtkw
 │   │   ├── PROJECTS
 │   │   │   ├── CENTOS-LTE-EPC-INTEGRATION
-│   │   │   │   └── CONF
-│   │   │   │       ├── enb.centos.calisson.conf
-│   │   │   │       ├── enb.centos.memphis.conf
-│   │   │   │       └── enb.centos.nord.conf
 │   │   │   ├── GENERIC-LTE-EPC
-│   │   │   │   └── CONF
-│   │   │   │       ├── benetel-4g.conf
-│   │   │   │       ├── benetel-5g.conf
-│   │   │   │       ├── enb.band13.tm1.50PRB.emtc.conf
-│   │   │   │       ├── enb.band38.tm1.100PRB.usrpx310.conf
-│   │   │   │       ├── enb.band38.tm1.25PRB.iris030.conf
-│   │   │   │       ├── enb.band38.tm1.usrpx310.conf
-│   │   │   │       ├── enb.band42.tm1.25PRB.iris030.conf
-│   │   │   │       ├── enb.band7.25prb.bladerf.conf
-│   │   │   │       ├── enb.band7.master.conf
-│   │   │   │       ├── enb.band7.tm1.100PRB.usrpx310.conf
-│   │   │   │       ├── enb.band7.tm1.25PRB.iris030.conf
-│   │   │   │       ├── enb.band7.tm1.25PRB.usrpb210.replay.conf
-│   │   │   │       ├── enb.band7.tm1.50PRB.usrpb210.conf
-│   │   │   │       ├── enb.band7.tm1.50PRB.usrpb210-d2d.conf
-│   │   │   │       ├── enb.band7.tm1.50PRB.usrpb210_ue_expansion.conf
-│   │   │   │       ├── gnb.band257.tm1.32PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band257.tm1.32PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band257.tm1.66PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band261.tm1.32PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band66.tm1.106PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band66.tm1.106PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band66.tm1.24PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band66.tm1.25PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band66.tm1.25PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band78.106PRB.30kHz,usrpb2x0.conf
-│   │   │   │       ├── gnb.band78.106PRB.slave.conf
-│   │   │   │       ├── gnb.band78.slave.conf
-│   │   │   │       ├── gnb.band78.tm1.106PRB.PTRS.usrpx300.conf
-│   │   │   │       ├── gnb.band78.tm1.106PRB.usrpb210.conf
-│   │   │   │       ├── gnb.band78.tm1.106PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band78.tm1.106PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band78.tm1.217PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band78.tm1.217PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band78.tm1.24PRB.usrpb210.conf
-│   │   │   │       ├── gnb.band78.tm1.24PRB.usrpn300.conf
-│   │   │   │       ├── gnb.band78.tm1.24PRB.usrpx300.conf
-│   │   │   │       ├── gnb.band78.tm1.273PRB.usrpn300.conf
-│   │   │   │       ├── oaiL1.nfapi.usrpx300.conf
-│   │   │   │       ├── rcc_b38_if5_ENDC.conf
-│   │   │   │       ├── rcc.band38.tm1.if4p5.50PRB.lo.conf
-│   │   │   │       ├── rcc.band7.tm1.50PRB.nfapi.conf
-│   │   │   │       ├── rcc.band7.tm1.50PRB.nfapi-STUB.conf
-│   │   │   │       ├── rcc.band7.tm1.if4p5.50PRB.conf
-│   │   │   │       ├── rcc.band7.tm1.if4p5.50PRB.lo.conf
-│   │   │   │       ├── rru.oaisim.conf
-│   │   │   │       ├── rru.oaisim.tdd.conf
-│   │   │   │       └── UE_config.xml
 │   │   │   ├── GENERIC-NR-5GC
-│   │   │   │   └── CONF
-│   │   │   │       ├── channelmod_rfsimu.conf
-│   │   │   │       ├── channelmod_rfsimu_LEO_satellite.conf
-│   │   │   │       ├── cu_gnb.conf
-│   │   │   │       ├── du_gnb.conf
-│   │   │   │       ├── gnb0.prs.band261.fr2.64PRB.usrpx310.conf
-│   │   │   │       ├── gnb0.prs.band78.fr1.106PRB.usrpx310.conf
-│   │   │   │       ├── gnb1.prs.band261.fr2.64PRB.usrpx310.conf
-│   │   │   │       ├── gnb1.prs.band78.fr1.106PRB.usrpx310.conf
-│   │   │   │       ├── gnb.band78.sa.fr1.106PRB.2x2.usrpn310.conf
-│   │   │   │       ├── gnb.band78.sa.fr1.162PRB.2x2.usrpn310.conf
-│   │   │   │       ├── gnb-cu.sa.f1.conf
-│   │   │   │       ├── gnb-du.sa.band66.25prb.rfsim.pci0.conf
-│   │   │   │       ├── gnb-du.sa.band66.25prb.rfsim.pci1.conf
-│   │   │   │       ├── gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf
-│   │   │   │       ├── gnb-du.sa.band77.273prb.fhi72.4x4-das-benetel650_650.conf
-│   │   │   │       ├── gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf
-│   │   │   │       ├── gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650-mplane.conf
-│   │   │   │       ├── gnb-du.sa.band78.106prb.rfsim.pci0.conf
-│   │   │   │       ├── gnb-du.sa.band78.106prb.rfsim.pci1.conf
-│   │   │   │       ├── gnb-pnf.band78.rfsim.2x2.conf
-│   │   │   │       ├── gnb-pnf.band78.rfsim.conf
-│   │   │   │       ├── gnb.sa.band1.u0.52PRB.usrpb210.conf
-│   │   │   │       ├── gnb.sa.band254.ntn.mu1.24prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band255.ntn.mu0.25prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band256.ntn.mu0.25prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band257.132prb.fhi72.2x2-liteon.conf
-│   │   │   │       ├── gnb.sa.band257.132prb.fhi72.2x2-microamp.conf
-│   │   │   │       ├── gnb.sa.band257.u3.32prb.usrpx410.conf
-│   │   │   │       ├── gnb.sa.band41.fr1.106PRB.usrpb210.conf
-│   │   │   │       ├── gnb.sa.band41.fr1.52PRB.usrpb210.conf
-│   │   │   │       ├── gnb.sa.band512.ntn.mu3.132prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band512.ntn.mu3.32prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band512.ntn.mu3.66prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band66.fr1.106PRB.usrpn300.conf
-│   │   │   │       ├── gnb.sa.band66.fr1.106PRB.usrpx300.conf
-│   │   │   │       ├── gnb.sa.band66.fr1.24PRB.usrpx300.conf
-│   │   │   │       ├── gnb.sa.band66.fr1.25PRB.usrpx300.conf
-│   │   │   │       ├── gnb.sa.band66.u0.25prb.rfsim.conf
-│   │   │   │       ├── gnb.sa.band77.106prb.fhi72.4x4-vvdn.conf
-│   │   │   │       ├── gnb.sa.band77.162prb.usrpn310.4x4.conf
-│   │   │   │       ├── gnb.sa.band77.273prb.fhi72.2x2-benetel550-long-prach.conf
-│   │   │   │       ├── gnb.sa.band77.273prb.fhi72.2x2-vvdn-16b.conf
-│   │   │   │       ├── gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf
-│   │   │   │       ├── gnb.sa.band77.273prb.fhi72.4x4-wnc.conf
-│   │   │   │       ├── gnb.sa.band77.fr1.273PRB.2x2.usrpn300.conf
-│   │   │   │       ├── gnb.sa.band77.fr1.273PRB.usrpx300.conf
-│   │   │   │       ├── gnb.sa.band78.106prb.bladerf2.0xa4.conf
-│   │   │   │       ├── gnb.sa.band78.106prb.fhi72.1x1-proto-ru.conf
-│   │   │   │       ├── gnb.sa.band78.106PRB.usrpb210.RA_2-Step.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.2x2-benetel550-16b.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.4x2-benetel550.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.4x4-benetel550-mplane.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.4x4-foxconn.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.4x4-liteon.conf
-│   │   │   │       ├── gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf
-│   │   │   │       ├── gnb.sa.band78.51PRB.bladerf2.0xa4.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.2x2.usrpn300.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.pci0.rfsim.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.pci1.rfsim.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.usrpb210.2pattern.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.usrpb210.4layer.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.usrpb210.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.usrpb210.redcap.yaml
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.usrpb210.sabox.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.106PRB.usrpb210.yaml
-│   │   │   │       ├── gnb.sa.band78.fr1.162PRB.2x2.usrpn300.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.189PRB.rfsim.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.217PRB.2x2.usrpn300.conf
-│   │   │   │       ├── gnb.sa.band78.fr1.24PRB.usrpb210.conf
-│   │   │   │       ├── gnb-vnf.sa.band78.106prb.nfapi.conf
-│   │   │   │       ├── gnb-vnf.sa.band78.273prb.aerial.conf
-│   │   │   │       ├── gnb-vnf.sa.band78.273prb.nfapi.conf
-│   │   │   │       ├── gnb-vnf.sa.cbrs.aerial.conf
-│   │   │   │       ├── neighbour-config-rfsim.conf
-│   │   │   │       ├── uecap_ports1.xml
-│   │   │   │       ├── uecap_ports2.xml
-│   │   │   │       ├── uecap_ports4.xml
-│   │   │   │       ├── ue.conf
-│   │   │   │       ├── ue.nr.prs.fr1.106prb.conf
-│   │   │   │       └── ue.nr.prs.fr2.64prb.conf
 │   │   │   └── NR-SIDELINK
-│   │   │       └── CONF
-│   │   │           ├── sidelink_preconfig_1rxpool_1txpool.conf
-│   │   │           ├── sidelink_preconfig_1rxpool.conf
-│   │   │           └── sidelink_preconfig_1txpool.conf
 │   │   └── TEST
 │   │       ├── AT_COMMANDS
-│   │       │   ├── Makefile
-│   │       │   └── oaisim.c
 │   │       ├── PDCP
-│   │       │   ├── Makefile
-│   │       │   ├── readme.txt
-│   │       │   ├── test_pdcp.c
-│   │       │   ├── test_pdcp.h
-│   │       │   ├── test_util.h
-│   │       │   ├── todo.txt
-│   │       │   └── with_rlc
-│   │       │       ├── Makefile.data_bearer
-│   │       │       ├── readme_test_pdcp_rlc.txt
-│   │       │       └── test_pdcp_rlc.c
 │   │       └── ROHDE_SCHWARZ
-│   │           ├── EthernetRawCommand.cpp
-│   │           ├── Makefile
-│   │           ├── TcpClient.cpp
-│   │           └── TcpClient.h
 │   ├── tests
 │   │   ├── CMakeLists.txt
 │   │   ├── nr-cu-nrppa
@@ -4696,20 +1620,7 @@
 │       ├── packages
 │       │   ├── packages.cmake
 │       │   ├── systemd_scripts
-│       │   │   ├── oai-lte
-│       │   │   │   ├── postinst
-│       │   │   │   └── prerm
-│       │   │   ├── oai-nr
-│       │   │   │   ├── postinst
-│       │   │   │   └── prerm
-│       │   │   ├── postinst
-│       │   │   └── prerm
 │       │   ├── systemd_services
-│       │   │   ├── oai-lte
-│       │   │   │   └── lte-softmodem.service
-│       │   │   └── oai-nr
-│       │   │       ├── nr-cuup.service
-│       │   │       └── nr-softmodem.service
 │       │   └── triggers
 │       ├── plots
 │       │   ├── ber_compare.svg
@@ -4721,6 +1632,8 @@
 │       │   └── ul_bler_vs_snr_graph.py
 │       └── scripts
 │           └── multi-ue.sh
+├── ps-result.log
+├── qos-flow-architecture.md
 ├── README.md
 ├── scheduler
 │   └── __pycache__
@@ -4730,6 +1643,7 @@
 │       ├── link.cpython-312.pyc
 │       ├── tier1.cpython-312.pyc
 │       └── two_tier.cpython-312.pyc
+├── script-logs
 ├── sensor_pf+twotier.png
 ├── sim
 │   ├── baselines
@@ -4763,6 +1677,7 @@
 │           ├── test_smoke.cpython-312-pytest-9.0.3.pyc
 │           ├── test_smoke_harq.cpython-312-pytest-9.0.3.pyc
 │           └── test_two_tier_refactor.cpython-312-pytest-9.0.3.pyc
-└── smoke_twotier.png
+├── smoke_twotier.png
+└── ue.log
 
-559 directories, 4207 files
+366 directories, 1315 files

@@ -1,5 +1,0 @@
-sigmf==1.2.1
-termcolor
-bitarray
-pandas
-numpy==1.23

@@ -382,60 +382,193 @@ Your Stage 6 hook (ia_p5g_dl_rb_alloc) hijacks the allocation loop to decide how
 - Slicing
 - Preemptive sending for urllc
   
-# Connection messages
+# gNB Initial Setup and Core Connection Signaling Flow
 
 ```
-[UE NAS / RRC Layer]
-          │
-          │ (1) UE triggers Random Access (RACH) at the PHY layer. 
-          │     Transmits "RRC Setup Request" over the CCCH logical channel.
-          ▼
-[ gNB-DU RLC / MAC / F1AP ]
-          │
-          │ (2) DU intercepts the request, wraps it inside an F1AP "Initial UL RRC Message Transfer",
-          │     and forwards it over the F1-C control plane interface to the Central Unit.
-          ▼
-[ gNB-CU RRC Processor ]
-          │
-          │ (3) CU processes the request and responds with an F1AP "DL RRC Message Transfer" 
-          │     containing the "RRC Setup" payload. The UE moves to RRC_CONNECTED state.
-          ▼
-[ UE NAS -> gNB-CU NGAP Engine ]
-          │
-          │ (4) UE sends "RRC Setup Complete" carrying an embedded NAS Registration Request.
-          │     gNB-CU extracts the NAS payload and packages it into an NGAP "Initial UE Message".
-          │     Pushes the message over the N1/N2 boundary to the Access and Mobility Management Function (AMF).
-          ▼
-[ 5GC Core (AMF / SMF) ]
-          │
-          │ (5) AMF authenticates the UE via the AUSF/UDM. Once approved, the SMF triggers 
-          │     PDU Session Establishment, selecting the UPF and creating the default QFI.
-          │     AMF issues an NGAP "Initial Context Setup Request" back to the gNB-CU.
-          ▼
- =================================================================================================
- gNB-CU LAYER (Central Unit — Processes Context Requests & Instantiated DRB Mappings)
- =================================================================================================
-          │
-          │ (6) gNB-CU receives the NGAP "Initial Context Setup Request" containing the AS Security 
-          │     Context and the "PDU Session Resource Setup List" (including the target QFI and 5QI metrics).
-          │     CU generates the security keys and determines the initial DRB mapping scheme.
-          ▼
- =================================================================================================
- gNB-DU LAYER (Distributed Unit — Establishes Local Bearers & Scheduler Queues)
- =================================================================================================
-          │
-          │ (7) CU transmits an F1AP "UE Context Setup Request" to the DU to instantiate the radio resources.
-          │     The DU processes the "DRB To Be Setup List", binds them to distinct Logical Channels (LCIDs),
-          │     and allocates local hardware resources for the UE context. DU replies with "UE Context Setup Response".
-          ▼
- =================================================================================================
- OVER-THE-AIR (Uu Interface — Reconfiguring the Device)
- =================================================================================================
-          │
-          │ (8) gNB-CU sends an "RRC Reconfiguration" message to the UE to activate AS Security (Ciphering),
-          │     and provides the explicit `radioBearerConfig` and `packetFilterSet` parameters.
-          │     The UE configures its internal SDAP/PDCP layers and replies with "RRC Reconfiguration Complete".
-          ▼
-[ Connection Fully Established ] ──► The control plane architecture is anchored. User plane QoS flow 
-                                      pipelines (like those in qos-flow-architecture.md) can now pass data.
+[ gNB-DU ]                       [ gNB-CU ]                     [ 5G Core (AMF) ]
+    │                                │                                 │
+    │──(1) SCTP Association Establish│                                 │
+    │      [Port 38472]              │                                 │
+    │                                │                                 │
+    │──(2) F1 SETUP REQUEST─────────►│                                 │
+    │      [F1AP: Sec 8.5.1]         │                                 │
+    │                                │──(3) SCTP Association Establish │
+    │◄─(4) F1 SETUP RESPONSE─────────│      [Port 38412]               │
+    │      [F1AP: Sec 8.5.1]         │                                 │
+    │                                │──(5) NG SETUP REQUEST──────────►│
+    │                                │      [NGAP: Sec 8.8.1]          │
+    │                                │                                 │
+    │                                │◄─(6) NG SETUP RESPONSE──────────│
+    │                                │      [NGAP: Sec 8.8.1]          │
+    ▼                                ▼                                 ▼
+```
+
+## Layer-by-Layer Walkthrough
+
+### Step 1 & 2: The Internal RAN Split Integration (gNB-DU $\rightarrow$ gNB-CU)
+
+- Layers Involved: gNB-DU F1AP $\rightarrow$ TNL (SCTP) $\rightarrow$ gNB-CU F1AP.
+  
+- The Interface/Port: F1-C Interface running over standard registered SCTP destination port 38472 (defined in TS 38.471).
+  
+- The Action: Upon powering on and acquiring local IP addresses, the gNB-DU initiates a stream control transmission protocol (SCTP) handshake with the gNB-CU. Once the socket state is established, the DU sends the F1 SETUP REQUEST (TS 38.473 Section 8.5.1).
+
+- Key Information Elements (IEs) Transmitted:
+  - gNB-DU ID and gNB-DU Name: Globally identifying this specific physical distributed unit hardware block.
+  - Supported TAC (Tracking Area Code) & PLMN Identity: Mapping the geographical tracking grid of the radio hardware cells.
+  - gNB-DU System Information: Contains the raw Master Information Block (MIB) and System Information Block Type 1 (SIB1) bytes that the DU plans to broadcast over the physical Uu interface for the cell.
+
+### Step 3 & 4: RAN Capacity Acceptance (gNB-CU $\rightarrow$ gNB-DU)
+- Layers Involved: gNB-CU F1AP $\rightarrow$ gNB-DU F1AP.
+- The Action: The gNB-CU validates that the incoming DU's PLMN matches its own software configuration profiles. It responds down the F1-C tunnel with an F1 SETUP RESPONSE (TS 38.473 Section 8.5.1).
+- Key Information Elements (IEs) Transmitted:
+  - gNB-CU Name: Confirming central controller identity.
+  - Cells to be Activated List: The CU explicitly instructs the DU which specific cell transmitters, physical cell identities (PCIs), and absolute radio-frequency channel numbers (ARFCNs) are cleared to go live and begin active radio transmission over the airwaves.
+  
+### Step 5: Bridging to the Core Cloud (gNB-CU $\rightarrow$ AMF)
+- Layers Involved: gNB-CU NGAP $\rightarrow$ TNL (SCTP) $\rightarrow$ AMF NGAP.
+
+- The Interface/Port: NG-C Interface running over standard registered SCTP destination port 38412 (defined in TS 38.411).
+
+- The Action: Once the internal DU assets are bound and validated, the Central Unit initiates its external control-plane backbone link. It connects via an SCTP socket to the Access and Mobility Management Function (AMF) in the 5G Core network and submits the NG SETUP REQUEST (TS 38.413 Section 8.8.1).
+  
+- Key Information Elements (IEs) Transmitted:
+  - Global gNB ID: Combines the PLMN ID and the gNB ID to uniquely represent this entire macro/micro station to the core global routing table.
+  - Supported TA List: Explicitly tells the core network which precise Tracking Area Codes this base station manages.
+  - Broadcast PLMN List $\rightarrow$ Slice Support List: Informs the AMF of the precise Network Slices (S-NSSAIs consisting of SST/SD values) supported across the radio interfaces.
+
+### Step 6: Core Admittance & Global Mapping (AMF $\rightarrow$ gNB-CU)
+
+- Layers Involved: AMF NGAP $\rightarrow$ gNB-CU NGAP.
+
+- The Action: The Core network verifies that the incoming base station's identifiers are authorized within the operator network database. The AMF acts as the master sync element and locks the configuration by returning an NG SETUP RESPONSE (TS 38.413 Section 8.8.1).
+
+- Key Information Elements (IEs) Transmitted:
+  - AMF Name and AMF Region ID / AMF Set ID: Letting the CU know exactly which pool of core nodes is answering and handling load balanced control sessions.
+  - Served GUAMI List (Globally Unique AMF Identifier): Explicitly provisions the globally distinct core identifiers the gNB must map individual UEs toward during initial attach requests.
+  - Relative AMF Capacity: An integer factor (0..255) dictating weight allocation properties so that the gNB-CU knows how to distribute random incoming device registrations across redundant core nodes.
+
+Once Step 6 finishes, the base station turns on its cellular radios, begins broadcasting its system configuration information (SIB1) to searching phones, and is fully ready to handle the uplink registration flows.
+
+# Control plane signalling for new connections
+
+## Uplink Connection & Registration Flow (UE $\rightarrow$ gNB-DU $\rightarrow$ gNB-CU $\rightarrow$ 5G Core)
+
+This flow tracks the initial entry of the phone from raw airwaves up into the core network gateway to request admission.
+
+```
+[ UE ]                  [ gNB-DU ]               [ gNB-CU ]             [ 5G Core (AMF) ]
+  │                         │                        │                         │
+  │──(1) RRCSetupRequest───►│                        │                         │
+  │   [Uu: SRB0 / CCCH]     │                        │                         │
+  │                         │──(2) Initial UL RRC───►│                         │
+  │                         │      Message Transfer  │                         │
+  │                         │      [F1AP: Sec 8.6.1] │                         │
+  │                         │                        │──(3) Initial UE────────►│
+  │                         │                        │      Message (NAS)      │
+  │                         │                        │      [NGAP: Sec 8.6.1]  │
+  │──(4) RRCSetupComplete──►│                        │                         │
+  │   [Uu: SRB1 / DCCH]     │──(5) UL RRC Message───►│                         │
+  │   (Contains NAS             Transfer (NAS)       │                         │
+  │    Registration Request)    [F1AP: Sec 8.6.2]    │──(6) Uplink NAS────────►│
+  │                         │                        │      Transport (NAS)    │
+  │                         │                        │      [NGAP: Sec 8.2.2]  │
+  ▼                         ▼                        ▼                         ▼
 ```                                      
+
+## Layer-by-Layer Walkthrough
+
+### Step 1: The Airwave Trigger (UE $\rightarrow$ gNB-DU)
+
+- Layers Involved: UE PHY/MAC/RLC $\rightarrow$ gNB-DU PHY/MAC/RLC (Control Plane: SRB0, CCCH Logical Channel).
+- The Action: After completing the Random Access (RACH) preamble exchange, the UE transmits the RRCSetupRequest (TS 38.331). It passes its identity (5G-S-TMSI or random value) and establishment cause (e.g., mo-Signalling).
+
+### Step 2: The F1-C Boundary Cross (gNB-DU $\rightarrow$ gNB-CU)
+
+- Layers Involved: gNB-DU F1AP $\rightarrow$ gNB-CU F1AP (Control Plane: F1-C interface over SCTP).
+
+- The Action: The gNB-DU allocates a unique identifier (gNB-DU UE F1AP ID). Because it does not process RRC messages directly, it wraps the raw RRC packet into an F1AP INITIAL UL RRC MESSAGE TRANSFER message (TS 38.473 Section 8.6.1) and pushes it up to the gNB-CU.
+  
+### Step 3: Core Network Admission Request (gNB-CU $\rightarrow$ AMF)
+
+- Layers Involved: gNB-CU NGAP $\rightarrow$ AMF NGAP (Control Plane: NG-C interface over SCTP).
+  
+- The Action: The gNB-CU parses the RRC layer, allocates its own gNB-CU UE NGAP ID, and assigns an RRC connection. The gNB-CU then creates an NGAP INITIAL UE MESSAGE (TS 38.413 Section 8.6.1). It bundles the UE's location details (User Location Information) and routes this towards the AMF inside the 5G Core.
+  
+### Step 4 & 5: The NAS Payload Injection (UE $\rightarrow$ gNB-DU $\rightarrow$ gNB-CU)
+
+- Layers Involved: UE RRC/NAS $\rightarrow$ DU RLC/MAC $\rightarrow$ CU RRC (Signaling Radio Bearer 1 - SRB1).
+  
+- The Action: The network assigns dedicated radio resources. The UE responds with an RRCSetupComplete message. Piggybacked directly inside this RRC layer is the NAS Registration Request (TS 24.501) containing the user’s subscription details. The gNB-DU receives this on SRB1, maps it to an F1AP UL RRC MESSAGE TRANSFER (TS 38.473 Section 8.6.2), and ships it to the CU.
+  
+### Step 6: Delivering the Intent to the Core (gNB-CU $\rightarrow$ AMF)
+
+- Layers Involved: gNB-CU NGAP $\rightarrow$ AMF NAS Layer.
+- The Action: The gNB-CU extracts the NAS payload from the RRC wrapper, embeds it into an NGAP UPLINK NAS TRANSPORT message (TS 38.413 Section 8.2.2), and passes it to the AMF. The 5G Core now begins authenticating the hardware.
+  
+## Core Command & Context Enforcement Flow (5G Core $\rightarrow$ gNB-CU $\rightarrow$ gNB-DU $\rightarrow$ UE)
+
+Once the core validates who the user is, it commands the base station to spin up security encryption and build the dedicated radio infrastructure for the subscriber.
+
+```
+[ 5G Core (AMF) ]       [ gNB-CU ]               [ gNB-DU ]                  [ UE ]
+        │                    │                        │                        │
+        │──(1) Initial UE───►│                        │                        │
+        │      Context Setup │                        │                        │ 
+        │      Request       │                        │                        │
+        │      [NGAP: 8.3.1] │──(2) UE Context Setup─►│                        │
+        │                    │      Request           │                        │
+        │                    │      [F1AP: Sec 8.3.1] │                        │
+        │                    │                        │──(3) SecurityMode─────►│
+        │                    │                        │      Command & RRC     │
+        │                    │                        │      Reconfiguration   │
+        │                    │                        │      [Uu: SRB1]        │
+        │                    │                        │                        │
+        │                    │                        │◄─(4) SecurityMode──────│
+        │                    │◄─(5) UE Context Setup──│      Complete &        │
+        │                    │      Response          │      ReconfigComplete  │
+        │◄─(6) Initial UE────│      [F1AP: Sec 8.3.1] │                        │
+        │      Context Setup │                        │                        │
+        │      Response      │                        │                        │
+        ▼                    ▼                        ▼                        ▼
+```      
+
+## Layer-by-Layer Walkthrough
+
+### Step 1: The Core Command (AMF $\rightarrow$ gNB-CU)
+
+- Layers Involved: AMF NGAP $\rightarrow$ gNB-CU NGAP.
+
+- The Action: The AMF approves the registration and triggers the creation of the local session profile. It sends an NGAP INITIAL UE CONTEXT SETUP REQUEST (TS 38.413 Section 8.3.1). This critical message carries the UE's security capabilities, 5G security keys ($K_{gNB}$), Allowed NSSAI (Slicing info), and the NAS Registration Accept payload.
+
+### Step 2: Partitioning the Context to the DU (gNB-CU ──► gNB-DU)
+- Layers Involved: gNB-CU F1AP ──► gNB-DU F1AP.
+
+- The Action: The gNB-CU evaluates core metrics and fires an F1AP UE CONTEXT SETUP REQUEST to the DU. This provisions local cell resources, SRB profiles, and maps incoming metrics to the local scheduler configuration (lc_config[lcid].fiveQI).
+
+### Step 3: Activating Radio Security & Reconfiguration (gNB-CU ──► gNB-DU ──► UE)
+- Layers Involved: gNB-CU RRC ──► F1AP DL RRC Transport ──► gNB-DU MAC/RLC ──► Uu Interface.
+  
+- The Action: 
+   - The gNB-CU acts as the brain: It compiles a transparent RRC SecurityModeCommand byte block and drops it into an F1AP DL RRC MESSAGE TRANSFER container. The DU ingests this container, strips the F1AP wrapper, and schedules the raw RRC payload across SRB1.
+   - Upon successful authentication, the gNB-CU compiles the subsequent RRCReconfiguration message (attaching the core's NAS Registration Accept), tunneling it to the DU via another DL RRC MESSAGE TRANSFER for physical transmission over the airwaves.
+
+### Step 4: Device-Side Execution Complete (UE $\rightarrow$ gNB-DU)
+
+- Layers Involved: UE RRC $\rightarrow$ gNB-DU MAC/RLC.
+  
+- The Action: The UE turns on its hardware encryption engines, configures its internal radio stack parameters, and fires back an encrypted SecurityModeComplete and RRCReconfigurationComplete verification block to the gNB-DU.
+  
+### Step 5: DU Loop Closure (gNB-DU $\rightarrow$ gNB-CU)
+
+- Layers Involved: gNB-DU F1AP $\rightarrow$ gNB-CU F1AP.
+  
+- The Action: The DU registers that the phone has successfully updated its layer state. It responds to the CU with an F1AP UE CONTEXT SETUP RESPONSE (TS 38.473 Section 8.3.1), which includes local physical layer/cell allocation parameters and the uplink/downlink F1-U GTP-U transport addresses for data distribution.
+  
+### Step 6: Session Established Acknowledgement (gNB-CU $\rightarrow$ AMF)
+
+- Layers Involved: gNB-CU NGAP $\rightarrow$ AMF NGAP.
+  
+- The Action: The gNB-CU maps the successful DU infrastructure initialization and issues the final NGAP INITIAL UE CONTEXT SETUP RESPONSE (TS 38.413 Section 8.3.1) back to the 5G Core.
+
+

@@ -1,0 +1,5 @@
+[0;32m[INFO]2026-06-04 12:50:28 Starting OAI 5G Core Network via Docker Compose...[0m
+[0;32m[INFO]2026-06-04 12:50:29 Waiting for Core Network containers to reach 'healthy' state (2 min timeout)...[0m
+[0;32m[INFO]2026-06-04 12:50:29 All core network containers are HEALTHY![0m
+[0;32m[INFO]2026-06-04 12:50:29 Launching gNB in rfsimulator mode...[0m
+[0;32m[INFO]2026-06-04 12:50:29 Checking gNB health alignment and NGAP connection to AMF...[0m

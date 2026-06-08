@@ -1,0 +1,33 @@
+[0;32m[INFO]2026-06-04 13:43:28 Starting OAI 5G Core Network via Docker Compose...[0m
+[0;32m[INFO]2026-06-04 13:43:29 Waiting for Core Network containers to reach 'healthy' state (2 min timeout)...[0m
+[0;32m[INFO]2026-06-04 13:43:29 All core network containers are HEALTHY![0m
+[0;32m[INFO]2026-06-04 13:43:29 Launching gNB in rfsimulator mode...[0m
+[0;32m[INFO]2026-06-04 13:43:29 Checking gNB health alignment and NGAP connection to AMF...[0m
+[0;32m[INFO]2026-06-04 13:43:37 gNB successfully initialized and registered with AMF![0m
+[0;32m[INFO]2026-06-04 13:43:37 Launching nrUE in rfsimulator mode...[0m
+[0;32m[INFO]2026-06-04 13:43:37 Waiting for nrUE network registration and PDU Session Activation...[0m
+[0;32m[INFO]2026-06-04 13:43:39 nrUE connected! Dynamic IP assigned: 10.0.0.2[0m
+[0;32m[INFO]2026-06-04 13:43:39 Extracted Data Network (oai-ext-dn) Target Core IP: 192.168.70.135[0m
+[0;32m[INFO]2026-06-04 13:43:39 Initializing iperf3 host endpoint context inside oai-ext-dn...[0m
+[0;32m[INFO]2026-06-04 13:43:42 Executing 10-Second Downstream (DL) Performance Benchmark...[0m
+Connecting to host 192.168.70.135, port 5201
+Reverse mode, remote host 192.168.70.135 is sending
+[  5] local 10.0.0.2 port 33203 connected to 192.168.70.135 port 5201
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-1.00   sec  54.4 MBytes   456 Mbits/sec                  
+[  5]   1.00-2.00   sec  62.2 MBytes   522 Mbits/sec                  
+[  5]   2.00-3.00   sec  62.6 MBytes   525 Mbits/sec                  
+[  5]   3.00-4.00   sec  63.1 MBytes   530 Mbits/sec                  
+[  5]   4.00-5.00   sec  63.5 MBytes   533 Mbits/sec                  
+[  5]   5.00-6.00   sec  62.6 MBytes   525 Mbits/sec                  
+[  5]   6.00-7.00   sec  40.1 MBytes   337 Mbits/sec                  
+[  5]   7.00-8.00   sec  52.4 MBytes   439 Mbits/sec                  
+[  5]   8.00-9.00   sec  63.1 MBytes   530 Mbits/sec                  
+[  5]   9.00-10.00  sec  61.8 MBytes   518 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.04  sec   589 MBytes   492 Mbits/sec  2473             sender
+[  5]   0.00-10.00  sec   586 MBytes   491 Mbits/sec                  receiver
+
+iperf Done.
+[0;32m[INFO]2026-06-04 13:43:52 Executing 10-Second Upstream (UL) Performance Benchmark...[0m
