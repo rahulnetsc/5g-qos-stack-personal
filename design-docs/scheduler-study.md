@@ -353,100 +353,115 @@ SNR and the target BLER. `C_d` is the PRB-symbol capacity per second in
 direction `d`, derived from the TDD pattern, carrier bandwidth, and a fixed
 overhead factor.
 
-### 4.1 Tier-1 — the strategic LP
+### 4.1 Tier-1 — the strategic solve
 
-Decision variables: target rates `rᵢ ≥ 0` (bps); GBR shortfall slacks
-`sᵢ ≥ 0`; per-(slice, direction) slacks `sₛₗᵢ𝒸ₑ ≥ 0`.
+Tier-1 answers one question every ~1 s: *what rate should each flow be
+targeting?* It ships as a **three-solve sequence** — a max-min stage that
+fixes a floor under the GBR class, then a lexicographic pair that spends the
+remaining capacity. Notation:
+
+| | |
+|---|---|
+| `rᵢ ≥ 0` | target rate for flow `i` (bps) — the decision |
+| `sᵢ, s_slice ≥ 0` | GBR and per-(slice, direction) shortfall slacks |
+| `SEᵢ` | bits per PRB-symbol for `i`'s UE, BLER-discounted |
+| `C_d` | PRB-symbol capacity of direction `d`, symbol-accurate over the TDD cycle |
+| `Gᵢ`, `Dᵢ` | GFBR contract, offered demand |
+| `Ĝᵢ = min(Gᵢ, Dᵢ)` | *reachable* contract |
+| `w_c` | class weight: `w_Delay = 5`, `w_PF = w_GBR = 1` |
+
+All three solves share one feasible set, parameterised by a per-flow floor:
 
 ```
-maximize    Σᵢ  w_c(i) · log(rᵢ + ε)              (utility)
-          −  Σᵢ  pᵢ · sᵢ                          (GBR-shortfall penalty)
-          −  p_slice · Σ  s_slice                 (slice-shortfall penalty)
-
-subject to
-  (capacity)     Σ_{i: d(i)=d}  rᵢ / SEᵢ  ≤  C_d                  ∀ d
-  (GBR floor)    rᵢ + sᵢ  ≥  Gᵢ                                   ∀ i: c(i)=GBR
-  (demand cap)   rᵢ  ≤  Dᵢ                                        ∀ i
-  (slice floor)  Σ_{i∈(σ,d)} rᵢ/SEᵢ  +  s_slice(σ,d)
-                     ≥  min( φ(σ,d)·C_d ,  demand(σ,d) )          ∀ (σ,d)
-  (sign)         rᵢ, sᵢ, s_slice  ≥  0
+F(floor):
+  (capacity)      Σ_{i: d(i)=d}  rᵢ / SEᵢ  ≤  C_d                          ∀ d
+  (demand cap)    rᵢ  ≤  Dᵢ                                                ∀ i
+  (GBR floor)     rᵢ + sᵢ  ≥  Gᵢ                                           ∀ i: c(i)=GBR
+  (hard floor)    rᵢ  ≥  floorᵢ                                            ∀ i: c(i)=GBR
+  (slice floor)   Σ_{i∈(σ,d)} rᵢ/SEᵢ  +  s_slice(σ,d)
+                        ≥  min( φ(σ,d)·C_d ,  demand(σ,d) )                ∀ (σ,d)
+  (sign)          rᵢ, sᵢ, s_slice  ≥  0
 ```
 
+**Stage A — the max-min GBR level.** The largest fraction of its reachable
+contract that *every* GBR flow can hold at once:
+
+```
+t*  =  max t   s.t.  r ∈ F(0),   rᵢ ≥ t·Ĝᵢ  ∀ i: c(i)=GBR,   0 ≤ t ≤ 1
+floorᵢ  =  α · t* · Ĝᵢ                                    (α = scale, default 1)
+```
+
+**Stages B1 and B2 — shortfall, then utility.** Over `F(floor)`:
+
+```
+B1:   S*  =  min   Σᵢ pᵢ·sᵢ  +  p_slice · Σ_(σ,d) SE_(σ,d) · s_slice(σ,d)
+B2:        max   Σᵢ w_c(i) · log(rᵢ + ε)      s.t.   (the B1 objective)  ≤  S*
+```
+
+Reading the program:
+
+- **Why B1 and B2 are separate solves.** They express a *lexicographic*
+  order — honour every GBR floor you can, then distribute what is left by
+  weighted proportional fairness. This used to be one objective, `max Σ w
+  log(r+ε) − Σ pᵢsᵢ`, with `pᵢ = 10³` chosen so the penalty would swamp the
+  utility. It did, by ~10⁷, which is an ordering written as a magnitude —
+  and it made the program numerically unsolvable. On the `overload` scenario
+  two solvers returned `optimal_inaccurate` and disagreed by 3.6× on a
+  flow's rate, under-serving the Delay class by 28% against the analytic
+  optimum. Rescaling cannot fix that: a *ratio* between objective terms is a
+  property of the model, not of the units. Stating the order directly does —
+  both solvers now land within 100 bps of the analytic optimum. A
+  consequence worth noting: `pᵢ`'s absolute magnitude is now irrelevant, and
+  only the *relative* values across flows matter.
+- **Why stage A exists.** B1 alone is `min Σ(Gᵢ − rᵢ)` under a PRB budget —
+  a **fractional knapsack**, whose optimum is greedy in spectral efficiency
+  and therefore a *vertex*: GBR flows are served in full or abandoned
+  outright, and the lowest-SE flow goes to zero. That is not a tuning
+  artifact and no reweighting of `pᵢ` removes it (§8.5). Only a constraint
+  changes the feasible region, which is what `floorᵢ` is.
+- **Stage A is on by default** (`gbr_maxmin`), which is safe because it
+  **self-disables**: whenever the GBR set is jointly feasible `t* = 1`, the
+  floor binds nothing and the result is identical to omitting stage A
+  entirely. It costs something only in genuine GBR overload, and there it
+  deliberately trades aggregate throughput for the worst-served flow (§7.7).
+  `α` (`gbr_maxmin_scale`) dials that trade; `α = 0` recovers the
+  single-stage behaviour exactly.
+- **The demand cap in `Ĝᵢ` is load-bearing.** A GBR flow offering less than
+  its GFBR can never reach 100% of it; without the cap it would pin `t*` at
+  its own unreachable ratio and drag the whole set down.
 - **Utility.** `log` makes the unconstrained optimum proportional-fair
-  (Kelly et al. 1998). Per-class weights are `w_Delay = 5`,
-  `w_PF = w_GBR = 1`: delay flows are typically low-rate, so a higher weight
-  ensures the LP funds them well; GBR flows are protected by their floor
-  constraint instead, so they need no weight boost. `ε = 1` keeps `log`
-  finite at `rᵢ = 0`.
-- **Capacity** is expressed in *PRB-seconds*: `rᵢ/SEᵢ` is the resource a
-  flow's target rate consumes, and the sum cannot exceed what the direction
-  offers. This is where symbol-accurate accounting enters — `C_d` counts the
-  TDD special-slot symbols.
-- **GBR floor is soft.** Writing `rᵢ + sᵢ ≥ Gᵢ` with a large penalty `pᵢ`
-  (default `10³`) makes the floor effectively *hard whenever the flow is
-  feasible* — the penalty dominates the `log` utility — yet keeps the LP
-  feasible under *any* overload: the slack simply absorbs the shortfall and
-  carries the cost. A hard constraint would make the program infeasible the
-  moment GBR demand exceeds capacity, which is exactly when you still need
-  an answer.
-- **Slice floor** has the *same soft shape*: a guaranteed share `φ(σ,d)` of
-  capacity, but capped at the slice's own demand (an idle slice holds
-  nothing) and soft (so slice and GBR floors can both be stated without
-  risking infeasibility). The capacity constraint above makes it
-  **work-conserving** — a busy slice freely borrows an idle slice's unused
-  share. Its slack is weighed in **bps** — PRB-symbols times the slice's
-  demand-weighted SE — so `p_slice` and `pᵢ` are quoted in one currency.
-  Compared raw the crossover between them sits at `pᵢ · SEᵢ`, making the
-  slice-vs-GBR priority a function of the channel rather than of policy.
+  (Kelly et al. 1998). Delay flows are typically low-rate, so the higher
+  weight ensures B2 funds them well; GBR flows are protected by their floors
+  instead and need no weight boost. `ε = 1` keeps `log` finite at `rᵢ = 0`.
+- **Capacity** is in *PRB-symbols per second*: `rᵢ/SEᵢ` is what a target
+  rate consumes. This is where symbol-accurate accounting enters — `C_d`
+  counts the TDD special-slot symbols.
+- **Both shortfall floors are soft**, so the program stays feasible under
+  *any* overload — the slack absorbs the shortfall and carries the cost. A
+  hard GFBR constraint would go infeasible exactly when an answer is still
+  needed. The slice floor is additionally capped at the slice's own demand
+  (an idle slice holds nothing) and the capacity constraint keeps it
+  **work-conserving** — a busy slice freely borrows an idle slice's share.
+- **The two penalties are quoted in one currency.** `s_slice` is natively in
+  PRB-symbols and `sᵢ` in bps, so B1 converts the slice slack at the slice's
+  demand-weighted `SE_(σ,d)`. Compared raw, the crossover between them sits
+  at `pᵢ · SEᵢ` — which would make slice-vs-GBR priority a function of the
+  radio channel rather than of policy.
+- **Everything is posed in normalised units** (rates as a multiple of the
+  largest contract, capacity usage as a fraction of each direction's
+  budget), so every coefficient is O(1). In raw bps — a unit-scale `t`
+  against 10⁷-scale rates — CVXPY returned `optimal` on a `t*` that was
+  *non-monotone in capacity*, which is impossible for a max-min level. A
+  relevant caution for anyone reimplementing this.
 
-The program is a small convex problem (log objective, linear constraints);
-CVXPY solves the study scenarios in well under 100 ms.
+Each solve is a small convex program; CVXPY handles the study scenarios in
+well under 100 ms, comfortably inside the 1 s cadence.
 
-**Adaptive GBR penalty (optional, dual ascent).** Under genuine
-infeasibility, a *uniform* penalty `pᵢ` has a bias: minimizing total bps of
-slack is cheapest by sacrificing *poor-SNR* GBR flows (their slack costs the
-most capacity per bit). Dual-subgradient ascent removes the bias by
-escalating the penalty on whichever flow is *actually* missing:
-
-```
-pᵢ(k+1)  =  min( p_max ,  pᵢ(k)  +  b · sᵢ(k) / Gᵢ )
-```
-
-The normalized shortfall `sᵢ/Gᵢ ∈ [0,1]` makes the learning rate `b`
-scale-free; `b = 0` recovers the fixed penalty. **This refinement is
-disabled by default** — §8.4 shows why it is the wrong shape for the deep-
-overload case it was built for, and §8.5 shows why *no* choice of `pᵢ` can
-be the right one.
-
-**Max-min GBR stage (optional, two-stage).** Because the penalty term
-outweighs the utility by ~7 orders of magnitude (§8.5), the program above is
-effectively an LP under overload, and its optimum is a *vertex*: GBR flows
-are served in full or abandoned outright. Removing that requires a
-constraint rather than a weight, so Tier-1 can run a max-min satisfaction
-stage first:
-
-```
-stage A:   max t   s.t.  rᵢ ≥ t·Ĝᵢ  ∀ i: c(i)=GBR;  capacity; demand; slice floors;  0 ≤ t ≤ 1
-stage B:   the program above, plus the hard floor  rᵢ ≥ scale · t* · Ĝᵢ
-```
-
-where `Ĝᵢ = min(Gᵢ, Dᵢ)` is the flow's *reachable* contract — the demand cap
-prevents an under-offered GBR flow from pinning `t*` at its own unreachable
-ratio. `t*` is the largest fraction of contract that every GBR flow can hold
-simultaneously; `t* = 1` means the set is jointly feasible and the floor is
-non-binding, so the stage is self-disabling wherever the single-stage solve
-is already right. Stage B is feasible by construction and keeps the soft
-GFBR constraint, so the utility still closes the gap from floor to full GFBR
-where that is cheap. `scale ∈ [0,1]` trades guarantee against throughput.
-Results in §7.7. **Enabled by default**, which is safe because the stage
-self-disables: whenever the GBR set is jointly feasible `t* = 1` and the
-floor binds nothing.
-
-Both stages are posed in **normalized units** (rates as a fraction of the
-largest contract, capacity usage as a fraction of each direction's budget).
-In raw bps — a unit-scale `t` against 1e7-scale rates — CVXPY returned
-`optimal` on a `t*` that was non-monotone in capacity, which is impossible
-for a max-min level. A relevant caution for anyone reimplementing this.
+One Tier-1 refinement is implemented but **off by default**: an adaptive
+per-flow `pᵢ` driven by dual ascent on the GBR constraints. §8.4 shows why
+it is the wrong shape for the deep-overload case it was built for, and §8.5
+why *no* choice of `pᵢ` could have been the right one. The mechanism is
+specified in [scheduler-design.md §4](scheduler-design.md).
 
 ### 4.2 Tier-2 — drift-plus-penalty rate tracking
 
@@ -1129,9 +1144,10 @@ and the on-time count, never just mean delivery.
 
 ### 8.4 A negative result: the adaptive penalty is the wrong shape
 
-The adaptive GBR penalty (§4.1, dual ascent) was built to fix cell-edge
+The adaptive GBR penalty (dual ascent on `pᵢ`; mechanism in
+[scheduler-design.md §4](scheduler-design.md)) was built to fix cell-edge
 starvation by escalating the penalty on whichever flow is actually missing.
-It does raise the *minimum* delivery (Study 1, 1.0× load: min GBR 0% → 35%).
+It does raise the *minimum* delivery (Study 1, 1.0× load: min GBR 0% → 34%).
 But it meets **0/10** contracts across every overloaded row in the sweep.
 
 The reason is a clean piece of theory. Dual ascent drives the system toward
@@ -1148,10 +1164,12 @@ shortfall. The adaptive penalty's legitimate role is narrow — fairness-of-
 shortfall *reporting* — so it ships **disabled by default** (`gbr_penalty_lr
 = 0`). A flow pinned at `p_max` and still missing is precisely the signal
 admission control should act on. The spectral-efficiency tilt knob `k`
-(§4.1, [scheduler-design.md](scheduler-design.md)) was explored for the same
+([scheduler-design.md §4](scheduler-design.md)) was explored for the same
 problem and also rejected: `k < 0` rescues the cell edge but only by
 *relocating* starvation to the next-worst tier. Neither static knob can lift
-the worst-case floor.
+the worst-case floor — and §8.5 shows that this is structural rather than
+bad luck with two particular knobs. What does lift it is a constraint: the
+max-min stage of §4.1, measured in §7.7.
 
 ### 8.5 Finding 1 — cell-edge starvation: the penalty, not the utility
 
