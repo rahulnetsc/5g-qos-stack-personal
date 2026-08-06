@@ -11,7 +11,7 @@ from sim.baselines.gradient import GradientScheduler
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
 from scheduler import TwoTier
-from scheduler import grid_capacity_prbsym_per_sec, solve_tier1
+from scheduler import bler_for_mcs, grid_capacity_prbsym_per_sec, mcs_threshold_for_snr, solve_tier1
 
 
 def test_channel_stationary_variance():
@@ -34,6 +34,96 @@ def test_channel_stationary_variance():
     assert abs(arr.mean() - 20.0) < 1.5
     # Std should be within ~30% of stationary_std_db (finite-sample tolerance)
     assert 0.8 < arr.std() < 2.5, f"std={arr.std():.2f} outside expected range"
+
+
+def test_channel_cqi_delay_lags_true_snr():
+    """With cqi_delay_slots > 0, get_reported_snr_db(ue) equals the true
+    SNR from `delay` slots ago, once the pipeline has filled. Before that,
+    the initial reported value equals mean_snr_db (a UE reports a CQI at
+    RRC attach)."""
+    import numpy as np
+
+    from sim.channel import ChannelModel
+
+    rng = np.random.default_rng(7)
+    ues = [UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=1)]
+    ch = ChannelModel(ues, rng, stationary_std_db=1.5, cqi_delay_slots=4)
+    trail = []
+    # First update publishes the initial mean-report; then reported lags
+    # by `delay` = 4 slots.
+    for i in range(10):
+        ch.update(i)
+        trail.append((ch.get_snr_db(1), ch.get_reported_snr_db(1)))
+    # At slot i >= 4, reported == true from slot i-4 (i.e. index i-4 in the
+    # true-SNR series). Verify a couple of late slots.
+    for i in range(4, 10):
+        true_then, _ = trail[i - 4]
+        _, reported_now = trail[i]
+        assert abs(reported_now - true_then) < 1e-9, f"slot {i}: reported {reported_now} vs true[i-4] {true_then}"
+
+
+def test_channel_cqi_loss_holds_last_reported_value():
+    """With cqi_loss_rate = 1.0 every update is lost -> the reported SNR
+    never advances past the initial mean value."""
+    import numpy as np
+
+    from sim.channel import ChannelModel
+
+    rng = np.random.default_rng(3)
+    ues = [UEConfig(ue_id=1, mean_snr_db=15.0, coherence_slots=1)]
+    ch = ChannelModel(ues, rng, cqi_delay_slots=2, cqi_loss_rate=1.0, cqi_seed=1)
+    for i in range(20):
+        ch.update(i)
+    # Every update lost -> reported stayed at the RRC-attach initial value.
+    assert abs(ch.get_reported_snr_db(1) - 15.0) < 1e-9
+
+
+def test_bler_for_mcs_matched_vs_mismatched():
+    """At the MCS threshold BLER is the target (10%); below the threshold
+    BLER doubles per dB of shortfall; well below, capped at 1.0."""
+    thresh = mcs_threshold_for_snr(20.0)  # some non-edge MCS
+    assert bler_for_mcs(thresh, thresh) == 0.10        # matched
+    assert bler_for_mcs(thresh, thresh + 5) == 0.10    # above -> still target
+    assert bler_for_mcs(thresh, thresh - 1) == 0.20    # -1 dB
+    assert bler_for_mcs(thresh, thresh - 2) == 0.40    # -2 dB
+    assert bler_for_mcs(thresh, thresh - 4) == 1.0     # capped
+
+
+def test_two_tier_sps_uses_conservative_mcs():
+    """SPS reservations are sized against snr_avg - sps_snr_margin_db.
+    Verify by picking a periodic flow with an explicit non-default margin
+    (default is 0.0 for slow-varying channels; a non-zero margin is used
+    where CQI can drift meaningfully -- see cqi_study.py)."""
+    tt = TwoTier(
+        tier1_period_slots=200,
+        enable_sps=True,
+        sps_snr_margin_db=3.0,
+    )
+    sc = ScenarioConfig(
+        name="sps_mcs",
+        horizon_slots=400,
+        carrier=CarrierConfig(bandwidth_hz=20_000_000, numerology=1),
+        ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=1000)],
+        flows=[
+            FlowConfig(
+                ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+                gfbr_bps=4_000_000, pdb_ms=20,
+                traffic_kind="deterministic",
+                traffic_params={"period_ms": 5.0, "bytes_per_period": 2500},
+            ),
+        ],
+    )
+    run(sc, tt)
+    # The reservation is sized against snr_avg - margin at the moment of
+    # the SPS solve (which may differ slightly from the final snr_avg due
+    # to AR(1) drift), so allow a few dB of tolerance vs mean - margin.
+    assert len(tt._sps) == 1
+    sps = tt._sps[0]
+    assert sps.ue_id == 1 and sps.direction == "UL"
+    assert abs(sps.snr_ref_db - (20.0 - 3.0)) < 2.0
+    # And strictly below the smoothed SNR by at least ~2.5 dB (the margin
+    # minus a small AR(1) wiggle room).
+    assert sps.snr_ref_db < tt._snr_avg[1] - 2.5
 
 
 def test_buffer_basic_drain():

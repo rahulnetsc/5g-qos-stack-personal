@@ -60,7 +60,9 @@ class RoundRobin:
             self._ul_cursor = (self._ul_cursor + 1) % len(eligible)
             chosen = eligible[self._ul_cursor]
 
-        snr = channel.get_snr_db(chosen)
+        # CQI-visible SNR for MCS pick; the driver will compute BLER at
+        # the true SNR against the MCS threshold this SNR implies.
+        snr = channel.get_reported_snr_db(chosen)
         bits_per_rb, _bler = bits_per_prb(snr, symbols=symbols)
         if bits_per_rb <= 0:
             return []
@@ -87,4 +89,5 @@ class RoundRobin:
             flows,
             buffers,
             cce_cost=cce_aggregation_level(snr),
+            snr_used_db=snr,
         )

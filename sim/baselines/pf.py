@@ -63,15 +63,16 @@ class ProportionalFair:
             return []
 
         # Score each backlogged UE: instantaneous rate over smoothed rate.
-        scored: list[tuple[float, int, list[FlowConfig], int, float]] = []
+        # bits_per_rb is derived from the CQI-visible SNR (what the gNB knows).
+        scored: list[tuple[float, int, list[FlowConfig], int, float, float]] = []
         for ue_id, flows in ue_flows.items():
-            snr = channel.get_snr_db(ue_id)
+            snr = channel.get_reported_snr_db(ue_id)
             bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
             if bits_per_rb <= 0:
                 continue
             r_avg = max(1.0, self._r_avg[ue_id])
             metric = bits_per_rb / r_avg
-            scored.append((metric, ue_id, flows, bits_per_rb, bler))
+            scored.append((metric, ue_id, flows, bits_per_rb, bler, snr))
 
         if not scored:
             return []
@@ -82,10 +83,11 @@ class ProportionalFair:
         increment = 1.0 / self.window
         out: list[Allocation] = []
 
-        for _metric, ue_id, flows, bits_per_rb, bler in scored:
+        for _metric, ue_id, flows, bits_per_rb, bler, snr in scored:
             if prbs_left <= 0:
                 break
-            cce_cost = cce_aggregation_level(channel.get_snr_db(ue_id))
+            # AL / DCI cost is picked from the same CQI view as the MCS.
+            cce_cost = cce_aggregation_level(snr)
             if cce_left < cce_cost:
                 # Try lower-AL UEs further down the list; don't break.
                 continue
@@ -113,6 +115,7 @@ class ProportionalFair:
                     flows,
                     buffers,
                     cce_cost=cce_cost,
+                    snr_used_db=snr,
                 )
             )
         return out

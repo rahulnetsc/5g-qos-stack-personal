@@ -499,7 +499,8 @@ nothing else.**
 |---|---|
 | Slot-by-slot PRB grid, including the TDD **special slot** | No LDPC, no I/Q, no actual modulation |
 | **PDCCH/CCE budget** per slot, with variable DCI aggregation level | HARQ as a fixed delay + BLER discount, not a full state machine |
-| **UL Buffer Status Report round-trip** as a fixed per-flow delay (8 slots ≈ 4 ms at μ=1); Configured Grants bypass | BSR quantisation and loss not modeled (delay captures the first-order effect) |
+| **UL Buffer Status Report round-trip** as a fixed per-flow delay (8 slots ≈ 4 ms at μ=1) + Bernoulli loss; Configured Grants bypass | BSR quantisation not modelled (delay + loss capture the first-order effect) |
+| **DL/UL CQI report round-trip** as a per-UE delay + Bernoulli loss; scheduler reads `get_reported_snr_db`, driver applies mismatch-BLER (`bler_for_mcs`) at the true SNR against the picked MCS; SPS uses a semi-static conservative MCS (`sps_snr_margin_db`) | CQI quantisation is implicit in the SNR→MCS staircase; direction-agnostic (see §7.6 for the effect on our scenarios — small) |
 | Per-UE SNR as an AR(1) process → MCS → bits/PRB | RLC as a fluid byte buffer, no per-packet segmentation |
 | BLER as a discount on delivered bits | Single-stream only — no MU-MIMO |
 | Per-flow buffers with HoL timestamps and PDB expiry | Single cell — no mobility, no inter-cell interference |
@@ -557,9 +558,12 @@ study uses three, each chosen to isolate a different bottleneck:
 | **`sensor_dense`** | 30 small periodic UL sensors (control-loop telemetry), 15 ms PDB. | **PDCCH/CCE budget** — the control channel binds before the data channel. |
 | **`latency_bound`** | 8 interactive 5 Mbps streams, 12 ms PDB, sharing a saturated downlink with 80 Mbps of bulk best-effort. | **Deadline awareness** under contention with elastic bulk. |
 
-`factory_robots` as shipped sits in *deep overload* — UL GBR demand is
-roughly 2× carrier capacity — so the overload study sweeps the carrier
-bandwidth around that point (1.0× … 3.0×) to traverse regimes.
+`factory_robots` as shipped sits in *deep overload* — total UL demand is
+roughly 2× carrier capacity — so the load-sweep study varies the offered
+load around that point (§7.1). In sim terms this is done by scaling the
+carrier bandwidth (an equivalent knob); the tables express the sweep as
+load × the as-shipped operating point, matching how an operator sees the
+axis in a real deployment where capacity is fixed by spectrum.
 
 ### 6.2 Schedulers compared
 
@@ -596,24 +600,33 @@ All numbers below are reproducible with `python scripts/scheduler_study.py`
 `python scripts/compare_schedulers.py`. Horizon is the project-standard
 4000 slots; see §9 on the ~5-point warm-up bias on *absolute* figures.
 
-### 7.1 Study 1 — overload sweep (`factory_robots`)
+### 7.1 Study 1 — offered-load sweep (`factory_robots`)
 
-Carrier capacity scaled around the as-shipped point (1.0×). A GBR contract
-counts as met when delivered throughput ≥ 95% of GFBR.
+Offered load scaled around the as-shipped operating point (1.0×), holding
+carrier capacity fixed — the deployment view: spectrum is fixed by
+allocation, the load is what the operator sees vary (and controls via
+admission). The as-shipped point is deep overload for this cell: no
+scheduler honours the contracts there. A GBR contract counts as met when
+delivered throughput ≥ 95% of GFBR.
 
-| Capacity | Scheduler | Total | GBR met | mean GBR | min GBR | worst p99 |
+*Implementation note: the sim scales carrier capacity (the equivalent
+operation — larger capacity for the same demand is the same load ratio
+as smaller demand for the same capacity). The numbers below are
+`1 / capacity_multiplier`, i.e., load relative to the as-shipped point.*
+
+| Load | Scheduler | Total | GBR met | mean GBR | min GBR | worst p99 |
 |---|---|---|---|---|---|---|
-| **1.0×** (deep overload) | PF | 69.1 M | 0/10 | 37% | 0% | 30 ms |
+| **1.0×** (as-shipped, deep overload) | PF | 69.1 M | 0/10 | 37% | 0% | 30 ms |
 | | TwoTier | 74.7 M | 0/10 | **51%** | 0% | 30 ms |
 | | TwoTier + adaptive | 66.0 M | 0/10 | 43% | 35% | 30 ms |
-| **1.5×** | PF | 93.7 M | **4/10** | 55% | 4% | 30 ms |
+| **0.67×** | PF | 93.7 M | **4/10** | 55% | 4% | 30 ms |
 | | TwoTier | 96.1 M | 0/10 | **68%** | **43%** | 30 ms |
 | | TwoTier + adaptive | 93.9 M | 0/10 | 65% | 46% | 30 ms |
-| **2.0×** (moderate overload) | PF | 111.1 M | 5/10 | 72% | 32% | 30 ms |
-| | TwoTier | 120.2 M | **10/10** | **83%** | **81%** | 30 ms |
-| | TwoTier + adaptive | 120.2 M | 10/10 | 83% | 81% | 30 ms |
-| **3.0×** (light load) | PF | 124.7 M | 10/10 | 85% | 83% | 30 ms |
-| | TwoTier | 125.4 M | 10/10 | 85% | 83% | 30 ms |
+| **0.50×** (moderate overload) | PF | 111.2 M | 5/10 | 72% | 31% | 30 ms |
+| | TwoTier | 118.9 M | **10/10** | **83%** | **81%** | 30 ms |
+| | TwoTier + adaptive | 118.9 M | 10/10 | 83% | 81% | 30 ms |
+| **0.33×** (light load) | PF | 124.7 M | 10/10 | 85% | 83% | 30 ms |
+| | TwoTier | 125.5 M | 10/10 | 85% | 83% | 30 ms |
 
 The uplink UEs run with an **8-slot (~4 ms) BSR round-trip delay** on the
 dynamic scheduler — see §5.1. SPS-served flows bypass it, exactly as they
@@ -621,23 +634,24 @@ do in real 5G.
 
 Reading the table:
 
-- **At 2.0× — the clean win, sharpened by BSR.** TwoTier honors **10/10**
-  GBR contracts vs PF's 5/10, with a much higher minimum delivery (81% vs
-  32%) and +9.1 Mbps total throughput. The gap widened from the BSR-off
-  version (8/10 for PF) because dynamic-only PF absorbs the full BSR
-  latency while TwoTier's SPS-served flows do not. This is the regime where
-  the two-tier scheduler unambiguously earns its complexity.
-- **At 1.5× — a distributional win the contract count hides.** TwoTier
-  meets *fewer* knife-edge contracts (0/10 vs PF's 4/10) yet delivers a far
-  better *distribution*: minimum delivery 43% vs PF's 4%, mean 68% vs 55%.
-  PF lets a few good-channel flows run clear of the 95% line while
-  abandoning the rest to near-zero; TwoTier equalizes everyone toward their
-  target, so most flows cluster in the 40–90% band and none cross the exact
-  95% threshold. "Every robot at ≥43%, mean 68%" is operationally better
-  than "4 robots at 100%, 6 robots below 30%" — but a 95% threshold metric
-  scores it lower. (See §8.1.)
-- **At 1.0× and 3.0× — convergence.** In deep overload no scheduler can
-  honor the contracts; with ample capacity all converge (10/10). The
+- **At 0.50× load — the clean win, sharpened by BSR.** TwoTier honors
+  **10/10** GBR contracts vs PF's 5/10, with a much higher minimum
+  delivery (81% vs 31%) and +7.7 Mbps total throughput. The gap widened
+  from the BSR-off version (8/10 for PF) because dynamic-only PF absorbs
+  the full BSR latency while TwoTier's SPS-served flows do not. This is
+  the regime where the two-tier scheduler unambiguously earns its
+  complexity.
+- **At 0.67× load — a distributional win the contract count hides.**
+  TwoTier meets *fewer* knife-edge contracts (0/10 vs PF's 4/10) yet
+  delivers a far better *distribution*: minimum delivery 43% vs PF's 4%,
+  mean 68% vs 55%. PF lets a few good-channel flows run clear of the 95%
+  line while abandoning the rest to near-zero; TwoTier equalizes everyone
+  toward their target, so most flows cluster in the 40–90% band and none
+  cross the exact 95% threshold. "Every robot at ≥43%, mean 68%" is
+  operationally better than "4 robots at 100%, 6 robots below 30%" — but a
+  95% threshold metric scores it lower. (See §8.1.)
+- **At 1.0× and 0.33× — convergence.** In deep overload no scheduler can
+  honor the contracts; at 1/3 of shipped load all converge (10/10). The
   scheduler choice is immaterial at both ends.
 - **The adaptive penalty meets 0/10 across every overload row.** §8.4.
 
@@ -649,7 +663,7 @@ channel. Delay contract = ≥99% on-time within the 15 ms PDB.
 | Scheduler | Total | On-time | mean deliv | min deliv | worst p99 |
 |---|---|---|---|---|---|
 | RoundRobin | 6.9 M | 0/30 | 72% | 71% | 15.0 ms |
-| ProportionalFair | 9.2 M | 1/30 | 95% | 85% | 15.0 ms |
+| ProportionalFair | 9.2 M | 2/30 | 95% | 85% | 15.0 ms |
 | **TwoTier** | **9.6 M** | **30/30** | **100%** | **100%** | **5.0 ms** |
 
 A decisive, structural separation: TwoTier meets **30/30** contracts at a
@@ -671,7 +685,7 @@ in every one of 60 consecutive windows; see the transient check in
 |---|---|---|---|---|
 | RoundRobin | 3/8 | 84% | 12.0 ms | 22.8 M |
 | ProportionalFair | 5/8 | 86% | 12.0 ms | 24.6 M |
-| **TwoTier** | **8/8** | **100%** | **10.0 ms** | 14.2 M |
+| **TwoTier** | **8/8** | **100%** | **10.5 ms** | 15.5 M |
 
 TwoTier meets **8/8** deadlines; PF meets 5/8. PF schedules by
 channel-relative throughput with no notion of a deadline, so a healthy
@@ -682,29 +696,29 @@ to clear every deadline. The danger PF poses here is that its **86% mean
 control delivery reads "fine" on a dashboard** while the missing 14% is
 aged-out motion-control packets — the safety-relevant ones (§8.3).
 
-### 7.4 Per-flow breakdown (`factory_robots`, 1.0×)
+### 7.4 Per-flow breakdown (`factory_robots`, 1.0× load — as shipped)
 
 The aggregates above hide *which* flows win and lose. The per-GBR-flow
-delivery (fraction of GFBR delivered) at the as-shipped 1.0× operating
-point:
+delivery (fraction of GFBR delivered) at the as-shipped 1.0× load
+operating point:
 
 | Flow | SNR | GFBR | RR | PF | Gradient | TwoTier |
 |---|---|---|---|---|---|---|
-| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 87% |
-| ue2 (video) | 18 dB | 8 M | 57% | 68% | 66% | 66% |
-| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 68% |
-| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 64% | **0%** ⚠ |
-| ue5 (LIDAR) | 24 dB | 14 M | 56% | 67% | 67% | 93% |
-| ue6 (LIDAR) | 19 dB | 14 M | 37% | 46% | 55% | 88% |
-| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **0%** ⚠ |
-| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 3% | 3% | **86%** |
-| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **47%** |
-| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **86%** |
-| Aggregate | | | mean 46% | **mean 44%** | mean 45% | **mean 62%** |
+| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 86% |
+| ue2 (video) | 18 dB | 8 M | 57% | 68% | 67% | 55% |
+| ue3 (video) | 20 dB | 8 M | 63% | 74% | 70% | 67% |
+| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 65% | 22% |
+| ue5 (LIDAR) | 24 dB | 14 M | 56% | 69% | 67% | 92% |
+| ue6 (LIDAR) | 19 dB | 14 M | 37% | 47% | 56% | 88% |
+| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 42% | **0%** ⚠ |
+| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 4% | 3% | **83%** |
+| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | 39% |
+| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **83%** |
+| Aggregate | | | mean 46% | **mean 45%** | mean 45% | **mean 62%** |
 
 Two opposite effects are visible:
 
-- **TwoTier protects mixed-flow GBR (ue8/9/10): 86/47/86% vs PF's 3/3/0%.**
+- **TwoTier protects mixed-flow GBR (ue8/9/10): 83/39/83% vs PF's 4/3/0%.**
   These UEs carry a GBR video flow *and* a best-effort flow. Under the
   QoS-blind baselines the MAC multiplexer fills the UE's transport block by
   raw backlog, and a continuously-backlogged best-effort flow wins every
@@ -712,14 +726,15 @@ Two opposite effects are visible:
   multiplexer fills by drift-plus-penalty deficit, so the GBR flow (far
   behind its Tier-1 target → large `Q`) is served first. This is a direct,
   clean demonstration of QoS-aware multiplexing.
-- **TwoTier still starves the cell edge (ue4 at 16 dB, ue7 at 14 dB → 0%).**
-  The Tier-1 `log`-utility objective with *soft* GBR floors finds it cheaper
-  to abandon expensive low-SNR flows and fund the rest — the classic
-  weighted-`log` pathology. This is **Finding 1** (§8.5), open.
+- **TwoTier still leaves the cell edge behind (ue7 at 14 dB → 0%; ue4 at
+  16 dB down to 22%).** The Tier-1 `log`-utility objective with *soft* GBR
+  floors finds it cheaper to abandon expensive low-SNR flows and fund the
+  rest — the classic weighted-`log` pathology. This is **Finding 1**
+  (§8.5), open.
 
-Net at 1.0×: TwoTier carries mean GBR delivery 62% vs PF's 44% and +5.6 Mbps
+Net at 1.0× load: TwoTier carries mean GBR delivery 62% vs PF's 45% and +5.2 Mbps
 total — but, being deep overload, still 0/10 *contracts* met either way
-(§7.1). The two-tier machinery redistributes the pain; at 1.0× it cannot
+(§7.1). The two-tier machinery redistributes the pain; at 1.0× load it cannot
 remove it.
 
 ### 7.5 BSR sensitivity — delay and loss sweeps
@@ -729,17 +744,18 @@ the direction of the effect and check that the story is not tuned to that
 point, [scripts/bsr_study.py](../scripts/bsr_study.py) sweeps delay ∈
 {0, 2, 4, 8, 16} slots at loss = 0, then sweeps loss ∈ {0, 5, 10, 20 %}
 at delay = 8, on the two scenarios where BSR bites: `factory_robots` at
-2.0× (moderate-overload UL GBR) and `sensor_dense` (PDCCH-and-BSR-bound).
+0.50× load (moderate-overload UL GBR — the §7.1 sweet spot) and
+`sensor_dense` (PDCCH-and-BSR-bound).
 
-**Delay sweep, factory_robots @ 2.0× (loss = 0).**
+**Delay sweep, factory_robots @ 0.50× load (loss = 0).**
 
 | Delay | PF met | TT met | PF min | TT min | PF total | TT total |
 |---|---|---|---|---|---|---|
-| 0 slots (0 ms) | 8/10 | 10/10 | 66% | 81% | 119.3 M | 123.2 M |
-| 2 slots (0.5 ms) | 8/10 | 10/10 | 56% | 81% | 117.2 M | 122.5 M |
-| 4 slots (1.0 ms) | 8/10 | 10/10 | 45% | 81% | 115.2 M | 121.8 M |
-| **8 slots (2.0 ms)** | **5/10** | **10/10** | **32%** | **81%** | 111.1 M | 120.2 M |
-| 16 slots (4.0 ms) | 5/10 | 10/10 | 30% | 81% | 107.0 M | 117.2 M |
+| 0 slots (0 ms) | 8/10 | 10/10 | 66% | 81% | 119.3 M | 120.9 M |
+| 2 slots (0.5 ms) | 8/10 | 10/10 | 56% | 81% | 117.2 M | 119.9 M |
+| 4 slots (1.0 ms) | 8/10 | 10/10 | 45% | 81% | 115.2 M | 118.9 M |
+| **8 slots (2.0 ms)** | **5/10** | **10/10** | **32%** | **81%** | 111.1 M | 117.3 M |
+| 16 slots (4.0 ms) | 5/10 | 10/10 | 30% | 81% | 107.0 M | 115.9 M |
 
 The picture is monotone. PF's minimum delivery slides from 66% at zero
 delay to 30% at 16 slots — a **factor-of-two hit** on the worst-served
@@ -750,7 +766,7 @@ invariant: min stays at 81%, contracts at 10/10, and total drops only
 delay. The gap widens roughly linearly with delay — no cliff, no
 saturation.
 
-**Loss sweep, factory_robots @ 2.0× (delay = 8 slots).**
+**Loss sweep, factory_robots @ 0.50× load (delay = 8 slots).**
 
 | Loss | PF met | TT met | PF min | TT min |
 |---|---|---|---|---|
@@ -792,6 +808,77 @@ with delay. In a real deployment where BSR degrades under stress
 Configured Grants is exactly *how much* PF's floor drops that TwoTier's
 does not.
 
+### 7.6 CQI staleness and SPS conservative MCS
+
+BSR is the *uplink* side of "the scheduler sees stale state." The *downlink*
+side is **CQI**: the gNB does not know the true per-UE SNR, only the last
+CQI report the UE sent, which is quantised and reported on a period. Our
+sim models this via [`ChannelModel.get_reported_snr_db`](../sim/channel.py):
+scheduler-side calls read the delayed view; the driver still computes BLER
+against the true SNR at transmission via a mismatch-BLER curve
+([`bler_for_mcs`](../scheduler/link.py)) — so a MCS picked from stale-
+optimistic CQI actually costs BLER when the true SNR has dropped below the
+picked MCS's threshold.
+
+The paired mechanism is **SPS's conservative MCS**: real 5G SPS grants use
+a semi-static MCS chosen at reservation time from `snr_avg − sps_snr_margin_db`,
+a safety margin against channel drift. Larger reservations (lower MCS)
+trade spectral efficiency for BLER robustness — worth paying for on
+channels that actually drift meaningfully.
+
+[`scripts/cqi_study.py`](../scripts/cqi_study.py) sweeps both.
+
+**CQI delay sweep, factory @ 0.50× load, sps_snr_margin = 0.**
+
+| CQI delay | PF met | TT met | PF min GBR | TT min GBR |
+|---|---|---|---|---|
+| 0 slots (static channel) | 5/10 | 10/10 | 32% | 81% |
+| 8 slots (static channel) | 5/10 | 10/10 | 31% | 81% |
+| 32 slots (static channel) | 5/10 | 10/10 | 31% | 81% |
+| 0 slots (mobile, coh 30 sl) | 5/10 | 10/10 | 38% | 81% |
+| 8 slots (mobile) | 5/10 | 10/10 | 37% | 81% |
+| 32 slots (mobile) | 5/10 | 10/10 | 31% | 81% |
+
+The takeaway is **negative** and instructive: CQI staleness barely moves
+either scheduler in our current scenarios. Even at 32 slots (16 ms) with a
+short-coherence "mobile" channel (30-slot coherence, roughly a moving robot),
+PF's min GBR drops only from 38% to 31%. The reason is that our AR(1) channel
+model with `stationary_std_db = 1.5` produces per-slot SNR innovations that
+are small compared to the ~3 dB spacing between MCS thresholds — so even a
+stale CQI usually still picks the right MCS. **CQI staleness would matter
+more on a channel with either faster fading amplitude, shorter coherence,
+or both** — a highly-mobile deployment, not a factory.
+
+**SPS margin sweep, factory @ 0.50× load, CQI delay = 8.**
+
+| SPS margin | TT met (static) | TT total (static) | TT met (mobile) | TT total (mobile) |
+|---|---|---|---|---|
+| 0.0 dB | 10/10 | 118.9 M | 10/10 | 118.2 M |
+| 1.0 dB | 10/10 | 117.3 M | 10/10 | 116.2 M |
+| 2.0 dB | 9/10 | 113.5 M | 9/10 | 114.8 M |
+| 3.0 dB | 0/10 | 113.3 M | 2/10 | 112.0 M |
+| 5.0 dB | 0/10 | 113.3 M | 2/10 | 112.0 M |
+
+The tradeoff is **stark and one-directional in these scenarios**: any
+margin above ~1 dB costs efficiency (larger reservations at a lower MCS
+per PRB), and margins ≥ 3 dB blow past the SPS-viability floor
+(`sps_min_scale = 0.75`) — SPS then drops entirely to dynamic and contract
+count collapses to 0–2 / 10. The mobile channel does not rescue the
+tradeoff: at coherence 30 slots the BLER protection from a larger margin
+is still smaller than the reservation-size cost.
+
+**Combined take-away.** Gaps 1 and 2 were modelled specifically to close
+"the scheduler is given perfect knowledge of channel state" — the DL twin
+of the BSR gap. The result is **honest but modest**: in our slow-varying
+industrial channel, CQI staleness costs little, and the SPS conservative
+MCS is either neutral (margin ≈ 0) or harmful (margin ≥ 2 dB). This
+matches physical intuition: SPS's semi-static MCS is a mobility-hedge
+feature, and a static factory is exactly where the hedge does not need
+paying for. The relevant *design* implication is that `sps_snr_margin_db`
+should be set from the deployment's channel-volatility budget — 0 dB for a
+warehouse / fixed AGV routes, non-zero (and swept experimentally) as
+mobility rises. **None of Study 1–3's conclusions change.**
+
 ---
 
 ## 8. Interpretation and discussion
@@ -801,18 +888,19 @@ does not.
 The intuition "a smarter scheduler is always at least as good" is **false**
 for contract satisfaction. Study 1 traces a *hump*:
 
-- **Deep overload (≥2.5×, here 1.0× as-shipped).** GBR demand far exceeds
-  capacity. No scheduler can honor the contracts; PF ≈ TwoTier on the
+- **Deep overload (1.0× shipped load — the as-shipped operating point).**
+  GBR demand far exceeds capacity — the shipped load is deeply overloaded
+  for this cell. No scheduler can honor the contracts; PF ≈ TwoTier on the
   contract count. A smarter MAC cannot manufacture capacity.
-- **Moderate overload (the 1.5–2.0× band).** Capacity is *enough to honor
-  the contracts but only if allocated deliberately*. This is where TwoTier
-  wins: at 2.0×, 10/10 vs 8/10 contracts; at 1.5×, a much better delivery
-  *distribution* (min 47% vs 7%). PF, optimizing the wrong objective, misses
-  contracts the cell could have met.
-- **Light load (≥3×).** Everyone has slack; all schedulers converge to
-  10/10.
+- **Moderate overload (0.50–0.67× shipped load).** Capacity is *enough to
+  honor the contracts but only if allocated deliberately*. This is where
+  TwoTier wins: at 0.50× load, 10/10 vs 8/10 contracts; at 0.67× load, a
+  much better delivery *distribution* (min 43% vs 4%). PF, optimizing the
+  wrong objective, misses contracts the cell could have met.
+- **Light load (0.33× shipped).** Everyone has slack; all schedulers
+  converge to 10/10.
 
-The 1.5× row deserves emphasis because it is where the *metric itself*
+The 0.67× row deserves emphasis because it is where the *metric itself*
 becomes the discussion. TwoTier there meets fewer 95%-threshold contracts
 than PF yet delivers a strictly better outcome by every distributional
 measure (higher mean, dramatically higher minimum). A knife-edge threshold
@@ -821,11 +909,13 @@ For a factory where every robot matters, "all robots degraded gracefully"
 beats "half the robots perfect, half offline" — so the contract *count* is
 necessary but not sufficient; report it alongside the minimum.
 
-**Engineering implication.** Dimension cells for the ~1.5–2× peak-overload
-band — that is where the two-tier scheduler pays for itself. A cell that
-*systematically* runs deeper than ~2.5× overload has a capacity-planning
-problem, and the fix is spectrum, cells, or admission control — not a
-smarter MAC.
+**Engineering implication.** In real deployments *capacity is fixed by
+spectrum*, so the corresponding operator lever is **admission control**:
+keep peak offered load in the moderate-overload band (≈ half the
+shipped-baseline load here) — that is where the two-tier scheduler pays
+for itself. A cell that *systematically* runs at ≳2.5× its own capacity
+(absolute demand-to-capacity ratio) has a capacity-planning problem, and
+the fix is spectrum, cells, or admission control — not a smarter MAC.
 
 ### 8.2 Configured Grants are a structural capability, not tuning
 
@@ -838,7 +928,7 @@ data channel, and every dynamic UL grant carries an extra ~4 ms BSR latency
 on top, that is the difference between meeting every deadline and meeting
 almost none. PF-class schedulers — including OAI's default — *cannot* close
 this gap by tuning, because they have no configured-grant mechanism driven
-by QoS. **This is also why the win widens (Study 1, 2.0×: PF 8/10 → 5/10)
+by QoS. **This is also why the win widens (Study 1, 0.50× load: PF 8/10 → 5/10)
 when BSR delay is modeled:** dynamic PF absorbs the round-trip; TwoTier's
 SPS-served flows do not.
 
@@ -876,8 +966,8 @@ and the on-time count, never just mean delivery.
 
 The adaptive GBR penalty (§4.1, dual ascent) was built to fix cell-edge
 starvation by escalating the penalty on whichever flow is actually missing.
-It does raise the *minimum* delivery (Study 1, 1.0×: min GBR 0% → 37%). But
-it meets **0/10** contracts at 1.0× — *worse* than default TwoTier's 1/10.
+It does raise the *minimum* delivery (Study 1, 1.0× load: min GBR 0% → 35%).
+But it meets **0/10** contracts across every overloaded row in the sweep.
 
 The reason is a clean piece of theory. Dual ascent drives the system toward
 **equal normalized shortfall** — proportional fairness *among the GBR
@@ -938,8 +1028,8 @@ tail loss it cannot schedule away.
 | Uniformly best-effort, or chronically deep-overloaded | **PF** (OAI default) | Two-tier adds no contract PF can't ≈match — pure overhead |
 | Dense periodic sensors / PLCs | **Two-tier with SPS** (mandatory) | PDCCH-bound; PF structurally cannot do configured grants |
 | Medium-rate latency-critical + bulk mix | **Two-tier** (deadline-aware Tier-2) | PF is deadline-blind, and misses silently |
-| GBR contracts at moderate (1.5–2×) overload | **Two-tier** (Tier-1 LP) | PF misses contracts the cell could honor |
-| GBR contracts at deep (≥2.5×) overload | **Admission control**, not a scheduler | Genuine infeasibility — satisfy a feasible subset |
+| GBR flows whose **aggregate GFBR demand is ≈ 1.0–2× cell capacity** (moderate overload) | **Two-tier** (Tier-1 LP) | The demand is *nearly* feasible — a QoS-aware LP honours the contracts PF misses by chasing throughput instead |
+| GBR flows whose **aggregate GFBR demand is ≳ 2.5× cell capacity** (deep overload) | **Admission control**, not a scheduler | Genuine infeasibility — no scheduler can satisfy an over-subscribed contract set; satisfy a feasible subset instead |
 
 The honest bottom line: the two-tier scheduler **is** worth building for the
 factory/warehouse target — but the load-bearing features are **Configured
@@ -974,11 +1064,14 @@ metrics are what surface the real, regime-dependent value.
 - **UL DCI is amortized** into the U-slot CCE budget rather than charged to
   the earlier D-slot that carries the real UL grant — a reasonable
   approximation, worth revisiting if PDCCH-edge UL scenarios become central.
-- **UL BSR is modeled as a fixed delay only.** Real BSR is also *quantised*
-  (5- or 8-bit table entries, ~10–15% granularity) and *lossy* (SR on PUCCH
-  and the BSR MAC CE itself). The delay model captures the first-order
-  effect on dynamic UL latency and grant sizing; quantisation and loss
-  would each add small further hits to dynamic PF but not to SPS.
+- **BSR is modelled as delay + Bernoulli loss; CQI as delay + Bernoulli
+  loss with MCS-mismatch BLER.** Both capture the first-order effects
+  (§7.5, §7.6). Not modelled: BSR *quantisation* (5- or 8-bit table
+  entries, ~10–15% granularity) and CQI *quantisation* beyond the implicit
+  SNR→MCS staircase. Each would add small further hits to dynamic scheduling
+  but not to SPS. Also not modelled: **UL k2 grant-to-transmission timing**
+  (~4 slots added on top of BSR for dynamic UL) — would widen SPS's win on
+  Studies 1 & 2 slightly, direction-consistent (see NOTES.md gap audit).
 
 ---
 
@@ -1033,8 +1126,9 @@ user feels — and feels sharply:
   1/30, via Configured Grants — a capability PF *structurally lacks*.
 - **Latency-bound** mixed deployments: 8/8 deadlines vs PF's 5/8, and PF's
   misses are *silent* — invisible to mean-delivery monitoring.
-- **Moderate-overload GBR** deployments (~1.5–2× peak): 10/10 contracts vs
-  PF's 8/10 at 2×; a far better delivery floor at 1.5×.
+- **Moderate-overload GBR** deployments (roughly half the shipped-baseline
+  load, where admission control has clipped the peak): 10/10 contracts vs
+  PF's 5/10 at 0.50× shipped load; a far better delivery floor at 0.67×.
 
 The decomposition that delivers this — a slow NUM-style LP (Tier-1) feeding
 a fast drift-plus-penalty tracker (Tier-2) — is a synthesis of established

@@ -8,6 +8,7 @@ inheritance. This keeps the `scheduler` package dependent on nothing
 outside itself.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -18,7 +19,17 @@ from .flow import FlowConfig
 class Allocation:
     """One flow's share of a per-UE grant for a slot. A multi-flow UE grant
     is emitted as several Allocations; the grant's PRB count and DCI cost
-    ride on the first."""
+    ride on the first.
+
+    ``snr_used_db`` is the SNR view the scheduler used to pick the MCS for
+    this grant -- reported (CQI-lagged) SNR for a dynamic grant, or the
+    conservative SPS-configured SNR for an SPS grant. The driver uses it to
+    compute a mismatch-aware BLER against the true SNR at transmission
+    time: when the true SNR falls below the picked MCS's threshold, BLER
+    climbs. Leaving it NaN (the default) falls back to the legacy behaviour
+    (BLER derived from bits_per_prb at true SNR), used by tests that don't
+    care about MCS mismatch.
+    """
 
     ue_id: int
     qfi: int
@@ -27,6 +38,7 @@ class Allocation:
     bytes_capacity: int
     cce_cost: int = 0
     is_sps: bool = False
+    snr_used_db: float = math.nan
 
 
 class SlotView(Protocol):
@@ -82,9 +94,21 @@ class BufferView(Protocol):
 
 class ChannelView(Protocol):
     """Per-UE channel quality the scheduler reads -- a CQI report in 5G
-    terms."""
+    terms.
+
+    ``get_snr_db`` returns the *true* instantaneous SNR (used by the driver
+    at transmission time to compute actual BLER).
+    ``get_reported_snr_db`` returns the *CQI-visible* SNR the scheduler is
+    entitled to see: it lags the true SNR by ``cqi_delay_slots`` for
+    UEs the host has enabled CQI delay for (real 5G: CQI is measured, then
+    reported on PUCCH with a period + processing delay). Dynamic
+    scheduling decisions read the reported view; SPS reservations pick a
+    conservative MCS at reservation time from the smoothed reported view.
+    """
 
     def get_snr_db(self, ue_id: int) -> float: ...
+
+    def get_reported_snr_db(self, ue_id: int) -> float: ...
 
 
 class Scheduler(Protocol):

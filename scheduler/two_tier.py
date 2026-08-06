@@ -15,12 +15,21 @@ from .tier1 import estimate_demand_bps, solve_tier1
 
 @dataclass
 class _SPSReservation:
-    """A per-slot PRB reservation for one (UE, QFI) flow in one direction."""
+    """A per-slot PRB reservation for one (UE, QFI) flow in one direction.
+
+    ``snr_ref_db`` is the SNR the reservation was sized against -- the
+    fixed MCS operating point for this SPS grant. Real 5G SPS uses a
+    semi-static MCS chosen conservatively (safety margin below the
+    smoothed CQI). Every firing uses this fixed MCS, so BLER at the true
+    SNR of the firing slot depends on how far the true SNR sits from
+    ``snr_ref_db`` (driver -> bler_for_mcs).
+    """
 
     ue_id: int
     qfi: int
     direction: str  # 'DL' or 'UL'
     prbs_per_slot: int
+    snr_ref_db: float
 
 
 class TwoTier:
@@ -68,6 +77,7 @@ class TwoTier:
         sps_safety_margin: float = 1.10,
         sps_budget_fraction: float = 0.85,
         sps_min_scale: float = 0.75,
+        sps_snr_margin_db: float = 0.0,
         gbr_penalty_init: float = 1e3,
         gbr_penalty_lr: float = 0.0,
         gbr_penalty_max: float = 1e6,
@@ -89,6 +99,16 @@ class TwoTier:
         # fraction of their desired size, the tier is run dynamically
         # instead -- unless that would overrun the PDCCH/CCE budget.
         self.sps_min_scale = sps_min_scale
+        # SPS uses a fixed MCS chosen at reservation time from
+        # (smoothed CQI SNR - this margin), in dB. Real 5G SPS is
+        # semi-static; picking a conservative MCS trades some spectral
+        # efficiency (larger reservations) for BLER robustness against
+        # CQI drift under channel variation. The deployment should size
+        # this margin to its channel volatility: a slow-varying industrial
+        # channel benefits little (default 0.0); a mobile deployment with
+        # significant Doppler benefits more. See the sensitivity study in
+        # scripts/cqi_study.py.
+        self.sps_snr_margin_db = sps_snr_margin_db
         # Adaptive per-flow GBR slack penalty (dual ascent). gbr_penalty_lr=0
         # freezes the penalty at gbr_penalty_init -> identical to the old
         # uniform-scalar behaviour.
@@ -257,13 +277,21 @@ class TwoTier:
                 tier = [f for f in eligible if f.priority_level == plevel]
 
                 # PRBs each flow wants to carry its contracted floor.
-                desired: list[tuple[FlowConfig, int]] = []
+                # Sized at the *conservative* MCS (snr - sps_snr_margin_db):
+                # real SPS is semi-static and cannot re-pick MCS per firing,
+                # so a lower MCS trades some spectral efficiency for BLER
+                # robustness against CQI drift / channel fades. The same
+                # conservative SNR (`snr_for_mcs`) is stamped on the
+                # reservation and reused at every firing, so the driver
+                # (via bler_for_mcs) reflects the fixed-MCS behaviour.
+                desired: list[tuple[FlowConfig, int, float]] = []
                 for f in tier:
                     floor_bps = self._sps_floor_bps(f)
                     if floor_bps <= 0:
                         continue
                     snr = snr_in.get(f.ue_id, 20.0)
-                    bits_per_rb, bler = bits_per_prb(snr, symbols=int(avg_sym))
+                    snr_for_mcs = snr - self.sps_snr_margin_db
+                    bits_per_rb, bler = bits_per_prb(snr_for_mcs, symbols=int(avg_sym))
                     effective_bits = bits_per_rb * (1.0 - bler)
                     if effective_bits <= 0:
                         continue
@@ -272,9 +300,9 @@ class TwoTier:
                         / n_dir_slots / 8
                     )
                     prbs = max(1, int(-(-bytes_per_dir_slot * 8 // effective_bits)))
-                    desired.append((f, prbs))
+                    desired.append((f, prbs, snr_for_mcs))
 
-                total = sum(p for _, p in desired)
+                total = sum(p for _, p, _ in desired)
                 if total <= 0:
                     continue
                 # Scale the whole tier proportionally if it over-commits, so
@@ -291,13 +319,13 @@ class TwoTier:
                 if scale < self.sps_min_scale:
                     tier_cce = sum(
                         cce_aggregation_level(snr_in.get(f.ue_id, 20.0))
-                        for f, _ in desired
+                        for f, _, _ in desired
                     )
                     if tier_cce <= per_dir_cce_budget[direction]:
                         continue  # dynamic can absorb the tier -- skip SPS
                     # else: keep the undersized reservation for CCE relief.
 
-                for f, prbs in desired:
+                for f, prbs, snr_ref in desired:
                     granted = max(1, round(prbs * scale))
                     self._sps.append(
                         _SPSReservation(
@@ -305,6 +333,7 @@ class TwoTier:
                             qfi=f.qfi,
                             direction=direction,
                             prbs_per_slot=granted,
+                            snr_ref_db=snr_ref,
                         )
                     )
                     self._sps_keys.add((f.ue_id, f.qfi))
@@ -312,9 +341,11 @@ class TwoTier:
                 remaining = max(0, remaining)
 
     def _update_snr_ewma(self, channel: ChannelView) -> None:
+        # Uses the CQI-visible SNR -- Tier-1 target rates and SPS MCS pick
+        # must live off what the gNB is entitled to see, not the true SNR.
         alpha = 1.0 - 1.0 / self.snr_window
         for f in self._flows:
-            cur = channel.get_snr_db(f.ue_id)
+            cur = channel.get_reported_snr_db(f.ue_id)
             prev = self._snr_avg.get(f.ue_id, cur)
             self._snr_avg[f.ue_id] = alpha * prev + (1.0 - alpha) * cur
 
@@ -453,11 +484,17 @@ class TwoTier:
 
     def _emit_grant(
         self, ue_id, direction, prbs_used, tbs_bytes, bler, ue_flows,
-        q_by_key, buffers, committed, cce_cost, is_sps,
+        q_by_key, buffers, committed, cce_cost, is_sps, snr_used_db,
     ) -> list[Allocation]:
         """Fill a UE's transport block via the MAC multiplexer and emit one
         per-flow Allocation per filled flow. The grant's PRB count and DCI
-        cost ride on the first Allocation -- one DCI per UE grant."""
+        cost ride on the first Allocation -- one DCI per UE grant.
+
+        ``snr_used_db`` is the SNR view that picked the MCS for this grant
+        -- reported (CQI-lagged) SNR for a dynamic grant, or the SPS
+        conservative reference SNR for a configured grant. Stamped on every
+        Allocation so the driver can compute mismatch-aware BLER.
+        """
         fills = self._mac_lcp_fill(ue_flows, tbs_bytes, q_by_key, buffers, committed)
         out: list[Allocation] = []
         for i, (key, byts) in enumerate(fills):
@@ -471,6 +508,7 @@ class TwoTier:
                     bytes_capacity=byts,
                     cce_cost=cce_cost if i == 0 else 0,
                     is_sps=is_sps,
+                    snr_used_db=snr_used_db,
                 )
             )
         return out
@@ -510,9 +548,12 @@ class TwoTier:
                 # Empty configured grant: a real gNB wastes the PRBs; the
                 # simulator releases them (release-on-empty CG).
                 continue
-            bits_per_rb, bler = bits_per_prb(
-                channel.get_snr_db(ue_id), symbols=symbols
-            )
+            # SPS uses the fixed MCS stamped on the reservation at
+            # configuration time -- semi-static, not per-firing CQI. All
+            # of a UE's reservations share the same snr_ref_db (built from
+            # the same smoothed CQI minus the same margin).
+            snr_ref = reservations[0].snr_ref_db
+            bits_per_rb, bler = bits_per_prb(snr_ref, symbols=symbols)
             if bits_per_rb <= 0:
                 continue
 
@@ -531,6 +572,7 @@ class TwoTier:
             out.extend(self._emit_grant(
                 ue_id, direction, prbs_used, tbs_bytes, bler, ue_flows,
                 q_by_key, buffers, committed_this_slot, cce_cost=0, is_sps=True,
+                snr_used_db=snr_ref,
             ))
         return out, prbs_used_total
 
@@ -571,25 +613,27 @@ class TwoTier:
             if visible > 0:
                 ue_flows[f.ue_id].append(f)
 
-        # Rank UEs by total deficit x spectral efficiency.
-        scored: list[tuple[float, int, list, int, float]] = []
+        # Rank UEs by total deficit x spectral efficiency. bits_per_rb here
+        # is from the CQI-visible SNR -- what the gNB knows to pick MCS
+        # from; the driver applies mismatch-aware BLER against the true SNR.
+        scored: list[tuple[float, int, list, int, float, float]] = []
         for ue_id, flows in ue_flows.items():
-            bits_per_rb, bler = bits_per_prb(
-                channel.get_snr_db(ue_id), symbols=symbols
-            )
+            snr_reported = channel.get_reported_snr_db(ue_id)
+            bits_per_rb, bler = bits_per_prb(snr_reported, symbols=symbols)
             if bits_per_rb <= 0:
                 continue
             ue_q = sum(q_by_key.get((f.ue_id, f.qfi), 0.0) for f in flows)
-            scored.append((ue_q * bits_per_rb, ue_id, flows, bits_per_rb, bler))
+            scored.append((ue_q * bits_per_rb, ue_id, flows, bits_per_rb, bler, snr_reported))
         scored.sort(key=lambda x: x[0], reverse=True)
 
         prbs_left = prb_budget
         cce_left = slot.pdcch_cce_budget
         out: list[Allocation] = []
-        for _metric, ue_id, flows, bits_per_rb, bler in scored:
+        for _metric, ue_id, flows, bits_per_rb, bler, snr_reported in scored:
             if prbs_left <= 0:
                 break
-            cce_cost = cce_aggregation_level(channel.get_snr_db(ue_id))
+            # AL / DCI cost is picked from the same CQI view as the MCS.
+            cce_cost = cce_aggregation_level(snr_reported)
             if cce_left < cce_cost:
                 continue
             # Grant sizing uses the BSR-visible view (mixed with real for
@@ -618,5 +662,6 @@ class TwoTier:
                 ue_id, direction, prbs_used, tbs_bytes, bler, flows,
                 q_by_key, buffers, committed_this_slot,
                 cce_cost=cce_cost, is_sps=False,
+                snr_used_db=snr_reported,
             ))
         return out

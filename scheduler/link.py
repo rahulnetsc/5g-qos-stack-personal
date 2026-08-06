@@ -29,7 +29,12 @@ _MCS_TABLE = [
 
 
 def bits_per_prb(snr_db: float, symbols: int = 14) -> tuple[int, float]:
-    """Return (bits_per_PRB_for_given_symbols, expected_BLER)."""
+    """Return (bits_per_PRB_for_given_symbols, expected_BLER) for the MCS
+    the scheduler would pick at ``snr_db``. BLER here is the target BLER at
+    the picked MCS (uniform 10% in the table), i.e. the *matched* BLER
+    assuming the true SNR equals ``snr_db``. When the scheduler's ``snr_db``
+    differs from the true SNR at transmission time (CQI staleness), use
+    ``bler_for_mcs`` instead to get the mismatch-adjusted BLER."""
     se = 0.0
     bler = 1.0  # below the lowest MCS, treat as untransmittable
     for thresh, eff, b in _MCS_TABLE:
@@ -40,6 +45,37 @@ def bits_per_prb(snr_db: float, symbols: int = 14) -> tuple[int, float]:
             break
     bits = int(se * 12 * symbols)
     return bits, bler
+
+
+def mcs_threshold_for_snr(snr_db: float) -> float:
+    """Return the SNR threshold of the MCS that ``bits_per_prb`` would pick
+    for ``snr_db``. This is the "picked MCS's operating point": at this SNR
+    the target BLER (10%) is met; below it, BLER climbs (see bler_for_mcs).
+    Returns the lowest threshold - 3 dB when snr_db is below the whole
+    table (representing an unusable MCS)."""
+    picked = _MCS_TABLE[0][0] - 3.0
+    for thresh, _, _ in _MCS_TABLE:
+        if snr_db >= thresh:
+            picked = thresh
+        else:
+            break
+    return picked
+
+
+def bler_for_mcs(
+    mcs_threshold_db: float, true_snr_db: float, base_bler: float = 0.10
+) -> float:
+    """BLER for an MCS with operating threshold ``mcs_threshold_db`` when the
+    true instantaneous SNR is ``true_snr_db``. If the true SNR is at or above
+    the threshold, BLER stays at the (link-adapted) target. Below the
+    threshold, BLER doubles per dB of shortfall -- a crude approximation of
+    the sharp BLER curves in real 5G, which is what makes an aggressively
+    picked MCS expensive when CQI was stale-optimistic."""
+    margin = true_snr_db - mcs_threshold_db
+    if margin >= 0.0:
+        return base_bler
+    # Doubles per dB below threshold; capped at 1.0 (total loss).
+    return min(1.0, base_bler * (2.0 ** (-margin)))
 
 
 # PDCCH aggregation level vs SNR (dB). Real 5G uses 1, 2, 4, 8, 16 CCEs;

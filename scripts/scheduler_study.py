@@ -50,6 +50,14 @@ DELAY_ONTIME_DELIVERY = 0.99
 # SPS in real 5G. See sim/buffer.py:snapshot_bsr.
 UL_BSR_DELAY_SLOTS = 8
 
+# DL CQI reporting latency in slots. Real 5G reports CQI on a period of
+# 5-160 ms; at mu=1 that's 10-320 slots. 8 slots (~4 ms) is a periodic-CQI
+# lower bound representative of an aperiodic-CQI-triggered flow. The effect
+# in these scenarios is small because the channel coherence is long
+# (2000 slots) so the CQI barely goes stale -- see scripts/cqi_study.py for
+# the sensitivity to shorter coherence and to sps_snr_margin_db.
+CQI_DELAY_SLOTS = 8
+
 
 def _pf():
     return ProportionalFair(ewma_window_slots=200)
@@ -145,7 +153,7 @@ def study_overload_sweep() -> None:
     for mult in (1.0, 1.5, 2.0, 3.0):
         sc = _scale_capacity(base, mult)
         for name, factory in scheds:
-            p = _profile(sc, run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
+            p = _profile(sc, run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=CQI_DELAY_SLOTS))
             g = p["gbr"]
             print(
                 f"{mult:>8.1f}x  {name:<18}{p['total_mbps']:>7.1f}M"
@@ -169,7 +177,7 @@ def study_pdcch_limited() -> None:
         f"{'mean deliv':>12}{'min deliv':>11}{'worst p99':>11}"
     )
     for name, factory in scheds:
-        p = _profile(sc, run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
+        p = _profile(sc, run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=CQI_DELAY_SLOTS))
         d = p["delay"]
         print(
             f"{name:<14}{p['total_mbps']:>7.1f}M{d['met']:>7}/{d['n']:<2}"
@@ -195,7 +203,7 @@ def study_latency_bound() -> None:
         f"{'ctrl worst p99':>16}{'bulk DL':>10}"
     )
     for name, factory in scheds:
-        summary = run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS)
+        summary = run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=CQI_DELAY_SLOTS)
         p = _profile(sc, summary)
         d = p["delay"]
         bulk = sum(
@@ -212,7 +220,9 @@ def study_latency_bound() -> None:
 def main() -> None:
     print(
         f"UL BSR delay: {UL_BSR_DELAY_SLOTS} slots "
-        "(dynamic UL flows only; Configured Grants bypass)."
+        "(dynamic UL flows only; Configured Grants bypass).\n"
+        f"DL CQI delay: {CQI_DELAY_SLOTS} slots "
+        "(scheduler-visible SNR lags true SNR; SPS uses smoothed CQI)."
     )
     study_overload_sweep()
     study_pdcch_limited()

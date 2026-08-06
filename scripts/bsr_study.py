@@ -12,7 +12,7 @@ Two things are being tested:
      PUSCH), so the gNB continues to schedule from stale info.
 
 Both are run on:
-  - factory_robots at 2.0x carrier capacity (moderate-overload GBR band,
+  - factory_robots at 0.50x shipped load (moderate-overload GBR band,
     the regime where the PF-vs-TwoTier gap is cleanest -- see
     design-docs/scheduler-study.md Section 7.1).
   - sensor_dense at 1.0x (as-shipped) -- to make explicit that TwoTier's
@@ -125,7 +125,7 @@ def _hr(title: str) -> None:
 
 
 def study_delay_sweep_factory() -> None:
-    _hr("STUDY A -- BSR delay sweep, factory_robots @ 2.0x, loss = 0")
+    _hr("STUDY A -- BSR delay sweep, factory_robots @ 0.50x load, loss = 0")
     print(
         "Uplink-heavy GBR workload in the moderate-overload band. Delays\n"
         "in slots (numerology mu=2 -> 0.25 ms/slot).\n"
@@ -151,7 +151,7 @@ def study_delay_sweep_factory() -> None:
 
 def study_loss_sweep_factory() -> None:
     _hr(
-        f"STUDY B -- BSR loss sweep, factory_robots @ 2.0x, "
+        f"STUDY B -- BSR loss sweep, factory_robots @ 0.50x load, "
         f"delay = {LOSS_SWEEP_AT_DELAY} slots"
     )
     print(

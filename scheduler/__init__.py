@@ -10,7 +10,7 @@ state, which need only satisfy the structural views in `interfaces`.
 """
 
 from .flow import FlowConfig
-from .link import bits_per_prb, cce_aggregation_level
+from .link import bits_per_prb, bler_for_mcs, cce_aggregation_level, mcs_threshold_for_snr
 from .interfaces import (
     Allocation,
     BufferView,
@@ -29,7 +29,9 @@ from .two_tier import TwoTier
 __all__ = [
     "FlowConfig",
     "bits_per_prb",
+    "bler_for_mcs",
     "cce_aggregation_level",
+    "mcs_threshold_for_snr",
     "Allocation",
     "Scheduler",
     "SlotView",

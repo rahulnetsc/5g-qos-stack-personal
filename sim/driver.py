@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict
 
 import numpy as np
@@ -7,7 +8,7 @@ from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
 from .metrics import Metrics
 from .resource import ResourceGrid
-from scheduler import Scheduler
+from scheduler import Scheduler, bler_for_mcs, mcs_threshold_for_snr
 from .traffic import TrafficModel
 
 
@@ -17,23 +18,36 @@ def run(
     record_timeseries: bool = False,
     ul_bsr_delay_slots: int = 0,
     ul_bsr_loss_rate: float = 0.0,
+    cqi_delay_slots: int = 0,
+    cqi_loss_rate: float = 0.0,
 ) -> dict:
     """Run one scenario through one scheduler.
 
-    ``ul_bsr_delay_slots`` models the UE-to-gNB Buffer Status Report round
-    trip: for each UL flow, the scheduler sees a view of the buffer that
-    lags reality by this many slots. Configured Grants / SPS bypass it.
-    Zero (the default) preserves the old zero-latency behaviour; a typical
-    realistic value at numerology μ=1 (0.5 ms slot) is 8 slots (~4 ms).
+    ``ul_bsr_delay_slots`` / ``ul_bsr_loss_rate`` model the UE-to-gNB
+    Buffer Status Report round-trip on the *uplink* -- see BufferModel.
+    Configured Grants (SPS) bypass BSR entirely. Zero (the defaults)
+    preserve the old zero-latency behaviour.
 
-    ``ul_bsr_loss_rate`` (0.0-1.0) is the per-slot per-UL-flow probability
-    that a BSR update fails to reach the gNB; on a loss the gNB keeps its
-    last successfully reported value. Independent of channel BLER; uses a
-    dedicated RNG seeded from ``scenario.seed`` for reproducibility.
+    ``cqi_delay_slots`` / ``cqi_loss_rate`` model the UE-to-gNB Channel
+    Quality Indicator report on the *downlink* -- ChannelModel exposes a
+    delayed ``get_reported_snr_db(ue)`` view that the scheduler consumes
+    for MCS picks and grant sizing, while the driver keeps computing BLER
+    against the *true* SNR at transmission time. When an Allocation carries
+    an ``snr_used_db`` (the SNR the scheduler saw), the driver uses the
+    mismatch-BLER curve ``bler_for_mcs`` so an aggressively-picked MCS
+    based on stale-optimistic CQI actually costs BLER. Zero preserves the
+    old behaviour.
     """
     rng = np.random.default_rng(scenario.seed)
     grid = ResourceGrid(scenario.carrier, scenario.tdd)
-    channel = ChannelModel(scenario.ues, rng)
+    channel = ChannelModel(
+        scenario.ues,
+        rng,
+        cqi_delay_slots=cqi_delay_slots,
+        cqi_loss_rate=cqi_loss_rate,
+        # Independent seed so CQI-loss draws don't perturb the AR(1) stream.
+        cqi_seed=scenario.seed ^ 0xC9C9C9C9,
+    )
     buffers = BufferModel(
         ul_bsr_delay_slots=ul_bsr_delay_slots,
         ul_bsr_loss_rate=ul_bsr_loss_rate,
@@ -80,7 +94,22 @@ def run(
             symbols = (
                 slot_grid.dl_symbols if alloc.direction == "DL" else slot_grid.ul_symbols
             )
-            _, bler = bits_per_prb(channel.get_snr_db(alloc.ue_id), symbols=symbols)
+            true_snr = channel.get_snr_db(alloc.ue_id)
+            if math.isnan(alloc.snr_used_db):
+                # Legacy path (no MCS-mismatch modelling) -- used by tests
+                # that don't set snr_used_db. BLER is the *matched* BLER
+                # at the true SNR, as if the scheduler had perfect CQI.
+                _, bler = bits_per_prb(true_snr, symbols=symbols)
+            else:
+                # Mismatch-aware path. The scheduler picked an MCS from
+                # ``alloc.snr_used_db`` (its CQI view); the actual BLER is
+                # for that MCS at the *true* SNR. If true_snr fell below the
+                # picked MCS's threshold since the CQI report was taken, BLER
+                # climbs sharply -- the cost of stale-optimistic CQI, and
+                # what SPS's conservative MCS margin (see TwoTier) buys
+                # protection against.
+                mcs_thresh = mcs_threshold_for_snr(alloc.snr_used_db)
+                bler = bler_for_mcs(mcs_thresh, true_snr)
             delivered = int(alloc.bytes_capacity * (1.0 - bler))
             buffers.drain(alloc.ue_id, alloc.qfi, delivered)
             metrics.record_delivery(alloc.ue_id, alloc.qfi, delivered)

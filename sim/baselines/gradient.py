@@ -109,9 +109,10 @@ class GradientScheduler:
             return []
 
         # Score each backlogged UE: base PF times its most urgent flow.
-        scored: list[tuple[float, int, list[FlowConfig], int, float]] = []
+        # bits_per_rb from the CQI-visible SNR (see pf.py / round_robin.py).
+        scored: list[tuple[float, int, list[FlowConfig], int, float, float]] = []
         for ue_id, flows in ue_flows.items():
-            snr = channel.get_snr_db(ue_id)
+            snr = channel.get_reported_snr_db(ue_id)
             bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
             if bits_per_rb <= 0:
                 continue
@@ -123,7 +124,7 @@ class GradientScheduler:
                 multiplier = max(
                     multiplier, self._urgency_multiplier(f, r_avg, hol)
                 )
-            scored.append((base * multiplier, ue_id, flows, bits_per_rb, bler))
+            scored.append((base * multiplier, ue_id, flows, bits_per_rb, bler, snr))
 
         if not scored:
             return []
@@ -134,10 +135,10 @@ class GradientScheduler:
         increment = 1.0 / self.window
         out: list[Allocation] = []
 
-        for _metric, ue_id, flows, bits_per_rb, bler in scored:
+        for _metric, ue_id, flows, bits_per_rb, bler, snr in scored:
             if prbs_left <= 0:
                 break
-            cce_cost = cce_aggregation_level(channel.get_snr_db(ue_id))
+            cce_cost = cce_aggregation_level(snr)
             if cce_left < cce_cost:
                 continue
             # Grant sizing uses the BSR-visible view.
@@ -164,6 +165,7 @@ class GradientScheduler:
                     flows,
                     buffers,
                     cce_cost=cce_cost,
+                    snr_used_db=snr,
                 )
             )
         return out

@@ -47,10 +47,15 @@ def emit_grant(
     ue_flows: list[FlowConfig],
     buffers,
     cce_cost: int,
+    snr_used_db: float,
 ) -> list[Allocation]:
     """Fill a UE's transport block via the MAC multiplexer and emit one
     Allocation per filled flow. The grant's PRB count and DCI/CCE cost
     ride on the first Allocation only -- one DCI per UE grant.
+
+    ``snr_used_db`` is the CQI-visible SNR the scheduler used to pick the
+    MCS for this grant; the driver uses it to compute a mismatch-aware
+    BLER against the true SNR at transmission time (see driver.py).
     """
     fills = lcp_fill(ue_flows, tbs_bytes, buffers)
     out: list[Allocation] = []
@@ -64,6 +69,7 @@ def emit_grant(
                 bytes_capacity=byts,
                 cce_cost=cce_cost if i == 0 else 0,
                 is_sps=False,
+                snr_used_db=snr_used_db,
             )
         )
     return out

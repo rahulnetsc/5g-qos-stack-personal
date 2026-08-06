@@ -45,7 +45,9 @@ Where to be careful, where to approximate.
 | Header overhead | Constant tax per grant | Captures the "small grant inefficiency" effect |
 | PDCCH | Count CCEs against a per-slot budget | The control bottleneck is real and matters |
 | HARQ ACK / k1 timing | Counted but not full simulated | Just enforce that DL needs a downstream PUCCH slot within k1_max |
-| UL Buffer Status Report | Fixed per-UL-flow delay (`ul_bsr_delay_slots`, default 8 in the study, 0 in tests) between arrival and scheduler visibility; **Configured Grants bypass** | Captures the ~4–8 ms SR/BSR round-trip that makes dynamic UL scheduling laggy vs SPS; loss/quantization not modeled |
+| UL Buffer Status Report | Fixed per-UL-flow delay (`ul_bsr_delay_slots`, default 8 in the study, 0 in tests) between arrival and scheduler visibility; Bernoulli loss (`ul_bsr_loss_rate`); **Configured Grants bypass** | Captures the ~4–8 ms SR/BSR round-trip that makes dynamic UL scheduling laggy vs SPS; loss models a lost SR-on-PUCCH or a lost BSR MAC CE |
+| DL/UL CQI (per-UE channel estimate) | Per-UE SNR history with a delay (`cqi_delay_slots`) and Bernoulli loss (`cqi_loss_rate`); scheduler reads `get_reported_snr_db(ue)` for MCS pick and grant sizing | Captures the ~5–10 ms CQI reporting round-trip. Effect is small on slow-varying factory channels; larger on high-mobility / short-coherence UEs |
+| MCS mismatch / BLER | `bler_for_mcs(threshold, true_snr)` doubles BLER per dB below the picked MCS's threshold; drives BLER at delivery from the scheduler's (possibly stale) MCS pick against the true SNR | Turns stale/optimistic CQI into a real cost; also enables the SPS "semi-static conservative MCS" tradeoff |
 | Multi-antenna / MIMO | Single-stream only | MU-MIMO is future work |
 
 `[OPEN]` Whether to model packet boundaries at all, or strictly fluid bits. Fluid is simpler and probably sufficient for scheduler-level questions; packet-aware is needed if we want to simulate concatenation overhead per SDU. Recommendation: start fluid, add packet-awareness only if a metric demands it.

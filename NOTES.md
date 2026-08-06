@@ -815,3 +815,237 @@ don't sweep that corner. Kept the study compact.
 New tests: `test_buffer_bsr_loss_holds_last_reported_value`,
 `test_buffer_bsr_loss_rng_independent_of_seed_variation` (49 pass).
 Reproduce: `python scripts/bsr_study.py`.
+
+---
+
+## 2026-05-17 — Modelling-gap audit (post-BSR)
+
+BSR delay+loss was one blind spot; a systematic audit surfaced several
+more. Recorded here so they are not lost. Each is annotated with (a) what
+we don't model, (b) direction the bias goes (which scheduler is likely
+favoured), (c) whether it could plausibly *flip* a study conclusion, and
+(d) cost to model. The meta-pattern that produced the BSR fix is worth
+naming explicitly: **any place where the scheduler is given perfect,
+instant knowledge of state a real gNB learns via a delayed and lossy
+report is a candidate blind spot** -- and every remaining candidate on
+this list points in the same direction as BSR did (SPS's advantage is
+currently *understated* in the sim, not overstated).
+
+### Rank 1 -- DL CQI staleness + quantisation (the BSR twin)
+
+The gNB in real 5G does not know the true DL SNR -- it knows the last
+CQI report the UE sent, which is (i) quantised to a 4-bit index (16
+levels), (ii) reported on a period of 5-160 ms, (iii) sometimes lost on
+PUCCH. Our sim: `channel.get_snr_db(ue)` returns the true instantaneous
+SNR to the scheduler -- exactly the sin we fixed on the UL side.
+
+Bias: symmetric across schedulers on the ranking side, but real SPS uses
+a *more conservative MCS baseline* than dynamic (see Rank 2) which we
+also do not model, so combined they produce an "SPS is more BLER-robust"
+axis currently invisible in our sim. Study 3 is the only DL study, so
+this is where the effect would show up.
+
+Flip risk: no. Study 3's mechanism is deadline awareness, orthogonal to
+MCS accuracy. But the *magnitude* of the TwoTier win might grow.
+
+Cost: cheap. Snapshot per-UE SNR into a delay pipeline exactly like
+`bytes_reported`. Quantisation is already implicit in our SNR→MCS
+staircase.
+
+**Implementing next together with Rank 2.**
+
+### Rank 2 -- SPS's more conservative MCS
+
+Real SPS grants use a semi-static, more conservative MCS than dynamic
+per-grant scheduling, because a mispicked MCS costs *every subsequent
+firing*. Our sim: SPS re-picks MCS every slot from the current true SNR,
+which is unrealistic (real SPS MCS is fixed at reservation time). The
+consequence: with Rank 1 also unfixed, SPS in reality is more robust to
+CQI errors than dynamic; our sim shows both equally CQI-blessed.
+
+Bias: SPS favoured (widens SPS win under CQI staleness).
+Flip risk: no; direction-consistent with existing findings.
+Cost: modest. Fix MCS in `_SPSReservation` at reservation time using
+`snr_avg - safety_margin`; drive BLER at firing from that fixed MCS vs
+the true SNR at the firing slot.
+
+**Implementing next together with Rank 1.** The two must ship as a pair
+because SPS conservative MCS is only meaningful once BLER depends on the
+MCS-vs-true-SNR mismatch, which requires a mismatch-BLER curve.
+
+### Rank 3 -- UL k2 grant-to-transmission timing
+
+Real: gNB issues a UL grant in D-slot `n`; the UE transmits at U-slot
+`n+k2` (~4 slots at μ=1, ~2 ms). Our sim schedules and transmits in the
+same slot, hiding this delay. Compounds with BSR: real dynamic UL total
+round-trip is BSR (~4 ms) + k2 (~2 ms) + processing. SPS bypasses k2 too
+(the grant is standing).
+
+Bias: SPS favoured (widens SPS win on Study 2, further weakens dynamic
+PF on Study 1). Direction consistent with BSR finding.
+Flip risk: no.
+Cost: modest. Per-UE UL grant-pending queue with `k2` slot delay before
+drain.
+
+### Rank 4 -- Proper HARQ retransmissions consuming PRBs
+
+Real HARQ: failed TBs are retransmitted with incremental redundancy;
+retransmits consume PRBs on later slots; 8-16 HARQ processes per UE.
+Our sim: failed bytes are just dropped (BLER-discounted delivery),
+retransmits neither consume PRBs nor eventually succeed.
+
+Bias: uniform across schedulers, so comparative claims unchanged.
+Absolute capacity is over-counted (retransmit PRBs not charged). The
+Tier-1 LP already sizes capacity as SE × (1 - BLER), so its budget is
+roughly right.
+Flip risk: no.
+Cost: non-trivial (state machine). Worth it only if the flat 10% BLER
+assumption starts feeling wrong for real deployment data.
+
+### Rank 5 -- RRC signalling latency for SPS reconfiguration
+
+Real: setting up / modifying an SPS/CG grant is an RRC reconfiguration
+costing ~50-100 ms. Our sim assumes Tier-1 can update SPS reservations
+every ~1 s at zero signalling cost. **Immaterial for our current
+scenarios** because the workloads are static (no UE join/leave, no flow
+churn) so Tier-1 solves the same SPS configuration on every re-solve.
+Would matter only when the study grows to dynamic membership.
+
+Cost: modest, but not now.
+
+### Rank 6 -- Traffic model realism
+
+Our video: fixed period, fixed I-frame multiplier, no GOP structure, no
+rate variability. Sensor telemetry: perfectly periodic, no jitter.
+No TCP closed-loop dynamics. Real workloads have all of these.
+
+Bias: mainly shifts Finding 3 (burst/PDB ceiling) numbers, not
+direction. The *root cause* of Finding 3 -- the GFBR/PDB contract is
+arithmetically inconsistent with a 4× burst -- is a contract-arithmetic
+finding independent of traffic-model detail.
+Flip risk: no.
+Cost: workload-dependent. Trace-driven workloads already listed as
+future work.
+
+### Rank 7 -- Absolute-only refinements (no comparative impact)
+
+- **3GPP TBS table extract** vs our fitted SE staircase -- already in
+  simulator-design.md open items.
+- **MU-MIMO** -- would multiply capacity, unclear which scheduler
+  benefits more; probably no directional flip.
+- **Real channel model (TDL/CDL)** vs AR(1) on dB-SNR -- affects tail
+  statistics.
+- **UL power control** -- power-limited cell-edge UEs would *exacerbate*
+  Finding 1 in reality.
+- **DRX / handover / inter-cell** -- out of scope for a single-cell
+  factory.
+
+### Meta-observation
+
+Every remaining candidate that could plausibly move a study conclusion
+(Ranks 1, 2, 3) points the same direction BSR did: **SPS's operational
+advantage is currently understated in the sim, not overstated.** The
+"give the scheduler perfect knowledge of state a real gNB only knows via
+delayed and lossy reports" pattern is where to look for the next blind
+spot. Ranks 1 and 2 are next.
+
+---
+
+## 2026-05-17 — Gaps 1 and 2 implemented: CQI staleness + SPS conservative MCS
+
+**Gap 1 (DL CQI staleness).** `ChannelModel(cqi_delay_slots=…, cqi_loss_rate=…)`
+snapshots true SNR per-UE each slot; `get_reported_snr_db(ue)` returns the
+value delayed by `cqi_delay_slots` (with independent Bernoulli loss).
+Scheduler-side code (baselines, `TwoTier._update_snr_ewma`,
+`_allocate_dynamic`) switched to `get_reported_snr_db`. The driver keeps
+`get_snr_db` for delivery-time BLER.
+
+**Coupled to that: MCS-mismatch BLER.** New `bler_for_mcs(threshold,
+true_snr)` in `scheduler/link.py` — BLER = target when true SNR is at or
+above the picked MCS's threshold, doubles per dB below. `Allocation` grows
+a `snr_used_db` field carrying the scheduler's CQI view; the driver
+computes BLER from that vs the true SNR (falls back to the legacy path
+via a NaN sentinel for test allocations that don't set it). This is what
+makes stale-optimistic CQI actually cost something.
+
+**Gap 2 (SPS conservative MCS).** `TwoTier(sps_snr_margin_db=…)` picks
+the SPS MCS at reservation time from `snr_avg − margin` and stamps
+`snr_ref_db` on each `_SPSReservation`; every firing uses that fixed MCS.
+Default 0.0 (see below).
+
+### The empirical finding: on our channel, both are small
+
+`scripts/cqi_study.py` sweeps CQI delay ∈ {0,4,8,16,32} slots and SPS
+margin ∈ {0,1,2,3,5} dB on factory @ 2.0×, on both the shipped near-
+static channel (coherence 2000 slots) and a short-coherence "mobile"
+variant (coherence 30 slots).
+
+- **CQI delay.** Essentially flat everywhere. PF's min GBR moves 32 → 31 %
+  across delay 0 → 32 slots on the static channel; on the short-coherence
+  mobile channel it moves 38 → 31 % only at 32 slots. TwoTier flat
+  (10/10, min 81 %) across the whole sweep on both channels.
+- **SPS margin.** One-directional. `margin = 0` gives 10/10 contracts and
+  the best total (118.9 M on static, 118.2 M on mobile). Any margin ≥ 2 dB
+  crosses the SPS viability floor (`sps_min_scale = 0.75`) → SPS drops to
+  dynamic → contracts collapse to 0-2/10.
+
+### Why -- and what it means
+
+Our AR(1) channel with `stationary_std_db = 1.5` produces per-slot SNR
+innovations that are small (< 0.7 dB per √8 slots even at coherence 30)
+compared to the ~3 dB spacing of MCS thresholds. So even a stale CQI
+usually picks the right MCS, and even short-coherence UEs don't feed the
+mismatch-BLER penalty enough to matter. The SPS "conservative margin"
+only pays off when the BLER-protection benefit exceeds the reservation-
+size cost -- which requires the true SNR to routinely dip below the
+picked MCS's threshold. On our channel model, it doesn't.
+
+**Physical intuition matches:** SPS's semi-static MCS is a mobility hedge.
+A static factory doesn't need it. `sps_snr_margin_db` should be sized
+from the deployment's channel-volatility budget: 0 dB for a warehouse /
+fixed AGVs, larger and swept-experimentally as mobility rises.
+
+Default now: `sps_snr_margin_db = 0.0`. Non-zero margin is opt-in.
+
+### Effect on the main study conclusions
+
+**None of Study 1-3's conclusions change.** Small numeric shifts:
+- Study 1 @ 2.0x TwoTier total: 120.2 M → 118.9 M (SPS now uses smoothed
+  MCS instead of per-slot true SNR -- small BLER variance around threshold
+  boundaries). Contract count 10/10 unchanged. Same for mean/min GBR.
+- Study 2 PF on-time: 1/30 → 2/30 (small noise). TwoTier 30/30 unchanged.
+- Study 3 TwoTier ctrl worst p99: 10.0 → 10.5 ms; bulk DL 14.2 → 15.5 M.
+- Factory per-flow @ 1.0x: ue4 (16 dB) improved 0 → 22 %; ue2/ue9
+  slightly regressed. Mean GBR 67 → 62 %. Story preserved (mixed-flow
+  UEs protected; cell-edge starvation persists at ue7).
+
+### What this rules out for future modelling
+
+The "SPS's advantage is understated" hypothesis from the gap audit (i.e.
+CQI staleness + SPS conservative MCS should widen the SPS win) is
+**false on our channel model** -- the channel is too well-behaved for
+either effect to matter. It would matter on:
+- Faster fading (higher `stationary_std_db` and/or shorter coherence).
+- A more punishing BLER curve (real 5G BLER above threshold is more
+  forgiving than "doubles per dB"; real BLER *below* threshold might be
+  even steeper).
+- Larger SNR quantisation error (real CQI has ~2 dB granularity vs our
+  finer staircase).
+
+None of these are worth implementing unless a scenario surfaces them.
+
+Reproduce: `python scripts/cqi_study.py`. Tests: 53 pass -- new
+`test_channel_cqi_delay_lags_true_snr`,
+`test_channel_cqi_loss_holds_last_reported_value`,
+`test_bler_for_mcs_matched_vs_mismatched`,
+`test_two_tier_sps_uses_conservative_mcs`.
+
+**Axis housekeeping (same commit).** Study 1's table used to be labelled
+"Capacity × shipped" (1.0x = as-shipped, 3.0x = light load). §8's
+interpretation used "Nx overload" (higher = worse). These were inverse
+and confusing to a cold reader. Relabelled Study 1 to "Load × shipped"
+so both sections increase-with-badness; sim still varies capacity
+(equivalent knob). §7.5, §7.6, §8.1, §11, and the sweep scripts'
+display headings updated for consistency.
+
+---
