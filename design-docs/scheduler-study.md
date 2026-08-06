@@ -10,9 +10,19 @@ and for the running lab notebook see [NOTES.md](../NOTES.md).
 
 **Status.** The scheduler is implemented and validated in simulation and
 extracted into a standalone [`scheduler/`](../scheduler/) library for an
-eventual OpenAirInterface (OAI) integration. All quantitative results below
-are reproducible with `python scripts/scheduler_study.py` and
-`python scripts/compare_schedulers.py`.
+eventual OpenAirInterface (OAI) integration. Every quantitative result below
+is reproducible:
+
+| section | script |
+|---|---|
+| §7.1–7.3 (Studies 1–3) | `python scripts/scheduler_study.py` |
+| §7.4 (per-flow breakdown) | `python scripts/compare_schedulers.py` |
+| §7.5 (BSR sensitivity) | `python scripts/bsr_study.py` |
+| §7.6 (CQI staleness, SPS margin) | `python scripts/cqi_study.py` |
+| §7.7 (max-min GBR stage) | `python scripts/maxmin_study.py` |
+
+Absolute figures predate the 2026-08-06 Tier-1 reformulation in older
+[NOTES.md](../NOTES.md) entries — see §9.
 
 ---
 
@@ -317,9 +327,19 @@ outcomes are:
    virtual queue, so a flow near its PDB preempts bulk traffic.
 3. **The Tier-1 LP** — earns its place specifically in the
    *moderate-overload* GBR regime.
+4. **A max-min GBR floor ahead of the Tier-1 utility solve** — without it
+   the utility objective is a shortfall-minimising knapsack that abandons
+   the lowest-spectral-efficiency GBR flows outright (§8.5). It ships on by
+   default because it self-disables wherever the GBR set is feasible, so it
+   costs nothing except in genuine GBR overload — where it deliberately
+   trades aggregate throughput for the worst-served flow.
 
-The adaptive GBR penalty (a dual-ascent refinement of Tier-1) turned out to
-be the *wrong shape* for its intended job; that negative result is in §8.4.
+Two Tier-1 refinements turned out *not* to be load-bearing, and both
+negative results are worth as much as the positive ones: the adaptive GBR
+penalty is the wrong shape for its intended job (§8.4), and the
+spectral-efficiency tilt `k` only relocates the starvation it was meant to
+cure (§8.5). Neither could have worked, for a structural reason given in
+§8.5.
 
 ---
 
@@ -691,17 +711,24 @@ Reading the table:
   complexity.
 - **At 0.67× load — a distributional win the contract count hides.**
   TwoTier meets *fewer* knife-edge contracts (0/10 vs PF's 4/10) yet
-  delivers a far better *distribution*: minimum delivery 43% vs PF's 4%,
-  mean 68% vs 55%. PF lets a few good-channel flows run clear of the 95%
-  line while abandoning the rest to near-zero; TwoTier equalizes everyone
-  toward their target, so most flows cluster in the 40–90% band and none
-  cross the exact 95% threshold. "Every robot at ≥43%, mean 68%" is
-  operationally better than "4 robots at 100%, 6 robots below 30%" — but a
-  95% threshold metric scores it lower. (See §8.1.)
-- **At 1.0× and 0.33× — convergence.** In deep overload no scheduler can
-  honor the contracts; at 1/3 of shipped load all converge (10/10). The
-  scheduler choice is immaterial at both ends.
-- **The adaptive penalty meets 0/10 across every overload row.** §8.4.
+  delivers a far better *distribution*: minimum delivery **60%** vs PF's 4%,
+  mean 65% vs 55%. PF lets a few good-channel flows run clear of the 95%
+  line while abandoning the rest to near-zero; TwoTier holds everyone near
+  their target, so the flows cluster tightly and none crosses the exact 95%
+  threshold. "Every robot at ≥60%, mean 65%" is operationally better than
+  "4 robots at 100%, 6 robots below 30%" — but a 95% threshold metric scores
+  it lower. (See §8.1.)
+- **At 1.0× — convergence on contracts only.** No scheduler honours a
+  contract here (0/10 everywhere), and in that sense the choice is
+  immaterial. Distributionally it is not: TwoTier holds its worst flow at
+  40% of contract where PF leaves one at 0%, and pays 2.6 Mbps of total
+  throughput for it. What converges at deep overload is the *contract
+  count*, not the outcome.
+- **At 0.33× — real convergence.** Everyone has slack and all schedulers
+  reach 10/10. The scheduler choice is genuinely immaterial.
+- **The adaptive penalty meets 0/10 in both overloaded rows** (1.0× and
+  0.67×), and is strictly dominated by the max-min default on minimum
+  delivery at both. §8.4, §7.7.
 
 ### 7.2 Study 2 — PDCCH-limited (`sensor_dense`)
 
@@ -747,8 +774,15 @@ aged-out motion-control packets — the safety-relevant ones (§8.3).
 ### 7.4 Per-flow breakdown (`factory_robots`, 1.0× load — as shipped)
 
 The aggregates above hide *which* flows win and lose. The per-GBR-flow
-delivery (fraction of GFBR delivered) at the as-shipped 1.0× load
-operating point:
+delivery at the as-shipped 1.0× load operating point:
+
+*Metric note: this table is **delivered ÷ GFBR** — throughput against the
+contract. The `mean GBR` / `min GBR` columns in §7.1 and §7.7 are instead
+**delivered ÷ arrived**, the flow's own delivery ratio. Offered load runs
+~9% above GFBR for these video profiles, so the same run reads a few points
+lower as a delivery ratio: the flat TwoTier column below spans 50–56% of
+GFBR, and 40–48% as a delivery ratio in §7.7. Both are correct; they answer
+different questions.*
 
 | Flow | SNR | GFBR | RR | PF | Gradient | TwoTier |
 |---|---|---|---|---|---|---|
@@ -965,7 +999,8 @@ the plain `TwoTier` rows pin it off. Reproduce with
 - **It lifts the floor it was built to lift.** min GBR 0% → 40% at 1.00× and
   43% → 60% at 0.67×; ue7 (the 14 dB flow the single-stage solve zeroes)
   goes 0% → 46%. At 1.00× the whole GBR set collapses into a **40–48% band**
-  against a single-stage spread of 0–80%.
+  (delivery ratio; 50–56% of GFBR — see the metric note in §7.4) against a
+  single-stage spread of 0–80%.
 - **It is free where the cell is not in GBR overload.** At 0.50× and 0.33×,
   `t* = 1.00`, the floor is non-binding, and every figure is identical to
   default TwoTier. Contrast the adaptive penalty, which had no such
@@ -1010,11 +1045,14 @@ for contract satisfaction. Study 1 traces a *hump*:
 - **Deep overload (1.0× shipped load — the as-shipped operating point).**
   GBR demand far exceeds capacity — the shipped load is deeply overloaded
   for this cell. No scheduler can honor the contracts; PF ≈ TwoTier on the
-  contract count. A smarter MAC cannot manufacture capacity.
+  contract count. A smarter MAC cannot manufacture capacity. What the
+  scheduler still decides here is *how the shortfall is distributed*, and
+  the two answers are genuinely different: TwoTier holds every flow near
+  50% of contract, PF leaves one at 0% and carries 2.6 Mbps more total.
 - **Moderate overload (0.50–0.67× shipped load).** Capacity is *enough to
   honor the contracts but only if allocated deliberately*. This is where
   TwoTier wins: at 0.50× load, 10/10 vs 5/10 contracts; at 0.67× load, a
-  much better delivery *distribution* (min 43% vs 4%). PF, optimizing the
+  much better delivery *distribution* (min 60% vs 4%). PF, optimizing the
   wrong objective, misses contracts the cell could have met.
 - **Light load (0.33× shipped).** Everyone has slack; all schedulers
   converge to 10/10.
@@ -1027,6 +1065,14 @@ rewards a scheduler that *abandons* some flows so that others clear the bar.
 For a factory where every robot matters, "all robots degraded gracefully"
 beats "half the robots perfect, half offline" — so the contract *count* is
 necessary but not sufficient; report it alongside the minimum.
+
+This is not only a reporting caveat: it is the choice the shipped default
+now makes. The max-min stage (§7.7) is exactly a commitment to "degraded
+gracefully" over "some perfect, some offline", and it is why at 1.0× load
+TwoTier gives up total throughput to PF. A deployment that genuinely
+prefers the other answer — where a robot at 50% of its video rate is as
+useless as one at 0%, so concentration is correct — should set
+`gbr_maxmin=False` and read §8.5's contract-count discussion.
 
 **Engineering implication.** In real deployments *capacity is fixed by
 spectrum*, so the corresponding operator lever is **admission control**:

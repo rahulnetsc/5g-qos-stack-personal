@@ -1137,9 +1137,11 @@ incentive to close the remaining gap wherever that is cheap. Stage B is
 feasible by construction (stage A's solution satisfies it).
 
 Wired as `TwoTier(gbr_maxmin=True, gbr_maxmin_scale=1.0)`; **off by
-default**, so every published study number is unchanged. `scale` dials how
-much of the achievable floor to claim: 0.0 is the single-stage behaviour,
-1.0 the full guarantee.
+default** at the time of writing, so every published study number was
+unchanged. `scale` dials how much of the achievable floor to claim: 0.0 is
+the single-stage behaviour, 1.0 the full guarantee. *(Superseded the same
+day — it is now the default; see the 2026-08-06 "gbr_maxmin is now the
+default" entry below.)*
 
 ### A conditioning bug found on the way — worth generalising
 
@@ -1254,14 +1256,19 @@ understood, the fix is implemented, measured, and self-disabling where
 unneeded. What remains under it is the contract-selection question above,
 which is not Tier-1's to answer.
 
-### Open: should max-min be the default?
+### Open: should max-min be the default?  → **Resolved same day: yes**
 
-Left as `False` so every number in the study docs still reproduces. The case
-for flipping it: it is free at moderate load and only binds where the
+Left as `False` here so every number in the study docs still reproduced. The
+case for flipping it: it is free at moderate load and only binds where the
 single-stage solve is doing something indefensible. The case against: it
-costs 10% throughput at deep overload, which is exactly the regime the study
-already says to solve with capacity planning rather than scheduling. Not
-decided.
+costs throughput at deep overload, which is exactly the regime the study
+already says to solve with capacity planning rather than scheduling.
+
+**Decided later the same day — flipped to `True`.** See the "gbr_maxmin is
+now the default" entry below for the deciding argument (the stage is
+self-disabling, so it is free outside genuine GBR overload) and for the cost
+re-measured after the solver rescale, which came out at −4% rather than the
+−10% estimated here.
 
 ---
 
