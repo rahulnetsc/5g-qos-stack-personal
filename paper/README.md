@@ -4,22 +4,22 @@ A conference-paper draft built from the project's design docs.
 
 - [`main.tex`](main.tex) — the paper (IEEE conference class)
 - [`refs.bib`](refs.bib) — bibliography
-- `build/main.pdf` — compiled output (gitignored)
+- [`main.pdf`](main.pdf) — committed build product, so the draft reads
+  without a TeX toolchain. Rebuild with `make`.
 
-**Status: complete first draft, 7 pages.** It compiles clean — no overfull
-boxes — and every number in it is reproduced from the current code, not
-copied from an older revision of the docs. It has *not* been read by a human
-yet, and the items under "Before submitting" below are real blockers, not
-polish.
+**Status: complete first draft, 8 pages**, of which the OAI results section
+(§VII) is a stub awaiting measurements. It compiles clean — no overfull
+boxes — and every quantitative claim maps to a committed script rather than
+to a transcribed one-off run. It has *not* been read by a human yet, and the
+items under "Before submitting" below are real blockers, not polish.
 
 ## Building
 
 ```bash
-# Self-contained, downloads what it needs (used to produce build/main.pdf):
-tectonic -X compile main.tex --outdir build
-
-# Or with a normal TeX Live installation:
-latexmk -pdf -outdir=build main.tex
+make            # tectonic, self-contained; writes main.pdf
+make latexmk    # same, using a local TeX Live installation
+make clean      # drop the build tree, keep main.pdf
+make distclean  # drop main.pdf too
 ```
 
 `IEEEtran.cls` and `IEEEtran.bst` are not vendored here — tectonic fetches
@@ -36,8 +36,9 @@ from CTAN mirrors of unknown vintage.
 | §IV Design | scheduler-study.md §4 (all subsections) |
 | §V Methodology | scheduler-study.md §5, §6; simulator-design.md |
 | §VI Results | scheduler-study.md §7 |
-| §VII Threats to validity | scheduler-study.md §9 |
-| §VIII Conclusion | scheduler-study.md §8, §11 |
+| §VII OAI implementation results | **stub** — to be written |
+| §VIII Threats to validity | scheduler-study.md §9 |
+| §IX Conclusion | scheduler-study.md §8, §11 |
 
 Everything the study doc carries that did **not** fit: the OAI integration
 plan, the SPS reservation-policy derivation, the per-scenario YAML schema,
@@ -58,19 +59,24 @@ reviewer asks for depth on any of those, the material exists.
    handling.
 4. **Confirm the GitHub repository is public**, or replace the artifact URL
    with an anonymised archive.
+5. **Decide what §VII becomes.** It is currently a stub. Either it acquires
+   real OAI measurements before submission, or it is cut — an empty section
+   must not ship. If it is filled in, three places describing the OAI work
+   as *future* need revising: the abstract, §VIII's first paragraph, and
+   §IX's last. `main.tex` carries a comment listing them.
 
 **Worth doing.**
 
-5. **A figure.** The paper is currently all tables. The load sweep (§VI-A)
+6. **A figure.** The paper is currently all tables. The load sweep (§VI-A)
    would carry much better as a two-line plot — contracts met vs load, for
    PF and TwoTier — and would give a reader the "hump" in one glance. That
    is the paper's headline and it deserves a picture. `pgfplots` is the
    obvious tool; the data is in Table~II.
-6. **Fill in the bibliography gaps.** `refs.bib` omits page numbers and DOIs
+7. **Fill in the bibliography gaps.** `refs.bib` omits page numbers and DOIs
    where the source doc did not record them, and the 3GPP entries need
    version/date stamps. The Shakkottai & Stolyar venue in particular should
    be checked against the canonical citation.
-7. **Related work is thin on recent literature.** The citations trace the
+8. **Related work is thin on recent literature.** The citations trace the
    foundational lineage (Kelly, Neely, Stolyar, Tassiulas) and the classic
    QoS schedulers, but there is nothing from the last few years on
    O-RAN-era or slicing-era scheduling. A reviewer will notice. Worth a
