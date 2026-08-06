@@ -1450,11 +1450,13 @@ def test_slice_vs_gbr_priority_is_channel_independent():
 
 
 def test_documented_defaults_match_the_code():
-    """The parameter table in design-docs/scheduler-study.md 4.5 must not
-    drift from the constructors it documents.
+    """The two documented parameter tables must not drift from the code.
 
-    A defaults table is worse than no table once it is stale, and these
-    values are cited as decided-by-evidence throughout the study.
+    Scheduler knobs are tabulated in design-docs/scheduler-study.md 4.5;
+    the simulator-fidelity knobs, whose defaults deliberately differ from
+    the settings the studies run, are in 5.1. A defaults table is worse
+    than no table once it is stale, and these values are cited as
+    decided-by-evidence throughout the study.
     """
     import inspect
     from pathlib import Path
@@ -1495,15 +1497,19 @@ def test_documented_defaults_match_the_code():
     assert t1["capacity_safety_factor"].default == 1.0
     assert "capacity_safety_factor" not in actual
 
-    # The simulator-fidelity knobs default to perfect information.
+    # Section 5.1: the fidelity knobs default to perfect information, so a
+    # unit test never has to reason about report latency...
     from sim.driver import run as _run
 
     sim_defaults = inspect.signature(_run).parameters
     for name in ("ul_bsr_delay_slots", "ul_bsr_loss_rate",
                  "cqi_delay_slots", "cqi_loss_rate"):
-        assert sim_defaults[name].default in (0, 0.0), name
+        assert sim_defaults[name].default in (0, 0.0), (
+            f"{name} should default to perfect information (0)"
+        )
 
-    # And the study settings the tables quote.
+    # ...while the studies deliberately run the delays non-zero. That gap is
+    # the point of the 5.1 table, so guard both halves of it.
     study = Path("scripts/scheduler_study.py").read_text()
     assert "UL_BSR_DELAY_SLOTS = 8" in study
     assert "CQI_DELAY_SLOTS = 8" in study

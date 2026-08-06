@@ -646,11 +646,14 @@ For each flow class:
 ## 12. Open Questions and Future Work
 
 **Parameters and defaults** are tabulated in
-[scheduler-study.md §4.5](scheduler-study.md) — every knob, its shipped
-value, whether it is settled by evidence / expected to be set per site /
-implemented-but-rejected, and what moving it does. That table is guarded by
-`test_documented_defaults_match_the_code`, so it cannot drift from the
-constructors silently.
+[scheduler-study.md §4.5](scheduler-study.md) — every scheduler knob, its
+shipped value, whether it is settled by evidence / expected to be set per
+site / implemented-but-rejected, and what moving it does. The simulator's
+fidelity settings (BSR and CQI report delay and loss), whose defaults are
+deliberately *not* what the studies run, are tabulated separately in
+[§5.1](scheduler-study.md). Both tables are guarded by
+`test_documented_defaults_match_the_code`, so neither can drift from the
+code silently.
 
 
 ### Open questions (still need answers)

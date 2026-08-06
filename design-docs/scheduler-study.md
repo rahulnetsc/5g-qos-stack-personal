@@ -552,8 +552,10 @@ drift-plus-penalty and not "PF with a bigger GBR knob."
 
 ### 4.5 Parameters and defaults
 
-Every knob, its shipped default, and what moving it does. Constructor
-arguments are on `scheduler.TwoTier` unless noted. **Status** reads:
+Every *scheduler* knob, its shipped default, and what moving it does.
+Constructor arguments are on `scheduler.TwoTier` unless noted. The
+simulator's own fidelity settings — how much the modelled gNB is allowed to
+know — are separate and live in §5.1. **Status** reads:
 *decided* — settled by evidence, do not change without re-running the
 studies; *deployment* — expected to be set per site; *rejected* — implemented,
 measured, and defaulted off, with the negative result cited.
@@ -585,19 +587,6 @@ measured, and defaulted off, with the negative result cited.
 | — | `sps_budget_fraction` | `0.85` | decided | Ceiling on the carrier fraction SPS may reserve, leaving a dynamic pool for burst spillover. |
 | — | `sps_min_scale` | `0.75` | decided | Viability floor. If a priority tier's reservations would be scaled below this, the tier runs dynamically instead — unless dropping it would overrun the CCE budget. This is what stops SPS being net-negative on an oversubscribed uplink. |
 | — | `sps_snr_margin_db` | `0.0` | deployment | Conservatism of the semi-static SPS MCS, chosen at reservation time from `snr_avg − margin`. A mobility hedge: `0` for fixed/slow deployments; anything ≥ 1 dB costs contracts on this channel (§7.6). |
-
-**Simulator fidelity (`sim.driver.run`)**
-
-Not scheduler parameters — they model what a real gNB does *not* know. Zero
-means perfect information, which is why the library defaults are `0` while
-the studies deliberately run them non-zero.
-
-| Knob | Library default | Study setting | What it models |
-|---|---|---|---|
-| `ul_bsr_delay_slots` | `0` | `8` (~4 ms) | SR/BSR/grant round-trip before the gNB learns of UL data. Configured Grants bypass it entirely — half of SPS's advantage (§7.5). |
-| `ul_bsr_loss_rate` | `0.0` | `0` | Per-slot Bernoulli BSR loss; the gNB keeps the last good report. Barely matters on continuously-backlogged traffic (§7.5). |
-| `cqi_delay_slots` | `0` | `8` (~4 ms) | Age of the CQI the scheduler picks an MCS from. Mismatch against true SNR drives BLER (§7.6). |
-| `cqi_loss_rate` | `0.0` | `0` | Per-slot Bernoulli CQI-report loss. |
 
 Per-flow contract fields (`gfbr_bps`, `pdb_ms`, `priority_level`,
 `slice_id`) are workload inputs rather than tuning knobs; see
@@ -639,6 +628,25 @@ value of SPS. (Ignoring BSR was the sim's largest fidelity gap; it surfaced
 during the parallel OAI-integration workstream and is closed here — see
 [NOTES.md](../NOTES.md).) Conversely, PHY detail is omitted because it does
 not change *which scheduler wins*.
+
+**The knobs, and why their defaults differ from the studies' settings.**
+These are `sim.driver.run` arguments, not scheduler parameters — each one
+models something a real gNB does *not* know. Zero means perfect
+information, which is why the library defaults are all `0`: a unit test
+should not have to reason about report latency to assert a scheduling
+decision. The studies deliberately run them non-zero, and the gap is worth
+stating plainly so the two sets of numbers are not read as inconsistent.
+
+| Knob | Library default | Study setting | What it models |
+|---|---|---|---|
+| `ul_bsr_delay_slots` | `0` | `8` (≈ 4 ms at μ=1) | SR/BSR/grant round-trip before the gNB learns a UE has UL data. Configured Grants bypass it entirely — half of SPS's structural advantage (§7.5). |
+| `ul_bsr_loss_rate` | `0.0` | `0` | Per-slot Bernoulli BSR loss; on a loss the gNB keeps the last good report. Barely moves either scheduler on continuously-backlogged traffic (§7.5). |
+| `cqi_delay_slots` | `0` | `8` (≈ 4 ms) | Age of the CQI the scheduler picks an MCS from. Mismatch against the true SNR at transmission drives BLER (§7.6). |
+| `cqi_loss_rate` | `0.0` | `0` | Per-slot Bernoulli CQI-report loss; the gNB holds the last reported value. |
+
+Both loss rates are left at `0` in the studies because the sweeps found
+them near-inert on these workloads (§7.5, §7.6); they exist so a deployment
+with marginal PUCCH can be modelled rather than assumed away.
 
 ### 5.2 The harness
 
