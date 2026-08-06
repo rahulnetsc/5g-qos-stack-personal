@@ -121,6 +121,7 @@ required. Full results and a build/don't-build decision table are in
 │   ├── bsr_study.py              UL BSR delay / loss sensitivity
 │   ├── cqi_study.py              DL CQI staleness / SPS MCS margin sensitivity
 │   ├── maxmin_study.py           max-min GBR stage (cell-edge starvation)
+│   ├── knapsack_diagnostic.py    why soft GBR floors abandon the cell edge
 │   ├── transient_check.py        long-run windowed steady-state check
 │   └── plot_timeseries.py
 └── ...

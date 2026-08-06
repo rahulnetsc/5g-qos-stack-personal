@@ -129,13 +129,14 @@ design was not worth building.
 \item \textbf{A structural result on soft GBR penalties}
 (Section~\ref{sec:knapsack}). In the standard formulation---maximise
 utility, minus a large penalty on GBR shortfall---the penalty outweighs the
-utility by a factor we measure at $3.4\times10^{7}$. The program is then
+utility by a factor we measure at $3.3\times10^{7}$. The program is then
 effectively \emph{minimise total shortfall bits under a PRB budget}: a
 fractional knapsack whose optimum is greedy in spectral efficiency and
 therefore a \emph{vertex}. The lowest-SE GBR flow is not degraded but
-abandoned, at exactly $0$. We show no reweighting of the penalty can remove
-this, and that a max-min satisfaction stage does, lifting the worst-served
-flow from 0\% to 40\% of contract at a cost of 4\% of cell throughput.
+abandoned, at exactly $0$---where the same flow receives 23\% under the
+utility term alone. We show no reweighting of the penalty can remove this,
+and that a max-min satisfaction stage does, lifting the worst-served flow
+from 0\% to 40\% of contract at a cost of 4\% of cell throughput.
 
 \item \textbf{Evidence that Configured Grants are structurally decisive}
 (Section~\ref{sec:pdcch}). When the control channel binds, the two-tier
@@ -257,8 +258,8 @@ The conventional formulation is a single objective,
 \label{eq:single}
 \end{equation}
 with $p_i$ ``large'' so that GBR floors are effectively hard whenever
-feasible. On our factory workload we measure the two terms at $709$ and
-$2.4\times10^{10}$ respectively: a ratio of $3.4\times10^{7}$. That is not
+feasible. On our factory workload we measure the two terms at $718$ and
+$2.4\times10^{10}$ respectively: a ratio of $3.3\times10^{7}$. That is not
 a weighting. It is a \emph{lexicographic ordering expressed as a
 magnitude}, and it has two consequences.
 
@@ -312,21 +313,28 @@ $\mathrm{SE}$ & Flows (SNR) & Target \\
 \midrule
 48.6 & ue1, ue5 (22, 24\,dB) & 100\% \\
 37.8 & ue3, ue6, ue8, ue10 (19--21\,dB) & 100\% \\
-29.7 & ue2, ue4, ue9 (16--18\,dB) & 53--56\% \\
+29.7 & ue2, ue4, ue9 (16--18\,dB) & 50--67\% \\
 21.6 & ue7 (14\,dB) & \textbf{0\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Two controls confirm the mechanism. Sweeping $p$ over six decades
-($1$ to $10^6$) leaves the targets \emph{identical}: the solution is fixed
-by the knapsack structure, not the penalty magnitude. Conversely at
-$p=10^{-6}$, with the utility alone driving, the allocation is 44--56\% and
-\emph{rises} as SE falls---the worst-channel flow receives the largest
-fraction of its contract. \textbf{The $\log$ utility is the term that
-protects cell-edge flows; the slack penalty is the term that starves
-them.} This inverts the usual attribution of cell-edge starvation to
-``weighted-$\log$ pathology.''
+Two controls confirm the mechanism. First, sweeping $p$ over six decades
+($1$ to $10^{6}$) leaves the targets \emph{identical}: the solution is
+fixed by the knapsack structure, not by the penalty magnitude, so no choice
+of $p$ is a tuning opportunity. Second, we drop the shortfall term entirely
+and maximise the utility alone. That allocation is not generous to the cell
+edge---the stationary condition of $\sum \log r_i$ under a capacity
+constraint is $r_i \propto \mathrm{SE}_i$, so the utility is itself
+SE-favouring, and the worst-channel flow receives 23\% of its contract
+against the best flow's 89\%. But it serves that flow \emph{something}.
+Adding the shortfall term takes the same flow to exactly $0$.
+
+The distinction matters for attribution. Cell-edge starvation under
+utility-based scheduling is often ascribed to ``weighted-$\log$
+pathology''; our measurements locate it instead in the \emph{shortfall
+term}, which is what converts a merely SE-favouring allocation into a
+vertex one that abandons outright.
 
 It also explains why penalty-shaped fixes cannot work. Since the optimum is
 a vertex, reweighting $p$ selects a \emph{different} vertex and nothing
@@ -675,6 +683,64 @@ different victim rather than removing the abandonment. We think this is the
 transferable lesson---\emph{in an infeasible allocation problem, a weight
 chooses whom to sacrifice; only a constraint prevents sacrifice}---and it
 applies to any scheduler enforcing rate contracts through penalty terms.
+
+% ===========================================================================
+\section{OAI Implementation Results}\label{sec:oai}
+% ===========================================================================
+%
+% STUB -- to be written once the OpenAirInterface port has measurements.
+% The scheduler/ library was dependency-isolated (cvxpy/numpy only, never
+% the simulator) specifically so it could be lifted here unchanged, so the
+% natural spine is: what actually had to change, what the testbed was, what
+% it measured, and how that compares against Section VI.
+%
+% NOTE: when this section acquires real content, three things elsewhere
+% must be revised, because they currently describe the OAI work as future:
+%   - Threats to Validity, first paragraph: "An OAI integration is the
+%     necessary next step."
+%   - Conclusion, last paragraph: "Future work is the OpenAirInterface
+%     integration..."
+%   - The abstract, which claims only simulation evidence.
+% ===========================================================================
+
+\emph{[Placeholder. The simulation results of Section~\ref{sec:results}
+motivated an OpenAirInterface implementation; its measurements are reported
+here.]}
+
+\subsection{Implementation}
+\emph{[Stub.]} What the port required: where Tier-1 runs relative to the
+MAC scheduler thread and how its targets are published; how Tier-2 attaches
+to the gNB's per-slot scheduling path; how configured grants are set up and
+released; and which of the simulator's abstractions --- symbol-accurate
+capacity, the CCE budget, the delayed BSR view --- map onto real gNB state
+rather than having to be re-derived. Worth stating explicitly which parts of
+the \texttt{scheduler/} library lifted unchanged and which did not, since
+dependency isolation was an explicit design goal.
+
+\subsection{Experimental Setup}
+\emph{[Stub.]} Testbed: gNB hardware and radio unit, OAI release, carrier
+and TDD configuration, UE population and type, and how the factory workload
+of Section~\ref{sec:method} was reproduced on real UEs. Any deviation from
+the simulated scenarios should be named --- particularly offered load, SNR
+spread, and whether the deep-overload operating point is reachable at all.
+
+\subsection{Results}
+\emph{[Stub.]} The same contract-oriented metrics as
+Section~\ref{sec:results}: GBR contracts met, minimum delivery across the
+GBR set, on-time fraction and p99 head-of-line delay, measured against the
+stock OAI PF scheduler on identical traffic. Tier-1 solve time and its
+margin against the re-solve cadence belong here too, since real-time
+feasibility is a claim simulation cannot make.
+
+\subsection{Discussion}
+\emph{[Stub.]} The load-bearing question is which simulated conclusions
+survive contact with hardware: whether the moderate-overload band remains
+the regime where the design pays (Section~\ref{sec:hump}); whether
+configured grants retain their structural advantage once real DCI and BSR
+timing apply (Section~\ref{sec:pdcch}); and whether the max-min floor
+behaves as Section~\ref{sec:celledge} predicts on a measured rather than
+modelled SNR spread. Divergence is more interesting than agreement, and
+should be attributed to a specific unmodelled effect.
 
 % ===========================================================================
 \section{Threats to Validity}\label{sec:threats}

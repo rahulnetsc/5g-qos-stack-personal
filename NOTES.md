@@ -1095,6 +1095,14 @@ at `p = 1e-6` (utility alone), the allocation is 44–56% *rising* as SE falls
 is the term that protects cell-edge flows; the slack penalty is the term
 that starves them. The 05-13 note had it backwards.
 
+> **Correction, same day, after the solver rescale.** The `p = 1e-6` row
+> above is an artifact of the badly-conditioned single-objective solver and
+> does not reproduce. The utility alone is *also* SE-favouring; the correct
+> control gives the worst-SE flow 23%, not the highest share. See the
+> "the log utility is not protective either" entry below. The knapsack
+> argument itself is unaffected — it rests on the term ratio, the
+> staircase, and the six-decade sweep, all of which reproduce.
+
 (Credit where due: `design-docs/scheduler-design.md`'s adaptive-penalty
 section already stated the shortfall-minimisation argument correctly. It was
 NOTES.md and scheduler-study.md §8.5 that mis-attributed it to the `log`.)
@@ -1558,5 +1566,74 @@ scale sweep at 1.0× load (§7.7) shows the curve is smooth, with the knee
 around 0.75 (min GBR 28% for 3.1% of throughput, against 40% for 10%). A
 deployment that wants the throughput back has a one-number dial, and 0.75 is
 the defensible alternative if the −4% ever becomes contentious.
+
+---
+
+## 2026-08-06 — Correction: the log utility is not protective either
+
+Writing the conference draft forced the knapsack evidence into a committed
+script (`scripts/knapsack_diagnostic.py`) instead of the ad-hoc probes it
+had lived in. Doing that **falsified one of the four claims** in the root-
+cause entry above, and it is worth recording exactly how.
+
+### What was claimed, and why it was wrong
+
+The original control was: set `p = 1e-6` so the utility dominates, and
+observe the allocation *rise* as SE falls — from which "the log utility is
+the term that protects cell-edge flows." Two things are wrong with it.
+
+1. **It no longer runs.** Since `solve_tier1` became lexicographic, phase 1
+   minimises shortfall before phase 2 looks at the utility, *regardless of
+   `p`*. Shrinking `p` cannot hand control to the utility any more. That is
+   the whole point of the rewrite — and it means the old control was only
+   ever possible because of the formulation we removed.
+2. **The original numbers were probably solver noise.** They came from the
+   single-objective form at a penalty six orders below its default, i.e. the
+   worst-conditioned corner of a formulation that we later showed returns
+   `optimal_inaccurate` and disagrees with itself across solvers.
+
+### The correct control, and what it shows
+
+Pose the utility-only program directly — maximise `Σ w log(r)` under
+capacity and demand, no GBR floor, no shortfall term:
+
+| flow | SE | utility alone | with shortfall term |
+|---|---|---|---|
+| ue1 (22 dB) | 48.6 | 89% | 100% |
+| ue7 (14 dB) | 21.6 | **23%** | **0%** |
+
+The log utility is **not** cell-edge-protecting. Its stationary condition
+under a capacity constraint is `rᵢ ∝ SEᵢ`, so it favours high-SE flows too —
+ue7 gets 23% where ue1 gets 89%. What it does *not* do is drive anyone to
+zero. Adding the shortfall term takes ue7 from 23% to exactly 0.
+
+So the corrected claim is narrower and sharper: **the shortfall term is what
+converts a merely SE-favouring allocation into a vertex one that abandons
+outright.** Not "the utility protects and the penalty starves" — both lean
+the same way; only one of them zeroes a flow.
+
+### What survives
+
+The knapsack argument is untouched. It rests on three things that all
+reproduce exactly: the term ratio (utility 718 vs penalty 2.4e10, ratio
+3.3e7), the SE staircase with a zeroed tail, and identical targets across
+six decades of `p`. The fix — a hard floor rather than a reweighting — was
+never justified by the falsified control.
+
+Also corrected while re-measuring: the boundary tier reads **50–67%**, not
+the 53–56% recorded earlier. That earlier figure predates the solver
+rescale, which redistributed within the tier (equal-weight, equal-SE flows
+should get equal *rates*, and now do).
+
+### The lesson worth keeping
+
+This is the second time today that making something reproducible changed
+what it said. The first was the solver rescale itself. **An ad-hoc probe run
+once, whose output is transcribed into prose, is not evidence — it is a
+memory of evidence.** The claims that survived contact with a committed
+script are the ones that were re-run; the one that did not was the one
+nobody had re-run since the formulation changed underneath it.
+
+Every quantitative claim in `paper/main.tex` now maps to a committed script.
 
 ---

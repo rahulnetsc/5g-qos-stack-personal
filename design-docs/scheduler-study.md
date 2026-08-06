@@ -1255,14 +1255,21 @@ knapsack**, whose optimum is greedy in spectral efficiency, and the solved
 targets are exactly that staircase: 100% for the two highest-SE flows, 100%
 for the next four, 53–56% for the boundary tier, and **0%** for the single
 lowest-SE flow. It orders by SE, not SNR — ue2 (18 dB) and ue4 (16 dB) share
-an MCS step and get the identical 56%.
+an MCS step and get identical targets.
 
 Two controls confirm it. Sweeping `p` over six decades (`1` … `1e6`) leaves
 the targets *identical* — the solution is fixed by the knapsack structure,
-not the penalty magnitude. And at `p = 1e-6`, with the utility alone driving,
-the allocation is 44–56% and **rises as SE falls**: ue7, the starved flow,
-gets the highest ratio of all. The `log` utility is the term that *protects*
-cell-edge flows; the slack penalty is the term that starves them.
+not the penalty magnitude. Second, dropping the shortfall term entirely and
+maximising the utility alone: the worst-SE flow gets **23%** of its contract
+against the best flow's 89%. The utility is *not* a cell-edge-protecting
+objective — its stationary condition is `rᵢ ∝ SEᵢ`, so it favours high SE
+too — but it serves every flow *something*, and adding the shortfall term
+takes that same flow to exactly **0%**. The abandonment is therefore
+attributable to the shortfall term specifically: it is what turns a merely
+SE-favouring allocation into a vertex one. (The 05-13 attribution to
+"weighted-`log` pathology" is still wrong, but the correction is narrower
+than first recorded — see the 2026-08-06 correction in
+[NOTES.md](../NOTES.md).)
 
 **Why every penalty-shaped fix was doomed.** Once the penalty dominates, the
 program is effectively an LP, so its optimum is a **vertex**: bang-bang,

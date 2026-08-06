@@ -85,10 +85,21 @@ reviewer asks for depth on any of those, the material exists.
   attack; the trade is defended in §VI-D rather than hidden.
 - **The strongest claim** is the knapsack argument in §IV-C — that soft GBR
   penalties make the strategic program a fractional knapsack whose optimum
-  abandons the worst-channel flow, and that no reweighting can fix it. It is
-  supported by a six-decade penalty sweep and a sign-flip control. If one
-  contribution is going to be pushed back on, it is worth defending this one
-  hardest, because it generalises beyond our design.
+  abandons the worst-channel flow, and that no reweighting can fix it. It
+  rests on three measurements that all reproduce: the objective-term ratio,
+  the spectral-efficiency staircase with a zeroed tail, and identical
+  targets across six decades of the penalty. Regenerate all three with
+  `python scripts/knapsack_diagnostic.py`. If one contribution is going to
+  be pushed back on, defend this one hardest — it generalises beyond our
+  design.
+- **One claim was cut during drafting**, and the reason is worth having to
+  hand if a reviewer probes. An earlier version argued that the log utility
+  *protects* cell-edge flows while the penalty starves them. Writing the
+  diagnostic script falsified it: the utility is also SE-favouring
+  (`r_i ∝ SE_i`), giving the worst flow 23% against the best flow's 89%.
+  What it does not do is drive anyone to zero, which the shortfall term
+  does — so the paper now makes that narrower claim. The original reading
+  came from an ad-hoc probe against a solver formulation since replaced.
 - **The weakest point** is external validity: three synthetic scenarios, one
   cell, simulation only. §VII says so. Trace-driven workloads or an OAI
   measurement would answer it, and neither exists yet.
