@@ -8,10 +8,25 @@ A conference-paper draft built from the project's design docs.
   without a TeX toolchain. Rebuild with `make`.
 
 **Status: complete first draft, 8 pages**, of which the OAI results section
-(§VII) is a stub awaiting measurements. It compiles clean — no overfull
-boxes — and every quantitative claim maps to a committed script rather than
-to a transcribed one-off run. It has *not* been read by a human yet, and the
-items under "Before submitting" below are real blockers, not polish.
+(§VII) is a stub awaiting measurements. Prepared for **double-blind**
+review: the author block is anonymised and the artifact section names no
+repository. It compiles clean — no overfull boxes — and every quantitative
+claim maps to a committed script rather than to a transcribed one-off run.
+It has *not* been read by a human yet.
+
+### Space budget for §VII
+
+Measured, not estimated: with §VII removed the paper is **exactly 7 full
+pages**. At an 8-page limit that leaves **one full page — about two columns
+— for the OAI section**, which the stub currently uses about 40% of.
+
+As a rough conversion from the existing sections: a 5-row table like
+Table~III costs ~1/3 column including its caption, and a column holds
+~450 words. So one workable shape is ~250 words of implementation, ~150 of
+setup, one results table, and ~200 of discussion. If it needs more, §II
+(related work) and §V (methodology) are the most compressible; the results
+tables are not, and neither is §IV-C, which carries the paper's analytical
+contribution.
 
 ## Building
 
@@ -47,36 +62,38 @@ reviewer asks for depth on any of those, the material exists.
 
 ## Before submitting
 
+**Settled** (2026-08-06): the track is double-blind, so the author block is
+anonymised and the artifact section names no repository; the page limit is
+taken as 8; the repository stays private for now, and the artifact section
+promises release on acceptance with reviewer access via the chairs. All
+three are marked in `main.tex` with comments saying what to restore for
+camera-ready.
+
 **Blockers.**
 
-1. **Author block and affiliation** — currently placeholders in `main.tex`.
-2. **Check the page limit against the current CFP.** COMSNETS has used 6, 8
-   and 9 page limits across tracks and years, sometimes counting references
-   separately. Do not trust this file for that number. At 7 pages there is
-   room to grow *or* to cut, depending.
-3. **Check whether the track is double-blind.** If it is, the author block,
-   the artifact URL, and the phrase "our implementation" in §IV all need
-   handling.
-4. **Confirm the GitHub repository is public**, or replace the artifact URL
-   with an anonymised archive.
-5. **Decide what §VII becomes.** It is currently a stub. Either it acquires
-   real OAI measurements before submission, or it is cut — an empty section
-   must not ship. If it is filled in, three places describing the OAI work
-   as *future* need revising: the abstract, §VIII's first paragraph, and
-   §IX's last. `main.tex` carries a comment listing them.
+1. **Decide what §VII becomes.** It is a stub. Either it acquires real OAI
+   measurements before submission, or it is cut — an empty section must not
+   ship. If it is filled in, three places describing the OAI work as
+   *future* need revising: the abstract, §VIII's first paragraph, and §IX's
+   last. `main.tex` carries a comment listing them.
+2. **Re-confirm the page limit against the current CFP** before submission.
+   8 is the working assumption, not a verified fact, and COMSNETS has used
+   other limits across tracks and years.
+3. **Restore for camera-ready**: real author block and affiliations, and the
+   artifact URL once the repository is public.
 
 **Worth doing.**
 
-6. **A figure.** The paper is currently all tables. The load sweep (§VI-A)
+4. **A figure.** The paper is currently all tables. The load sweep (§VI-A)
    would carry much better as a two-line plot — contracts met vs load, for
    PF and TwoTier — and would give a reader the "hump" in one glance. That
    is the paper's headline and it deserves a picture. `pgfplots` is the
    obvious tool; the data is in Table~II.
-7. **Fill in the bibliography gaps.** `refs.bib` omits page numbers and DOIs
+5. **Fill in the bibliography gaps.** `refs.bib` omits page numbers and DOIs
    where the source doc did not record them, and the 3GPP entries need
    version/date stamps. The Shakkottai & Stolyar venue in particular should
    be checked against the canonical citation.
-8. **Related work is thin on recent literature.** The citations trace the
+6. **Related work is thin on recent literature.** The citations trace the
    foundational lineage (Kelly, Neely, Stolyar, Tassiulas) and the classic
    QoS schedulers, but there is nothing from the last few years on
    O-RAN-era or slicing-era scheduling. A reviewer will notice. Worth a
