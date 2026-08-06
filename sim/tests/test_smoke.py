@@ -1447,3 +1447,63 @@ def test_slice_vs_gbr_priority_is_channel_independent():
         assert gbr_fraction_met(snr_db, gbr_penalty * 10) < 0.90, (
             f"at {snr_db} dB a 10x dearer slice floor should win"
         )
+
+
+def test_documented_defaults_match_the_code():
+    """The parameter table in design-docs/scheduler-study.md 4.5 must not
+    drift from the constructors it documents.
+
+    A defaults table is worse than no table once it is stale, and these
+    values are cited as decided-by-evidence throughout the study.
+    """
+    import inspect
+    from pathlib import Path
+
+    from scheduler import solve_tier1
+
+    documented = {
+        "tier1_period_slots": 2000,
+        "snr_window_slots": 100,
+        "delay_urgency_weight": 4.0,
+        "delay_exponent": 2.0,
+        "enable_sps": True,
+        "sps_safety_margin": 1.10,
+        "sps_budget_fraction": 0.85,
+        "sps_min_scale": 0.75,
+        "sps_snr_margin_db": 0.0,
+        "gbr_penalty_init": 1e3,
+        "gbr_penalty_lr": 0.0,
+        "gbr_penalty_max": 1e6,
+        "gbr_penalty_se_exponent": 0.0,
+        "gbr_maxmin": True,
+        "gbr_maxmin_scale": 1.0,
+        "slice_shares": None,
+        "slice_slack_penalty": 1e3,
+    }
+    actual = inspect.signature(TwoTier.__init__).parameters
+    assert set(documented) == set(actual) - {"self"}, (
+        "TwoTier gained or lost a knob -- update scheduler-study.md 4.5"
+    )
+    for name, want in documented.items():
+        assert actual[name].default == want, (
+            f"TwoTier.{name} default is {actual[name].default!r}, "
+            f"scheduler-study.md 4.5 documents {want!r}"
+        )
+
+    # capacity_safety_factor is documented as a solve_tier1-only knob.
+    t1 = inspect.signature(solve_tier1).parameters
+    assert t1["capacity_safety_factor"].default == 1.0
+    assert "capacity_safety_factor" not in actual
+
+    # The simulator-fidelity knobs default to perfect information.
+    from sim.driver import run as _run
+
+    sim_defaults = inspect.signature(_run).parameters
+    for name in ("ul_bsr_delay_slots", "ul_bsr_loss_rate",
+                 "cqi_delay_slots", "cqi_loss_rate"):
+        assert sim_defaults[name].default in (0, 0.0), name
+
+    # And the study settings the tables quote.
+    study = Path("scripts/scheduler_study.py").read_text()
+    assert "UL_BSR_DELAY_SLOTS = 8" in study
+    assert "CQI_DELAY_SLOTS = 8" in study

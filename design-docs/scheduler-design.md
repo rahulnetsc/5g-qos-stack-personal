@@ -645,6 +645,14 @@ For each flow class:
 
 ## 12. Open Questions and Future Work
 
+**Parameters and defaults** are tabulated in
+[scheduler-study.md §4.5](scheduler-study.md) — every knob, its shipped
+value, whether it is settled by evidence / expected to be set per site /
+implemented-but-rejected, and what moving it does. That table is guarded by
+`test_documented_defaults_match_the_code`, so it cannot drift from the
+constructors silently.
+
+
 ### Open questions (still need answers)
 - TDD pattern (DSUUU? something else?), numerology, carrier bandwidth — exact choice for the deployment.
 - SPS periodicity quantization for 16.67 ms camera frames (16 vs 17 slots; or staggered configs).

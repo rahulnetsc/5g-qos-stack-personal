@@ -31,7 +31,7 @@ Absolute figures predate the 2026-08-06 Tier-1 reformulation in older
 1. [Problem statement and design goals](#1-problem-statement-and-design-goals)
 2. [State of the art](#2-state-of-the-art)
 3. [The proposed solution](#3-the-proposed-solution)
-4. [Mathematical formulation](#4-mathematical-formulation)
+4. [Mathematical formulation](#4-mathematical-formulation) — incl. [§4.5 parameters and defaults](#45-parameters-and-defaults)
 5. [The simulation framework](#5-the-simulation-framework)
 6. [Scenarios and schedulers compared](#6-scenarios-and-schedulers-compared)
 7. [Comparative results](#7-comparative-results)
@@ -547,6 +547,61 @@ on* the target; it just lands somewhere higher. A virtual queue, by
 contrast, integrates the rate error `(target − delivered)` without bound, so
 the only steady state is `delivered = target`. This is why Tier-2 is
 drift-plus-penalty and not "PF with a bigger GBR knob."
+
+---
+
+### 4.5 Parameters and defaults
+
+Every knob, its shipped default, and what moving it does. Constructor
+arguments are on `scheduler.TwoTier` unless noted. **Status** reads:
+*decided* — settled by evidence, do not change without re-running the
+studies; *deployment* — expected to be set per site; *rejected* — implemented,
+measured, and defaulted off, with the negative result cited.
+
+**Tier-1 — the strategic solve (§4.1)**
+
+| Symbol | Knob | Default | Status | What it does |
+|---|---|---|---|---|
+| — | `tier1_period_slots` | `2000` | decided | Slots between Tier-1 re-solves (~1 s at μ=1). Tier-2's drift-plus-penalty absorbs drift inside the window, so no intermediate weight refresh is needed. |
+| `α` | `gbr_maxmin_scale` | `1.0` | decided | Fraction of the achievable max-min level `t*` claimed as a hard GBR floor. `1.0` claims all of it; `0.0` recovers the single-stage solve. The cost curve is smooth with a knee near `0.75` (§7.7). |
+| — | `gbr_maxmin` | `True` | decided | Runs stage A at all. On by default because it self-disables — at `t* = 1` the floor binds nothing (§7.7). |
+| `pᵢ` | `gbr_penalty_init` | `1e3` | decided | Per-flow weight on GBR shortfall in B1. Since B1/B2 are lexicographic, only the *ratio* between flows matters — the absolute value is inert. |
+| `p_slice` | `slice_slack_penalty` | `1e3` | deployment | Weight on slice-floor shortfall, in the same bps currency as `pᵢ`. At parity a bit denied to a slice floor costs the same as a bit denied to a GBR floor. Whether tenant slice guarantees *should* rank equal with per-flow GBR guarantees is a policy call. |
+| `φ(σ,d)` | `slice_shares` | `None` | deployment | `{slice_id: {"DL": frac, "UL": frac}}`. Guaranteed, work-conserving share of each direction's capacity. `None` disables slicing. |
+| — | `capacity_safety_factor` | `1.0` | deployment | Scales `C_d`. Headroom for control overhead the model does not itemise. `solve_tier1` only. |
+| `b` | `gbr_penalty_lr` | `0.0` | **rejected** | Dual-ascent learning rate on `pᵢ`. Equalises normalised shortfall, which is the wrong objective for a step-function contract — §8.4. |
+| — | `gbr_penalty_max` | `1e6` | rejected | Cap on the adaptive `pᵢ`. Inert while `gbr_penalty_lr = 0`. Hitting it is the admission-control reject signal. |
+| `k` | `gbr_penalty_se_exponent` | `0.0` | **rejected** | Tilts `pᵢ` by `(SEᵢ/SE_max)^k`. `k < 0` relocates starvation rather than removing it — §8.4, §8.5. |
+
+**Tier-2 — per-slot scheduling and SPS (§4.2, §4.3)**
+
+| Symbol | Knob | Default | Status | What it does |
+|---|---|---|---|---|
+| — | `snr_window_slots` | `100` | decided | EWMA window on reported CQI (`α = 1 − 1/window`) used for ranking and for sizing SPS. |
+| `V_delay` | `delay_urgency_weight` | `4.0` | decided | Scales the head-of-line urgency term folded into a Delay flow's virtual queue. Urgency is multiplied by the largest system `Q`, so it stays comparable as queues grow — this is what lets a small periodic flow preempt bulk near its PDB. |
+| `β` | `delay_exponent` | `2.0` | decided | Shape of that urgency: `(HoL / PDB)^β`. `β > 1` keeps a flow patient until its deadline approaches, then escalates sharply. |
+| — | `enable_sps` | `True` | decided | Configured Grants. The single highest-leverage feature in the study (§8.2) — 30/30 deadlines vs PF's 2/30 when PDCCH-bound. |
+| — | `sps_safety_margin` | `1.10` | decided | Over-sizes an SPS reservation against its contracted floor, so ordinary jitter does not have to spill into the dynamic pool. |
+| — | `sps_budget_fraction` | `0.85` | decided | Ceiling on the carrier fraction SPS may reserve, leaving a dynamic pool for burst spillover. |
+| — | `sps_min_scale` | `0.75` | decided | Viability floor. If a priority tier's reservations would be scaled below this, the tier runs dynamically instead — unless dropping it would overrun the CCE budget. This is what stops SPS being net-negative on an oversubscribed uplink. |
+| — | `sps_snr_margin_db` | `0.0` | deployment | Conservatism of the semi-static SPS MCS, chosen at reservation time from `snr_avg − margin`. A mobility hedge: `0` for fixed/slow deployments; anything ≥ 1 dB costs contracts on this channel (§7.6). |
+
+**Simulator fidelity (`sim.driver.run`)**
+
+Not scheduler parameters — they model what a real gNB does *not* know. Zero
+means perfect information, which is why the library defaults are `0` while
+the studies deliberately run them non-zero.
+
+| Knob | Library default | Study setting | What it models |
+|---|---|---|---|
+| `ul_bsr_delay_slots` | `0` | `8` (~4 ms) | SR/BSR/grant round-trip before the gNB learns of UL data. Configured Grants bypass it entirely — half of SPS's advantage (§7.5). |
+| `ul_bsr_loss_rate` | `0.0` | `0` | Per-slot Bernoulli BSR loss; the gNB keeps the last good report. Barely matters on continuously-backlogged traffic (§7.5). |
+| `cqi_delay_slots` | `0` | `8` (~4 ms) | Age of the CQI the scheduler picks an MCS from. Mismatch against true SNR drives BLER (§7.6). |
+| `cqi_loss_rate` | `0.0` | `0` | Per-slot Bernoulli CQI-report loss. |
+
+Per-flow contract fields (`gfbr_bps`, `pdb_ms`, `priority_level`,
+`slice_id`) are workload inputs rather than tuning knobs; see
+[sim/scenarios/README.md](../sim/scenarios/README.md).
 
 ---
 
