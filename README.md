@@ -55,6 +55,12 @@ make compare
 # Three contract-oriented studies: overload sweep, PDCCH-limited, latency-bound
 uv run python scripts/scheduler_study.py
 
+# Sensitivity studies: UL BSR delay/loss, DL CQI staleness + SPS MCS margin,
+# and the max-min GBR stage that fixes cell-edge starvation
+uv run python scripts/bsr_study.py
+uv run python scripts/cqi_study.py
+uv run python scripts/maxmin_study.py
+
 # Per-slot time-series plots
 uv run python scripts/plot_timeseries.py --scenario sensor --schedulers pf twotier
 uv run python scripts/plot_timeseries.py --scenario smoke --scheduler twotier
@@ -112,6 +118,9 @@ required. Full results and a build/don't-build decision table are in
 │   ├── run_smoke.py
 │   ├── compare_schedulers.py
 │   ├── scheduler_study.py        overload-sweep / PDCCH / latency studies
+│   ├── bsr_study.py              UL BSR delay / loss sensitivity
+│   ├── cqi_study.py              DL CQI staleness / SPS MCS margin sensitivity
+│   ├── maxmin_study.py           max-min GBR stage (cell-edge starvation)
 │   ├── transient_check.py        long-run windowed steady-state check
 │   └── plot_timeseries.py
 └── ...

@@ -10,7 +10,12 @@ from .interfaces import (
     SlotView,
 )
 from .link import bits_per_prb, cce_aggregation_level
-from .tier1 import estimate_demand_bps, solve_tier1
+from .tier1 import (
+    estimate_demand_bps,
+    gbr_maxmin_floors,
+    solve_maxmin_gbr_level,
+    solve_tier1,
+)
 
 
 @dataclass
@@ -82,6 +87,8 @@ class TwoTier:
         gbr_penalty_lr: float = 0.0,
         gbr_penalty_max: float = 1e6,
         gbr_penalty_se_exponent: float = 0.0,
+        gbr_maxmin: bool = True,
+        gbr_maxmin_scale: float = 1.0,
         slice_shares: "dict[int, dict[str, float]] | None" = None,
         slice_slack_penalty: float = 1e3,
     ) -> None:
@@ -118,6 +125,27 @@ class TwoTier:
         # Spectral-efficiency tilt exponent k on the GBR slack penalty (see
         # solve_tier1): 0 = off, k>0 efficiency-first, k<0 RB-level parity.
         self.gbr_penalty_se_exponent = gbr_penalty_se_exponent
+        # Two-stage GBR protection, ON by default. A max-min stage runs ahead
+        # of the utility solve and pins every GBR flow at gbr_maxmin_scale *
+        # t* of its contracted floor, where t* is the largest fraction all of
+        # them can hold at once. Without it the utility solve is a
+        # shortfall-minimising knapsack that abandons the lowest-SE GBR flows
+        # outright -- a hard floor is the only thing that stops it, since
+        # reweighting a linear penalty just picks a different victim.
+        #
+        # The default is on because the stage is *self-disabling* where it is
+        # not needed: whenever the GBR set is jointly feasible t* = 1, the
+        # floor is non-binding, and the result is identical to leaving it
+        # off. It costs something only in genuine GBR overload, and there
+        # what it costs is aggregate throughput bought by starving a
+        # cell-edge flow to zero. gbr_maxmin_scale dials the guarantee back:
+        # 1.0 claims the whole achievable floor, 0.0 restores the
+        # single-stage behaviour exactly. See scheduler/tier1.py.
+        self.gbr_maxmin = gbr_maxmin
+        self.gbr_maxmin_scale = gbr_maxmin_scale
+        # Last max-min level solved, for diagnostics/telemetry. NaN until
+        # the first Tier-1 solve; stays NaN when gbr_maxmin is off.
+        self.maxmin_level = float("nan")
         # Network-slice RB shares {slice_id: {"DL": frac, "UL": frac}};
         # None disables slicing. Enforced as a soft Tier-1 floor.
         self.slice_shares = slice_shares
@@ -163,6 +191,26 @@ class TwoTier:
         snr_in = {
             f.ue_id: self._snr_avg.get(f.ue_id, 20.0) for f in self._flows
         }
+        # Stage A (optional): the max-min GBR satisfaction level, turned into
+        # hard per-flow floors for the utility solve below. Without it the
+        # utility objective is free to abandon the lowest-SE GBR flows.
+        floors = None
+        if self.gbr_maxmin:
+            self.maxmin_level = solve_maxmin_gbr_level(
+                flows=self._flows,
+                snr_db_per_ue=snr_in,
+                grid=self._grid,
+                demand_bps=self._demand_bps,
+                slice_shares=self.slice_shares,
+                slice_slack_penalty=self.slice_slack_penalty,
+            )
+            floors = gbr_maxmin_floors(
+                flows=self._flows,
+                demand_bps=self._demand_bps,
+                level=self.maxmin_level,
+                scale=self.gbr_maxmin_scale,
+            )
+
         self._targets_bps = solve_tier1(
             flows=self._flows,
             snr_db_per_ue=snr_in,
@@ -172,6 +220,7 @@ class TwoTier:
             se_penalty_exponent=self.gbr_penalty_se_exponent,
             slice_shares=self.slice_shares,
             slice_slack_penalty=self.slice_slack_penalty,
+            gbr_floor_bps=floors,
         )
         self._tier1_solve_count += 1
         self._update_gbr_penalties()

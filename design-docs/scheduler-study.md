@@ -10,9 +10,19 @@ and for the running lab notebook see [NOTES.md](../NOTES.md).
 
 **Status.** The scheduler is implemented and validated in simulation and
 extracted into a standalone [`scheduler/`](../scheduler/) library for an
-eventual OpenAirInterface (OAI) integration. All quantitative results below
-are reproducible with `python scripts/scheduler_study.py` and
-`python scripts/compare_schedulers.py`.
+eventual OpenAirInterface (OAI) integration. Every quantitative result below
+is reproducible:
+
+| section | script |
+|---|---|
+| §7.1–7.3 (Studies 1–3) | `python scripts/scheduler_study.py` |
+| §7.4 (per-flow breakdown) | `python scripts/compare_schedulers.py` |
+| §7.5 (BSR sensitivity) | `python scripts/bsr_study.py` |
+| §7.6 (CQI staleness, SPS margin) | `python scripts/cqi_study.py` |
+| §7.7 (max-min GBR stage) | `python scripts/maxmin_study.py` |
+
+Absolute figures predate the 2026-08-06 Tier-1 reformulation in older
+[NOTES.md](../NOTES.md) entries — see §9.
 
 ---
 
@@ -21,7 +31,7 @@ are reproducible with `python scripts/scheduler_study.py` and
 1. [Problem statement and design goals](#1-problem-statement-and-design-goals)
 2. [State of the art](#2-state-of-the-art)
 3. [The proposed solution](#3-the-proposed-solution)
-4. [Mathematical formulation](#4-mathematical-formulation)
+4. [Mathematical formulation](#4-mathematical-formulation) — incl. [§4.5 parameters and defaults](#45-parameters-and-defaults)
 5. [The simulation framework](#5-the-simulation-framework)
 6. [Scenarios and schedulers compared](#6-scenarios-and-schedulers-compared)
 7. [Comparative results](#7-comparative-results)
@@ -317,9 +327,19 @@ outcomes are:
    virtual queue, so a flow near its PDB preempts bulk traffic.
 3. **The Tier-1 LP** — earns its place specifically in the
    *moderate-overload* GBR regime.
+4. **A max-min GBR floor ahead of the Tier-1 utility solve** — without it
+   the utility objective is a shortfall-minimising knapsack that abandons
+   the lowest-spectral-efficiency GBR flows outright (§8.5). It ships on by
+   default because it self-disables wherever the GBR set is feasible, so it
+   costs nothing except in genuine GBR overload — where it deliberately
+   trades aggregate throughput for the worst-served flow.
 
-The adaptive GBR penalty (a dual-ascent refinement of Tier-1) turned out to
-be the *wrong shape* for its intended job; that negative result is in §8.4.
+Two Tier-1 refinements turned out *not* to be load-bearing, and both
+negative results are worth as much as the positive ones: the adaptive GBR
+penalty is the wrong shape for its intended job (§8.4), and the
+spectral-efficiency tilt `k` only relocates the starvation it was meant to
+cure (§8.5). Neither could have worked, for a structural reason given in
+§8.5.
 
 ---
 
@@ -333,66 +353,115 @@ SNR and the target BLER. `C_d` is the PRB-symbol capacity per second in
 direction `d`, derived from the TDD pattern, carrier bandwidth, and a fixed
 overhead factor.
 
-### 4.1 Tier-1 — the strategic LP
+### 4.1 Tier-1 — the strategic solve
 
-Decision variables: target rates `rᵢ ≥ 0` (bps); GBR shortfall slacks
-`sᵢ ≥ 0`; per-(slice, direction) slacks `sₛₗᵢ𝒸ₑ ≥ 0`.
+Tier-1 answers one question every ~1 s: *what rate should each flow be
+targeting?* It ships as a **three-solve sequence** — a max-min stage that
+fixes a floor under the GBR class, then a lexicographic pair that spends the
+remaining capacity. Notation:
+
+| | |
+|---|---|
+| `rᵢ ≥ 0` | target rate for flow `i` (bps) — the decision |
+| `sᵢ, s_slice ≥ 0` | GBR and per-(slice, direction) shortfall slacks |
+| `SEᵢ` | bits per PRB-symbol for `i`'s UE, BLER-discounted |
+| `C_d` | PRB-symbol capacity of direction `d`, symbol-accurate over the TDD cycle |
+| `Gᵢ`, `Dᵢ` | GFBR contract, offered demand |
+| `Ĝᵢ = min(Gᵢ, Dᵢ)` | *reachable* contract |
+| `w_c` | class weight: `w_Delay = 5`, `w_PF = w_GBR = 1` |
+
+All three solves share one feasible set, parameterised by a per-flow floor:
 
 ```
-maximize    Σᵢ  w_c(i) · log(rᵢ + ε)              (utility)
-          −  Σᵢ  pᵢ · sᵢ                          (GBR-shortfall penalty)
-          −  p_slice · Σ  s_slice                 (slice-shortfall penalty)
-
-subject to
-  (capacity)     Σ_{i: d(i)=d}  rᵢ / SEᵢ  ≤  C_d                  ∀ d
-  (GBR floor)    rᵢ + sᵢ  ≥  Gᵢ                                   ∀ i: c(i)=GBR
-  (demand cap)   rᵢ  ≤  Dᵢ                                        ∀ i
-  (slice floor)  Σ_{i∈(σ,d)} rᵢ/SEᵢ  +  s_slice(σ,d)
-                     ≥  min( φ(σ,d)·C_d ,  demand(σ,d) )          ∀ (σ,d)
-  (sign)         rᵢ, sᵢ, s_slice  ≥  0
+F(floor):
+  (capacity)      Σ_{i: d(i)=d}  rᵢ / SEᵢ  ≤  C_d                          ∀ d
+  (demand cap)    rᵢ  ≤  Dᵢ                                                ∀ i
+  (GBR floor)     rᵢ + sᵢ  ≥  Gᵢ                                           ∀ i: c(i)=GBR
+  (hard floor)    rᵢ  ≥  floorᵢ                                            ∀ i: c(i)=GBR
+  (slice floor)   Σ_{i∈(σ,d)} rᵢ/SEᵢ  +  s_slice(σ,d)
+                        ≥  min( φ(σ,d)·C_d ,  demand(σ,d) )                ∀ (σ,d)
+  (sign)          rᵢ, sᵢ, s_slice  ≥  0
 ```
 
+**Stage A — the max-min GBR level.** The largest fraction of its reachable
+contract that *every* GBR flow can hold at once:
+
+```
+t*  =  max t   s.t.  r ∈ F(0),   rᵢ ≥ t·Ĝᵢ  ∀ i: c(i)=GBR,   0 ≤ t ≤ 1
+floorᵢ  =  α · t* · Ĝᵢ                                    (α = scale, default 1)
+```
+
+**Stages B1 and B2 — shortfall, then utility.** Over `F(floor)`:
+
+```
+B1:   S*  =  min   Σᵢ pᵢ·sᵢ  +  p_slice · Σ_(σ,d) SE_(σ,d) · s_slice(σ,d)
+B2:        max   Σᵢ w_c(i) · log(rᵢ + ε)      s.t.   (the B1 objective)  ≤  S*
+```
+
+Reading the program:
+
+- **Why B1 and B2 are separate solves.** They express a *lexicographic*
+  order — honour every GBR floor you can, then distribute what is left by
+  weighted proportional fairness. This used to be one objective, `max Σ w
+  log(r+ε) − Σ pᵢsᵢ`, with `pᵢ = 10³` chosen so the penalty would swamp the
+  utility. It did, by ~10⁷, which is an ordering written as a magnitude —
+  and it made the program numerically unsolvable. On the `overload` scenario
+  two solvers returned `optimal_inaccurate` and disagreed by 3.6× on a
+  flow's rate, under-serving the Delay class by 28% against the analytic
+  optimum. Rescaling cannot fix that: a *ratio* between objective terms is a
+  property of the model, not of the units. Stating the order directly does —
+  both solvers now land within 100 bps of the analytic optimum. A
+  consequence worth noting: `pᵢ`'s absolute magnitude is now irrelevant, and
+  only the *relative* values across flows matter.
+- **Why stage A exists.** B1 alone is `min Σ(Gᵢ − rᵢ)` under a PRB budget —
+  a **fractional knapsack**, whose optimum is greedy in spectral efficiency
+  and therefore a *vertex*: GBR flows are served in full or abandoned
+  outright, and the lowest-SE flow goes to zero. That is not a tuning
+  artifact and no reweighting of `pᵢ` removes it (§8.5). Only a constraint
+  changes the feasible region, which is what `floorᵢ` is.
+- **Stage A is on by default** (`gbr_maxmin`), which is safe because it
+  **self-disables**: whenever the GBR set is jointly feasible `t* = 1`, the
+  floor binds nothing and the result is identical to omitting stage A
+  entirely. It costs something only in genuine GBR overload, and there it
+  deliberately trades aggregate throughput for the worst-served flow (§7.7).
+  `α` (`gbr_maxmin_scale`) dials that trade; `α = 0` recovers the
+  single-stage behaviour exactly.
+- **The demand cap in `Ĝᵢ` is load-bearing.** A GBR flow offering less than
+  its GFBR can never reach 100% of it; without the cap it would pin `t*` at
+  its own unreachable ratio and drag the whole set down.
 - **Utility.** `log` makes the unconstrained optimum proportional-fair
-  (Kelly et al. 1998). Per-class weights are `w_Delay = 5`,
-  `w_PF = w_GBR = 1`: delay flows are typically low-rate, so a higher weight
-  ensures the LP funds them well; GBR flows are protected by their floor
-  constraint instead, so they need no weight boost. `ε = 1` keeps `log`
-  finite at `rᵢ = 0`.
-- **Capacity** is expressed in *PRB-seconds*: `rᵢ/SEᵢ` is the resource a
-  flow's target rate consumes, and the sum cannot exceed what the direction
-  offers. This is where symbol-accurate accounting enters — `C_d` counts the
-  TDD special-slot symbols.
-- **GBR floor is soft.** Writing `rᵢ + sᵢ ≥ Gᵢ` with a large penalty `pᵢ`
-  (default `10³`) makes the floor effectively *hard whenever the flow is
-  feasible* — the penalty dominates the `log` utility — yet keeps the LP
-  feasible under *any* overload: the slack simply absorbs the shortfall and
-  carries the cost. A hard constraint would make the program infeasible the
-  moment GBR demand exceeds capacity, which is exactly when you still need
-  an answer.
-- **Slice floor** has the *same soft shape*: a guaranteed share `φ(σ,d)` of
-  capacity, but capped at the slice's own demand (an idle slice holds
-  nothing) and soft (so slice and GBR floors can both be stated without
-  risking infeasibility). The capacity constraint above makes it
-  **work-conserving** — a busy slice freely borrows an idle slice's unused
-  share.
+  (Kelly et al. 1998). Delay flows are typically low-rate, so the higher
+  weight ensures B2 funds them well; GBR flows are protected by their floors
+  instead and need no weight boost. `ε = 1` keeps `log` finite at `rᵢ = 0`.
+- **Capacity** is in *PRB-symbols per second*: `rᵢ/SEᵢ` is what a target
+  rate consumes. This is where symbol-accurate accounting enters — `C_d`
+  counts the TDD special-slot symbols.
+- **Both shortfall floors are soft**, so the program stays feasible under
+  *any* overload — the slack absorbs the shortfall and carries the cost. A
+  hard GFBR constraint would go infeasible exactly when an answer is still
+  needed. The slice floor is additionally capped at the slice's own demand
+  (an idle slice holds nothing) and the capacity constraint keeps it
+  **work-conserving** — a busy slice freely borrows an idle slice's share.
+- **The two penalties are quoted in one currency.** `s_slice` is natively in
+  PRB-symbols and `sᵢ` in bps, so B1 converts the slice slack at the slice's
+  demand-weighted `SE_(σ,d)`. Compared raw, the crossover between them sits
+  at `pᵢ · SEᵢ` — which would make slice-vs-GBR priority a function of the
+  radio channel rather than of policy.
+- **Everything is posed in normalised units** (rates as a multiple of the
+  largest contract, capacity usage as a fraction of each direction's
+  budget), so every coefficient is O(1). In raw bps — a unit-scale `t`
+  against 10⁷-scale rates — CVXPY returned `optimal` on a `t*` that was
+  *non-monotone in capacity*, which is impossible for a max-min level. A
+  relevant caution for anyone reimplementing this.
 
-The program is a small convex problem (log objective, linear constraints);
-CVXPY solves the study scenarios in well under 100 ms.
+Each solve is a small convex program; CVXPY handles the study scenarios in
+well under 100 ms, comfortably inside the 1 s cadence.
 
-**Adaptive GBR penalty (optional, dual ascent).** Under genuine
-infeasibility, a *uniform* penalty `pᵢ` has a bias: minimizing total bps of
-slack is cheapest by sacrificing *poor-SNR* GBR flows (their slack costs the
-most capacity per bit). Dual-subgradient ascent removes the bias by
-escalating the penalty on whichever flow is *actually* missing:
-
-```
-pᵢ(k+1)  =  min( p_max ,  pᵢ(k)  +  b · sᵢ(k) / Gᵢ )
-```
-
-The normalized shortfall `sᵢ/Gᵢ ∈ [0,1]` makes the learning rate `b`
-scale-free; `b = 0` recovers the fixed penalty. **This refinement is
-disabled by default** — §8.4 shows why it is the wrong shape for the deep-
-overload case it was built for.
+One Tier-1 refinement is implemented but **off by default**: an adaptive
+per-flow `pᵢ` driven by dual ascent on the GBR constraints. §8.4 shows why
+it is the wrong shape for the deep-overload case it was built for, and §8.5
+why *no* choice of `pᵢ` could have been the right one. The mechanism is
+specified in [scheduler-design.md §4](scheduler-design.md).
 
 ### 4.2 Tier-2 — drift-plus-penalty rate tracking
 
@@ -481,6 +550,50 @@ drift-plus-penalty and not "PF with a bigger GBR knob."
 
 ---
 
+### 4.5 Parameters and defaults
+
+Every *scheduler* knob, its shipped default, and what moving it does.
+Constructor arguments are on `scheduler.TwoTier` unless noted. The
+simulator's own fidelity settings — how much the modelled gNB is allowed to
+know — are separate and live in §5.1. **Status** reads:
+*decided* — settled by evidence, do not change without re-running the
+studies; *deployment* — expected to be set per site; *rejected* — implemented,
+measured, and defaulted off, with the negative result cited.
+
+**Tier-1 — the strategic solve (§4.1)**
+
+| Symbol | Knob | Default | Status | What it does |
+|---|---|---|---|---|
+| — | `tier1_period_slots` | `2000` | decided | Slots between Tier-1 re-solves (~1 s at μ=1). Tier-2's drift-plus-penalty absorbs drift inside the window, so no intermediate weight refresh is needed. |
+| `α` | `gbr_maxmin_scale` | `1.0` | decided | Fraction of the achievable max-min level `t*` claimed as a hard GBR floor. `1.0` claims all of it; `0.0` recovers the single-stage solve. The cost curve is smooth with a knee near `0.75` (§7.7). |
+| — | `gbr_maxmin` | `True` | decided | Runs stage A at all. On by default because it self-disables — at `t* = 1` the floor binds nothing (§7.7). |
+| `pᵢ` | `gbr_penalty_init` | `1e3` | decided | Per-flow weight on GBR shortfall in B1. Since B1/B2 are lexicographic, only the *ratio* between flows matters — the absolute value is inert. |
+| `p_slice` | `slice_slack_penalty` | `1e3` | deployment | Weight on slice-floor shortfall, in the same bps currency as `pᵢ`. At parity a bit denied to a slice floor costs the same as a bit denied to a GBR floor. Whether tenant slice guarantees *should* rank equal with per-flow GBR guarantees is a policy call. |
+| `φ(σ,d)` | `slice_shares` | `None` | deployment | `{slice_id: {"DL": frac, "UL": frac}}`. Guaranteed, work-conserving share of each direction's capacity. `None` disables slicing. |
+| — | `capacity_safety_factor` | `1.0` | deployment | Scales `C_d`. Headroom for control overhead the model does not itemise. `solve_tier1` only. |
+| `b` | `gbr_penalty_lr` | `0.0` | **rejected** | Dual-ascent learning rate on `pᵢ`. Equalises normalised shortfall, which is the wrong objective for a step-function contract — §8.4. |
+| — | `gbr_penalty_max` | `1e6` | rejected | Cap on the adaptive `pᵢ`. Inert while `gbr_penalty_lr = 0`. Hitting it is the admission-control reject signal. |
+| `k` | `gbr_penalty_se_exponent` | `0.0` | **rejected** | Tilts `pᵢ` by `(SEᵢ/SE_max)^k`. `k < 0` relocates starvation rather than removing it — §8.4, §8.5. |
+
+**Tier-2 — per-slot scheduling and SPS (§4.2, §4.3)**
+
+| Symbol | Knob | Default | Status | What it does |
+|---|---|---|---|---|
+| — | `snr_window_slots` | `100` | decided | EWMA window on reported CQI (`α = 1 − 1/window`) used for ranking and for sizing SPS. |
+| `V_delay` | `delay_urgency_weight` | `4.0` | decided | Scales the head-of-line urgency term folded into a Delay flow's virtual queue. Urgency is multiplied by the largest system `Q`, so it stays comparable as queues grow — this is what lets a small periodic flow preempt bulk near its PDB. |
+| `β` | `delay_exponent` | `2.0` | decided | Shape of that urgency: `(HoL / PDB)^β`. `β > 1` keeps a flow patient until its deadline approaches, then escalates sharply. |
+| — | `enable_sps` | `True` | decided | Configured Grants. The single highest-leverage feature in the study (§8.2) — 30/30 deadlines vs PF's 2/30 when PDCCH-bound. |
+| — | `sps_safety_margin` | `1.10` | decided | Over-sizes an SPS reservation against its contracted floor, so ordinary jitter does not have to spill into the dynamic pool. |
+| — | `sps_budget_fraction` | `0.85` | decided | Ceiling on the carrier fraction SPS may reserve, leaving a dynamic pool for burst spillover. |
+| — | `sps_min_scale` | `0.75` | decided | Viability floor. If a priority tier's reservations would be scaled below this, the tier runs dynamically instead — unless dropping it would overrun the CCE budget. This is what stops SPS being net-negative on an oversubscribed uplink. |
+| — | `sps_snr_margin_db` | `0.0` | deployment | Conservatism of the semi-static SPS MCS, chosen at reservation time from `snr_avg − margin`. A mobility hedge: `0` for fixed/slow deployments; anything ≥ 1 dB costs contracts on this channel (§7.6). |
+
+Per-flow contract fields (`gfbr_bps`, `pdb_ms`, `priority_level`,
+`slice_id`) are workload inputs rather than tuning knobs; see
+[sim/scenarios/README.md](../sim/scenarios/README.md).
+
+---
+
 ## 5. The simulation framework
 
 The design is validated in a purpose-built discrete-event simulator
@@ -515,6 +628,25 @@ value of SPS. (Ignoring BSR was the sim's largest fidelity gap; it surfaced
 during the parallel OAI-integration workstream and is closed here — see
 [NOTES.md](../NOTES.md).) Conversely, PHY detail is omitted because it does
 not change *which scheduler wins*.
+
+**The knobs, and why their defaults differ from the studies' settings.**
+These are `sim.driver.run` arguments, not scheduler parameters — each one
+models something a real gNB does *not* know. Zero means perfect
+information, which is why the library defaults are all `0`: a unit test
+should not have to reason about report latency to assert a scheduling
+decision. The studies deliberately run them non-zero, and the gap is worth
+stating plainly so the two sets of numbers are not read as inconsistent.
+
+| Knob | Library default | Study setting | What it models |
+|---|---|---|---|
+| `ul_bsr_delay_slots` | `0` | `8` (≈ 4 ms at μ=1) | SR/BSR/grant round-trip before the gNB learns a UE has UL data. Configured Grants bypass it entirely — half of SPS's structural advantage (§7.5). |
+| `ul_bsr_loss_rate` | `0.0` | `0` | Per-slot Bernoulli BSR loss; on a loss the gNB keeps the last good report. Barely moves either scheduler on continuously-backlogged traffic (§7.5). |
+| `cqi_delay_slots` | `0` | `8` (≈ 4 ms) | Age of the CQI the scheduler picks an MCS from. Mismatch against the true SNR at transmission drives BLER (§7.6). |
+| `cqi_loss_rate` | `0.0` | `0` | Per-slot Bernoulli CQI-report loss; the gNB holds the last reported value. |
+
+Both loss rates are left at `0` in the studies because the sweeps found
+them near-inert on these workloads (§7.5, §7.6); they exist so a deployment
+with marginal PUCCH can be modelled rather than assumed away.
 
 ### 5.2 The harness
 
@@ -614,19 +746,33 @@ operation — larger capacity for the same demand is the same load ratio
 as smaller demand for the same capacity). The numbers below are
 `1 / capacity_multiplier`, i.e., load relative to the as-shipped point.*
 
+`TwoTier` is the shipped default, which includes the max-min GBR stage
+(§4.1). `−maxmin` pins that stage off to show what it buys; `+adaptive`
+builds on the same single-stage baseline so the §8.4 negative result stays
+a like-for-like comparison.
+
 | Load | Scheduler | Total | GBR met | mean GBR | min GBR | worst p99 |
 |---|---|---|---|---|---|---|
-| **1.0×** (as-shipped, deep overload) | PF | 69.1 M | 0/10 | 37% | 0% | 30 ms |
-| | TwoTier | 74.7 M | 0/10 | **51%** | 0% | 30 ms |
-| | TwoTier + adaptive | 66.0 M | 0/10 | 43% | 35% | 30 ms |
-| **0.67×** | PF | 93.7 M | **4/10** | 55% | 4% | 30 ms |
-| | TwoTier | 96.1 M | 0/10 | **68%** | **43%** | 30 ms |
-| | TwoTier + adaptive | 93.9 M | 0/10 | 65% | 46% | 30 ms |
+| **1.0×** (as-shipped, deep overload) | PF | **69.3 M** | 0/10 | 37% | 0% | 30 ms |
+| | **TwoTier** | 66.7 M | 0/10 | **44%** | **40%** | 30 ms |
+| | TwoTier −maxmin | 74.2 M | 0/10 | 53% | 0% | 30 ms |
+| | TwoTier −maxmin +adaptive | 68.7 M | 0/10 | 44% | 34% | 30 ms |
+| **0.67×** | PF | 93.9 M | **4/10** | 55% | 4% | 30 ms |
+| | **TwoTier** | 94.1 M | 0/10 | **65%** | **60%** | 30 ms |
+| | TwoTier −maxmin | 95.8 M | 0/10 | 68% | 43% | 30 ms |
+| | TwoTier −maxmin +adaptive | 94.6 M | 0/10 | 65% | 33% | 30 ms |
 | **0.50×** (moderate overload) | PF | 111.2 M | 5/10 | 72% | 31% | 30 ms |
-| | TwoTier | 118.9 M | **10/10** | **83%** | **81%** | 30 ms |
-| | TwoTier + adaptive | 118.9 M | 10/10 | 83% | 81% | 30 ms |
+| | **TwoTier** | 120.1 M | **10/10** | **82%** | **78%** | 30 ms |
+| | TwoTier −maxmin | 120.1 M | 10/10 | 82% | 78% | 30 ms |
 | **0.33×** (light load) | PF | 124.7 M | 10/10 | 85% | 83% | 30 ms |
-| | TwoTier | 125.5 M | 10/10 | 85% | 83% | 30 ms |
+| | TwoTier | 125.4 M | 10/10 | 85% | 83% | 30 ms |
+
+**Note the 1.0× total-throughput row: PF carries 69.3 M against TwoTier's
+66.7 M.** In deep overload the default deliberately gives up ~4% of cell
+throughput, and it buys a worst-served-flow floor of 40% where PF and the
+single-stage form both leave a flow at 0%. That is the max-min trade, taken
+on purpose (§7.7). At 0.50× and above the stage is non-binding and costs
+nothing at all.
 
 The uplink UEs run with an **8-slot (~4 ms) BSR round-trip delay** on the
 dynamic scheduler — see §5.1. SPS-served flows bypass it, exactly as they
@@ -636,24 +782,31 @@ Reading the table:
 
 - **At 0.50× load — the clean win, sharpened by BSR.** TwoTier honors
   **10/10** GBR contracts vs PF's 5/10, with a much higher minimum
-  delivery (81% vs 31%) and +7.7 Mbps total throughput. The gap widened
+  delivery (78% vs 31%) and +8.9 Mbps total throughput. The gap widened
   from the BSR-off version (8/10 for PF) because dynamic-only PF absorbs
   the full BSR latency while TwoTier's SPS-served flows do not. This is
   the regime where the two-tier scheduler unambiguously earns its
   complexity.
 - **At 0.67× load — a distributional win the contract count hides.**
   TwoTier meets *fewer* knife-edge contracts (0/10 vs PF's 4/10) yet
-  delivers a far better *distribution*: minimum delivery 43% vs PF's 4%,
-  mean 68% vs 55%. PF lets a few good-channel flows run clear of the 95%
-  line while abandoning the rest to near-zero; TwoTier equalizes everyone
-  toward their target, so most flows cluster in the 40–90% band and none
-  cross the exact 95% threshold. "Every robot at ≥43%, mean 68%" is
-  operationally better than "4 robots at 100%, 6 robots below 30%" — but a
-  95% threshold metric scores it lower. (See §8.1.)
-- **At 1.0× and 0.33× — convergence.** In deep overload no scheduler can
-  honor the contracts; at 1/3 of shipped load all converge (10/10). The
-  scheduler choice is immaterial at both ends.
-- **The adaptive penalty meets 0/10 across every overload row.** §8.4.
+  delivers a far better *distribution*: minimum delivery **60%** vs PF's 4%,
+  mean 65% vs 55%. PF lets a few good-channel flows run clear of the 95%
+  line while abandoning the rest to near-zero; TwoTier holds everyone near
+  their target, so the flows cluster tightly and none crosses the exact 95%
+  threshold. "Every robot at ≥60%, mean 65%" is operationally better than
+  "4 robots at 100%, 6 robots below 30%" — but a 95% threshold metric scores
+  it lower. (See §8.1.)
+- **At 1.0× — convergence on contracts only.** No scheduler honours a
+  contract here (0/10 everywhere), and in that sense the choice is
+  immaterial. Distributionally it is not: TwoTier holds its worst flow at
+  40% of contract where PF leaves one at 0%, and pays 2.6 Mbps of total
+  throughput for it. What converges at deep overload is the *contract
+  count*, not the outcome.
+- **At 0.33× — real convergence.** Everyone has slack and all schedulers
+  reach 10/10. The scheduler choice is genuinely immaterial.
+- **The adaptive penalty meets 0/10 in both overloaded rows** (1.0× and
+  0.67×), and is strictly dominated by the max-min default on minimum
+  delivery at both. §8.4, §7.7.
 
 ### 7.2 Study 2 — PDCCH-limited (`sensor_dense`)
 
@@ -685,7 +838,7 @@ in every one of 60 consecutive windows; see the transient check in
 |---|---|---|---|---|
 | RoundRobin | 3/8 | 84% | 12.0 ms | 22.8 M |
 | ProportionalFair | 5/8 | 86% | 12.0 ms | 24.6 M |
-| **TwoTier** | **8/8** | **100%** | **10.5 ms** | 15.5 M |
+| **TwoTier** | **8/8** | **100%** | **10.5 ms** | 15.2 M |
 
 TwoTier meets **8/8** deadlines; PF meets 5/8. PF schedules by
 channel-relative throughput with no notion of a deadline, so a healthy
@@ -699,26 +852,36 @@ aged-out motion-control packets — the safety-relevant ones (§8.3).
 ### 7.4 Per-flow breakdown (`factory_robots`, 1.0× load — as shipped)
 
 The aggregates above hide *which* flows win and lose. The per-GBR-flow
-delivery (fraction of GFBR delivered) at the as-shipped 1.0× load
-operating point:
+delivery at the as-shipped 1.0× load operating point:
+
+*Metric note: this table is **delivered ÷ GFBR** — throughput against the
+contract. The `mean GBR` / `min GBR` columns in §7.1 and §7.7 are instead
+**delivered ÷ arrived**, the flow's own delivery ratio. Offered load runs
+~9% above GFBR for these video profiles, so the same run reads a few points
+lower as a delivery ratio: the flat TwoTier column below spans 50–56% of
+GFBR, and 40–48% as a delivery ratio in §7.7. Both are correct; they answer
+different questions.*
 
 | Flow | SNR | GFBR | RR | PF | Gradient | TwoTier |
 |---|---|---|---|---|---|---|
-| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 86% |
-| ue2 (video) | 18 dB | 8 M | 57% | 68% | 67% | 55% |
-| ue3 (video) | 20 dB | 8 M | 63% | 74% | 70% | 67% |
-| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 65% | 22% |
-| ue5 (LIDAR) | 24 dB | 14 M | 56% | 69% | 67% | 92% |
-| ue6 (LIDAR) | 19 dB | 14 M | 37% | 47% | 56% | 88% |
-| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 42% | **0%** ⚠ |
-| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 4% | 3% | **83%** |
-| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | 39% |
-| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **83%** |
-| Aggregate | | | mean 46% | **mean 45%** | mean 45% | **mean 62%** |
+| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 56% |
+| ue2 (video) | 18 dB | 8 M | 57% | 68% | 66% | 54% |
+| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 53% |
+| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 64% | **50%** |
+| ue5 (LIDAR) | 24 dB | 14 M | 56% | 67% | 67% | 56% |
+| ue6 (LIDAR) | 19 dB | 14 M | 37% | 46% | 55% | 55% |
+| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **53%** |
+| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 3% | 3% | **53%** |
+| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **50%** |
+| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **53%** |
+| Aggregate | | | mean 46% | **mean 44%** | mean 45% | **mean 53%** |
 
-Two opposite effects are visible:
+The shape of the TwoTier column is the whole point: **every GBR flow lands
+between 50% and 53–56%**, a 6-point spread across a 10 dB SNR range, against
+PF's 0–91%. That flatness is the max-min floor (§4.1, §7.7), which now ships
+on by default. Three effects are visible:
 
-- **TwoTier protects mixed-flow GBR (ue8/9/10): 83/39/83% vs PF's 4/3/0%.**
+- **TwoTier protects mixed-flow GBR (ue8/9/10): 53/50/53% vs PF's 3/3/0%.**
   These UEs carry a GBR video flow *and* a best-effort flow. Under the
   QoS-blind baselines the MAC multiplexer fills the UE's transport block by
   raw backlog, and a continuously-backlogged best-effort flow wins every
@@ -726,16 +889,24 @@ Two opposite effects are visible:
   multiplexer fills by drift-plus-penalty deficit, so the GBR flow (far
   behind its Tier-1 target → large `Q`) is served first. This is a direct,
   clean demonstration of QoS-aware multiplexing.
-- **TwoTier still leaves the cell edge behind (ue7 at 14 dB → 0%; ue4 at
-  16 dB down to 22%).** The Tier-1 `log`-utility objective with *soft* GBR
-  floors finds it cheaper to abandon expensive low-SNR flows and fund the
-  rest — the classic weighted-`log` pathology. This is **Finding 1**
-  (§8.5), open.
+- **The cell edge is held up, not abandoned: ue7 (14 dB) at 53% and ue4
+  (16 dB) at 50%, against PF's 28% and 62%.** With the max-min stage
+  switched off these two land at exactly **0%** — Tier-1's soft GBR floors
+  make it cheaper to abandon expensive low-SE flows and fund the rest, and
+  two flows at a clean zero is the fractional-knapsack vertex showing
+  through (§8.5). The hard floor is what removes it.
+- **The bill is paid by the high-SNR flows.** ue1 (22 dB) goes 91% under PF
+  to 56%, ue5 (24 dB) 67% to 56%. Deliberate: at deep overload the cell
+  cannot serve everyone, and the choice is *whose* contract to break.
 
-Net at 1.0× load: TwoTier carries mean GBR delivery 62% vs PF's 45% and +5.2 Mbps
-total — but, being deep overload, still 0/10 *contracts* met either way
-(§7.1). The two-tier machinery redistributes the pain; at 1.0× load it cannot
-remove it.
+This was **Finding 1** (§8.5) — caused by the slack penalty rather than the
+`log` utility, and fixed by the max-min stage (§7.7).
+
+Net at 1.0× load: TwoTier carries mean GBR delivery 53% vs PF's 44%, and a
+worst-served flow at 50% against PF's 0% — for 2.6 Mbps *less* total. Being
+deep overload, still 0/10 *contracts* met either way (§7.1). The two-tier
+machinery redistributes the pain; at 1.0× load it cannot remove it, and the
+default now chooses to spread it rather than concentrate it.
 
 ### 7.5 BSR sensitivity — delay and loss sweeps
 
@@ -751,29 +922,33 @@ at delay = 8, on the two scenarios where BSR bites: `factory_robots` at
 
 | Delay | PF met | TT met | PF min | TT min | PF total | TT total |
 |---|---|---|---|---|---|---|
-| 0 slots (0 ms) | 8/10 | 10/10 | 66% | 81% | 119.3 M | 120.9 M |
-| 2 slots (0.5 ms) | 8/10 | 10/10 | 56% | 81% | 117.2 M | 119.9 M |
-| 4 slots (1.0 ms) | 8/10 | 10/10 | 45% | 81% | 115.2 M | 118.9 M |
-| **8 slots (2.0 ms)** | **5/10** | **10/10** | **32%** | **81%** | 111.1 M | 117.3 M |
-| 16 slots (4.0 ms) | 5/10 | 10/10 | 30% | 81% | 107.0 M | 115.9 M |
+| 0 slots (0 ms) | 8/10 | 10/10 | 66% | 80% | 119.3 M | 120.1 M |
+| 2 slots (0.5 ms) | 8/10 | 10/10 | 56% | 79% | 117.2 M | 119.7 M |
+| 4 slots (1.0 ms) | 8/10 | 10/10 | 45% | 78% | 115.2 M | 119.5 M |
+| **8 slots (2.0 ms)** | **5/10** | **9/10** | **32%** | **77%** | 111.1 M | 119.2 M |
+| 16 slots (4.0 ms) | 5/10 | 8/10 | 30% | 77% | 107.0 M | 118.9 M |
 
 The picture is monotone. PF's minimum delivery slides from 66% at zero
 delay to 30% at 16 slots — a **factor-of-two hit** on the worst-served
 flow — and its contract count breaks between 4 and 8 slots (8/10 → 5/10).
-Cell throughput slips ~10% (119 → 107 M). TwoTier is essentially
-invariant: min stays at 81%, contracts at 10/10, and total drops only
-~5% because its dynamic-scheduled (non-SPS) flows still absorb the
-delay. The gap widens roughly linearly with delay — no cliff, no
-saturation.
+Cell throughput slips ~10% (119 → 107 M). TwoTier degrades far more
+gently: its minimum delivery moves only 80% → 77%, throughput barely at
+all (120.1 → 118.9 M, ~1%), and its contract count slips 10/10 → 8/10
+only once delay reaches 8–16 slots — where its remaining
+dynamic-scheduled (non-SPS) flows start absorbing the delay too. So the
+SPS bypass is not total *immunity* at the contract level, but the
+degradation is roughly a third of PF's on contracts and an order of
+magnitude smaller on throughput. The gap widens roughly linearly with
+delay — no cliff, no saturation.
 
 **Loss sweep, factory_robots @ 0.50× load (delay = 8 slots).**
 
 | Loss | PF met | TT met | PF min | TT min |
 |---|---|---|---|---|
-| 0% | 5/10 | 10/10 | 32% | 81% |
-| 5% | 5/10 | 10/10 | 32% | 81% |
-| 10% | 5/10 | 10/10 | 33% | 81% |
-| 20% | 5/10 | 10/10 | 33% | 81% |
+| 0% | 5/10 | 9/10 | 32% | 77% |
+| 5% | 5/10 | 9/10 | 32% | 78% |
+| 10% | 5/10 | 9/10 | 33% | 77% |
+| 20% | 5/10 | 9/10 | 33% | 78% |
 
 Loss barely moves the needle — a somewhat counter-intuitive result worth
 understanding. Factory UEs carry continuous video traffic, so their
@@ -832,17 +1007,18 @@ channels that actually drift meaningfully.
 
 | CQI delay | PF met | TT met | PF min GBR | TT min GBR |
 |---|---|---|---|---|
-| 0 slots (static channel) | 5/10 | 10/10 | 32% | 81% |
-| 8 slots (static channel) | 5/10 | 10/10 | 31% | 81% |
-| 32 slots (static channel) | 5/10 | 10/10 | 31% | 81% |
-| 0 slots (mobile, coh 30 sl) | 5/10 | 10/10 | 38% | 81% |
-| 8 slots (mobile) | 5/10 | 10/10 | 37% | 81% |
-| 32 slots (mobile) | 5/10 | 10/10 | 31% | 81% |
+| 0 slots (static channel) | 5/10 | 9/10 | 32% | 77% |
+| 8 slots (static channel) | 5/10 | 10/10 | 31% | 78% |
+| 32 slots (static channel) | 5/10 | 10/10 | 31% | 78% |
+| 0 slots (mobile, coh 30 sl) | 5/10 | 10/10 | 38% | 78% |
+| 8 slots (mobile) | 5/10 | 9/10 | 37% | 77% |
+
+| 32 slots (mobile) | 5/10 | 9/10 | 31% | 75% |
 
 The takeaway is **negative** and instructive: CQI staleness barely moves
 either scheduler in our current scenarios. Even at 32 slots (16 ms) with a
 short-coherence "mobile" channel (30-slot coherence, roughly a moving robot),
-PF's min GBR drops only from 38% to 31%. The reason is that our AR(1) channel
+PF's min GBR drops only from 38% to 31% and TwoTier's from 78% to 75%. The reason is that our AR(1) channel
 model with `stationary_std_db = 1.5` produces per-slot SNR innovations that
 are small compared to the ~3 dB spacing between MCS thresholds — so even a
 stale CQI usually still picks the right MCS. **CQI staleness would matter
@@ -853,31 +1029,87 @@ or both** — a highly-mobile deployment, not a factory.
 
 | SPS margin | TT met (static) | TT total (static) | TT met (mobile) | TT total (mobile) |
 |---|---|---|---|---|
-| 0.0 dB | 10/10 | 118.9 M | 10/10 | 118.2 M |
-| 1.0 dB | 10/10 | 117.3 M | 10/10 | 116.2 M |
-| 2.0 dB | 9/10 | 113.5 M | 9/10 | 114.8 M |
-| 3.0 dB | 0/10 | 113.3 M | 2/10 | 112.0 M |
-| 5.0 dB | 0/10 | 113.3 M | 2/10 | 112.0 M |
+| 0.0 dB | 10/10 | 120.1 M | 9/10 | 121.4 M |
+| 1.0 dB | 7/10 | 119.0 M | 4/10 | 117.2 M |
+| 2.0 dB | 3/10 | 112.5 M | 2/10 | 113.6 M |
+| 3.0 dB | 0/10 | 114.7 M | 0/10 | 114.9 M |
+| 5.0 dB | 0/10 | 114.7 M | 0/10 | 114.9 M |
 
-The tradeoff is **stark and one-directional in these scenarios**: any
-margin above ~1 dB costs efficiency (larger reservations at a lower MCS
-per PRB), and margins ≥ 3 dB blow past the SPS-viability floor
+The tradeoff is **stark and one-directional in these scenarios**: the
+margin costs efficiency from the first dB (larger reservations at a lower
+MCS per PRB), contract count falling 10/10 → 7/10 → 3/10 over 0–2 dB on
+the static channel, and margins ≥ 3 dB blow past the SPS-viability floor
 (`sps_min_scale = 0.75`) — SPS then drops entirely to dynamic and contract
-count collapses to 0–2 / 10. The mobile channel does not rescue the
-tradeoff: at coherence 30 slots the BLER protection from a larger margin
-is still smaller than the reservation-size cost.
+count collapses to 0/10. The mobile channel does not rescue the tradeoff,
+and in fact degrades faster: at coherence 30 slots the BLER protection
+from a larger margin is still smaller than the reservation-size cost.
 
 **Combined take-away.** Gaps 1 and 2 were modelled specifically to close
 "the scheduler is given perfect knowledge of channel state" — the DL twin
 of the BSR gap. The result is **honest but modest**: in our slow-varying
 industrial channel, CQI staleness costs little, and the SPS conservative
-MCS is either neutral (margin ≈ 0) or harmful (margin ≥ 2 dB). This
+MCS is either neutral (margin = 0) or harmful (any margin ≥ 1 dB). This
 matches physical intuition: SPS's semi-static MCS is a mobility-hedge
 feature, and a static factory is exactly where the hedge does not need
 paying for. The relevant *design* implication is that `sps_snr_margin_db`
 should be set from the deployment's channel-volatility budget — 0 dB for a
 warehouse / fixed AGV routes, non-zero (and swept experimentally) as
 mobility rises. **None of Study 1–3's conclusions change.**
+
+### 7.7 The max-min GBR stage — closing Finding 1
+
+`factory_robots`, same contract metrics and report settings as §7.1.
+`+maxmin` is the shipped default (`gbr_maxmin=True, gbr_maxmin_scale=1.0`);
+the plain `TwoTier` rows pin it off. Reproduce with
+`python scripts/maxmin_study.py`.
+
+| load | scheduler | total | GBR met | mean GBR | **min GBR** | ue4 (16 dB) | ue7 (14 dB) |
+|---|---|---|---|---|---|---|---|
+| 1.00× | TwoTier −maxmin | 74.2M | 0/10 | 53% | **0%** | 16% | 0% |
+| 1.00× | −maxmin +adaptive | 68.7M | 0/10 | 44% | 34% | 47% | 36% |
+| 1.00× | **default (+maxmin)** | 66.7M | 0/10 | 44% | **40%** | 40% | 46% |
+| 0.67× | TwoTier −maxmin | 95.8M | 0/10 | 68% | 43% | 63% | 43% |
+| 0.67× | −maxmin +adaptive | 94.6M | 0/10 | 65% | 33% | 33% | 68% |
+| 0.67× | **default (+maxmin)** | 94.1M | 0/10 | 65% | **60%** | 61% | 69% |
+| 0.50× | either | 120.1M | 10/10 | 82% | 78% | 78% | 84% |
+| 0.33× | either | 125.4M | 10/10 | 85% | 83% | 83% | 86% |
+
+- **It lifts the floor it was built to lift.** min GBR 0% → 40% at 1.00× and
+  43% → 60% at 0.67×; ue7 (the 14 dB flow the single-stage solve zeroes)
+  goes 0% → 46%. At 1.00× the whole GBR set collapses into a **40–48% band**
+  (delivery ratio; 50–56% of GFBR — see the metric note in §7.4) against a
+  single-stage spread of 0–80%.
+- **It is free where the cell is not in GBR overload.** At 0.50× and 0.33×,
+  `t* = 1.00`, the floor is non-binding, and every figure is identical to
+  default TwoTier. Contrast the adaptive penalty, which had no such
+  self-disabling property.
+- **It dominates the adaptive penalty** — better min GBR at both loads, same
+  mean, and at 0.67× the adaptive penalty is actively *worse than doing
+  nothing* (min 43% → 33%) where max-min improves things.
+- DL Delay flows stay 10/10 on time throughout: a hard UL GBR floor does not
+  crowd out the deadline class. Studies 2 and 3 are structurally untouched —
+  neither scenario has a GBR flow, so stage A imposes no floor at all.
+
+The `scale` knob traces a smooth cost curve at 1.00× (`t* = 0.59`): min GBR
+0 / 8 / 17 / 28 / 40% for scale 0 / 0.25 / 0.5 / 0.75 / 1.0, against total
+74.2 / 73.7 / 72.7 / 71.9 / 66.7 Mbps. The first 28 points of floor cost 3.1%
+of throughput; the last 12 cost a further 7%.
+
+**What it does not change: the contract count**, at any load. That limit is
+structural and is discussed in §8.5.
+
+**Why it ships on.** The deciding property is the second bullet: the stage
+is *self-disabling*. Wherever the GBR set is jointly feasible `t* = 1`, the
+floor binds nothing, and the result is bit-identical to leaving it off — so
+the default costs exactly nothing in every regime except genuine GBR
+overload. In that regime what it costs is aggregate throughput (−4% at 1.0×
+load, and PF then carries more total than TwoTier does), and what it buys is
+a worst-served flow at 40% of contract instead of 0%. A cell-edge robot
+whose video is switched off entirely is a deployment failure in a way that a
+uniformly degraded fleet is not; that is the judgement encoded in the
+default. `gbr_maxmin_scale` dials it back for deployments that would rather
+have the throughput, and `gbr_maxmin=False` restores the single-stage form
+exactly.
 
 ---
 
@@ -891,11 +1123,14 @@ for contract satisfaction. Study 1 traces a *hump*:
 - **Deep overload (1.0× shipped load — the as-shipped operating point).**
   GBR demand far exceeds capacity — the shipped load is deeply overloaded
   for this cell. No scheduler can honor the contracts; PF ≈ TwoTier on the
-  contract count. A smarter MAC cannot manufacture capacity.
+  contract count. A smarter MAC cannot manufacture capacity. What the
+  scheduler still decides here is *how the shortfall is distributed*, and
+  the two answers are genuinely different: TwoTier holds every flow near
+  50% of contract, PF leaves one at 0% and carries 2.6 Mbps more total.
 - **Moderate overload (0.50–0.67× shipped load).** Capacity is *enough to
   honor the contracts but only if allocated deliberately*. This is where
-  TwoTier wins: at 0.50× load, 10/10 vs 8/10 contracts; at 0.67× load, a
-  much better delivery *distribution* (min 43% vs 4%). PF, optimizing the
+  TwoTier wins: at 0.50× load, 10/10 vs 5/10 contracts; at 0.67× load, a
+  much better delivery *distribution* (min 60% vs 4%). PF, optimizing the
   wrong objective, misses contracts the cell could have met.
 - **Light load (0.33× shipped).** Everyone has slack; all schedulers
   converge to 10/10.
@@ -908,6 +1143,14 @@ rewards a scheduler that *abandons* some flows so that others clear the bar.
 For a factory where every robot matters, "all robots degraded gracefully"
 beats "half the robots perfect, half offline" — so the contract *count* is
 necessary but not sufficient; report it alongside the minimum.
+
+This is not only a reporting caveat: it is the choice the shipped default
+now makes. The max-min stage (§7.7) is exactly a commitment to "degraded
+gracefully" over "some perfect, some offline", and it is why at 1.0× load
+TwoTier gives up total throughput to PF. A deployment that genuinely
+prefers the other answer — where a robot at 50% of its video rate is as
+useless as one at 0%, so concentration is correct — should set
+`gbr_maxmin=False` and read §8.5's contract-count discussion.
 
 **Engineering implication.** In real deployments *capacity is fixed by
 spectrum*, so the corresponding operator lever is **admission control**:
@@ -964,9 +1207,10 @@ and the on-time count, never just mean delivery.
 
 ### 8.4 A negative result: the adaptive penalty is the wrong shape
 
-The adaptive GBR penalty (§4.1, dual ascent) was built to fix cell-edge
+The adaptive GBR penalty (dual ascent on `pᵢ`; mechanism in
+[scheduler-design.md §4](scheduler-design.md)) was built to fix cell-edge
 starvation by escalating the penalty on whichever flow is actually missing.
-It does raise the *minimum* delivery (Study 1, 1.0× load: min GBR 0% → 35%).
+It does raise the *minimum* delivery (Study 1, 1.0× load: min GBR 0% → 34%).
 But it meets **0/10** contracts across every overloaded row in the sweep.
 
 The reason is a clean piece of theory. Dual ascent drives the system toward
@@ -983,22 +1227,76 @@ shortfall. The adaptive penalty's legitimate role is narrow — fairness-of-
 shortfall *reporting* — so it ships **disabled by default** (`gbr_penalty_lr
 = 0`). A flow pinned at `p_max` and still missing is precisely the signal
 admission control should act on. The spectral-efficiency tilt knob `k`
-(§4.1, [scheduler-design.md](scheduler-design.md)) was explored for the same
+([scheduler-design.md §4](scheduler-design.md)) was explored for the same
 problem and also rejected: `k < 0` rescues the cell edge but only by
 *relocating* starvation to the next-worst tier. Neither static knob can lift
-the worst-case floor.
+the worst-case floor — and §8.5 shows that this is structural rather than
+bad luck with two particular knobs. What does lift it is a constraint: the
+max-min stage of §4.1, measured in §7.7.
 
-### 8.5 Finding 1 — cell-edge starvation (open)
+### 8.5 Finding 1 — cell-edge starvation: the penalty, not the utility
 
 The per-flow breakdown (§7.4) shows TwoTier driving the two lowest-SNR GBR
-flows (ue4 at 16 dB, ue7 at 14 dB) to 0%. The Tier-1 `log`-utility objective
-with soft floors prefers to abandon flows that are *expensive in PRBs per
-delivered bit* and fund cheaper ones — a known pathology of weighted-`log`
-objectives under infeasibility. The adaptive penalty mitigates the symptom
-but, per §8.4, breaks the contract count. The principled fix is a
-**lexicographic / max-min stage on GBR satisfaction before the `log`
-utility**, or hard floors plus admission control. This is open; it is a
-*Tier-1 objective-design* question, not a Tier-2 bug.
+flows (ue4 at 16 dB, ue7 at 14 dB) to 0%. Earlier revisions of this document
+attributed that to the `log` utility — "a known pathology of weighted-`log`
+objectives under infeasibility." **That was wrong**, and it is why two
+successive fixes (§8.4, and the SE-tilt knob `k`) both failed.
+
+Measured on `factory_robots` at 1.0× load, the two objective terms are
+`Σ w·log(r+ε) = 709` and `Σ p·s = 2.4e10` — a ratio of **3.4e7**. The utility
+is a tie-break and nothing more. What Tier-1 actually solves is
+
+```
+minimize  Σᵢ (Gᵢ − rᵢ)      subject to   Σᵢ rᵢ / SEᵢ  ≤  C
+```
+
+— minimize total shortfall *bits* under a PRB budget. That is a **fractional
+knapsack**, whose optimum is greedy in spectral efficiency, and the solved
+targets are exactly that staircase: 100% for the two highest-SE flows, 100%
+for the next four, 53–56% for the boundary tier, and **0%** for the single
+lowest-SE flow. It orders by SE, not SNR — ue2 (18 dB) and ue4 (16 dB) share
+an MCS step and get the identical 56%.
+
+Two controls confirm it. Sweeping `p` over six decades (`1` … `1e6`) leaves
+the targets *identical* — the solution is fixed by the knapsack structure,
+not the penalty magnitude. And at `p = 1e-6`, with the utility alone driving,
+the allocation is 44–56% and **rises as SE falls**: ue7, the starved flow,
+gets the highest ratio of all. The `log` utility is the term that *protects*
+cell-edge flows; the slack penalty is the term that starves them.
+
+**Why every penalty-shaped fix was doomed.** Once the penalty dominates, the
+program is effectively an LP, so its optimum is a **vertex**: bang-bang,
+served in full or abandoned. Reweighting `p` selects a different vertex and
+nothing more. `k < 0` sets `pᵢ ∝ 1/SEᵢ`, equalizing the knapsack's value
+density and merely permuting the victims — precisely the observed "relocates
+starvation." Dual ascent promotes the missing flow and demotes another.
+Removing the abandonment requires changing the **feasible region**: a
+constraint, not a weight.
+
+**The fix, and its limit.** The max-min stage of §4.1 supplies that
+constraint, and §7.7 measures it: min GBR delivery 0% → 40% at 1.00× load,
+43% → 60% at 0.67×, at zero cost where the GBR set is jointly feasible. It
+**ships on by default** — see §7.7 for why that is safe and what it costs
+where it binds. Finding 1 is **closed as a scheduler issue**.
+
+What max-min cannot do is raise the **contract count** — and this is not a
+shortcoming of the implementation but a genuine conflict of objectives. A
+GBR contract is a step function, so parking ten flows at a uniform 59% of
+GFBR satisfies none of them; the same wall §8.4 hit. Note that at 0.67× load
+PF meets 4/10 contracts to TwoTier's 0/10 *precisely because* PF
+concentrates — serving a few fully and abandoning the rest is the answer a
+contract-count metric rewards. So Tier-1 can serve one objective at a time:
+
+| objective | mechanism | right when |
+|---|---|---|
+| maximize the worst-served flow | `gbr_maxmin` | partial delivery has value — video that degrades gracefully, telemetry |
+| maximize flows meeting GFBR | knapsack over contracts | partial delivery is worthless — a control loop at 59% of rate is a failed control loop |
+
+The second is a contract-*selection* decision — admission control — and is
+deliberately outside the scheduler's scope. Tier-1 now hands that gate a
+clean signal for free: `t* < 1` is the infeasibility detector, and `t*`
+quantifies how far off the GBR set is *before* any flow has been starved to
+reveal it.
 
 ### 8.6 Finding 3 — the burst/PDB ceiling is a contract-dimensioning problem
 
@@ -1043,6 +1341,13 @@ metrics are what surface the real, regime-dependent value.
 
 ## 9. Threats to validity
 
+- **Absolute figures predate 2026-08-06 in older write-ups.** Tier-1 was
+  reformulated on that date after its single-objective form was found to
+  return solver-inaccurate targets (§4.1). Every study here has been
+  re-measured against the corrected solve and no conclusion changed, but
+  absolute numbers quoted in [NOTES.md](../NOTES.md) entries dated before
+  then carry an unknown few-percent solver error on top of the warm-up and
+  channel scatter below.
 - **Simulator, not silicon.** Results are comparative and architecture-level
   (§5.1). They establish *which scheduler wins and roughly by how much*;
   they do not predict absolute throughput or microsecond-accurate latency.
@@ -1078,32 +1383,48 @@ metrics are what surface the real, regime-dependent value.
 ## 10. Next steps
 
 **Algorithm.**
-1. **Finding 1 (cell-edge starvation).** Prototype a lexicographic / max-min
-   GBR-satisfaction stage ahead of the `log` utility in Tier-1, and compare
-   against hard floors + admission control.
-2. **Admission control.** Build the knapsack-on-contracts gate that §8.4
-   argues for: when the LP reports a flow pinned at `p_max` and still
-   missing, defer/reject rather than fairly under-serve everyone.
-3. **Finding 3.** Treat as a contract/source issue: encoder pacing, I-frame
+1. ~~**Finding 1 (cell-edge starvation).**~~ **Done** (2026-08-06) — the
+   max-min GBR stage of §4.1, measured in §7.7, **on by default** since the
+   same date. The default question is settled: the stage self-disables
+   wherever the GBR set is feasible, so it is free everywhere except genuine
+   GBR overload, and there the aggregate throughput it gives up (−4% at 1.0×
+   load) buys a worst-served flow at 40% of contract rather than 0%.
+2. **Admission control.** Build the knapsack-on-contracts gate that §8.4 and
+   §8.5 argue for: max-min raises the delivery *floor* but cannot raise the
+   *contract count*, because a contract is a step function. Tier-1's `t*`
+   is the trigger and the sizing signal. Out of scope for the scheduler
+   itself.
+3. ~~**Rescale the Tier-1 utility program.**~~ **Done** (2026-08-06), and
+   the earlier reading that "nothing here is currently corrupted" was
+   wrong. The single-objective form was returning materially inaccurate
+   targets — on `overload`, two solvers disagreed by 3.6× and the Delay
+   class was under-served by 28% against the analytic optimum. Rescaling
+   alone did not fix it (a term *ratio* is a property of the model, not the
+   units); the fix was to state the lexicographic order as two phases
+   (§4.1). All studies were re-measured; no conclusion changed. The
+   follow-on item of the same shape — `slice_slack_penalty` being compared
+   against the GBR penalty in different units — was measured and fixed the
+   same day; it had made the slice-vs-GBR priority a function of SNR.
+4. **Finding 3.** Treat as a contract/source issue: encoder pacing, I-frame
    staggering across cameras, and burst-aware PDB sizing — none of which is
    a scheduler change. Surface `bytes_dropped_pdb` correlated with I-frame
    slots so the dimensioning tool can flag inconsistent contracts.
 
 **Evaluation.**
-4. Adopt a 3GPP TBS table extract for absolute-claim credibility.
-5. Collect and replay trace-driven factory workloads.
-6. Make the longer (60-window) horizon the default for *absolute* figures;
+5. Adopt a 3GPP TBS table extract for absolute-claim credibility.
+6. Collect and replay trace-driven factory workloads.
+7. Make the longer (60-window) horizon the default for *absolute* figures;
    keep the 4000-slot horizon for fast comparative runs.
 
 **Toward OAI** (the phased plan in [scheduler-design.md §10](scheduler-design.md)).
-7. Instrument the OAI MAC with per-flow throughput / HoL / BLER metrics;
+8. Instrument the OAI MAC with per-flow throughput / HoL / BLER metrics;
    verify against its default PF scheduler.
-8. Port Tier-2 (drift-plus-penalty + the MAC multiplexer) into the OAI MAC
+9. Port Tier-2 (drift-plus-penalty + the MAC multiplexer) into the OAI MAC
    scheduler thread; the `scheduler/` library is already dependency-isolated
    for exactly this.
-9. Run Tier-1 as a separate thread/process writing an atomic shared-memory
+10. Run Tier-1 as a separate thread/process writing an atomic shared-memory
    snapshot of target rates.
-10. Wire SPS/Configured-Grant setup to Tier-1's decisions — per §8.2, the
+11. Wire SPS/Configured-Grant setup to Tier-1's decisions — per §8.2, the
     highest-leverage feature, so prioritize it.
 
 ---
@@ -1139,6 +1460,25 @@ its place in the moderate-overload band specifically; and the adaptive GBR
 penalty was explored and *rejected* — equalizing shortfall is the wrong
 objective when a contract is a step function, and deep infeasibility is an
 admission-control problem, not a scheduling one.
+
+A late result sharpened that last point. Cell-edge starvation under overload
+(§8.5) turned out to be driven not by the `log` utility, as two rounds of
+attempted fixes had assumed, but by the GBR slack penalty, which outweighs
+the utility by seven orders of magnitude and so reduces Tier-1 to a
+shortfall-minimizing knapsack — solved greedily by spectral efficiency, with
+the lowest-SE flow abandoned outright. Since that solution is a *vertex*, no
+reweighting of a linear penalty could ever have removed it; only a
+constraint could. The two-stage max-min form (§4.1, §7.7) supplies one and
+**now ships on by default**: it takes the worst-served GBR flow from 0% to
+40% of its contract, and costs nothing at all wherever the GBR set is
+jointly feasible, which is what makes it defensible as a default. Where it
+does bind — genuine GBR overload — it gives up ~4% of cell throughput, and
+at the as-shipped load PF consequently carries more total traffic than
+TwoTier does. That is the trade stated plainly: a fleet degraded evenly to
+~53% of contract, against one where two cell-edge robots are switched off so
+the rest can run faster. It still cannot raise the count of contracts
+*met* — that remains a knapsack over contracts, which is to say admission
+control, and not the scheduler's decision to make.
 
 For the factory/warehouse target, the two-tier scheduler is worth building —
 and this study says precisely which parts, for which deployments, and why.

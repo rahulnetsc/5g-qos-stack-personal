@@ -1049,3 +1049,514 @@ so both sections increase-with-badness; sim still varies capacity
 display headings updated for consistency.
 
 ---
+
+## 2026-08-06 — Finding 1 root cause: the slack penalty, not the log utility
+
+Finding 1 (cell-edge starvation) has been carried as open since 05-13, with
+the mechanism recorded as "Tier-1's log-utility LP is trading cell-edge GBR
+for system-wide log utility — classic pathology of weighted-log objectives."
+**That attribution is wrong, and it is why two rounds of fixes failed.**
+Measured on `factory_robots` at 1.0× load, with the default penalty:
+
+| objective term | value |
+|---|---|
+| utility `Σ w·log(r+ε)` | 709 |
+| penalty `Σ p·s` at `p = 1e3` | 2.39e10 |
+| **ratio** | **3.4e7** |
+
+The log utility contributes nothing but a tie-break. Tier-1 is, to seven
+significant figures, solving
+
+```
+minimize  Σ_i (GFBR_i − r_i)      subject to   Σ_i r_i / SE_i  ≤  C
+```
+
+— minimise total shortfall *bits* under a PRB budget. That is a **fractional
+knapsack**, and its optimum is the greedy one: buy rate where it is cheapest
+per PRB, i.e. in descending spectral efficiency. The solved targets are
+exactly that staircase:
+
+| SE (bits/PRB-sym) | flows | target |
+|---|---|---|
+| 48.6 | ue1 (22 dB), ue5 (24 dB) | 100% |
+| 37.8 | ue3, ue6, ue8, ue10 (19–21 dB) | 100% |
+| 29.7 | ue2 (18 dB), ue4 (16 dB), ue9 (17 dB) | 53–56% |
+| 21.6 | ue7 (14 dB) | **0%** |
+
+One fully-served head, exactly one partially-served boundary tier, a zeroed
+tail — a textbook LP basic solution. Note it orders by **SE, not SNR**: ue2
+(18 dB) and ue4 (16 dB) land on the same MCS step and get the identical 56%.
+
+**Decisive control — a penalty sweep over six decades.** Targets are
+*identical* for `p ∈ {1, 10, 1e3, 1e6}`. The solution is fixed by the
+knapsack structure, not by the penalty magnitude. And running the other way,
+at `p = 1e-6` (utility alone), the allocation is 44–56% *rising* as SE falls
+— ue7, the starved flow, gets the **highest** ratio of all. The log utility
+is the term that protects cell-edge flows; the slack penalty is the term
+that starves them. The 05-13 note had it backwards.
+
+(Credit where due: `design-docs/scheduler-design.md`'s adaptive-penalty
+section already stated the shortfall-minimisation argument correctly. It was
+NOTES.md and scheduler-study.md §8.5 that mis-attributed it to the `log`.)
+
+### Why every previous fix was structurally doomed
+
+Once the penalty dominates, the program is effectively an **LP**, so its
+optimum sits at a **vertex** of the feasible polytope: bang-bang, flows
+served in full or abandoned, at most one partial per tier. Reweighting `p`
+moves *which* vertex, never the fact that there is one:
+
+- **`k < 0` (SE tilt)** sets `p_i ∝ 1/SE_i`, equalising the knapsack's value
+  density `p_i·SE_i` — so the greedy order becomes arbitrary and the victim
+  set merely permutes. Exactly the observed "only relocates starvation".
+- **Adaptive dual ascent** escalates `p_i` on whoever is missing, promoting
+  that flow up the greedy order and demoting another. Still a vertex, hence
+  "equalises shortfall but meets 0/10 contracts".
+
+No choice of a *linear* penalty vector removes the vertex. Only changing the
+**feasible region** does — i.e. a constraint, not a weight.
+
+---
+
+## 2026-08-06 — Finding 1 fix: a max-min GBR stage ahead of the utility solve
+
+Implemented the fix the design docs committed to. Two stages, both convex,
+both in `scheduler/tier1.py`:
+
+**Stage A — `solve_maxmin_gbr_level`.** `maximize t` s.t. `r_i ≥ t·contract_i`
+for every GBR flow, plus capacity, demand caps and (soft) slice floors.
+Returns `t*`: the largest fraction of its contracted floor that *every* GBR
+flow can hold simultaneously. `contract_i = min(GFBR_i, demand_i)` — the
+demand cap matters, or an under-offered GBR flow pins `t*` at its own
+unreachable ratio and drags the whole set down.
+
+**Stage B — `solve_tier1(gbr_floor_bps=…)`.** The existing solve, with
+`gbr_maxmin_floors(…, t*, scale)` added as *hard* lower bounds. The soft
+GFBR constraint is kept alongside, so the utility term still has an
+incentive to close the remaining gap wherever that is cheap. Stage B is
+feasible by construction (stage A's solution satisfies it).
+
+Wired as `TwoTier(gbr_maxmin=True, gbr_maxmin_scale=1.0)`; **off by
+default** at the time of writing, so every published study number was
+unchanged. `scale` dials how much of the achievable floor to claim: 0.0 is
+the single-stage behaviour, 1.0 the full guarantee. *(Superseded the same
+day — it is now the default; see the 2026-08-06 "gbr_maxmin is now the
+default" entry below.)*
+
+### A conditioning bug found on the way — worth generalising
+
+The first cut posed stage A in raw bps: `t` of order 1, rate variables of
+order 1e7. The solver returned `optimal` on a level that was both wrong and
+**non-monotone in capacity** — `t*` peaked at 0.87 around 2× and then *fell*
+to 0.84 at 4×, never reaching 1.0 however much spectrum it was given. Since
+more capacity can never shrink a max-min level, that is a pure numerical
+artifact. Rebuilt in normalised units (rates as a fraction of the largest
+contract, capacity usage as a fraction of each direction's own budget, every
+coefficient O(1)), `t*` is now exactly linear in PRB count and saturates
+cleanly at 1.0. Regression guard:
+`test_maxmin_level_monotone_and_saturating_in_capacity`.
+
+**The general lesson, and an open item.** Stage B has the *same* smell and
+worse: utility ≈ 709 against a penalty term ≈ 2.4e10, a 1e8 dynamic range,
+and `problem.solve()` does emit "Solution may be inaccurate" on some
+scenarios. Its answer is structurally sound — invariant across six decades
+of `p`, and it saturates UL at exactly 100.0% — so this is not currently
+corrupting results. But it has never been checked in normalised units, and
+after the BSR/CQI "perfect knowledge" meta-pattern this is worth naming as a
+second one: **any convex program mixing O(1) and O(1e7) magnitudes is a
+candidate for a silently inaccurate `optimal`.** Rescaling stage B is
+unfinished business.
+
+### Results — `factory_robots`, contract metrics, BSR 8 / CQI 8 slots
+
+Reproduce with `python scripts/maxmin_study.py`.
+
+| load | scheduler | total | GBR met | mean GBR | **min GBR** | ue4 (16 dB) | ue7 (14 dB) |
+|---|---|---|---|---|---|---|---|
+| 1.00× | TwoTier | 74.2M | 0/10 | 53% | **0%** | 16% | 0% |
+| 1.00× | +adaptive | 68.7M | 0/10 | 44% | 34% | 47% | 36% |
+| 1.00× | **+maxmin** | 66.7M | 0/10 | 44% | **40%** | 40% | 46% |
+| 0.67× | TwoTier | 95.8M | 0/10 | 68% | 43% | 63% | 43% |
+| 0.67× | +adaptive | 94.6M | 0/10 | 65% | 33% | 33% | 68% |
+| 0.67× | **+maxmin** | 94.1M | 0/10 | 65% | **60%** | 61% | 69% |
+| 0.50× | TwoTier / +maxmin | 120.1M | 10/10 | 82% | 78% | 78% | 84% |
+| 0.33× | TwoTier / +maxmin | 125.4M | 10/10 | 85% | 83% | 83% | 86% |
+
+(Re-measured after the 2026-08-06 solve_tier1 rescale below; the numbers
+this entry originally carried came from the pre-rescale solver.)
+
+Three things to read off it:
+
+1. **It fixes the thing it was built to fix.** min GBR 0% → 40% at 1.00×,
+   43% → 60% at 0.67×. ue7 goes 0% → 46%. Per-flow at 1.00× the whole GBR
+   set collapses into a **40–48% band**, against the single-stage spread of
+   0–80% — max-min doing exactly what it says.
+2. **It costs nothing where nothing is wrong.** At 0.50× and 0.33×, `t* = 1.00`,
+   the floor is non-binding, and results are identical to default TwoTier.
+   The knob is self-disabling in the regime where the single-stage solve is
+   already right — which the adaptive penalty never managed.
+3. **It dominates the adaptive penalty.** Better min GBR at both loads
+   (40 vs 34, 60 vs 33), same mean. And note the 0.67× row: the adaptive
+   penalty is *worse than doing nothing* there (min 43% → 33%), while
+   max-min improves it.
+
+DL Delay flows stay 10/10 on time in every row — the hard UL GBR floor does
+not crowd out the deadline class. Studies 2 and 3 are structurally untouched:
+neither `sensor_dense` nor `latency_bound` has a GBR flow, so stage A returns
+`t* = 1` over an empty set and imposes no floor (test:
+`test_maxmin_level_is_one_without_gbr_flows`).
+
+### The cost curve, and choosing `scale`
+
+`gbr_maxmin_scale` at 1.00× load (`t* = 0.59`):
+
+| scale | total | mean GBR | min GBR |
+|---|---|---|---|
+| 0.00 | 74.2M | 53% | 0% |
+| 0.25 | 73.7M | 51% | 8% |
+| 0.50 | 72.7M | 50% | 17% |
+| 0.75 | 71.9M | 48% | 28% |
+| 1.00 | 66.7M | 44% | 40% |
+
+Monotone and smooth — the first 28 points of floor cost 3.1% of throughput,
+the last 12 cost another 7%. At 0.50× load the curve is flat (floor
+non-binding at any scale). A deployment that has to name one number: `scale`
+is "what fraction of the worst-case guarantee is worth buying", and the knee
+is around 0.75.
+
+### What it does *not* fix — and why that is expected
+
+**The GBR-contract count is unchanged at every load** (0/10 at 1.00× and
+0.67×, 10/10 at 0.50× and 0.33×). Max-min addresses *fairness of shortfall*;
+it cannot address the fact that a GBR contract is a **step function**.
+Parking ten flows at a uniform 59% of GFBR clears zero 95%-contracts, just as
+equalising shortfall did (§8.4). This is the same wall the adaptive penalty
+hit, and it is not a scheduler problem: at 0.67× load PF meets **4/10**
+contracts to TwoTier's 0/10 precisely *because* PF concentrates — it fully
+serves a few and abandons the rest, which is the knapsack answer a
+contract-count metric rewards.
+
+So the two objectives are genuinely in tension and Tier-1 can serve one at a
+time:
+- **max-min** (`gbr_maxmin=True`) — maximise the worst-served flow. Right
+  when partial delivery has value (video that degrades gracefully, telemetry).
+- **contract count** — maximise flows fully meeting GFBR, accepting that the
+  rest get nothing. Right when partial delivery is worthless (a control loop
+  at 59% of its rate is a failed control loop).
+
+The second is a knapsack over contracts — i.e. an admission-control /
+contract-selection decision, deliberately **out of scope** for the scheduler
+(owner's call, 2026-08-06). Worth recording that Tier-1 now hands that gate a
+clean signal for free: `t* < 1` *is* the infeasibility detector, and `t*`
+quantifies how far off the GBR set is, before any flow has been starved to
+find out.
+
+**Finding 1 status: closed as a scheduler issue.** The mechanism is
+understood, the fix is implemented, measured, and self-disabling where
+unneeded. What remains under it is the contract-selection question above,
+which is not Tier-1's to answer.
+
+### Open: should max-min be the default?  → **Resolved same day: yes**
+
+Left as `False` here so every number in the study docs still reproduced. The
+case for flipping it: it is free at moderate load and only binds where the
+single-stage solve is doing something indefensible. The case against: it
+costs throughput at deep overload, which is exactly the regime the study
+already says to solve with capacity planning rather than scheduling.
+
+**Decided later the same day — flipped to `True`.** See the "gbr_maxmin is
+now the default" entry below for the deciding argument (the stage is
+self-disabling, so it is free outside genuine GBR overload) and for the cost
+re-measured after the solver rescale, which came out at −4% rather than the
+−10% estimated here.
+
+---
+
+## 2026-08-06 — solve_tier1 rescaled: the penalty was hiding a wrong answer
+
+Closing the open item flagged in the max-min entry above. It was logged as
+a conditioning smell; it turned out to be a live defect.
+
+### The symptom
+
+On `overload` (scenario 2, three flows) the shipped `solve_tier1` returned
+`optimal_inaccurate`, and **CLARABEL and SCS disagreed with each other**:
+
+| | PF flow | GBR flow | Delay flow |
+|---|---|---|---|
+| CLARABEL | 0.847 M | 4.000 M | 0.461 M |
+| SCS | 0.233 M | 4.000 M | 0.202 M |
+| **analytic optimum** | **0.667 M** | **4.000 M** | **0.640 M** |
+
+The problem is small enough to solve by hand: pin the GBR flow at its 4 Mbps
+floor, then split the residual 1.307 Mbps between the PF flow (`w=1`) and the
+Delay flow (`w=5`) under `log`. The Delay flow should sit at its 0.64 Mbps
+demand cap with the PF flow taking the rest. Both solvers missed it, and the
+shipped answer **under-served the Delay class by 28%** — the highest-weighted
+class in the model, in the scenario used for the SPS and adaptive-penalty
+regression tests.
+
+### Why rescaling alone could not fix it
+
+The first instinct — normalise like stage A — is not enough, and the reason
+is worth writing down. Rescaling variables cannot change the *ratio* between
+two objective terms; that ratio is a property of the model. Here it is ~1e7
+(utility 709, penalty 2.4e10), and it is there on purpose: `p = 1e3` was
+chosen so the GBR floor would be "effectively hard whenever feasible."
+
+Measured directly: normalising the variables and dividing the objective by
+the rate scale produced a clean `optimal` status — and a *still-wrong*
+answer, because the utility term had been pushed to ~1e-6 and became
+invisible to the solver. That is the worst outcome available: a confident
+wrong answer. **Status is not accuracy.**
+
+### The fix: state the lexicographic order instead of encoding it as a weight
+
+A penalty 1e7 larger than the utility is not a weighting, it is a
+lexicographic order written as a magnitude. So `solve_tier1` now says so:
+
+```
+phase 1:  minimize  Σ p_i s_i + p_slice Σ ss_j
+phase 2:  maximize  Σ w_c log(r_i + ε)
+          s.t.      the phase-1 penalty stays at its optimum
+```
+
+Each phase is well conditioned alone, and both are posed in normalised
+units (rates as multiples of `rate_scale`, capacity usage as a fraction of
+each direction's own budget). Phase 2 is feasible by construction; if it
+fails anyway the code keeps phase 1's answer, which already honours every
+floor it could — strictly better than the old fall-back to raw demand.
+
+Result on the case above: **both solvers return `optimal` and land within
+100 bps of the analytic optimum**, agreeing with each other. Across the six
+shipped scenarios the solver warning is gone from five; `factory` still
+reports `optimal_inaccurate` in phase 2, but there CLARABEL and SCS now
+agree to **18 kbps** on rates of 4–14 Mbps (0.4%), against 440 kbps of
+mutual disagreement before. Sweeping the log's `ε` over four decades moves
+the answer by <0.1 kbps, so `ε` is not the residual — 24 simultaneous log
+terms against a tight budget constraint simply is a harder problem than
+CLARABEL's default tolerance likes. Left as is: 0.4% is an order of
+magnitude below the ±2 pt per-window scatter this project already documents.
+
+**Side benefit: one less magic number.** `gbr_slack_penalty` now means only
+what it always should have — the *relative* worth of closing one flow's GBR
+gap against another's, which is all the adaptive dual-ascent update and the
+SE tilt `k` ever read it for. Its absolute magnitude no longer holds the
+model together.
+
+### What moved, and what did not
+
+Re-ran every study. **No qualitative conclusion changes anywhere.** All
+contract counts in Studies 1–3 are identical; Study 2 is bit-identical
+(no GBR flows → phase 1's optimum is 0 → phase 2 is a pure utility solve).
+Absolute figures shift by ~1–3 points, i.e. within the documented
+per-window scatter. Two documented claims did need softening:
+
+- **BSR delay (§7.5).** "TwoTier is essentially invariant: min 81%, 10/10
+  contracts at every delay" becomes 80→77% min and **10/10 → 8/10** over
+  0–16 slots. The SPS bypass is not total immunity at the contract level.
+  The comparative claim is untouched and still large: PF goes 8/10 → 5/10
+  and loses 10% of cell throughput, TwoTier loses ~1%.
+- **SPS margin (§7.6).** "Any margin ≥ 2 dB collapses contracts to 0–2/10"
+  becomes a graded 10/10 → 7/10 → 3/10 → 0/10 over 0/1/2/3 dB. Direction
+  and design implication unchanged — margin is a mobility hedge this
+  channel does not need — but the first dB already costs.
+
+The per-flow breakdown (§7.4) sharpened in a way that *supports* the
+Finding 1 story: TwoTier now zeroes **both** cell-edge flows (ue4 and ue7 at
+exactly 0%), where the old solve showed ue4 at a smeared 22%. Two clean
+zeros is the fractional-knapsack vertex; the smear was solver error.
+
+**Reading older entries in this file.** Every absolute number recorded
+before today came from the pre-rescale solver. The comparative findings all
+survive re-measurement, but treat pre-2026-08-06 absolute figures as
+carrying an unknown few-percent solver error on top of the ±2 pt warm-up
+and channel scatter already documented. The dated entries above are left as
+written — they are what was measured at the time.
+
+### The generalisable bit
+
+The BSR/CQI work named one meta-pattern ("the scheduler is given perfect
+knowledge of state a real gNB learns late"). This is a second:
+**a term many orders of magnitude larger than its neighbours is not a
+weighting, it is a constraint or an ordering that has not been written
+down.** Look for those; each one is both a modelling smell and a numerical
+one. `slice_slack_penalty` (still `1e3`, same shape as the old GBR penalty)
+is the remaining candidate in this file — it is now folded into phase 1, so
+it is no longer competing with the utility, but its *relative* weight
+against the GBR penalty has never been studied.
+
+---
+
+## 2026-08-06 — slice vs GBR penalty: the ratio was a function of the channel
+
+Third and last item on today's list, flagged at the end of the rescale
+entry. Same family as lesson 6 above, in a different disguise: not an
+oversized weight this time, but a weight compared against something in
+**different units**.
+
+### The defect
+
+Phase 1 minimises `Σ p_gbr,i · s_i + p_slice · Σ ss_j`. But `s_i` is a GBR
+shortfall in **bps** and `ss_j` is a slice shortfall in **PRB-symbols/s**.
+Those are not the same thing, and the conversion between them is the
+spectral efficiency — so the *relative priority of a slice floor against a
+GBR floor was a function of the UEs' SNR.*
+
+Measured on a designed conflict (slice 1 holds a GBR flow wanting 80% of DL;
+slice 2 has a 50% DL floor and unbounded demand — only one can be met),
+bisecting for the `p_slice` at which the winner flips, with `p_gbr = 1e3`:
+
+| SNR | SE (bits/PRB-sym) | crossover `p_slice` | `p_gbr × SE` | ratio |
+|---|---|---|---|---|
+| 10 dB | 16.2 | 1.620e4 | 1.620e4 | 1.00 |
+| 14 dB | 21.6 | 2.160e4 | 2.160e4 | 1.00 |
+| 20 dB | 37.8 | 3.780e4 | 3.780e4 | 1.00 |
+| 25 dB | 59.4 | 5.940e4 | 5.940e4 | 1.00 |
+| 30 dB | 70.2 | 7.020e4 | 7.020e4 | 1.00 |
+
+Exact, to two decimal places, at every point. The consequences:
+
+- **A 4.3× policy swing across the SNR range these scenarios already use.**
+  Same deployment, same contracts, same config file — move a UE from the
+  cell edge to the cell centre and the operator's slice guarantee changes
+  rank against the GBR guarantee.
+- **With the shipped defaults (`p_gbr = p_slice = 1e3`) the GBR floor
+  outranked the slice floor by 16–70×** — not as a policy decision, but as
+  an artifact of the units. Nobody chose that.
+
+### Fix
+
+Convert the slice slack to bps before weighing it: multiply by the slice's
+**demand-weighted spectral efficiency** over its flows in that direction —
+the rate the slice would actually have realised on the PRB-symbols it was
+denied. Both penalties are then quoted in the same currency, "cost per bps
+of denied rate", and the crossover lands at exactly `p_slice = p_gbr` for
+every SNR (re-measured: 1.000e3 at all five points).
+
+The GBR side is deliberately left in raw bps. Normalising it by GFBR would
+have been the tidier-looking move and is *wrong*: it changes the relative
+weighting **among** GBR flows, which is precisely the fractional-knapsack
+ordering behind Finding 1. This fix touches only the slice-vs-GBR
+comparison, nothing else.
+
+`slice_slack_penalty` now has a stable meaning: at the default `1e3`, equal
+to `gbr_penalty_init`, a bit denied to a slice floor costs the same as a bit
+denied to a GBR floor. Whether tenant-level slice guarantees *should* rank
+equal with per-flow GBR guarantees is a genuine policy question and is now
+an explicit, single-number choice rather than an emergent property of the
+link budget. Default left at parity.
+
+### Blast radius: none
+
+No scenario YAML sets `slice_shares`, and the two existing slice tests carry
+only PF flows — with no GBR flow there is no GBR slack, and phase 1 is then
+minimising the single remaining term, whose optimum is independent of its
+own coefficient. Every study number is byte-identical to the pre-change run.
+This was latent, caught before slicing was used in anger.
+
+New guard: `test_slice_vs_gbr_priority_is_channel_independent`, which asserts
+the tie-break goes the same way an order of magnitude either side of the
+crossover at 10, 20 and 30 dB. Tests 62 → 63.
+
+### Why the two-phase form made this findable
+
+Worth recording the sequence. Under the old single-objective form, both
+penalties were mainly busy overpowering the log utility, and their ratio to
+*each other* was buried. Once phase 1 became "minimise shortfall" on its
+own, the absolute magnitudes stopped mattering entirely and the ratio became
+the only thing those knobs control — at which point a ratio that silently
+tracked the channel was the obvious next question to ask. Fixing the
+conditioning did not just make the answer accurate; it made the next bug
+visible.
+
+---
+
+## 2026-08-06 — gbr_maxmin is now the default
+
+Owner's decision, taken with the tradeoff on the table. `TwoTier` now ships
+`gbr_maxmin=True, gbr_maxmin_scale=1.0`.
+
+### The case that decided it
+
+The stage is **self-disabling**. Whenever the GBR set is jointly feasible
+`t* = 1`, the floor binds nothing, and the run is bit-identical to leaving
+it off. So the default is free in every regime except genuine GBR overload —
+verified as a test, not an argument
+(`test_two_tier_maxmin_default_is_free_when_gbr_set_is_feasible`, byte-equal
+delivery on `smoke`). Confirmed at scale too: the BSR study is byte-identical
+and the CQI study moves by tenths of a Mbps, because both run at 0.50× load
+where `t* = 1`.
+
+Where it does bind, it is the difference between a fleet degraded evenly and
+a fleet with two robots switched off. That is the judgement.
+
+### What the default now looks like — `factory_robots` per-flow, 1.0× load
+
+| flow | SNR | RR | PF | Gradient | **TwoTier** |
+|---|---|---|---|---|---|
+| ue1 | 22 dB | 77% | 91% | 77% | 56% |
+| ue2 | 18 dB | 57% | 68% | 66% | 54% |
+| ue3 | 20 dB | 63% | 74% | 71% | 53% |
+| ue4 | 16 dB | 51% | 62% | 64% | **50%** |
+| ue5 | 24 dB | 56% | 67% | 67% | 56% |
+| ue6 | 19 dB | 37% | 46% | 55% | 55% |
+| ue7 | 14 dB | 23% | 28% | 41% | **53%** |
+| ue8 | 21 dB | 3% | 3% | 3% | 53% |
+| ue9 | 17 dB | 3% | 3% | 3% | 50% |
+| ue10 | 20 dB | 89% | 0% | 0% | 53% |
+| **mean** | | 46% | 44% | 45% | **53%** |
+
+**Every GBR flow between 50% and 56% — a 6-point spread over a 10 dB SNR
+range**, against PF's 0–91%. That column is the clearest single picture of
+what the two-tier design does that PF cannot.
+
+### The honest cost, stated where it will be read
+
+**At 1.0× load PF now carries more total throughput than TwoTier: 69.3 M vs
+66.7 M.** That reverses a claim the study made at every load point until
+today. It is the max-min trade taken deliberately — −4% aggregate for a
+worst-served flow at 40% of contract instead of 0% — but it is a real
+reversal and §7.1 now says so in bold rather than leaving a reader to notice.
+
+Load-by-load, default vs the single-stage form it replaces:
+
+| load | metric | −maxmin | **default** |
+|---|---|---|---|
+| 1.00× | total / mean / min GBR | 74.2 M / 53% / **0%** | 66.7 M / 44% / **40%** |
+| 0.67× | total / mean / min GBR | 95.8 M / 68% / 43% | 94.1 M / 65% / **60%** |
+| 0.50× | — | identical | identical |
+| 0.33× | — | identical | identical |
+
+GBR contract counts are unchanged at every load (0/10, 0/10, 10/10, 10/10),
+as are Studies 2 and 3 — neither has a GBR flow. The value-of-QoS hump still
+peaks at 0.50× load, 10/10 contracts against PF's 5/10; that headline is
+untouched.
+
+### Consequences for the harness
+
+- `scripts/scheduler_study.py` Study 1 now runs four rows: PF, TwoTier
+  (default), TwoTier−maxmin, and TwoTier−maxmin+adaptive. The adaptive row
+  had to be re-based on the single-stage form or it became a duplicate of
+  the default — max-min dominates it, so with both on the rows were
+  identical. §8.4's negative result needs the like-for-like baseline.
+- Three tests had to pin `gbr_maxmin=False` because they measure mechanisms
+  the floor would otherwise mask — notably
+  `test_two_tier_adaptive_penalty_helps_poor_snr_gbr`, which is precisely a
+  test that the adaptive penalty protects the poor-SNR flow. With the floor
+  on, it protects it first and the test measures nothing.
+- `test_two_tier_maxmin_disabled_by_default` became
+  `test_two_tier_maxmin_enabled_by_default`, so the default cannot be
+  flipped back silently.
+
+Tests 63 → 64.
+
+### Still not settled
+
+`gbr_maxmin_scale` stays at 1.0 — full claim on the achievable floor. The
+scale sweep at 1.0× load (§7.7) shows the curve is smooth, with the knee
+around 0.75 (min GBR 28% for 3.1% of throughput, against 40% for 10%). A
+deployment that wants the throughput back has a one-number dial, and 0.75 is
+the defensible alternative if the −4% ever becomes contentious.
+
+---
