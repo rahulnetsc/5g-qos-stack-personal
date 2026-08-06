@@ -722,6 +722,76 @@ total — but, being deep overload, still 0/10 *contracts* met either way
 (§7.1). The two-tier machinery redistributes the pain; at 1.0× it cannot
 remove it.
 
+### 7.5 BSR sensitivity — delay and loss sweeps
+
+The 8-slot BSR delay used above is one point on a spectrum. To confirm
+the direction of the effect and check that the story is not tuned to that
+point, [scripts/bsr_study.py](../scripts/bsr_study.py) sweeps delay ∈
+{0, 2, 4, 8, 16} slots at loss = 0, then sweeps loss ∈ {0, 5, 10, 20 %}
+at delay = 8, on the two scenarios where BSR bites: `factory_robots` at
+2.0× (moderate-overload UL GBR) and `sensor_dense` (PDCCH-and-BSR-bound).
+
+**Delay sweep, factory_robots @ 2.0× (loss = 0).**
+
+| Delay | PF met | TT met | PF min | TT min | PF total | TT total |
+|---|---|---|---|---|---|---|
+| 0 slots (0 ms) | 8/10 | 10/10 | 66% | 81% | 119.3 M | 123.2 M |
+| 2 slots (0.5 ms) | 8/10 | 10/10 | 56% | 81% | 117.2 M | 122.5 M |
+| 4 slots (1.0 ms) | 8/10 | 10/10 | 45% | 81% | 115.2 M | 121.8 M |
+| **8 slots (2.0 ms)** | **5/10** | **10/10** | **32%** | **81%** | 111.1 M | 120.2 M |
+| 16 slots (4.0 ms) | 5/10 | 10/10 | 30% | 81% | 107.0 M | 117.2 M |
+
+The picture is monotone. PF's minimum delivery slides from 66% at zero
+delay to 30% at 16 slots — a **factor-of-two hit** on the worst-served
+flow — and its contract count breaks between 4 and 8 slots (8/10 → 5/10).
+Cell throughput slips ~10% (119 → 107 M). TwoTier is essentially
+invariant: min stays at 81%, contracts at 10/10, and total drops only
+~5% because its dynamic-scheduled (non-SPS) flows still absorb the
+delay. The gap widens roughly linearly with delay — no cliff, no
+saturation.
+
+**Loss sweep, factory_robots @ 2.0× (delay = 8 slots).**
+
+| Loss | PF met | TT met | PF min | TT min |
+|---|---|---|---|---|
+| 0% | 5/10 | 10/10 | 32% | 81% |
+| 5% | 5/10 | 10/10 | 32% | 81% |
+| 10% | 5/10 | 10/10 | 33% | 81% |
+| 20% | 5/10 | 10/10 | 33% | 81% |
+
+Loss barely moves the needle — a somewhat counter-intuitive result worth
+understanding. Factory UEs carry continuous video traffic, so their
+buffers are almost always non-empty. Losing an individual BSR update
+therefore rarely changes the *eligibility* bit (the UE is known to have
+data either way), and only slightly restales the *sizing* (`bytes_reported`
+is already stale by 8 slots; losing this slot's update makes it a few
+slots more stale). The 5-slot rescheduled BSR grants a fresh view soon
+enough. For a workload with more frequent empty-to-non-empty transitions
+(sparse traffic, bursty control), loss would matter more.
+
+**sensor_dense — the SPS-invariance test.**
+
+| Delay / Loss | PF on-time | TT on-time | PF worst p99 | TT worst p99 |
+|---|---|---|---|---|
+| delay 0–16 slots (loss 0) | 1–2 / 30 | **30 / 30** (all) | 15 ms | **5 ms** (all) |
+| loss 0–20% (delay 8) | 1–2 / 30 | **30 / 30** (all) | 15 ms | **5 ms** (all) |
+
+TwoTier holds **30/30 on-time at 5 ms p99 across every (delay, loss)
+point**. This is the clean structural claim: Configured Grants are
+insensitive to BSR delay and loss because they *use no BSR*. PF stays
+broken at 1–2/30 throughout — the 15 ms PDB ceiling binds regardless of
+BSR condition, because PF has no mechanism to bypass either the DCI cost
+or the BSR round-trip.
+
+**Take-away.** Modelling BSR does not change *which scheduler wins* on
+any scenario — but it changes *by how much*, and it puts a concrete
+number on the SPS story: SPS-served flows are *invariant* to BSR delay
+and loss, while dynamic PF's minimum-served flow scales roughly linearly
+with delay. In a real deployment where BSR degrades under stress
+(imperfect PUCCH, marginal SR reception), the operational value of
+Configured Grants is exactly *how much* PF's floor drops that TwoTier's
+does not.
+
 ---
 
 ## 8. Interpretation and discussion

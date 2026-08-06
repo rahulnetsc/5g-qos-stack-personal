@@ -1,6 +1,8 @@
 from collections import deque
 from dataclasses import dataclass
 
+import numpy as np
+
 
 @dataclass
 class BufferState:
@@ -29,9 +31,20 @@ class BufferModel:
     ``ul_bsr_delay_slots = 0`` disables the pipeline entirely (bytes_reported
     is kept in lock-step with bytes_queued), preserving the previous
     zero-latency behaviour.
+
+    ``ul_bsr_loss_rate`` (0.0-1.0) is the probability that a BSR update
+    fails to reach the gNB on any given slot; on a loss the gNB keeps the
+    previously reported value (real 5G: SR-on-PUCCH loss or a lost BSR MAC
+    CE on PUSCH). Independent Bernoulli per slot per UL flow, seeded from
+    ``bsr_seed`` for reproducibility.
     """
 
-    def __init__(self, ul_bsr_delay_slots: int = 0) -> None:
+    def __init__(
+        self,
+        ul_bsr_delay_slots: int = 0,
+        ul_bsr_loss_rate: float = 0.0,
+        bsr_seed: int = 0,
+    ) -> None:
         self._buffers: dict[tuple[int, int], BufferState] = {}
         # Each chunk is [timestamp_s, bytes_remaining]; FIFO via deque.
         self._chunks: dict[tuple[int, int], deque] = {}
@@ -41,8 +54,12 @@ class BufferModel:
         self._delivered_cum: dict[tuple[int, int], int] = {}
         # UL BSR-delay pipeline.
         self._ul_bsr_delay = max(0, int(ul_bsr_delay_slots))
+        self._ul_bsr_loss_rate = float(min(1.0, max(0.0, ul_bsr_loss_rate)))
         self._ul_flows: set[tuple[int, int]] = set()
         self._bsr_history: dict[tuple[int, int], deque] = {}
+        # Independent RNG so BSR-loss draws don't perturb channel / traffic
+        # sequences when the loss rate is varied.
+        self._bsr_rng = np.random.default_rng(int(bsr_seed))
 
     def register(self, ue_id: int, qfi: int, is_ul: bool = False) -> None:
         key = (ue_id, qfi)
@@ -140,7 +157,13 @@ class BufferModel:
         BEFORE the scheduler reads state -- so ``bytes_reported`` reflects
         the buffer as seen ``ul_bsr_delay_slots`` ago. No-op if no UL flow
         has a delay configured (bytes_reported is already tracked in
-        enqueue/drain/expire for the zero-delay case)."""
+        enqueue/drain/expire for the zero-delay case).
+
+        If ``ul_bsr_loss_rate > 0``, each slot's update independently fails
+        with that probability per UL flow; on a loss the gNB keeps the last
+        successfully reported value (no explicit re-report -- the next
+        slot's BSR either arrives or is also lost).
+        """
         if not self._ul_flows:
             return
         for key in self._ul_flows:
@@ -151,5 +174,12 @@ class BufferModel:
             # from `delay` slots ago. Before that, nothing has been reported
             # yet -- the scheduler sees an empty buffer, matching the real
             # cold-start behaviour (no BSR has yet reached the gNB).
-            if len(hist) > self._ul_bsr_delay:
-                st.bytes_reported = hist[0]
+            if len(hist) <= self._ul_bsr_delay:
+                continue
+            if (
+                self._ul_bsr_loss_rate > 0.0
+                and self._bsr_rng.random() < self._ul_bsr_loss_rate
+            ):
+                # BSR lost: keep the previously reported value.
+                continue
+            st.bytes_reported = hist[0]

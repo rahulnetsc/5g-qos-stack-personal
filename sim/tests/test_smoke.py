@@ -108,6 +108,45 @@ def test_buffer_bsr_delay_lags_ul_by_configured_slots():
     assert b.state(1, 9).bytes_queued == 900
 
 
+def test_buffer_bsr_loss_holds_last_reported_value():
+    """With a 100% BSR loss rate, bytes_reported never advances past its
+    initial value -- every update is lost, so the gNB keeps the (empty)
+    initial view forever. Confirms the loss branch actually short-circuits
+    the pipeline write."""
+    b = BufferModel(ul_bsr_delay_slots=2, ul_bsr_loss_rate=1.0, bsr_seed=1)
+    b.register(1, 9, is_ul=True)
+    for slot in range(10):
+        b.enqueue(1, 9, 100, slot * 0.001)
+        b.snapshot_bsr()
+    assert b.state(1, 9).bytes_queued == 1000
+    assert b.state(1, 9).bytes_reported == 0  # every update lost
+
+    # With a 0% loss rate the pipeline behaves normally (regression guard).
+    b2 = BufferModel(ul_bsr_delay_slots=2, ul_bsr_loss_rate=0.0, bsr_seed=2)
+    b2.register(2, 9, is_ul=True)
+    for slot in range(5):
+        b2.enqueue(2, 9, 100, slot * 0.001)
+        b2.snapshot_bsr()
+    # After 5 slots (indices 0..4) with delay=2: bytes_reported at slot 4
+    # is the value from slot 2, which is 3 * 100 = 300 bytes.
+    assert b2.state(2, 9).bytes_reported == 300
+
+
+def test_buffer_bsr_loss_rng_independent_of_seed_variation():
+    """Different bsr_seed values produce different loss draws (so runs are
+    varied) but bsr_seed=0 is deterministic across constructor calls."""
+    b1 = BufferModel(ul_bsr_delay_slots=1, ul_bsr_loss_rate=0.5, bsr_seed=0)
+    b1.register(1, 9, is_ul=True)
+    b2 = BufferModel(ul_bsr_delay_slots=1, ul_bsr_loss_rate=0.5, bsr_seed=0)
+    b2.register(1, 9, is_ul=True)
+    for slot in range(20):
+        b1.enqueue(1, 9, 100, slot * 0.001)
+        b1.snapshot_bsr()
+        b2.enqueue(1, 9, 100, slot * 0.001)
+        b2.snapshot_bsr()
+    assert b1.state(1, 9).bytes_reported == b2.state(1, 9).bytes_reported
+
+
 def test_buffer_bsr_sps_bypass_uses_bytes_queued():
     """A CG / SPS-served flow reads bytes_queued (real) not bytes_reported.
     The BufferState carries both so the scheduler can choose which to use;

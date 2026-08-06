@@ -765,3 +765,53 @@ widen the SPS win, not narrow it. Reasonable to leave as future work.
 
 Reproduce: `python scripts/scheduler_study.py` (BSR on by default in the
 study). Set `ul_bsr_delay_slots=0` on `run()` to disable.
+
+---
+
+## 2026-05-17 — BSR sensitivity sweep: delay linear, loss essentially flat
+
+Added `ul_bsr_loss_rate` to `BufferModel` (per-slot per-UL-flow Bernoulli;
+on loss the gNB keeps last-successful `bytes_reported`), with its own
+seeded RNG so loss draws don't perturb channel/traffic streams. New
+`scripts/bsr_study.py` sweeps delay ∈ {0,2,4,8,16} slots (loss=0) and
+loss ∈ {0,5,10,20%} (delay=8) on `factory_robots` @ 2.0× and on
+`sensor_dense`.
+
+### Findings
+
+**Delay sweep, factory 2.0×.** PF's min GBR delivery drops smoothly:
+66 → 56 → 45 → 32 → 30 % from 0 to 16 slots. PF contract count breaks
+between 4 and 8 slots (8/10 → 5/10). PF total slips ~10% (119.3 → 107.0
+M). TwoTier is essentially flat: min GBR 81% across every row, 10/10
+contracts, total slips only ~5%. Gap grows roughly linearly with delay
+-- no cliff, no saturation.
+
+**Loss sweep, factory 2.0× @ delay=8.** Both schedulers barely move
+across 0-20% loss. PF min GBR wobbles by 1 point (32 ↔ 33 %); TwoTier
+unchanged. Reason: factory UEs carry continuous video, so buffers are
+almost always non-empty -- individual BSR losses don't change the
+eligibility bit, only slightly restale the sizing. Loss would matter
+more on a workload with frequent empty-to-non-empty transitions.
+
+**sensor_dense.** TwoTier holds **30/30 on-time at 5 ms p99 across every
+(delay, loss) point**. PF stays broken at 1-2/30. Clean structural
+invariance -- SPS uses no BSR, so nothing about BSR touches it.
+
+### What this actually tells us
+
+Adding BSR delay does not change *which scheduler wins* on any scenario
+-- but it puts a concrete number on the SPS story: SPS-served flows are
+*invariant* to BSR delay and loss, while dynamic PF's floor scales
+roughly linearly with delay. In a real deployment where BSR degrades
+under stress (imperfect PUCCH, marginal SR reception), the operational
+value of Configured Grants is exactly the gap between "PF's minimum
+drops a factor of two" and "TwoTier stays put." That is a stronger,
+more concrete claim than the previous scheduler-study said.
+
+Loss at *low* delays would probably show more effect (the pipeline
+starts near-perfect and losing updates degrades it noticeably) -- we
+don't sweep that corner. Kept the study compact.
+
+New tests: `test_buffer_bsr_loss_holds_last_reported_value`,
+`test_buffer_bsr_loss_rng_independent_of_seed_variation` (49 pass).
+Reproduce: `python scripts/bsr_study.py`.

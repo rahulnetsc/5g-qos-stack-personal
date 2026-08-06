@@ -16,6 +16,7 @@ def run(
     scheduler: Scheduler,
     record_timeseries: bool = False,
     ul_bsr_delay_slots: int = 0,
+    ul_bsr_loss_rate: float = 0.0,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -24,11 +25,22 @@ def run(
     lags reality by this many slots. Configured Grants / SPS bypass it.
     Zero (the default) preserves the old zero-latency behaviour; a typical
     realistic value at numerology μ=1 (0.5 ms slot) is 8 slots (~4 ms).
+
+    ``ul_bsr_loss_rate`` (0.0-1.0) is the per-slot per-UL-flow probability
+    that a BSR update fails to reach the gNB; on a loss the gNB keeps its
+    last successfully reported value. Independent of channel BLER; uses a
+    dedicated RNG seeded from ``scenario.seed`` for reproducibility.
     """
     rng = np.random.default_rng(scenario.seed)
     grid = ResourceGrid(scenario.carrier, scenario.tdd)
     channel = ChannelModel(scenario.ues, rng)
-    buffers = BufferModel(ul_bsr_delay_slots=ul_bsr_delay_slots)
+    buffers = BufferModel(
+        ul_bsr_delay_slots=ul_bsr_delay_slots,
+        ul_bsr_loss_rate=ul_bsr_loss_rate,
+        # Derive a distinct seed so BSR-loss draws don't perturb the channel
+        # / traffic RNG stream when the loss rate is swept.
+        bsr_seed=scenario.seed ^ 0xB5B5B5B5,
+    )
     traffic = TrafficModel(scenario.flows, buffers, grid.slot_duration_s, rng)
     metrics = Metrics(record_timeseries=record_timeseries)
 
