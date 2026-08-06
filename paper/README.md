@@ -4,6 +4,8 @@ A conference-paper draft built from the project's design docs.
 
 - [`main.tex`](main.tex) — the paper (IEEE conference class)
 - [`refs.bib`](refs.bib) — bibliography
+- [`related-work-review.md`](related-work-review.md) — the literature search
+  behind §II, its method, and its limits
 - [`main.pdf`](main.pdf) — committed build product, so the draft reads
   without a TeX toolchain. Rebuild with `make`.
 
@@ -16,17 +18,34 @@ It has *not* been read by a human yet.
 
 ### Space budget for §VII
 
-Measured, not estimated: with §VII removed the paper is **exactly 7 full
-pages**. At an 8-page limit that leaves **one full page — about two columns
-— for the OAI section**, which the stub currently uses about 40% of.
+Measured, not estimated, and **revised down** after the 2026-08-06 related-
+work additions (see [related-work-review.md](related-work-review.md)).
 
-As a rough conversion from the existing sections: a 5-row table like
-Table~III costs ~1/3 column including its caption, and a column holds
-~450 words. So one workable shape is ~250 words of implementation, ~150 of
-setup, one results table, and ~200 of discussion. If it needs more, §II
-(related work) and §V (methodology) are the most compressible; the results
-tables are not, and neither is §IV-C, which carries the paper's analytical
-contribution.
+| | §VII budget |
+|---|---|
+| Before the literature review | ~1 full page (2 columns) |
+| **Now** | **~0.6 page (~1.2 columns)** |
+
+Six new references and about 0.6 column of new §II prose cost roughly 0.4
+page. With §VII removed the paper is now 8 pages ending a quarter of the
+way down page 8; with the stub it ends about 60% down. The stub itself uses
+roughly two-thirds of what remains available.
+
+As a conversion from the existing sections: a 5-row table like Table~III
+costs ~1/3 column including its caption, and a column holds ~450 words. So
+a workable shape is now ~200 words of implementation, ~100 of setup, one
+compact results table, and ~150 of discussion.
+
+**If §VII needs more room**, in order of what costs least to lose:
+1. Drop three or four of the five 3GPP specification citations — they are
+   individually low-value and cost ~4 bibliography lines each.
+2. Compress §II. It is now the longest background section, and §II-D
+   (learning-based schedulers) could lose a third of its length without
+   losing its argument.
+3. Compress §V-A (fidelity discipline prose).
+
+Do **not** cut the results tables, and do not cut §IV-C — it carries the
+analytical contribution.
 
 ## Building
 
@@ -84,20 +103,25 @@ camera-ready.
 
 **Worth doing.**
 
-4. **A figure.** The paper is currently all tables. The load sweep (§VI-A)
+4. **A proper database search.** [related-work-review.md](related-work-review.md)
+   records a web-search-based review — six verified citations, and an
+   honest account of what it does and does not establish. It is not a
+   substitute for IEEE Xplore / ACM DL / Scopus before submission,
+   particularly for checking prior art on the §IV-C knapsack result.
+5. **A figure.** The paper is currently all tables. The load sweep (§VI-A)
    would carry much better as a two-line plot — contracts met vs load, for
    PF and TwoTier — and would give a reader the "hump" in one glance. That
    is the paper's headline and it deserves a picture. `pgfplots` is the
    obvious tool; the data is in Table~II.
-5. **Fill in the bibliography gaps.** `refs.bib` omits page numbers and DOIs
+6. **Fill in the bibliography gaps.** `refs.bib` omits page numbers and DOIs
    where the source doc did not record them, and the 3GPP entries need
    version/date stamps. The Shakkottai & Stolyar venue in particular should
    be checked against the canonical citation.
-6. **Related work is thin on recent literature.** The citations trace the
-   foundational lineage (Kelly, Neely, Stolyar, Tassiulas) and the classic
-   QoS schedulers, but there is nothing from the last few years on
-   O-RAN-era or slicing-era scheduling. A reviewer will notice. Worth a
-   targeted search before submission.
+7. ~~**Related work is thin on recent literature.**~~ **Addressed**
+   2026-08-06: §II restructured into six subsections, adding *Learning-based
+   schedulers* and *Industrial and private 5G*. See
+   [related-work-review.md](related-work-review.md) for what was found and
+   what it changed.
 
 ## Honest notes on the draft
 

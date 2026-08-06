@@ -179,17 +179,53 @@ $\max \sum_i U_i(r_i)$ under capacity constraints, but yields a
 to serve this slot} over a stochastic channel. Drift-plus-penalty
 control~\cite{neely2010} and greedy primal-dual
 scheduling~\cite{stolyar2005} address the per-slot problem but need a
-target to track. The natural composition---slow declarative program feeding
-a fast tracker---is the pattern behind NVS~\cite{kokku2012} and the O-RAN
-non-RT/near-RT RIC split~\cite{oran}. Our contribution is not the pattern
-but its concrete instantiation against a symbol-accurate 5G NR resource
-model, and the empirical characterisation of when it pays.
+target to track. The natural composition---a slow declarative program
+feeding a fast tracker---is the pattern behind NVS~\cite{kokku2012}, the
+O-RAN non-RT/near-RT RIC split~\cite{oran}, and two-timescale IIoT resource
+allocation that likewise places Lyapunov control on the slow scale and a
+fast solver beneath it~\cite{he2022twotimescale}. \textbf{The pattern is
+not our contribution}; its concrete instantiation against a symbol-accurate
+NR resource model, and the empirical characterisation of when it pays, are.
+
+\subsection{Learning-based schedulers}
+Most recent work in this space is learned rather than declarative. xSlice
+places an online deep-RL agent on the near-RT RIC and adapts MAC-layer
+allocation against a combined throughput/latency/reliability
+objective~\cite{yan2026xslice}, evaluated---unlike this paper---on a real
+O-RAN testbed. We deliberately do not take that route, and it is worth
+saying why rather than leaving the omission unexplained. Kela et
+al.~\cite{kela2024deep}, arguing from inside that literature, find that
+practically deployable deep schedulers do not yet exist, and name the
+obstacles: real-time execution cost, 3GPP compliance, and poor
+generalisation across bandwidth, MIMO and traffic configurations. For a
+deployment that must be commissioned, certified and reasoned about by plant
+engineers, a convex program with an auditable objective and a single
+fairness dial is a defensible alternative to a policy network---and its
+failure modes, as Section~\ref{sec:knapsack} shows, can be characterised
+analytically rather than only measured.
+
+\subsection{Industrial and private 5G}
+Closest to our target is FLEX~\cite{kleinberger2026flex}, which is also
+QoS-aware, also industrial, and also simulator-based, but varies the
+\emph{TDD pattern}---adjusting the UL/DL split in flexible slots---where we
+hold the pattern static and allocate within a fixed per-direction budget.
+The two are complementary. On configured grants, Larra\~{n}aga et
+al.~\cite{larranaga2023cg} contribute an independent open-source CG
+implementation for ns-3/5G-LENA and an Industry 4.0 scheduling study; their
+finding that CG policy dominates latency for time-critical industrial
+traffic corroborates our Section~\ref{sec:pdcch} from a different
+simulator. Our contribution there is accordingly not that CG helps, but
+\emph{why} it helps twice over---bypassing the PDCCH budget and the BSR
+round-trip simultaneously---and the self-gating rule that keeps it from
+hurting when reservations cannot be honoured.
 
 \subsection{The OAI baseline}
 OAI's~\cite{oai} NR MAC schedules with a PF metric over per-UE grants. Our
 \texttt{ProportionalFair} baseline is modelled on it, and all schedulers we
 compare grant \emph{per UE} with one DCI each, so the comparison isolates
-QoS-awareness rather than grant granularity.
+QoS-awareness rather than grant granularity. OAI is also the integration
+target for Section~\ref{sec:oai}; open private-5G O-RAN testbeds built on
+it are now well established~\cite{villa2024x5g}.
 
 % ===========================================================================
 \section{System Model}\label{sec:model}
@@ -326,11 +362,16 @@ SE-favouring, and the worst-channel flow receives 23\% of its contract
 against the best flow's 89\%. But it serves that flow \emph{something}.
 Adding the shortfall term takes the same flow to exactly $0$.
 
-The distinction matters for attribution. Cell-edge starvation under
-utility-based scheduling is often ascribed to ``weighted-$\log$
-pathology''; our measurements locate it instead in the \emph{shortfall
-term}, which is what converts a merely SE-favouring allocation into a
-vertex one that abandons outright.
+The distinction matters, and it is worth being precise about which part is
+new. That utility maximisation favours high-SNR users, and so does not by
+itself protect heterogeneous channels, is established~\cite{capozzi2013};
+our control confirms it rather than discovering it. The sharper claim is
+what the \emph{shortfall term} adds: it converts a merely SE-favouring
+allocation into a \emph{vertex} one, in which the worst flow receives
+exactly zero rather than merely too little, and it does so for every
+positive penalty vector. Cell-edge starvation under this formulation is
+therefore not a tuning failure to be corrected by reweighting---it is the
+optimum of the objective as written.
 
 It also explains why penalty-shaped fixes cannot work. Since the optimum is
 a vertex, reweighting $p$ selects a \emph{different} vertex and nothing
