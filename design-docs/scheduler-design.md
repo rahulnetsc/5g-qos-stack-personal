@@ -88,22 +88,35 @@ For each (UE *i*, QFI *q*) pair active in the next horizon:
 - `sps_{i,q}` — boolean / structured: whether this flow gets a Configured Grant, and its periodicity + size.
 
 ### Objective (decided form)
-Composite utility, summed across flows. The GBR slack penalty is a
-per-flow **vector** `p`, not a scalar:
+Two phases in lexicographic order — shortfall first, utility second. The
+GBR slack penalty is a per-flow **vector** `p`, not a scalar:
 
 ```
-maximize  Σ_i  w_class_i · log(r_i + ε)
-        - pᵀ · slack          (p, slack are length-(#flows) vectors)
+phase 1:  minimize  pᵀ · slack  +  p_slice · Σ slice_slack
+phase 2:  maximize  Σ_i  w_class_i · log(r_i + ε)
+          s.t.      the phase-1 penalty stays at its optimum
 ```
+
+This used to be one objective, `max Σ w log(r+ε) − pᵀ·slack`, with `p = 1e3`
+picked so the penalty would swamp the utility. It did — by ~1e7 — which is
+an ordering expressed as a magnitude, and it made the program numerically
+unsolvable: on the `overload` scenario CLARABEL and SCS both returned
+`optimal_inaccurate` and disagreed by 3.6× on a flow's rate, under-serving
+the Delay class by 28% against the analytic optimum. Stating the order
+directly fixes it (both solvers now land within 100 bps of that optimum) and
+removes the magic constant: `p` now carries only the *relative* worth of
+closing one flow's GBR gap versus another's, which is all the adaptive
+update and the SE tilt ever used it for. Both phases are posed in
+normalised units so every coefficient is O(1). See NOTES.md 2026-08-06.
 
 - Per-class utility weights: `w_PF = 1`, `w_GBR = 1`, `w_Delay = 5`.
   Delay's higher weight makes the LP fund it well during overload; GBR
   also has a hard floor via slack.
 - GBR enforcement: soft floor `r_i + slack_i ≥ GFBR_i`, with `slack_i ≥ 0`
-  and a slack penalty `p_i` per flow. At the baseline value `p_i = 1e3`
-  the penalty so dominates the log-utility that the floor is effectively
-  hard whenever the flow is *feasible*; slack only appears under genuine
-  (partial) infeasibility. Soft form keeps the LP feasible under arbitrary
+  and a slack penalty `p_i` per flow. Because phase 1 minimises shortfall
+  before phase 2 touches the utility, the floor is effectively hard whenever
+  the flow is *feasible*; slack only appears under genuine (partial)
+  infeasibility. Soft form keeps the program feasible under arbitrary
   overload — slack just carries the cost.
 - Delay flows: handled in Tier-2 via HoL urgency on top of Tier-1's rate
   target. The LP itself doesn't model delay; it just gives Delay flows
@@ -622,7 +635,7 @@ For each flow class:
 - 5QI table: which standardized 5QIs do we actually use, and what custom 5QIs do we need for industrial flows?
 
 ### Closed (decisions made during simulator work)
-- Tier-1 solver: **CVXPY** with log objective and slack-penalty GBR.
+- Tier-1 solver: **CVXPY**, two phases in lexicographic order (minimise GBR/slice shortfall, then maximise log utility without giving it back), posed in normalised units. Not one weighted objective — a penalty large enough to enforce an ordering is large enough to break the solver.
 - Tier-1 cadence: **1 s full re-solve, no intermediate refresh** — drift-plus-penalty handles drift.
 - GBR infeasibility: **soft penalty** (slack with `1e3` weight). Keeps LP feasible under any overload; admission control can layer on top later.
 - Cell-edge starvation (Finding 1) is caused by the **slack penalty, not the log utility**. At `p ≳ 1` the penalty outweighs the utility by ~1e7, making Tier-1 a total-shortfall minimiser — a fractional knapsack solved greedily by spectral efficiency, whose optimum is a vertex (serve in full or abandon). No linear reweighting of `p` removes that; the log utility on its own is in fact *protective* of low-SE flows. Fix is a **max-min GBR stage** producing hard floors (`gbr_maxmin`), not a penalty tweak.

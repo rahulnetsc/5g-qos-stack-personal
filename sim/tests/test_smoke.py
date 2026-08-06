@@ -1271,3 +1271,97 @@ def test_two_tier_maxmin_disabled_by_default():
     run(overload_scenario(), sched)
     assert sched.gbr_maxmin is False
     assert sched.maxmin_level != sched.maxmin_level  # NaN -- never solved
+
+
+# --- Tier-1 numerical accuracy (the two-phase lexicographic form) -----------
+
+
+def test_tier1_matches_analytic_optimum_on_overload():
+    """Tier-1 must hit the closed-form optimum on `overload`, where it is
+    small enough to solve by hand.
+
+    Three flows share one direction at equal SNR. The GBR flow takes its
+    floor; the residual pool is then split between the PF flow (w=1) and the
+    Delay flow (w=5) under `log`, which pins the Delay flow at its demand cap
+    and gives the PF flow the remainder.
+
+    Regression guard for a real defect: written as one objective with a
+    penalty ~1e7 larger than the utility, this returned `optimal_inaccurate`
+    with CLARABEL and SCS disagreeing by 3.6x, and under-served the Delay
+    class -- the highest-weighted one -- by 28%.
+    """
+    from sim.scenarios import overload_scenario
+    from scheduler.tier1 import _spectral_efficiency, grid_capacity_prbsym_per_sec
+
+    scenario = overload_scenario()
+    flows, snr, demand = _maxmin_inputs(scenario)
+    grid = ResourceGrid(scenario.carrier, scenario.tdd)
+    se = _spectral_efficiency(flows, snr)
+    cap_dl, _ = grid_capacity_prbsym_per_sec(grid)
+
+    by_class = {f.flow_class: (i, f) for i, f in enumerate(flows)}
+    assert set(by_class) == {"PF", "GBR", "Delay"}, "fixture changed"
+    assert all(f.direction == "DL" for f in flows), "fixture changed"
+    assert max(se) - min(se) < 1e-9, "closed form assumes equal SE"
+
+    (i_pf, f_pf), (i_gbr, f_gbr), (i_dly, f_dly) = (
+        by_class["PF"], by_class["GBR"], by_class["Delay"]
+    )
+    # The GBR floor is served first, leaving this rate pool for the other two.
+    gbr_rate = min(f_gbr.gfbr_bps, demand[(f_gbr.ue_id, f_gbr.qfi)])
+    pool = (cap_dl - gbr_rate / se[i_gbr]) * se[i_pf]
+    # Equal marginal utility: 1/(r_pf + e) == 5/(r_delay + e)  =>  r_delay = 5 r_pf + 4e
+    eps = 1.0
+    r_pf = (pool - 4 * eps) / 6.0
+    r_dly = pool - r_pf
+    d_dly = demand[(f_dly.ue_id, f_dly.qfi)]
+    if r_dly > d_dly:                      # Delay flow saturates its demand
+        r_dly, r_pf = d_dly, pool - d_dly
+
+    targets = solve_tier1(flows, snr, grid, demand)
+    expected = {
+        (f_pf.ue_id, f_pf.qfi): r_pf,
+        (f_gbr.ue_id, f_gbr.qfi): gbr_rate,
+        (f_dly.ue_id, f_dly.qfi): r_dly,
+    }
+    for key, want in expected.items():
+        got = targets[key]
+        assert abs(got - want) <= max(1_000.0, 1e-3 * want), (
+            f"{key}: got {got:.0f} bps, analytic optimum {want:.0f} bps "
+            f"(off by {abs(got - want):.0f})"
+        )
+
+
+def test_tier1_is_solver_independent():
+    """Two different conic solvers must agree on the Tier-1 targets.
+
+    Solver disagreement is the sharpest available signal that a convex
+    program is badly posed -- it was ~440 kbps on `factory_robots` before
+    the two-phase rewrite, on rates of 4-14 Mbps.
+    """
+    import cvxpy as cp
+    import pytest
+
+    from sim.scenarios import factory_robots_scenario
+
+    available = [s for s in ("CLARABEL", "SCS") if s in cp.installed_solvers()]
+    if len(available) < 2:
+        pytest.skip("needs two conic solvers to cross-check")
+
+    scenario = factory_robots_scenario()
+    flows, snr, demand = _maxmin_inputs(scenario)
+    grid = ResourceGrid(scenario.carrier, scenario.tdd)
+
+    runs = []
+    for solver in available:
+        default = cp.Problem.solve
+        try:
+            cp.Problem.solve = lambda self, *a, **k: default(self, solver=solver)
+            runs.append(solve_tier1(flows, snr, grid, demand))
+        finally:
+            cp.Problem.solve = default
+
+    worst = max(abs(runs[0][k] - runs[1][k]) for k in runs[0])
+    assert worst < 200_000, (
+        f"{available[0]} and {available[1]} disagree by {worst:.0f} bps"
+    )

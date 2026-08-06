@@ -3,40 +3,70 @@
 Decision variables:
     r_i  (bps)         per-flow target rate
     s_i  (bps, >= 0)   GBR shortfall slack (so the problem stays feasible
-                       under overload; the slack carries a large penalty)
+                       under overload)
 
-Objective:
-    maximize  sum_i  w_class_i * log(r_i + epsilon)
-            -        gbr_slack_penalty * sum_i s_i
+Goal, in words: honour every GBR floor you can, and distribute whatever
+capacity is left by weighted proportional fairness.
 
 Constraints:
-    sum_{i in DL} r_i / SE_i  <=  C_DL_prbs_per_sec
-    sum_{i in UL} r_i / SE_i  <=  C_UL_prbs_per_sec
+    sum_{i in DL} r_i / SE_i  <=  C_DL_prbsym_per_sec
+    sum_{i in UL} r_i / SE_i  <=  C_UL_prbsym_per_sec
     r_i + s_i  >=  GFBR_i        (for GBR flows)
     r_i  >=  floor_i             (optional hard floor, see below)
-    r_i  <=  demand_i             (offered load cap)
+    r_i  <=  demand_i            (offered load cap)
     r_i, s_i  >=  0
 
 Where SE_i = bits per PRB-symbol for UE i (function of its current SNR and
 target BLER), and capacities are PRB-symbols per second derived from the TDD
 pattern.
 
-Two-stage GBR protection (the `solve_maxmin_gbr_level` path)
-------------------------------------------------------------
-The soft-penalty form above concentrates its shortfall. Reducing flow i's
-slack by one bit costs 1/SE_i PRB-symbols, so with a uniform penalty the
-solver drops whichever GBR flows are most expensive per bit -- the cell-edge
-ones -- and spends the freed capacity on cheap high-SNR flows. That is the
-utility-maximizing answer and it is why a low-SNR GBR flow can end up at
-near-zero target rate while high-SNR peers sit above their GFBR.
+Why two phases, not one weighted objective
+------------------------------------------
+The goal above is *lexicographic*: shortfall first, utility second. It used
+to be written as a single objective, `max sum w log(r+eps) - sum p_i s_i`,
+with `p_i = 1e3` chosen so the penalty "effectively hardens" the floor. It
+does -- by a factor of ~1e7 (measured: penalty 2.4e10 against utility 709 on
+`factory_robots`). That is not a weighting, it is a lexicographic order
+expressed as a magnitude, and it made the program numerically unsolvable:
+on the `overload` scenario CLARABEL and SCS both returned
+`optimal_inaccurate` and *disagreed with each other* by 3.6x on a flow's
+rate, with the Delay class -- the highest-weighted one -- under-served by
+28% against the analytic optimum. Rescaling cannot fix this; the dynamic
+range is in the model, not the units.
 
-Where that trade is unacceptable, run `solve_maxmin_gbr_level` first: it
-returns the largest uniform fraction `t*` of its contracted floor that
-*every* GBR flow can hold simultaneously. Feeding `gbr_maxmin_floors(...,
-t*)` back into `solve_tier1` as `gbr_floor_bps` pins that fraction as a hard
-floor, and the log utility then distributes whatever capacity is left. The
-guarantee is on the worst-served GBR flow; the cost is total throughput,
-paid by the flows that the single-stage form would have over-served.
+So the order is now stated directly:
+
+    phase 1:  minimize   sum_i p_i s_i  +  p_slice sum_j ss_j
+    phase 2:  maximize   sum_i w_class_i log(r_i + eps)
+              subject to the phase-1 penalty staying at its optimum
+
+Each phase is well conditioned on its own, and both are posed in normalised
+units (rates as a multiple of `rate_scale`, capacity usage as a fraction of
+each direction's own budget) so every coefficient is O(1). On the case above
+both solvers now return `optimal` and land within 100 bps of the analytic
+optimum, agreeing with each other.
+
+`p_i` keeps its meaning as the *relative* worth of closing one flow's GBR
+gap versus another's -- which is all the adaptive dual-ascent update and the
+spectral-efficiency tilt ever used it for. Its absolute magnitude no longer
+matters, and there is no longer a magic constant holding the model together.
+
+Max-min GBR protection (the `solve_maxmin_gbr_level` path)
+----------------------------------------------------------
+Phase 1 concentrates its shortfall. Reducing flow i's slack by one bit costs
+1/SE_i PRB-symbols, so with a uniform `p` the minimiser drops whichever GBR
+flows are most expensive per bit -- the cell-edge ones -- and spends the
+freed capacity on cheap high-SNR flows. Minimising total shortfall bits
+under a capacity budget is a *fractional knapsack*, and its optimum is the
+greedy one: served in full or abandoned outright. No reweighting of `p`
+changes that, because the solution is a vertex; only a constraint does.
+
+Hence `solve_maxmin_gbr_level`: it returns the largest uniform fraction `t*`
+of its contracted floor that *every* GBR flow can hold simultaneously.
+Feeding `gbr_maxmin_floors(..., t*)` back into `solve_tier1` as
+`gbr_floor_bps` pins that fraction as a hard floor. The guarantee is on the
+worst-served GBR flow; the cost is total throughput, paid by the flows the
+unconstrained form would have over-served.
 """
 
 import cvxpy as cp
@@ -45,6 +75,11 @@ import numpy as np
 from .flow import FlowConfig
 from .interfaces import GridView
 from .link import bits_per_prb
+
+# Offered-load sentinel: `estimate_demand_bps` returns 1e10 for a traffic
+# kind it cannot size, meaning "do not cap me", not a real 100 Gbps demand.
+# Binding it would put a huge coefficient into an otherwise O(1) program.
+_DEMAND_SENTINEL = 1e10
 
 
 def _utility_weight(flow_class: str) -> float:
@@ -83,47 +118,95 @@ def _spectral_efficiency(
 
 def _capacities(
     grid: GridView, capacity_safety_factor: float
-) -> tuple[float, float]:
+) -> dict[str, float]:
     cap_dl, cap_ul = grid_capacity_prbsym_per_sec(grid)
-    return cap_dl * capacity_safety_factor, cap_ul * capacity_safety_factor
+    return {
+        "DL": cap_dl * capacity_safety_factor,
+        "UL": cap_ul * capacity_safety_factor,
+    }
 
 
-def _direction_capacity_constraints(
-    r: cp.Variable, flows: list[FlowConfig], se: np.ndarray,
-    cap_dl: float, cap_ul: float,
+def _rate_scale(
+    flows: list[FlowConfig],
+    demand_bps: dict[tuple[int, int], float],
+    se: np.ndarray,
+    cap_by_dir: dict[str, float],
+) -> float:
+    """A representative bps magnitude to express rates as multiples of.
+
+    Every rate variable is divided by this, so the program's variables and
+    coefficients come out O(1) instead of O(1e7). Any positive value gives
+    the same optimum; one near the largest rate in play gives the best
+    conditioning. Falls back to the largest rate the carrier could physically
+    deliver when nothing else pins the scale.
+    """
+    candidates = [f.gfbr_bps for f in flows if f.gfbr_bps > 0]
+    candidates += [
+        d for d in (
+            demand_bps.get((f.ue_id, f.qfi), _DEMAND_SENTINEL) for f in flows
+        )
+        if 0.0 < d < _DEMAND_SENTINEL
+    ]
+    if candidates:
+        return float(max(candidates))
+    se_max = float(se.max()) if len(se) else 1.0
+    cap_max = max(cap_by_dir.values(), default=0.0)
+    return max(1.0, cap_max * se_max)
+
+
+def _capacity_constraints(
+    u: cp.Variable, flows: list[FlowConfig], se: np.ndarray,
+    cap_by_dir: dict[str, float], rate_scale: float,
 ) -> list:
-    """DL and UL each spend at most their PRB-symbol budget."""
+    """Per-direction PRB-symbol budget, divided through by the budget itself
+    so each constraint reads "fraction of this direction used <= 1"."""
     cons: list = []
-    dl_terms = [r[i] / se[i] for i, f in enumerate(flows) if f.direction == "DL"]
-    ul_terms = [r[i] / se[i] for i, f in enumerate(flows) if f.direction == "UL"]
-    if dl_terms:
-        cons.append(cp.sum(cp.hstack(dl_terms)) <= cap_dl)
-    if ul_terms:
-        cons.append(cp.sum(cp.hstack(ul_terms)) <= cap_ul)
+    for direction, cap in cap_by_dir.items():
+        idx = [i for i, f in enumerate(flows) if f.direction == direction]
+        if not idx or cap <= 0.0:
+            continue
+        cons.append(
+            cp.sum(cp.hstack(
+                [u[i] * (rate_scale / (se[i] * cap)) for i in idx]
+            )) <= 1.0
+        )
+    return cons
+
+
+def _demand_constraints(
+    u: cp.Variable, flows: list[FlowConfig],
+    demand_bps: dict[tuple[int, int], float], rate_scale: float,
+) -> list:
+    """Offered-load caps, skipping the "do not cap me" sentinel."""
+    cons: list = []
+    for i, f in enumerate(flows):
+        d = demand_bps.get((f.ue_id, f.qfi), _DEMAND_SENTINEL)
+        if d < _DEMAND_SENTINEL:
+            cons.append(u[i] <= d / rate_scale)
     return cons
 
 
 def _slice_floor_constraints(
-    r: cp.Variable, flows: list[FlowConfig], se: np.ndarray,
-    demand_bps: dict[tuple[int, int], float], cap_dl: float, cap_ul: float,
-    slice_shares: "dict[int, dict[str, float]] | None",
+    u: cp.Variable, flows: list[FlowConfig], se: np.ndarray,
+    demand_bps: dict[tuple[int, int], float], cap_by_dir: dict[str, float],
+    slice_shares: "dict[int, dict[str, float]] | None", rate_scale: float,
 ) -> tuple[list, list[tuple[cp.Variable, float]]]:
-    """Soft per-(slice, direction) PRB-symbol floors.
+    """Soft per-(slice, direction) PRB-symbol floors, in normalised units.
 
     Each floor is capped at the slice's own offered demand so an idle slice
-    holds nothing, and it is soft (a penalised slack) so the problem stays
+    holds nothing, and it is soft (a penalised slack) so the program stays
     feasible when slice and GBR floors collide. The per-direction capacity
     constraints keep it work-conserving -- a busy slice borrows the unused
     share of an idle one.
 
-    Returns (constraints, [(slack_var, floor_value)]); the caller decides how
-    to weigh the slacks (stage A normalises by the floor, stage B does not).
+    Returns (constraints, [(slack_var, direction_capacity)]). The capacity is
+    handed back so the caller can weigh a slack in the original PRB-symbol
+    units, keeping `slice_slack_penalty` comparable with the GBR penalty.
     """
     cons: list = []
     slacks: list[tuple[cp.Variable, float]] = []
     if not slice_shares:
         return cons, slacks
-    cap_by_dir = {"DL": cap_dl, "UL": cap_ul}
     for sid, shares in slice_shares.items():
         for direction, cap in cap_by_dir.items():
             share = float(shares.get(direction, 0.0))
@@ -131,7 +214,7 @@ def _slice_floor_constraints(
                 i for i, f in enumerate(flows)
                 if f.slice_id == sid and f.direction == direction
             ]
-            if share <= 0.0 or not idx:
+            if share <= 0.0 or not idx or cap <= 0.0:
                 continue
             slice_demand = sum(
                 demand_bps.get((flows[i].ue_id, flows[i].qfi), 1e12) / se[i]
@@ -141,9 +224,11 @@ def _slice_floor_constraints(
             if floor <= 0.0:
                 continue
             ss = cp.Variable(nonneg=True)
-            usage = cp.sum(cp.hstack([r[i] / se[i] for i in idx]))
-            cons.append(usage + ss >= floor)
-            slacks.append((ss, floor))
+            usage = cp.sum(cp.hstack(
+                [u[i] * (rate_scale / (se[i] * cap)) for i in idx]
+            ))
+            cons.append(usage + ss >= floor / cap)
+            slacks.append((ss, cap))
     return cons, slacks
 
 
@@ -197,14 +282,7 @@ def solve_maxmin_gbr_level(
 
     Returns 1.0 when there are no GBR flows (nothing to protect), and 0.0 if
     the solve fails -- either way `gbr_maxmin_floors` then imposes no
-    binding floor and `solve_tier1` behaves exactly as it does today.
-
-    The problem is built in *normalised* units -- rates as a fraction of the
-    largest contract, capacity usage as a fraction of each direction's own
-    budget -- so every coefficient is O(1). This matters: posed in raw bps,
-    maximising a unit-scale `t` against rate variables of order 1e7 is badly
-    enough conditioned that the solver returns `optimal` with a level that
-    is neither accurate nor monotone in capacity.
+    binding floor and `solve_tier1` behaves exactly as it does without one.
     """
     contracts = {(f.ue_id, f.qfi): gbr_contract_bps(f, demand_bps) for f in flows}
     gbr_idx = [
@@ -214,74 +292,35 @@ def solve_maxmin_gbr_level(
         return 1.0
 
     se = _spectral_efficiency(flows, snr_db_per_ue)
-    cap_dl, cap_ul = _capacities(grid, capacity_safety_factor)
-    cap_by_dir = {"DL": cap_dl, "UL": cap_ul}
+    cap_by_dir = _capacities(grid, capacity_safety_factor)
+    scale = _rate_scale(flows, demand_bps, se, cap_by_dir)
 
-    # u_i is flow i's rate in units of `rate_scale` bps.
-    rate_scale = max(contracts.values())
     u = cp.Variable(len(flows), nonneg=True)
     t = cp.Variable(nonneg=True)
 
     constraints: list = [t <= 1.0]
-
-    # Per-direction capacity, each divided through by its own budget so the
-    # constraint reads "fraction of this direction's PRB-symbols used <= 1".
-    for direction, cap in cap_by_dir.items():
-        idx = [i for i, f in enumerate(flows) if f.direction == direction]
-        if not idx or cap <= 0.0:
-            continue
-        constraints.append(
-            cp.sum(cp.hstack(
-                [u[i] * (rate_scale / (se[i] * cap)) for i in idx]
-            )) <= 1.0
-        )
-
-    # Offered-load caps. The `estimate_demand_bps` sentinel for an unknown
-    # traffic kind (1e10) is deliberately not a real cap; binding it here
-    # would put a 1e3-magnitude coefficient into an otherwise O(1) problem
-    # for no benefit, since the capacity constraint already bounds u.
-    for i, f in enumerate(flows):
-        d = demand_bps.get((f.ue_id, f.qfi), float("inf"))
-        if d < 1e10:
-            constraints.append(u[i] <= d / rate_scale)
+    constraints += _capacity_constraints(u, flows, se, cap_by_dir, scale)
+    constraints += _demand_constraints(u, flows, demand_bps, scale)
 
     # The max-min coupling: every GBR flow held at the same fraction t of
     # its own contract.
     for i in gbr_idx:
         f = flows[i]
-        constraints.append(u[i] >= t * (contracts[(f.ue_id, f.qfi)] / rate_scale))
+        constraints.append(u[i] >= t * (contracts[(f.ue_id, f.qfi)] / scale))
 
-    # Slice floors, in the same normalised units: usage and floor both as a
-    # fraction of the direction's budget, so the slack is O(1) and
-    # slice_slack_penalty keeps its "worth this many t-units" meaning.
-    slice_slacks: list = []
-    if slice_shares:
-        for sid, shares in slice_shares.items():
-            for direction, cap in cap_by_dir.items():
-                share = float(shares.get(direction, 0.0))
-                idx = [
-                    i for i, f in enumerate(flows)
-                    if f.slice_id == sid and f.direction == direction
-                ]
-                if share <= 0.0 or not idx or cap <= 0.0:
-                    continue
-                slice_demand = sum(
-                    demand_bps.get((flows[i].ue_id, flows[i].qfi), 1e12) / se[i]
-                    for i in idx
-                )
-                floor = min(share * cap, slice_demand)
-                if floor <= 0.0:
-                    continue
-                ss = cp.Variable(nonneg=True)
-                usage = cp.sum(cp.hstack(
-                    [u[i] * (rate_scale / (se[i] * cap)) for i in idx]
-                ))
-                constraints.append(usage + ss >= floor / cap)
-                slice_slacks.append(ss)
+    slice_cons, slice_slacks = _slice_floor_constraints(
+        u, flows, se, demand_bps, cap_by_dir, slice_shares, scale
+    )
+    constraints += slice_cons
 
+    # t and the normalised slice slacks are both fractions in [0, 1], so
+    # slice_slack_penalty keeps a "worth this many t-units" meaning rather
+    # than being swamped by PRB-symbol magnitudes.
     objective_expr = t
     if slice_slacks:
-        objective_expr = objective_expr - slice_slack_penalty * sum(slice_slacks)
+        objective_expr = objective_expr - slice_slack_penalty * sum(
+            ss for ss, _ in slice_slacks
+        )
 
     problem = cp.Problem(cp.Maximize(objective_expr), constraints)
     try:
@@ -307,11 +346,11 @@ def gbr_maxmin_floors(
     Floor is `scale * level * contract_i`. `scale` dials how much of the
     achievable protection to actually claim:
         1.0 -> full max-min protection (the guaranteed floor is t*),
-        0.0 -> no floor at all (identical to the single-stage solve),
+        0.0 -> no floor at all (identical to solving without the stage),
     and anything between leaves the balance to the log utility, which is
     also what funds the Delay and best-effort classes. The `tolerance`
     shave keeps the floors strictly inside the region stage A proved
-    feasible, so solver round-off cannot make stage B infeasible.
+    feasible, so solver round-off cannot make the next solve infeasible.
     """
     frac = (
         max(0.0, min(1.0, scale))
@@ -342,14 +381,21 @@ def solve_tier1(
 ) -> dict[tuple[int, int], float]:
     """Solve Tier-1. Returns target rate (bps) per (ue_id, qfi).
 
-    gbr_slack_penalty may be a scalar (uniform penalty) or a per-flow dict
-    keyed by (ue_id, qfi). The dict form is what TwoTier's adaptive
-    dual-ascent update uses to escalate the penalty on GBR flows that keep
-    missing their floor.
+    Two phases, in lexicographic order (see the module docstring): phase 1
+    minimises weighted GBR/slice shortfall, phase 2 maximises weighted log
+    utility without giving any of that shortfall back.
 
-    se_penalty_exponent (k) tilts each flow's GBR slack penalty by its
-    spectral efficiency: p_i is multiplied by (SE_i / SE_max) ** k.
-        k = 0  -> no tilt (default; identical to the old behaviour).
+    gbr_slack_penalty may be a scalar (uniform) or a per-flow dict keyed by
+    (ue_id, qfi). It sets the *relative* worth of closing one flow's GBR gap
+    against another's; its absolute magnitude no longer matters, since the
+    shortfall-before-utility ordering is now structural rather than a
+    consequence of the penalty being large. The dict form is what TwoTier's
+    adaptive dual-ascent update uses to escalate the penalty on GBR flows
+    that keep missing their floor.
+
+    se_penalty_exponent (k) tilts each flow's GBR penalty by its spectral
+    efficiency: p_i is multiplied by (SE_i / SE_max) ** k.
+        k = 0  -> no tilt (default).
         k > 0  -> discount poor-SE flows. A low-SE flow's GBR shortfall
                   drags the objective down less ("efficiency-first": spend
                   RBs where they convert to the most rate).
@@ -362,22 +408,25 @@ def solve_tier1(
     PRB-symbol capacity, capped at the slice's own offered demand. The floor
     is soft (a penalised slack) and the per-direction capacity constraint
     keeps it work-conserving -- a busy slice borrows an idle slice's unused
-    share. slice_slack_penalty weighs a missed slice floor.
+    share. slice_slack_penalty weighs a missed slice floor against a missed
+    GBR floor, in the original bps / PRB-symbol units.
 
     gbr_floor_bps adds a *hard* per-flow lower bound on top of the usual
-    soft GFBR constraint -- the second stage of the max-min path (see the
-    module docstring). Build it with `gbr_maxmin_floors` from a level
-    returned by `solve_maxmin_gbr_level`; passing floors from anywhere else
-    risks an infeasible problem, in which case the solve falls back to
-    demand as it does for any other failure. The soft GFBR constraint is
-    kept alongside the floor, so the utility term still has an incentive to
-    close the remaining gap to full GFBR wherever that is cheap.
+    soft GFBR constraint -- the second stage of the max-min path. Build it
+    with `gbr_maxmin_floors` from a level returned by
+    `solve_maxmin_gbr_level`; floors from anywhere else risk an infeasible
+    problem, in which case the solve falls back to demand as it does for any
+    other failure. The soft GFBR constraint is kept alongside the floor, so
+    phase 2 still has an incentive to close the remaining gap to full GFBR
+    wherever that is cheap.
     """
     n = len(flows)
     if n == 0:
         return {}
 
     se = _spectral_efficiency(flows, snr_db_per_ue)
+    cap_by_dir = _capacities(grid, capacity_safety_factor)
+    scale = _rate_scale(flows, demand_bps, se, cap_by_dir)
 
     # Per-flow slack penalty vector (scalar broadcasts to all flows).
     if isinstance(gbr_slack_penalty, dict):
@@ -394,58 +443,88 @@ def solve_tier1(
         if se_max > 0.0:
             penalty = penalty * (se / se_max) ** se_penalty_exponent
 
-    cap_dl, cap_ul = _capacities(grid, capacity_safety_factor)
+    def _demand_fallback() -> dict[tuple[int, int], float]:
+        return {
+            (f.ue_id, f.qfi): demand_bps.get((f.ue_id, f.qfi), 0.0)
+            for f in flows
+        }
 
-    r = cp.Variable(n, nonneg=True)
-    slack = cp.Variable(n, nonneg=True)
+    u = cp.Variable(n, nonneg=True)          # rate, in units of `scale`
+    v = cp.Variable(n, nonneg=True)          # GBR shortfall, same units
 
     constraints: list = []
-    constraints += _direction_capacity_constraints(r, flows, se, cap_dl, cap_ul)
+    constraints += _capacity_constraints(u, flows, se, cap_by_dir, scale)
+    constraints += _demand_constraints(u, flows, demand_bps, scale)
 
-    # Demand caps, GBR floors, and the optional hard max-min floor.
     for i, f in enumerate(flows):
-        d = demand_bps.get((f.ue_id, f.qfi), 1e12)
-        constraints.append(r[i] <= d)
+        d = demand_bps.get((f.ue_id, f.qfi), _DEMAND_SENTINEL)
         if f.flow_class == "GBR" and f.gfbr_bps > 0:
-            constraints.append(r[i] + slack[i] >= f.gfbr_bps)
+            constraints.append(u[i] + v[i] >= f.gfbr_bps / scale)
             if gbr_floor_bps:
                 floor = float(gbr_floor_bps.get((f.ue_id, f.qfi), 0.0))
                 if floor > 0.0:
-                    constraints.append(r[i] >= min(floor, d))
+                    constraints.append(u[i] >= min(floor, d) / scale)
         else:
-            constraints.append(slack[i] == 0)
+            constraints.append(v[i] == 0)
 
     slice_cons, slice_slacks = _slice_floor_constraints(
-        r, flows, se, demand_bps, cap_dl, cap_ul, slice_shares
+        u, flows, se, demand_bps, cap_by_dir, slice_shares, scale
     )
     constraints += slice_cons
 
-    # Objective
-    epsilon = 1.0
-    utility = cp.sum(
-        [_utility_weight(f.flow_class) * cp.log(r[i] + epsilon) for i, f in enumerate(flows)]
-    )
-    slice_penalty = (
-        slice_slack_penalty * sum(ss for ss, _ in slice_slacks)
-        if slice_slacks
-        else 0
-    )
-    objective = cp.Maximize(
-        utility - cp.sum(cp.multiply(penalty, slack)) - slice_penalty
-    )
+    # Total weighted shortfall, in the *original* units (bps for GBR slack,
+    # PRB-symbols for slice slack) so the two penalties stay comparable,
+    # then divided by a common factor to bring the expression back to O(1).
+    shortfall_scale = max(1.0, float(penalty.max()) * scale)
+    shortfall = cp.sum(cp.multiply(penalty * scale / shortfall_scale, v))
+    if slice_slacks:
+        shortfall = shortfall + sum(
+            (slice_slack_penalty * cap / shortfall_scale) * ss
+            for ss, cap in slice_slacks
+        )
 
-    problem = cp.Problem(objective, constraints)
+    # Phase 1 -- how much shortfall is unavoidable?
+    phase1 = cp.Problem(cp.Minimize(shortfall), constraints)
     try:
-        problem.solve()
-    except (cp.SolverError, Exception):
-        # Fall back to demand
-        return {(f.ue_id, f.qfi): demand_bps.get((f.ue_id, f.qfi), 0.0) for f in flows}
+        phase1.solve()
+    except Exception:
+        return _demand_fallback()
+    if phase1.status not in ("optimal", "optimal_inaccurate") or u.value is None:
+        return _demand_fallback()
+    min_shortfall = max(0.0, float(phase1.value))
+    phase1_rates = np.asarray(u.value, dtype=float).copy()
 
-    if problem.status not in ("optimal", "optimal_inaccurate"):
-        return {(f.ue_id, f.qfi): demand_bps.get((f.ue_id, f.qfi), 0.0) for f in flows}
+    # Phase 2 -- best utility that gives none of it back. The budget is
+    # nudged out by a hair so phase 1's own solver tolerance cannot make
+    # phase 2 infeasible.
+    epsilon = 1.0
+    utility = cp.sum([
+        _utility_weight(f.flow_class) * cp.log(u[i] + epsilon / scale)
+        for i, f in enumerate(flows)
+    ])
+    budget = min_shortfall * (1.0 + 1e-6) + 1e-9
+    phase2 = cp.Problem(
+        cp.Maximize(utility), constraints + [shortfall <= budget]
+    )
+    try:
+        phase2.solve()
+    except Exception:
+        phase2 = None
+    if (
+        phase2 is None
+        or phase2.status not in ("optimal", "optimal_inaccurate")
+        or u.value is None
+    ):
+        # Keep phase 1's answer: it already honours every floor it could,
+        # which is strictly more useful than falling back to raw demand.
+        return {
+            (f.ue_id, f.qfi): float(max(0.0, phase1_rates[i] * scale))
+            for i, f in enumerate(flows)
+        }
 
     return {
-        (f.ue_id, f.qfi): float(max(0.0, r.value[i])) for i, f in enumerate(flows)
+        (f.ue_id, f.qfi): float(max(0.0, u.value[i] * scale))
+        for i, f in enumerate(flows)
     }
 
 
@@ -466,5 +545,5 @@ def estimate_demand_bps(f: FlowConfig) -> float:
         # Average frame size accounting for I-frame inflation
         avg_frame_bytes = avg_bytes * (1.0 + (i_mult - 1.0) / i_period)
         return avg_frame_bytes * 8 / period_s
-    # Unknown: be generous so the LP doesn't artificially cap us
-    return 1e10
+    # Unknown: be generous so the solve doesn't artificially cap us
+    return _DEMAND_SENTINEL
