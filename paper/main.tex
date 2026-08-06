@@ -1,0 +1,770 @@
+%% ---------------------------------------------------------------------------
+%% COMSNETS submission draft.
+%%
+%% Source material: design-docs/scheduler-study.md (primary),
+%% design-docs/scheduler-design.md and design-docs/simulator-design.md
+%% (architecture and simulator detail). Every number in Section VI is
+%% reproducible from the scripts named in Table REPRO.
+%%
+%% BEFORE SUBMITTING, see paper/README.md -- author block, page limit,
+%% anonymisation and artifact-availability policy all still need checking
+%% against the current call for papers.
+%% ---------------------------------------------------------------------------
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{url}
+
+% Stop "OpenAirInterface" breaking as "Ope-nAirInterface".
+\hyphenation{Open-Air-Inter-face}
+
+% Tables in this paper are dense; give them a little air.
+\renewcommand{\arraystretch}{1.15}
+
+\begin{document}
+
+\title{When Does QoS-Aware Scheduling Earn Its Complexity?\\
+A Two-Tier Scheduler for Private 5G Factory Networks}
+
+% TODO: replace with the real author block, and check whether the track is
+% double-blind before submitting.
+\author{
+\IEEEauthorblockN{Author One, Author Two}
+\IEEEauthorblockA{\textit{Affiliation} \\
+City, Country \\
+email@example.org}
+}
+
+\maketitle
+
+\begin{abstract}
+Private 5G networks for factories carry traffic whose classes want
+qualitatively different things: guaranteed-bitrate uplink video, motion
+control with millisecond deadlines, and elastic best-effort. Proportional
+fair (PF), the de facto default in LTE and NR and the scheduler shipped by
+OpenAirInterface, has no notion of a rate contract or a deadline. A large
+literature proposes QoS-aware alternatives, but little of it asks the
+engineering question that decides whether to deploy one: \emph{in which
+regimes does QoS-awareness change outcomes a user feels, and in which is it
+overhead?} We design a two-tier scheduler---a network-utility-maximisation
+program setting per-flow rate targets on a ${\sim}1$\,s horizon, and a
+per-slot drift-plus-penalty tracker that realises them under a
+symbol-accurate PRB and PDCCH budget---and evaluate it against RR, PF and a
+class-aware gradient baseline. Our headline result is that the value of
+QoS-awareness is a \emph{hump, not a slope}: in deep overload and under
+light load the two-tier design is indistinguishable from PF on contract
+satisfaction, and it decides outcomes only in a moderate-overload band,
+where it honours 10/10 GBR contracts against PF's 5/10. We further show
+that the soft GBR penalty used by utility-based schedulers reduces the
+strategic program to a fractional knapsack whose optimum \emph{abandons}
+the lowest-spectral-efficiency flow outright, that no reweighting of that
+penalty can prevent this, and that a max-min satisfaction stage does---
+raising the worst-served flow from 0\% to 40\% of its contract. We report
+two negative results and release the simulator and all scripts.
+\end{abstract}
+
+\begin{IEEEkeywords}
+private 5G, MAC scheduling, quality of service, network utility
+maximisation, Lyapunov optimisation, configured grants, OpenAirInterface
+\end{IEEEkeywords}
+
+% ===========================================================================
+\section{Introduction}
+% ===========================================================================
+
+A private 5G network on a factory floor carries a workload that public
+mobile broadband does not. Mobile robots stream machine-vision and LIDAR
+uplink at a sustained rate; motion-control loops exchange small payloads
+under packet delay budgets (PDB) of a few milliseconds; firmware pushes and
+log uploads soak up whatever is left. These classes do not simply want
+\emph{more} throughput---they want \emph{different things}. A best-effort
+flow wants its share of the residue. A guaranteed-bitrate (GBR) flow wants
+a specific rate or nothing of value. A delay-critical flow wants its bytes
+before a deadline, after which they are worthless.
+
+The scheduler that ships in OpenAirInterface (OAI), and the de facto
+default across LTE and NR, is proportional fair (PF)~\cite{jalali2000}.
+PF ranks users by instantaneous rate over smoothed average rate; its fixed
+point maximises $\sum_i \log R_i$~\cite{kelly1998}. It is a good answer to
+a question the factory is not asking, because it has no representation of a
+rate contract or a deadline.
+
+A substantial literature adds QoS-awareness by modifying the PF metric with
+an urgency term---M-LWDF~\cite{andrews2001}, EXP/PF and the
+Exp-rule~\cite{shakkottai2002}, and the variants surveyed
+in~\cite{capozzi2013}. A parallel thread casts allocation as network
+utility maximisation (NUM)~\cite{kelly1998} or as Lyapunov drift-plus-penalty
+control~\cite{neely2010,tassiulas1992,stolyar2005}. What is scarcer is an
+answer to the question an operator actually faces before adopting any of
+it: a two-tier scheduler means an LP solver, a control loop, and a
+non-trivial port into a real-time MAC. \emph{When is that worth paying
+for?}
+
+This paper answers that question for a private-5G factory target, and in
+doing so surfaces a structural pathology in a mechanism that utility-based
+schedulers commonly rely on.
+
+\subsection*{Contributions}
+
+\begin{enumerate}
+\item \textbf{A two-tier scheduler} (Section~\ref{sec:design}) composing a
+NUM program on a ${\sim}1$\,s horizon with a per-slot drift-plus-penalty
+tracker, granting resources \emph{per UE} with a MAC logical-channel
+multiplexer so that grant granularity and DCI cost match the 5G MAC.
+The strategic tier is dependency-isolated for an OAI port.
+
+\item \textbf{A regime characterisation} (Section~\ref{sec:hump}): the
+value of QoS-awareness is a \emph{hump}, not a slope. At the shipped load
+(deep overload) and at one third of it (light load), the two-tier design
+and PF are indistinguishable on contract satisfaction. Only in a moderate
+band does the scheduler decide outcomes---10/10 GBR contracts against PF's
+5/10. A study reporting mean throughput alone would have concluded the
+design was not worth building.
+
+\item \textbf{A structural result on soft GBR penalties}
+(Section~\ref{sec:knapsack}). In the standard formulation---maximise
+utility, minus a large penalty on GBR shortfall---the penalty outweighs the
+utility by a factor we measure at $3.4\times10^{7}$. The program is then
+effectively \emph{minimise total shortfall bits under a PRB budget}: a
+fractional knapsack whose optimum is greedy in spectral efficiency and
+therefore a \emph{vertex}. The lowest-SE GBR flow is not degraded but
+abandoned, at exactly $0$. We show no reweighting of the penalty can remove
+this, and that a max-min satisfaction stage does, lifting the worst-served
+flow from 0\% to 40\% of contract at a cost of 4\% of cell throughput.
+
+\item \textbf{Evidence that Configured Grants are structurally decisive}
+(Section~\ref{sec:pdcch}). When the control channel binds, the two-tier
+design meets 30/30 deadlines against PF's 2/30. The mechanism is a
+\emph{double} bypass---zero PDCCH \emph{and} no buffer-status-report
+round-trip---and PF-class schedulers have no equivalent for either.
+
+\item \textbf{Two negative results}, reported because they cost us months:
+an adaptive dual-ascent GBR penalty and a spectral-efficiency tilt were
+both implemented, measured, and rejected (Section~\ref{sec:negative}).
+
+\item \textbf{An open, reproducible artifact}: the simulator, the
+scheduler library, and a script per result table.
+\end{enumerate}
+
+% ===========================================================================
+\section{Background and Related Work}
+% ===========================================================================
+
+\subsection{Channel-opportunistic scheduling}
+Round Robin is channel-blind and wastes capacity on faded users; Max-C/I
+maximises cell throughput and starves the cell edge; PF~\cite{jalali2000}
+interpolates via $r_{\mathrm{inst}}/R_{\mathrm{avg}}$ and is the practical
+default. All three share one limitation: none can be told ``this flow needs
+8\,Mbps'' or ``this packet dies in 10\,ms.''
+
+\subsection{QoS-aware single-tier schedulers}
+M-LWDF~\cite{andrews2001} multiplies the PF metric by head-of-line delay
+and a weight; the Exp-rule~\cite{shakkottai2002} uses an exponential
+urgency term. These handle \emph{delay} well. For \emph{rate} contracts
+they share a subtler defect: a multiplicative urgency metric of the form
+$(r_{\mathrm{inst}}/R_{\mathrm{avg}})\cdot(1+w\cdot\mathrm{deficit})$ has
+an equilibrium that equalises a weighted $1/R_{\mathrm{avg}}$ across flows.
+It cannot drive delivered rate to an \emph{arbitrary, unequal} target
+vector however large $w$ is. This saturation argument is why our Tier-2 is
+a drift-plus-penalty integrator rather than a tuned PF variant; we include
+a class-aware ``Gradient'' baseline of exactly this shape to make the
+difference measurable.
+
+\subsection{Optimisation-based and hierarchical RRM}
+NUM~\cite{kelly1998} states allocation declaratively as
+$\max \sum_i U_i(r_i)$ under capacity constraints, but yields a
+\emph{rate vector}, whereas a wireless scheduler must decide \emph{which UE
+to serve this slot} over a stochastic channel. Drift-plus-penalty
+control~\cite{neely2010} and greedy primal-dual
+scheduling~\cite{stolyar2005} address the per-slot problem but need a
+target to track. The natural composition---slow declarative program feeding
+a fast tracker---is the pattern behind NVS~\cite{kokku2012} and the O-RAN
+non-RT/near-RT RIC split~\cite{oran}. Our contribution is not the pattern
+but its concrete instantiation against a symbol-accurate 5G NR resource
+model, and the empirical characterisation of when it pays.
+
+\subsection{The OAI baseline}
+OAI's~\cite{oai} NR MAC schedules with a PF metric over per-UE grants. Our
+\texttt{ProportionalFair} baseline is modelled on it, and all schedulers we
+compare grant \emph{per UE} with one DCI each, so the comparison isolates
+QoS-awareness rather than grant granularity.
+
+% ===========================================================================
+\section{System Model}\label{sec:model}
+% ===========================================================================
+
+We consider a single NR cell~\cite{ts38300} with a static TDD pattern. Time is slotted;
+each slot offers a set of physical resource blocks (PRBs) in one direction,
+with the special slot contributing partial DL and UL symbol counts. Let
+$d(i)\in\{\mathrm{DL},\mathrm{UL}\}$ be flow $i$'s direction and $C_d$ the
+capacity of direction $d$ in \emph{PRB-symbols per second} over the TDD
+cycle. Per-UE SNR evolves as an AR(1) process in dB and maps through a
+link-adaptation staircase~\cite{ts38214} to $\mathrm{SE}_i$, bits per
+PRB-symbol, discounted by target BLER.
+
+Each flow is uni-directional and carries a 5G QoS profile~\cite{ts23501}:
+a class
+$c(i)\in\{\mathrm{GBR},\mathrm{Delay},\mathrm{PF}\}$, a guaranteed flow
+bit rate $G_i$ (GBR only), a packet delay budget $\mathrm{PDB}_i$, a
+5QI-style \texttt{priority\_level}, and an optional slice identifier.
+$D_i$ denotes offered demand.
+
+Two control-plane budgets are modelled explicitly because both bind in
+practice. First, a per-slot \textbf{PDCCH/CCE budget}: every dynamic grant
+costs one DCI at an aggregation level that grows as SNR falls. Second, the
+\textbf{uplink buffer-status-report round-trip}: a real gNB learns of UL
+data only via a delayed BSR, so the scheduler sees a lagged view of UL
+backlog. Semi-persistent scheduling (SPS, ``Configured
+Grants''~\cite{ts38321,ts38331}) bypasses both---a CG user transmits on a standing allocation with no DCI and no BSR.
+Section~\ref{sec:pdcch} shows this double bypass is decisive.
+
+% ===========================================================================
+\section{Two-Tier Scheduler Design}\label{sec:design}
+% ===========================================================================
+
+\subsection{Tier-1: the strategic solve}
+
+Tier-1 answers, every ${\sim}1$\,s, \emph{what rate should each flow
+target?} Decision variables are target rates $r_i \ge 0$ (bps) with
+shortfall slacks $s_i, s_\sigma \ge 0$ for GBR and slice floors. All solves
+share one feasible set, parameterised by a per-flow floor:
+\begin{align}
+\mathcal{F}(\mathrm{floor}):\quad
+&\textstyle\sum_{i: d(i)=d} r_i/\mathrm{SE}_i \le C_d && \forall d \label{eq:cap}\\
+&r_i \le D_i && \forall i \label{eq:dem}\\
+&r_i + s_i \ge G_i && \forall i{:}\, c(i){=}\mathrm{GBR} \label{eq:gbr}\\
+&r_i \ge \mathrm{floor}_i && \forall i{:}\, c(i){=}\mathrm{GBR} \label{eq:hard}\\
+&\textstyle\sum_{i\in\sigma} r_i/\mathrm{SE}_i + s_\sigma \ge \phi_\sigma C_d
+  && \forall \sigma \label{eq:slice}
+\end{align}
+Constraint~\eqref{eq:cap} is where symbol-accurate accounting enters:
+$r_i/\mathrm{SE}_i$ is the resource a target rate consumes, and $C_d$
+counts special-slot symbols. Slice floors~\eqref{eq:slice} are capped at
+the slice's own demand and kept soft, so an idle slice holds nothing and a
+busy slice borrows freely---the allocation remains work-conserving.
+
+\subsection{Shortfall before utility: an ordering, not a weight}
+\label{sec:lex}
+
+The conventional formulation is a single objective,
+\begin{equation}
+\max \;\; \textstyle\sum_i w_{c(i)} \log(r_i + \epsilon) \;-\; \sum_i p_i s_i ,
+\label{eq:single}
+\end{equation}
+with $p_i$ ``large'' so that GBR floors are effectively hard whenever
+feasible. On our factory workload we measure the two terms at $709$ and
+$2.4\times10^{10}$ respectively: a ratio of $3.4\times10^{7}$. That is not
+a weighting. It is a \emph{lexicographic ordering expressed as a
+magnitude}, and it has two consequences.
+
+The first is numerical. Posed as~\eqref{eq:single}, the program is badly
+conditioned: on a three-flow instance small enough to solve in closed form,
+two interior-point solvers both returned \texttt{optimal\_inaccurate},
+disagreed with each other by $3.6\times$ on one flow's rate, and
+under-served the highest-weighted (Delay) class by 28\% against the
+analytic optimum. Rescaling does not fix this---a ratio between objective
+terms is a property of the model, not of the units. Stating the order
+directly does. We solve, over $\mathcal{F}$,
+\begin{align}
+\text{B1:}\quad S^\star &= \min \;\; \textstyle\sum_i p_i s_i + p_\sigma \sum_\sigma \mathrm{SE}_\sigma s_\sigma
+  \label{eq:b1}\\
+\text{B2:}\quad &\max \;\; \textstyle\sum_i w_{c(i)}\log(r_i+\epsilon)
+  \;\;\text{s.t.}\;\; \eqref{eq:b1} \le S^\star
+  \label{eq:b2}
+\end{align}
+after which both solvers agree to within 100\,bps of the analytic optimum.
+A useful side effect: $p_i$'s absolute magnitude becomes irrelevant and
+only the ratios across flows matter. Both slacks are converted to bits per
+second before being weighed---a slice slack is natively in PRB-symbols---so
+that $p_i$ and $p_\sigma$ are quoted in one currency. Compared raw, the
+crossover between them sits at $p_i \cdot \mathrm{SE}_i$, which would make
+slice-versus-GBR priority a function of the radio channel rather than of
+policy.
+
+\subsection{Soft GBR floors are a knapsack}\label{sec:knapsack}
+
+The second consequence is structural, and it is the more interesting one.
+Once the penalty dominates, \eqref{eq:b1} is
+$\min \sum_i (G_i - r_i)$ subject to $\sum_i r_i/\mathrm{SE}_i \le C$: a
+\textbf{fractional knapsack}. Its optimum is the greedy one---buy rate
+where it is cheapest per PRB, i.e.\ in descending spectral efficiency---and
+therefore a \emph{vertex} of the feasible polytope. Flows are served in
+full or abandoned outright, with at most one partially served flow per SE
+tier. Table~\ref{tab:knapsack} shows the solved targets on our factory
+workload: a fully served head, one boundary tier, and a zeroed tail.
+
+\begin{table}[t]
+\caption{Tier-1 targets under~\eqref{eq:single} on \texttt{factory\_robots}
+at the shipped load. The allocation is an exact spectral-efficiency
+staircase---note it orders by SE, not SNR: ue2 (18\,dB) and ue4 (16\,dB)
+share an MCS step and receive identical targets.}
+\label{tab:knapsack}
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+$\mathrm{SE}$ & Flows (SNR) & Target \\
+\midrule
+48.6 & ue1, ue5 (22, 24\,dB) & 100\% \\
+37.8 & ue3, ue6, ue8, ue10 (19--21\,dB) & 100\% \\
+29.7 & ue2, ue4, ue9 (16--18\,dB) & 53--56\% \\
+21.6 & ue7 (14\,dB) & \textbf{0\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two controls confirm the mechanism. Sweeping $p$ over six decades
+($1$ to $10^6$) leaves the targets \emph{identical}: the solution is fixed
+by the knapsack structure, not the penalty magnitude. Conversely at
+$p=10^{-6}$, with the utility alone driving, the allocation is 44--56\% and
+\emph{rises} as SE falls---the worst-channel flow receives the largest
+fraction of its contract. \textbf{The $\log$ utility is the term that
+protects cell-edge flows; the slack penalty is the term that starves
+them.} This inverts the usual attribution of cell-edge starvation to
+``weighted-$\log$ pathology.''
+
+It also explains why penalty-shaped fixes cannot work. Since the optimum is
+a vertex, reweighting $p$ selects a \emph{different} vertex and nothing
+more (Section~\ref{sec:negative}). Removing an abandonment requires
+changing the feasible region---a constraint, not a weight.
+
+\subsection{A max-min GBR floor}\label{sec:maxmin}
+
+We therefore prepend a max-min satisfaction stage. Let
+$\hat{G}_i = \min(G_i, D_i)$ be flow $i$'s \emph{reachable} contract; the
+demand cap matters, or an under-offered GBR flow pins the level at its own
+unreachable ratio and drags the set down. Stage~A solves
+\begin{equation}
+\begin{aligned}
+t^\star = \max\, t \quad \text{s.t.} \quad & r\in\mathcal{F}(0), \;\; t\in[0,1],\\
+& r_i \ge t\hat{G}_i \;\; \forall i{:}\, c(i){=}\mathrm{GBR}
+\end{aligned}
+\label{eq:maxmin}
+\end{equation}
+and sets $\mathrm{floor}_i = \alpha\, t^\star \hat{G}_i$ in~\eqref{eq:hard}.
+$t^\star$ is the largest fraction of contract that \emph{every} GBR flow
+can hold simultaneously; $t^\star = 1$ means the GBR set is jointly
+feasible.
+
+This is enabled by default, and the reason it is safe is that it
+\textbf{self-disables}: whenever $t^\star = 1$ the floor binds nothing and
+the result is identical to omitting the stage. It costs something only in
+genuine GBR overload. $\alpha$ trades the guarantee against throughput,
+with $\alpha = 0$ recovering the single-stage behaviour exactly.
+
+All programs are posed in normalised units---rates as multiples of the
+largest contract, capacity usage as a fraction of each direction's
+budget---so every coefficient is $O(1)$. This is not cosmetic: posed in raw
+bps, a unit-scale $t$ against $10^7$-scale rates made the solver report
+\texttt{optimal} on a $t^\star$ that was \emph{non-monotone in capacity},
+which is impossible for a max-min level.
+
+\subsection{Tier-2: drift-plus-penalty rate tracking}
+
+Each flow carries a virtual queue $Q_i$, a control accumulator in bits
+rather than a buffer of data. Per slot of duration $\Delta$: grow
+$Q_i \mathbin{+}= r_i\Delta$; clamp $Q_i \leftarrow \min(Q_i, \mathrm{ceil}_i)$;
+serve; drain $Q_i \leftarrow \max(0, Q_i - \mathrm{delivered}_i)$. Because
+$Q_i$ is a non-saturating integrator it can enforce an \emph{arbitrary}
+target vector, which is precisely what the multiplicative metrics of
+Section~II cannot do.
+
+The clamp is subtle. $Q_i$ is bounded by what the flow legitimately should
+have delivered over the trailing Tier-1 window $W$ but did not:
+$\mathrm{ceil}_i = \max(0, \min(r_i W, A_i^W) - D_i^W)$ with $A^W, D^W$
+bits arrived and delivered in the window. Using a \emph{windowed arrival
+count} rather than instantaneous backlog is essential: a bursty video
+flow's buffer momentarily empties between frames, and clamping to that
+near-zero backlog erases its legitimate rate-tracking debt, letting
+continuous flows starve bursty GBR ones. This was a real regression in our
+implementation.
+
+\subsection{Per-UE grants and the MAC multiplexer}
+
+The 5G MAC grants per UE---one DCI, one transport block---so Tier-2 does
+too. For Delay flows a head-of-line urgency bonus enters the queue before
+ranking,
+$\tilde{Q}_i = Q_i + w_\mathrm{d}(\mathrm{HoL}_i/\mathrm{PDB}_i)^{\kappa}\max_j Q_j$,
+scaled by the \emph{system-wide} maximum queue rather than the flow's own
+small target---otherwise a low-rate control flow could never out-compete
+bulk. UEs are then ranked by
+$M_u = \big(\sum_{i\in u} \tilde{Q}_i\big)\cdot \mathrm{SE}_u$, which is
+simultaneously opportunistic and rate-tracking, and served greedily subject
+to PRB and CCE budgets. A granted UE's transport block is filled across its
+flows by logical-channel prioritisation~\cite{ts38321}: by
+\texttt{priority\_level}, then by $\tilde{Q}_i$. The baselines use the same multiplexer (with plain
+backlog as the tiebreak, since they carry no virtual queues), so all
+schedulers are strictly comparable on DCI cost.
+
+\subsection{Configured grants}
+Periodic flows receive standing allocations sized to their contracted
+floor, granted in priority tiers with proportional scale-back so that no
+flow is dropped for being late in an enumeration order. A \emph{viability
+floor} governs the mechanism: if a tier's reservations would be scaled
+below a threshold, the tier runs dynamically instead---unless dropping it
+would overrun the CCE budget, in which case SPS's zero-DCI property makes
+it the lesser evil. SPS thus self-gates, engaging where it helps and
+standing aside where fixed reservations would starve the dynamic pool.
+
+% ===========================================================================
+\section{Evaluation Methodology}\label{sec:method}
+% ===========================================================================
+
+\subsection{Simulator and fidelity discipline}
+We evaluate in a purpose-built discrete-event simulator whose job is
+\emph{comparative} questions, not absolute ones. The design principle is to
+model, to good accuracy, every resource the scheduler competes for, and
+nothing else. Modelled: the slot-by-slot PRB grid including the TDD special
+slot; the per-slot PDCCH/CCE budget with variable DCI aggregation level;
+the UL BSR round-trip as a per-flow delay plus Bernoulli loss, bypassed by
+configured grants; CQI report delay and loss, with BLER computed from the
+mismatch between the MCS the scheduler picked and the true SNR at
+transmission; per-UE AR(1) SNR through an MCS staircase; per-flow buffers
+with head-of-line timestamps and PDB expiry. Not modelled: LDPC and I/Q,
+HARQ as a full state machine (a fixed delay plus BLER discount instead),
+per-packet RLC segmentation, MU-MIMO, mobility and inter-cell interference.
+
+The discipline cuts both ways, and the PDCCH budget is the case in point:
+modelling it is what reveals configured grants to be decisive
+(Section~\ref{sec:pdcch}), and omitting it would have led to the opposite
+conclusion. The same held for the BSR round-trip, which was our largest
+fidelity gap until we closed it; omitting it \emph{understates} SPS.
+
+\subsection{Scenarios}
+Three workloads isolate three bottlenecks. \texttt{factory\_robots}: 10
+mobile robots, 24 flows---uplink camera and LIDAR (GBR), downlink
+motion-control (Delay), best-effort uploads and a TCP flow---with an SNR
+spread of 14--24\,dB and uplink demand roughly twice carrier capacity as
+shipped. \texttt{sensor\_dense}: 30 small periodic uplink sensors with a
+15\,ms PDB, sized so the control channel binds before the data channel.
+\texttt{latency\_bound}: 8 interactive 5\,Mbps streams with a 12\,ms PDB
+sharing a saturated downlink with 80\,Mbps of bulk.
+
+The load sweep varies offered load around the shipped operating point.
+Because capacity in a real deployment is fixed by spectrum, we report the
+axis as \emph{load} relative to the shipped point, where higher is worse.
+Uplink runs with an 8-slot ($\approx$4\,ms) BSR round-trip and an 8-slot
+CQI report delay throughout.
+
+\subsection{Metrics}
+We report \textbf{contract-oriented} metrics, and this is a deliberate
+methodological choice: mean delivery ratio hid every finding in this study.
+A GBR flow's contract is its GFBR, counted as met at $\ge 95\%$; a Delay
+flow's is $\ge 99\%$ on-time delivery within PDB. We report the
+\emph{count of flows meeting their contract}, the \emph{minimum} delivery
+across the GBR set, and p99 head-of-line delay. Mean and total throughput
+appear as context, not as the verdict---a scheduler can post a healthy 86\%
+mean while the missing 14\% is one starved safety-critical flow.
+
+% ===========================================================================
+\section{Results}\label{sec:results}
+% ===========================================================================
+
+\subsection{The value of QoS-awareness is a hump}\label{sec:hump}
+
+Table~\ref{tab:sweep} sweeps offered load. The shape is the paper's
+headline. At the shipped load, GBR demand far exceeds capacity and
+\emph{no} scheduler honours a contract; at one third of it everyone has
+slack and all converge to 10/10. The scheduler decides outcomes only in
+between: at $0.50\times$ load the two-tier design honours \textbf{10/10}
+contracts against PF's 5/10, with a minimum delivery of 78\% against 31\%
+and $+8.9$\,Mbps of cell throughput.
+
+\begin{table}[t]
+\caption{Load sweep on \texttt{factory\_robots}. Load is relative to the
+shipped operating point; higher is worse. ``met'' counts GBR flows
+delivering $\ge 95\%$ of GFBR. $-$mm pins the max-min stage off.}
+\label{tab:sweep}
+\centering
+\small
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Load & Scheduler & Total & met & mean & min \\
+\midrule
+\multirow{3}{*}{$1.00\times$}
+ & PF               & \textbf{69.3}\,M & 0/10 & 37\% & 0\% \\
+ & TwoTier          & 66.7\,M & 0/10 & 44\% & \textbf{40\%} \\
+ & TwoTier $-$mm    & 74.2\,M & 0/10 & 53\% & 0\% \\
+\midrule
+\multirow{3}{*}{$0.67\times$}
+ & PF               & 93.9\,M & \textbf{4/10} & 55\% & 4\% \\
+ & TwoTier          & 94.1\,M & 0/10 & 65\% & \textbf{60\%} \\
+ & TwoTier $-$mm    & 95.8\,M & 0/10 & 68\% & 43\% \\
+\midrule
+\multirow{2}{*}{$0.50\times$}
+ & PF               & 111.2\,M & 5/10 & 72\% & 31\% \\
+ & TwoTier          & \textbf{120.1}\,M & \textbf{10/10} & \textbf{82\%} & \textbf{78\%} \\
+\midrule
+\multirow{2}{*}{$0.33\times$}
+ & PF               & 124.7\,M & 10/10 & 85\% & 83\% \\
+ & TwoTier          & 125.4\,M & 10/10 & 85\% & 83\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The $0.67\times$ row is where the \emph{metric} becomes the discussion.
+The two-tier design meets \emph{fewer} knife-edge contracts than PF (0/10
+against 4/10) while delivering a strictly better distribution: minimum 60\%
+against 4\%, mean 65\% against 55\%. A 95\% threshold rewards a scheduler
+that abandons some flows so others clear the bar. For a factory where every
+robot matters, ``all robots degraded gracefully'' beats ``four robots
+perfect, six offline''---so the contract count is necessary but not
+sufficient, and must be read alongside the minimum.
+
+\textbf{Engineering implication.} Since capacity is fixed by spectrum, the
+operator's lever is admission control: keep peak offered load in the
+moderate band, because that is where the scheduler pays for itself. A cell
+that systematically runs at ${\gtrsim}2.5\times$ its capacity has a
+capacity-planning problem that no MAC fixes.
+
+\subsection{Control-channel-limited: a capability PF lacks}\label{sec:pdcch}
+
+Table~\ref{tab:sensor} reports \texttt{sensor\_dense}, where the DCI/CCE
+budget binds before the data channel. The two-tier design meets
+\textbf{30/30} deadlines with a 5\,ms p99 tail; PF meets 2/30 and pins at
+the 15\,ms PDB. This is not a tuning difference. Each periodic flow
+receives a standing allocation that costs \emph{zero PDCCH per slot} and
+\emph{needs no BSR round-trip}; PF is throttled by both budgets at once and
+has no mechanism to bypass either.
+
+\begin{table}[t]
+\caption{\texttt{sensor\_dense}: 30 periodic uplink sensors, 15\,ms PDB.
+On-time requires $\ge 99\%$ delivery within PDB.}
+\label{tab:sensor}
+\centering
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Scheduler & Total & on-time & min deliv. & p99 \\
+\midrule
+RoundRobin & 6.9\,M & 0/30  & 71\%  & 15.0\,ms \\
+PF         & 9.2\,M & 2/30  & 85\%  & 15.0\,ms \\
+\textbf{TwoTier}  & \textbf{9.6}\,M & \textbf{30/30} & \textbf{100\%} & \textbf{5.0}\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We regard this as the strongest practical result in the paper: for any
+deployment with dense periodic small-payload traffic---sensors, PLCs, AGV
+telemetry---configured-grant support is not an optimisation but a
+prerequisite, and capacity planning that counts only PRBs will mis-size the
+cell.
+
+\subsection{Deadline-blindness is silent}\label{sec:latency}
+
+Table~\ref{tab:latency} reports \texttt{latency\_bound}. The two-tier
+design meets 8/8 deadlines; PF meets 5/8. The trade is explicit and
+deliberate: bulk throughput falls from 24.6\,Mbps to 15.2\,Mbps to fund the
+interactive set.
+
+\begin{table}[t]
+\caption{\texttt{latency\_bound}: 8 interactive streams (12\,ms PDB) versus
+80\,Mbps of bulk on a saturated downlink.}
+\label{tab:latency}
+\centering
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Scheduler & on-time & mean & p99 & bulk DL \\
+\midrule
+RoundRobin  & 3/8 & 84\%  & 12.0\,ms & 22.8\,M \\
+PF          & 5/8 & 86\%  & 12.0\,ms & \textbf{24.6}\,M \\
+\textbf{TwoTier} & \textbf{8/8} & \textbf{100\%} & \textbf{10.5}\,ms & 15.2\,M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dangerous property is that PF's failure is \emph{quiet}. Its
+control-flow mean delivery is 86\%---a number that reads as healthy on a
+dashboard---but the missing 14\% are aged-out packets, and in a
+teleoperation or motion-control loop those are precisely the
+safety-relevant ones. Mean delivery is not a safety metric.
+
+\subsection{Cell-edge starvation and the max-min floor}\label{sec:celledge}
+
+Table~\ref{tab:perflow} gives the per-flow picture at the shipped load and
+makes the knapsack result of Section~\ref{sec:knapsack} concrete. Without
+the max-min stage the two lowest-SE flows land at exactly $0\%$---not
+degraded, abandoned---while high-SNR peers run at 71--80\%. With the stage
+enabled every GBR flow lands between 50\% and 56\%: a 6-point spread across
+a 10\,dB SNR range, against PF's 0--91\%.
+
+\begin{table}[t]
+\caption{Per-flow delivery as a fraction of GFBR, \texttt{factory\_robots}
+at the shipped load, worst channel first. $-$mm pins the max-min stage off.}
+\label{tab:perflow}
+\centering
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Flow & SNR & RR & PF & TwoTier $-$mm & \textbf{TwoTier} \\
+\midrule
+ue7  & 14\,dB & 23\% & 28\% & \textbf{0\%} & 53\% \\
+ue4  & 16\,dB & 51\% & 62\% & \textbf{0\%} & 50\% \\
+ue9  & 17\,dB & 3\%  & 3\%  & 55\% & 50\% \\
+ue2  & 18\,dB & 57\% & 68\% & 53\% & 54\% \\
+ue6  & 19\,dB & 37\% & 46\% & 50\% & 55\% \\
+ue3  & 20\,dB & 63\% & 74\% & 69\% & 53\% \\
+ue10 & 20\,dB & 89\% & 0\%  & 69\% & 53\% \\
+ue8  & 21\,dB & 3\%  & 3\%  & 69\% & 53\% \\
+ue1  & 22\,dB & 77\% & 91\% & 71\% & 56\% \\
+ue5  & 24\,dB & 56\% & 67\% & 80\% & 56\% \\
+\midrule
+mean &        & 46\% & 44\% & 53\% & 53\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The cost is stated plainly: at the shipped load PF carries
+\emph{more} total throughput than the two-tier design (69.3 vs
+66.7\,Mbps). The max-min floor gives up 4\% of aggregate capacity to hold
+the worst-served flow at 40\% of contract rather than 0\%. Whether that is
+the right trade is a deployment question---a robot whose video is switched
+off entirely is a failure in a way that a uniformly degraded fleet is
+not---but it is a trade, and we do not present it as a free win.
+
+Two further effects are visible. The mixed-flow UEs (ue8--ue10, carrying a
+GBR flow \emph{and} a best-effort flow) collapse to 0--3\% under the
+QoS-blind baselines, because their MAC multiplexer fills the transport
+block by raw backlog and a continuously backlogged best-effort flow wins
+every time. And the bill for the max-min floor is paid by the high-SNR
+flows: ue1 drops from 91\% under PF to 56\%.
+
+\subsection{Sensitivity to control-plane fidelity}\label{sec:sensitivity}
+
+Because our BSR and CQI models are approximations, we sweep them. BSR delay
+matters and is close to linear: over 0--16 slots PF's minimum delivery
+falls 66\%$\to$30\% and its contract count breaks 8/10$\to$5/10, while the
+two-tier design moves 80\%$\to$77\% and 10/10$\to$8/10 and loses about 1\%
+of throughput against PF's 10\%. SPS-served flows are invariant to BSR by
+construction. BSR \emph{loss} is near-inert on this workload (0--20\% loss
+moves nothing) because continuously backlogged video keeps buffers
+non-empty, so a lost report rarely changes the eligibility bit.
+
+CQI staleness is likewise small here, and the reason is a property of the
+channel rather than of the scheduler: our AR(1) model produces per-slot SNR
+innovations well below the ${\sim}3$\,dB spacing of MCS thresholds, so even
+a stale report usually picks the right MCS. A conservative semi-persistent
+MCS for SPS---a mobility hedge---is neutral at 0\,dB margin and actively
+harmful beyond 1\,dB, because larger reservations cross the SPS viability
+floor. We report this as a \emph{negative} result for our deployment class:
+the hedge is worth paying for under mobility, and a static factory is
+exactly where it is not.
+
+\subsection{Two negative results}\label{sec:negative}
+
+We implemented and rejected two mechanisms, both aimed at cell-edge
+starvation. An \textbf{adaptive dual-ascent penalty} escalates $p_i$ on
+whichever flow is actually missing. It raises minimum delivery
+(0\%$\to$34\%) but meets \textbf{0/10} contracts in both overloaded rows,
+because dual ascent drives toward equal \emph{normalised shortfall} while a
+GBR contract is a \emph{step function}---equalising shortfall parks every
+flow just below its floor so none clears it. A
+\textbf{spectral-efficiency tilt} $p_i \propto \mathrm{SE}_i^{k}$ with
+$k<0$ rescues the cell edge only by relocating starvation to the next-worst
+tier.
+
+Section~\ref{sec:knapsack} explains why neither could have worked: both
+reweight a linear penalty whose optimum is a vertex, so they select a
+different victim rather than removing the abandonment. We think this is the
+transferable lesson---\emph{in an infeasible allocation problem, a weight
+chooses whom to sacrifice; only a constraint prevents sacrifice}---and it
+applies to any scheduler enforcing rate contracts through penalty terms.
+
+% ===========================================================================
+\section{Threats to Validity}\label{sec:threats}
+% ===========================================================================
+
+\textbf{Simulation, not silicon.} Results are comparative and
+architecture-level. They establish which scheduler wins and roughly by how
+much; they do not predict absolute throughput or microsecond-accurate
+latency, and they do not validate real-time feasibility or UE interop. An
+OAI integration is the necessary next step.
+
+\textbf{Warm-up and sampling.} A single run reads GBR delivery about 5
+points below steady state, with $\pm$2 point per-window scatter (channel
+coherence is comparable to the run length). We verified over 60 consecutive
+windows that the scheduler-versus-scheduler \emph{gap} is stable, so
+comparative claims hold; absolute percentages should be read as soft.
+
+\textbf{Link model.} Spectral efficiency is a fitted staircase rather than
+a 3GPP TBS table extract---adequate for comparative work, insufficient for
+absolute claims.
+
+\textbf{Workload realism.} Three synthetic scenarios isolate three
+bottlenecks cleanly, but trace-driven factory workloads would strengthen
+external validity. Our video model uses a fixed I-frame multiplier without
+GOP structure.
+
+\textbf{Unmodelled control-plane latency.} UL $k_2$ grant-to-transmission
+timing is not modelled; including it would widen the configured-grant
+advantage further, so its omission is conservative with respect to our
+conclusions.
+
+\textbf{A contract-dimensioning caveat.} Even at three times capacity,
+about 15\% of GBR video bytes expire on PDB. We verified this is
+scheduler-independent---a lone video flow drops identically under RR, PF
+and our design---because an I-frame burst is 3--4$\times$ the GFBR, making
+a ``GFBR plus tight PDB'' contract internally inconsistent. This is an
+admission and contract-dimensioning problem, not a scheduling one, and it
+bounds what any scheduler can achieve on such a workload.
+
+% ===========================================================================
+\section{Conclusion}
+% ===========================================================================
+
+We set out to decide whether a QoS-aware two-tier scheduler is worth
+building for a private-5G factory, or whether the proportional-fair
+scheduler that OpenAirInterface ships today is good enough. The answer is
+conditional, and we have characterised the conditions.
+
+QoS-awareness is not a uniform improvement. In deep overload and under
+light load it is indistinguishable from PF on contract satisfaction, and a
+study reporting mean throughput alone would have concluded it was not worth
+the complexity. Contract-oriented metrics reveal three regimes where it
+changes outcomes sharply: control-channel-limited deployments, where
+configured grants deliver 30/30 deadlines against PF's 2/30 via a
+capability PF structurally lacks; latency-bound mixed deployments, where PF
+misses deadlines \emph{silently}; and moderate-overload GBR deployments,
+where the strategic tier honours contracts the cell could otherwise have
+met. The load-bearing features are configured grants and a deadline-aware
+Tier-2---not, as we initially assumed, the sophistication of the strategic
+program.
+
+Our analytical contribution is a diagnosis with a fix: the soft GBR penalty
+that utility-based schedulers rely on turns the strategic program into a
+fractional knapsack whose optimum abandons the worst-channel flow entirely,
+no reweighting of that penalty can prevent it, and a max-min satisfaction
+stage can---at a stated cost in aggregate throughput. We expect this to
+generalise to any scheduler that enforces rate contracts through penalty
+terms.
+
+Future work is the OpenAirInterface integration the strategic tier was
+isolated for, trace-driven workloads, and an admission-control gate: our
+max-min level $t^\star$ is a ready-made infeasibility detector, since
+$t^\star < 1$ quantifies how far a GBR set is from satisfiable before any
+flow has been starved to reveal it.
+
+\section*{Artifact Availability}
+The simulator, the scheduler library and all scenario configurations are
+available at \url{https://github.com/artpark-hub/5g-qos-stack}. Every table
+in Section~\ref{sec:results} is regenerated by a single command:
+Tables~\ref{tab:sweep}, \ref{tab:sensor} and~\ref{tab:latency} by
+\texttt{scheduler\_study.py}; Table~\ref{tab:perflow} by
+\texttt{maxmin\_study.py} and \texttt{compare\_schedulers.py};
+Table~\ref{tab:knapsack} and the penalty sweep of
+Section~\ref{sec:knapsack} by \texttt{maxmin\_study.py}; the sensitivity
+results of Section~\ref{sec:sensitivity} by \texttt{bsr\_study.py} and
+\texttt{cqi\_study.py}. A dated engineering log recording every finding,
+regression and rejected design in this paper is included in the repository.
+% TODO: confirm the repository is public before submission.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
