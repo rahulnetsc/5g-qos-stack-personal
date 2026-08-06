@@ -15,11 +15,20 @@ def run(
     scenario: ScenarioConfig,
     scheduler: Scheduler,
     record_timeseries: bool = False,
+    ul_bsr_delay_slots: int = 0,
 ) -> dict:
+    """Run one scenario through one scheduler.
+
+    ``ul_bsr_delay_slots`` models the UE-to-gNB Buffer Status Report round
+    trip: for each UL flow, the scheduler sees a view of the buffer that
+    lags reality by this many slots. Configured Grants / SPS bypass it.
+    Zero (the default) preserves the old zero-latency behaviour; a typical
+    realistic value at numerology μ=1 (0.5 ms slot) is 8 slots (~4 ms).
+    """
     rng = np.random.default_rng(scenario.seed)
     grid = ResourceGrid(scenario.carrier, scenario.tdd)
     channel = ChannelModel(scenario.ues, rng)
-    buffers = BufferModel()
+    buffers = BufferModel(ul_bsr_delay_slots=ul_bsr_delay_slots)
     traffic = TrafficModel(scenario.flows, buffers, grid.slot_duration_s, rng)
     metrics = Metrics(record_timeseries=record_timeseries)
 
@@ -37,6 +46,11 @@ def run(
             per_flow_arrived[(ue_id, qfi)] += byts
 
         channel.update(slot_index)
+
+        # Advance the UL BSR-delay pipeline so bytes_reported reflects the
+        # buffer as seen `ul_bsr_delay_slots` ago -- what a real gNB would
+        # know from BSR. No-op when ul_bsr_delay_slots = 0.
+        buffers.snapshot_bsr()
 
         slot_grid = grid.slot_grid(slot_index)
         metrics.record_grid_capacity(

@@ -386,8 +386,19 @@ class TwoTier:
     def _remaining_backlog(self, key, buffers, committed) -> int:
         """Real bytes still queued for a flow, net of whatever has already
         been committed to it this slot (so SPS then dynamic for the same
-        flow do not both allocate against the original backlog)."""
+        flow do not both allocate against the original backlog). This is
+        the *real* backlog -- used by SPS (a CG UE just fills its reserved
+        grant with whatever it has) and by the MAC LCP fill (once a grant
+        exists the UE fills with real bytes, no BSR involved)."""
         return max(0, buffers.state(*key).bytes_queued - committed.get(key, 0))
+
+    def _remaining_reported(self, key, buffers, committed) -> int:
+        """BSR-visible bytes for a flow, net of committed. This is what
+        the dynamic scheduler can actually see for eligibility and grant
+        sizing -- ``bytes_reported`` lags ``bytes_queued`` for UL flows
+        by the driver's ul_bsr_delay_slots. For DL / no-delay flows it is
+        identical to _remaining_backlog."""
+        return max(0, buffers.state(*key).bytes_reported - committed.get(key, 0))
 
     def _compute_flow_q(self, direction, buffers, committed, now_s):
         """Per-flow effective virtual deficit for `direction`: the Tier-2
@@ -542,14 +553,22 @@ class TwoTier:
             direction, buffers, committed_this_slot, now_s
         )
 
-        # Group this direction's backlogged flows by UE.
+        # Group this direction's backlogged flows by UE. Eligibility uses
+        # the BSR-visible view -- a UE whose data hasn't been reported yet
+        # cannot be scheduled dynamically. (SPS-served flows still count
+        # here for their spillover; their view is real, since a CG UE
+        # needs no BSR.)
         ue_flows: dict[int, list[FlowConfig]] = defaultdict(list)
         for f in self._flows:
             if f.direction != direction:
                 continue
-            if self._remaining_backlog(
-                (f.ue_id, f.qfi), buffers, committed_this_slot
-            ) > 0:
+            key = (f.ue_id, f.qfi)
+            visible = (
+                self._remaining_backlog(key, buffers, committed_this_slot)
+                if key in self._sps_keys
+                else self._remaining_reported(key, buffers, committed_this_slot)
+            )
+            if visible > 0:
                 ue_flows[f.ue_id].append(f)
 
         # Rank UEs by total deficit x spectral efficiency.
@@ -573,8 +592,16 @@ class TwoTier:
             cce_cost = cce_aggregation_level(channel.get_snr_db(ue_id))
             if cce_left < cce_cost:
                 continue
+            # Grant sizing uses the BSR-visible view (mixed with real for
+            # SPS-served flows -- their CG relation still applies). The
+            # MAC LCP fill (_emit_grant → _mac_lcp_fill) then takes bytes
+            # from real bytes_queued up to the granted TB.
             ue_backlog = sum(
-                self._remaining_backlog((f.ue_id, f.qfi), buffers, committed_this_slot)
+                (
+                    self._remaining_backlog((f.ue_id, f.qfi), buffers, committed_this_slot)
+                    if (f.ue_id, f.qfi) in self._sps_keys
+                    else self._remaining_reported((f.ue_id, f.qfi), buffers, committed_this_slot)
+                )
                 for f in flows
             )
             if ue_backlog <= 0:

@@ -24,7 +24,7 @@ class TrafficModel:
         self.slot_duration_s = slot_duration_s
         self.rng = rng
         for f in flows:
-            buffers.register(f.ue_id, f.qfi)
+            buffers.register(f.ue_id, f.qfi, is_ul=(f.direction == "UL"))
 
     def generate(self, slot_index: int) -> list[tuple[int, int, int]]:
         """Generate arrivals for this slot. Returns list of (ue_id, qfi, bytes)."""

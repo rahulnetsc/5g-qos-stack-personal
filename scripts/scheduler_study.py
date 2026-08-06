@@ -42,6 +42,13 @@ from scheduler import TwoTier
 GBR_CONTRACT_FRACTION = 0.95
 # Delay flow is "on time" at >= this delivery ratio with p99 HoL <= PDB.
 DELAY_ONTIME_DELIVERY = 0.99
+# UL BSR-cycle latency in slots. Real 5G is ~4-8 ms of SR/BSR/grant/data
+# round-trip; at numerology mu=1 (0.5 ms/slot) that is 8-16 slots. We use
+# 8 slots as a realistic-but-conservative default -- captures the first-
+# order UL latency effect without over-modelling it. Configured Grants
+# bypass this entirely (a CG UE needs no BSR), which is the whole point of
+# SPS in real 5G. See sim/buffer.py:snapshot_bsr.
+UL_BSR_DELAY_SLOTS = 8
 
 
 def _pf():
@@ -138,7 +145,7 @@ def study_overload_sweep() -> None:
     for mult in (1.0, 1.5, 2.0, 3.0):
         sc = _scale_capacity(base, mult)
         for name, factory in scheds:
-            p = _profile(sc, run(sc, factory()))
+            p = _profile(sc, run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
             g = p["gbr"]
             print(
                 f"{mult:>8.1f}x  {name:<18}{p['total_mbps']:>7.1f}M"
@@ -162,7 +169,7 @@ def study_pdcch_limited() -> None:
         f"{'mean deliv':>12}{'min deliv':>11}{'worst p99':>11}"
     )
     for name, factory in scheds:
-        p = _profile(sc, run(sc, factory()))
+        p = _profile(sc, run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
         d = p["delay"]
         print(
             f"{name:<14}{p['total_mbps']:>7.1f}M{d['met']:>7}/{d['n']:<2}"
@@ -188,7 +195,7 @@ def study_latency_bound() -> None:
         f"{'ctrl worst p99':>16}{'bulk DL':>10}"
     )
     for name, factory in scheds:
-        summary = run(sc, factory())
+        summary = run(sc, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS)
         p = _profile(sc, summary)
         d = p["delay"]
         bulk = sum(
@@ -203,6 +210,10 @@ def study_latency_bound() -> None:
 
 
 def main() -> None:
+    print(
+        f"UL BSR delay: {UL_BSR_DELAY_SLOTS} slots "
+        "(dynamic UL flows only; Configured Grants bypass)."
+    )
     study_overload_sweep()
     study_pdcch_limited()
     study_latency_bound()

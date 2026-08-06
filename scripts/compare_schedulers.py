@@ -25,6 +25,10 @@ from sim.baselines.round_robin import RoundRobin
 from scheduler import TwoTier
 
 
+# UL BSR round-trip in slots -- kept consistent with scheduler_study.py.
+UL_BSR_DELAY_SLOTS = 8
+
+
 SCHEDULERS = [
     ("RoundRobin", lambda: RoundRobin()),
     ("ProportionalFair", lambda: ProportionalFair(ewma_window_slots=200)),
@@ -51,7 +55,7 @@ SCHEDULERS = [
 def _print_scenario(scenario: ScenarioConfig) -> None:
     results: dict[str, dict] = {}
     for name, factory in SCHEDULERS:
-        results[name] = run(scenario, factory())
+        results[name] = run(scenario, factory(), ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS)
 
     sched_names = [n for n, _ in SCHEDULERS]
     flow_keys = sorted(next(iter(results.values()))["flows"].keys())

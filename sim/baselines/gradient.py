@@ -101,7 +101,8 @@ class GradientScheduler:
         for f in self._flows:
             if f.direction != direction:
                 continue
-            if buffers.state(f.ue_id, f.qfi).bytes_queued <= 0:
+            # Eligibility uses the BSR-visible view (see round_robin.py).
+            if buffers.state(f.ue_id, f.qfi).bytes_reported <= 0:
                 continue
             ue_flows.setdefault(f.ue_id, []).append(f)
         if not ue_flows:
@@ -139,8 +140,9 @@ class GradientScheduler:
             cce_cost = cce_aggregation_level(channel.get_snr_db(ue_id))
             if cce_left < cce_cost:
                 continue
+            # Grant sizing uses the BSR-visible view.
             ue_backlog = sum(
-                buffers.state(f.ue_id, f.qfi).bytes_queued for f in flows
+                buffers.state(f.ue_id, f.qfi).bytes_reported for f in flows
             )
             prbs_needed = (ue_backlog * 8 + bits_per_rb - 1) // bits_per_rb
             prbs_used = min(prbs_left, max(1, prbs_needed))

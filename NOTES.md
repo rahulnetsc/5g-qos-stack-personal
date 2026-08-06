@@ -715,3 +715,53 @@ metrics are untouched.
 `factory_robots` (multi-flow UEs) shifts, as expected: the baselines now
 draw one DCI per UE instead of one per flow, so all four schedulers are
 finally strictly comparable on PDCCH/CCE.
+
+---
+
+## 2026-05-17 — UL BSR round-trip modeled; SPS's second bypass surfaces
+
+The sim previously gave the scheduler zero-latency, perfect-fidelity
+visibility of the UL buffer -- unrealistic. In real 5G the gNB learns
+about UE-side data only via a delayed and quantised BSR MAC CE that
+piggybacks on a UL grant that itself was triggered by a Scheduling
+Request; the round-trip is ~4-8 ms for an idle UE. **This gap surfaced
+during the parallel OAI-integration workstream**, not in the sim itself.
+
+**Fix (cheap approximation).** `BufferModel` gains `ul_bsr_delay_slots`;
+`BufferState.bytes_reported` lags `bytes_queued` by that many slots for UL
+flows, `== bytes_queued` for DL. Dynamic schedulers (RR / PF / Gradient /
+TwoTier's `_allocate_dynamic`) now read `bytes_reported` for eligibility
+and grant sizing. **SPS / Configured Grants read `bytes_queued` directly**
+-- a CG UE fills its reserved PRBs with real data, no BSR needed. The MAC
+LCP fill also reads real bytes (once a grant exists the UE fills with
+what it has). Study default: 8 slots ≈ 4 ms at μ=1. Tests default to 0
+(backward compat); new tests lock in the pipeline behaviour.
+
+**Effect on the studies.**
+
+| Study | Metric | BSR off | BSR on (8 slots) |
+|---|---|---|---|
+| 1 @ 2.0× | PF GBR met | 8/10 | **5/10** |
+| 1 @ 2.0× | PF min GBR | 66% | **32%** |
+| 1 @ 2.0× | TwoTier GBR met | 10/10 | **10/10** (SPS bypasses) |
+| 2 (sensor_dense) | TwoTier / PF on-time | 30/30 vs 1/30 | 30/30 vs 1/30 |
+| 3 (latency_bound) | any | unchanged (DL) | unchanged |
+
+The 2.0× row is the big one. Dynamic PF now absorbs the full ~4 ms BSR
+latency and its GBR-contract count drops from 8/10 to 5/10; min GBR halves
+(66→32 %). TwoTier's SPS-served UL flows do not see BSR at all, so
+TwoTier holds 10/10. The value-of-QoS-hump story sharpens: the 2.0× band
+is now unambiguously TwoTier's, with almost twice the PF contract count.
+
+**Interpretation shift.** SPS's win in Study 2 was previously credited to
+"zero PDCCH." It is actually *two* bypasses -- zero PDCCH *and* zero BSR
+round-trip. Both matter, and Configured Grants are the only mechanism
+that skips both. The PDCCH story alone understated SPS's structural edge.
+
+**Not modeled (still).** BSR quantisation (5/8-bit table entries) and
+loss (SR on PUCCH; BSR MAC CE). Each would add small further hits to
+dynamic UL scheduling but not to SPS -- so a fuller model would only
+widen the SPS win, not narrow it. Reasonable to leave as future work.
+
+Reproduce: `python scripts/scheduler_study.py` (BSR on by default in the
+study). Set `ul_bsr_delay_slots=0` on `run()` to disable.

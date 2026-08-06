@@ -499,6 +499,7 @@ nothing else.**
 |---|---|
 | Slot-by-slot PRB grid, including the TDD **special slot** | No LDPC, no I/Q, no actual modulation |
 | **PDCCH/CCE budget** per slot, with variable DCI aggregation level | HARQ as a fixed delay + BLER discount, not a full state machine |
+| **UL Buffer Status Report round-trip** as a fixed per-flow delay (8 slots ≈ 4 ms at μ=1); Configured Grants bypass | BSR quantisation and loss not modeled (delay captures the first-order effect) |
 | Per-UE SNR as an AR(1) process → MCS → bits/PRB | RLC as a fluid byte buffer, no per-packet segmentation |
 | BLER as a discount on delivered bits | Single-stream only — no MU-MIMO |
 | Per-flow buffers with HoL timestamps and PDB expiry | Single cell — no mobility, no inter-cell interference |
@@ -506,8 +507,13 @@ nothing else.**
 The discipline cuts both ways. The PDCCH budget is modeled *because the
 control channel is a genuine bottleneck* — and §7.2 shows that omitting it
 would have led to the wrong conclusion that Configured Grants are
-unnecessary. Conversely, PHY detail is omitted because it does not change
-*which scheduler wins*.
+unnecessary. The UL BSR delay is modeled for the same reason: dynamic UL
+scheduling in real 5G carries a ~4–8 ms SR/BSR/grant/data round-trip that
+Configured Grants sidestep entirely, and omitting it *understates* the
+value of SPS. (Ignoring BSR was the sim's largest fidelity gap; it surfaced
+during the parallel OAI-integration workstream and is closed here — see
+[NOTES.md](../NOTES.md).) Conversely, PHY detail is omitted because it does
+not change *which scheduler wins*.
 
 ### 5.2 The harness
 
@@ -597,37 +603,43 @@ counts as met when delivered throughput ≥ 95% of GFBR.
 
 | Capacity | Scheduler | Total | GBR met | mean GBR | min GBR | worst p99 |
 |---|---|---|---|---|---|---|
-| **1.0×** (deep overload) | PF | 72.1 M | 1/10 | 39% | 0% | 30 ms |
-| | TwoTier | 77.8 M | 1/10 | **55%** | 0% | 30 ms |
-| | TwoTier + adaptive | 69.2 M | **0/10** | 46% | 37% | 30 ms |
-| **1.5×** | PF | 100.4 M | **5/10** | 61% | 7% | 30 ms |
-| | TwoTier | 101.7 M | 1/10 | **72%** | **47%** | 30 ms |
-| | TwoTier + adaptive | 99.9 M | 3/10 | 69% | 51% | 30 ms |
-| **2.0×** (moderate overload) | PF | 119.3 M | 8/10 | 80% | 66% | 30 ms |
-| | TwoTier | 123.2 M | **10/10** | **83%** | **81%** | 30 ms |
-| | TwoTier + adaptive | 123.2 M | 10/10 | 83% | 81% | 30 ms |
-| **3.0×** (light load) | PF | 125.4 M | 10/10 | 86% | 83% | 30 ms |
+| **1.0×** (deep overload) | PF | 69.1 M | 0/10 | 37% | 0% | 30 ms |
+| | TwoTier | 74.7 M | 0/10 | **51%** | 0% | 30 ms |
+| | TwoTier + adaptive | 66.0 M | 0/10 | 43% | 35% | 30 ms |
+| **1.5×** | PF | 93.7 M | **4/10** | 55% | 4% | 30 ms |
+| | TwoTier | 96.1 M | 0/10 | **68%** | **43%** | 30 ms |
+| | TwoTier + adaptive | 93.9 M | 0/10 | 65% | 46% | 30 ms |
+| **2.0×** (moderate overload) | PF | 111.1 M | 5/10 | 72% | 32% | 30 ms |
+| | TwoTier | 120.2 M | **10/10** | **83%** | **81%** | 30 ms |
+| | TwoTier + adaptive | 120.2 M | 10/10 | 83% | 81% | 30 ms |
+| **3.0×** (light load) | PF | 124.7 M | 10/10 | 85% | 83% | 30 ms |
 | | TwoTier | 125.4 M | 10/10 | 85% | 83% | 30 ms |
+
+The uplink UEs run with an **8-slot (~4 ms) BSR round-trip delay** on the
+dynamic scheduler — see §5.1. SPS-served flows bypass it, exactly as they
+do in real 5G.
 
 Reading the table:
 
-- **At 2.0× — the clean win.** TwoTier honors **10/10** GBR contracts vs
-  PF's 8/10, with a higher minimum delivery (81% vs 66%) and +3.9 Mbps total
-  throughput. This is the regime where the Tier-1 LP unambiguously earns its
-  complexity.
-- **At 1.5× — a distributional win the contract count hides.** TwoTier meets
-  *fewer* knife-edge contracts (1/10 vs PF's 5/10) yet delivers a far better
-  *distribution*: minimum delivery 47% vs PF's 7%, mean 72% vs 61%. PF lets
-  five good-channel flows run clear of the 95% line while abandoning the
-  rest to near-zero; TwoTier equalizes everyone toward their target, so most
-  flows cluster in the 50–90% band and few cross the exact 95% threshold.
-  "Every robot at ≥47%, mean 72%" is operationally better than "5 robots at
-  100%, 5 robots below 30%" — but a 95% threshold metric scores it lower.
-  (See §8.1.)
+- **At 2.0× — the clean win, sharpened by BSR.** TwoTier honors **10/10**
+  GBR contracts vs PF's 5/10, with a much higher minimum delivery (81% vs
+  32%) and +9.1 Mbps total throughput. The gap widened from the BSR-off
+  version (8/10 for PF) because dynamic-only PF absorbs the full BSR
+  latency while TwoTier's SPS-served flows do not. This is the regime where
+  the two-tier scheduler unambiguously earns its complexity.
+- **At 1.5× — a distributional win the contract count hides.** TwoTier
+  meets *fewer* knife-edge contracts (0/10 vs PF's 4/10) yet delivers a far
+  better *distribution*: minimum delivery 43% vs PF's 4%, mean 68% vs 55%.
+  PF lets a few good-channel flows run clear of the 95% line while
+  abandoning the rest to near-zero; TwoTier equalizes everyone toward their
+  target, so most flows cluster in the 40–90% band and none cross the exact
+  95% threshold. "Every robot at ≥43%, mean 68%" is operationally better
+  than "4 robots at 100%, 6 robots below 30%" — but a 95% threshold metric
+  scores it lower. (See §8.1.)
 - **At 1.0× and 3.0× — convergence.** In deep overload no scheduler can
-  honor the contracts (1/10 either way); with ample capacity all converge
-  (10/10 either way). The scheduler choice is immaterial at both ends.
-- **The adaptive penalty makes 1.0× *worse*** (0/10). §8.4.
+  honor the contracts; with ample capacity all converge (10/10). The
+  scheduler choice is immaterial at both ends.
+- **The adaptive penalty meets 0/10 across every overload row.** §8.4.
 
 ### 7.2 Study 2 — PDCCH-limited (`sensor_dense`)
 
@@ -636,17 +648,19 @@ channel. Delay contract = ≥99% on-time within the 15 ms PDB.
 
 | Scheduler | Total | On-time | mean deliv | min deliv | worst p99 |
 |---|---|---|---|---|---|
-| RoundRobin | 7.0 M | 0/30 | 73% | 72% | 15.0 ms |
-| ProportionalFair | 8.9 M | 1/30 | 93% | 71% | 15.0 ms |
+| RoundRobin | 6.9 M | 0/30 | 72% | 71% | 15.0 ms |
+| ProportionalFair | 9.2 M | 1/30 | 95% | 85% | 15.0 ms |
 | **TwoTier** | **9.6 M** | **30/30** | **100%** | **100%** | **5.0 ms** |
 
 A decisive, structural separation: TwoTier meets **30/30** contracts at a
 5 ms tail; PF meets **1/30** at the 15 ms PDB ceiling. The mechanism is
-Configured Grants — each periodic flow gets a standing allocation costing
-**zero PDCCH per slot**, so the DCI budget that throttles PF simply does not
-apply. This is not a tuning gap; PF-class schedulers have no equivalent
-mechanism. (And it is permanent, not a transient — 30/30 holds in every one
-of 60 consecutive windows; see the transient check in [NOTES.md](../NOTES.md).)
+Configured Grants — each periodic flow gets a standing allocation that
+costs **zero PDCCH per slot** *and* **needs no BSR round-trip** (see §5.1).
+PF is doubly-throttled here: it must issue a DCI *and* wait for a BSR, and
+both budgets bind. PF-class schedulers have no equivalent mechanism to
+bypass either. (The 30/30 result is permanent, not a transient — it holds
+in every one of 60 consecutive windows; see the transient check in
+[NOTES.md](../NOTES.md).)
 
 ### 7.3 Study 3 — latency-bound (`latency_bound`)
 
@@ -676,21 +690,21 @@ point:
 
 | Flow | SNR | GFBR | RR | PF | Gradient | TwoTier |
 |---|---|---|---|---|---|---|
-| ue1 (video) | 22 dB | 8 M | 77% | 96% | 81% | 93% |
-| ue2 (video) | 18 dB | 8 M | 57% | 73% | 72% | 74% |
-| ue3 (video) | 20 dB | 8 M | 67% | 80% | 74% | 74% |
-| **ue4 (video)** | **16 dB** | 8 M | 56% | 67% | 68% | **0%** ⚠ |
-| ue5 (LIDAR) | 24 dB | 14 M | 62% | 73% | 71% | 95% |
-| ue6 (LIDAR) | 19 dB | 14 M | 41% | 50% | 59% | 92% |
-| **ue7 (LIDAR)** | **14 dB** | 14 M | 26% | 30% | 44% | **0%** ⚠ |
-| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 4% | 3% | **93%** |
-| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **54%** |
-| **ue10 (video + TCP)** | 20 dB | 6 M | 92% | 0% | 0% | **93%** |
-| Aggregate | | | mean 48% | **mean 47%** | mean 48% | **mean 67%** |
+| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 87% |
+| ue2 (video) | 18 dB | 8 M | 57% | 68% | 66% | 66% |
+| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 68% |
+| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 64% | **0%** ⚠ |
+| ue5 (LIDAR) | 24 dB | 14 M | 56% | 67% | 67% | 93% |
+| ue6 (LIDAR) | 19 dB | 14 M | 37% | 46% | 55% | 88% |
+| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **0%** ⚠ |
+| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 3% | 3% | **86%** |
+| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **47%** |
+| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **86%** |
+| Aggregate | | | mean 46% | **mean 44%** | mean 45% | **mean 62%** |
 
 Two opposite effects are visible:
 
-- **TwoTier protects mixed-flow GBR (ue8/9/10): 93/54/93% vs PF's 4/3/0%.**
+- **TwoTier protects mixed-flow GBR (ue8/9/10): 86/47/86% vs PF's 3/3/0%.**
   These UEs carry a GBR video flow *and* a best-effort flow. Under the
   QoS-blind baselines the MAC multiplexer fills the UE's transport block by
   raw backlog, and a continuously-backlogged best-effort flow wins every
@@ -703,10 +717,10 @@ Two opposite effects are visible:
   to abandon expensive low-SNR flows and fund the rest — the classic
   weighted-`log` pathology. This is **Finding 1** (§8.5), open.
 
-Net at 1.0×: TwoTier carries mean GBR delivery 67% vs PF's 47% and +5.7 Mbps
-total — but, being deep overload, still only 1/10 *contracts* met, the same
-as PF (§7.1). The two-tier machinery redistributes the pain; at 1.0× it
-cannot remove it.
+Net at 1.0×: TwoTier carries mean GBR delivery 62% vs PF's 44% and +5.6 Mbps
+total — but, being deep overload, still 0/10 *contracts* met either way
+(§7.1). The two-tier machinery redistributes the pain; at 1.0× it cannot
+remove it.
 
 ---
 
@@ -748,17 +762,24 @@ smarter MAC.
 Study 2's 30/30-vs-1/30 result is the **largest single effect** in the
 study, and it does not come from the LP or the drift-plus-penalty metric —
 it comes from SPS. A periodic flow on a Configured Grant costs **zero
-PDCCH** per slot; in a deployment where the DCI/CCE budget binds before the
-data channel, that is the difference between meeting every deadline and
-meeting almost none. PF-class schedulers — including OAI's default —
-*cannot* close this gap by tuning, because they have no configured-grant
-mechanism driven by QoS.
+PDCCH** per slot *and* **needs no BSR round-trip** (the standing grant is
+pre-negotiated). In a deployment where the DCI/CCE budget binds before the
+data channel, and every dynamic UL grant carries an extra ~4 ms BSR latency
+on top, that is the difference between meeting every deadline and meeting
+almost none. PF-class schedulers — including OAI's default — *cannot* close
+this gap by tuning, because they have no configured-grant mechanism driven
+by QoS. **This is also why the win widens (Study 1, 2.0×: PF 8/10 → 5/10)
+when BSR delay is modeled:** dynamic PF absorbs the round-trip; TwoTier's
+SPS-served flows do not.
 
 This finding also validates the simulator's fidelity discipline (§5.1):
-**before** the PDCCH budget was modeled, SPS made no measurable difference
-in any scenario and looked like dead weight. The bottleneck SPS exists to
-relieve is the control channel — model only the data channel and you
-conclude, wrongly, that Configured Grants are unnecessary.
+**before** the PDCCH budget and the BSR delay were modeled, SPS made no
+measurable difference and looked like dead weight. The bottlenecks SPS
+exists to relieve are the *control channel* and the *BSR round-trip* —
+model only the data channel and you conclude, wrongly, that Configured
+Grants are unnecessary. The BSR gap surfaced during the parallel OAI
+integration workstream, not in the sim — a nice illustration of why the
+integration is a distinct validation of what the sim tells us.
 
 **Engineering implication.** Any deployment with dense periodic
 small-payload traffic — sensors, PLCs, AGV telemetry — *requires*
@@ -883,6 +904,11 @@ metrics are what surface the real, regime-dependent value.
 - **UL DCI is amortized** into the U-slot CCE budget rather than charged to
   the earlier D-slot that carries the real UL grant — a reasonable
   approximation, worth revisiting if PDCCH-edge UL scenarios become central.
+- **UL BSR is modeled as a fixed delay only.** Real BSR is also *quantised*
+  (5- or 8-bit table entries, ~10–15% granularity) and *lossy* (SR on PUCCH
+  and the BSR MAC CE itself). The delay model captures the first-order
+  effect on dynamic UL latency and grant sizing; quantisation and loss
+  would each add small further hits to dynamic PF but not to SPS.
 
 ---
 

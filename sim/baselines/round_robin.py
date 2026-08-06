@@ -43,7 +43,10 @@ class RoundRobin:
         for f in self._flows:
             if f.direction != direction:
                 continue
-            if buffers.state(f.ue_id, f.qfi).bytes_queued <= 0:
+            # Eligibility uses the BSR-visible (bytes_reported) view: the
+            # scheduler cannot serve a UL flow it hasn't yet been told
+            # about. For DL / no-BSR-delay flows this equals bytes_queued.
+            if buffers.state(f.ue_id, f.qfi).bytes_reported <= 0:
                 continue
             ue_flows.setdefault(f.ue_id, []).append(f)
         if not ue_flows:
@@ -63,10 +66,13 @@ class RoundRobin:
             return []
 
         flows = ue_flows[chosen]
+        # Grant sizing uses the BSR-visible view -- that is what the gNB
+        # would base the grant on. The MAC LCP fill (emit_grant) then
+        # actually fills the granted TB from real bytes_queued.
         ue_backlog = sum(
-            buffers.state(f.ue_id, f.qfi).bytes_queued for f in flows
+            buffers.state(f.ue_id, f.qfi).bytes_reported for f in flows
         )
-        # Right-size PRBs to the smaller of UE backlog or full grid.
+        # Right-size PRBs to the smaller of BSR-view backlog or full grid.
         prbs_needed = (ue_backlog * 8 + bits_per_rb - 1) // bits_per_rb
         prbs_used = min(slot.prb_count, max(1, prbs_needed))
         tbs_bytes = min(ue_backlog, (prbs_used * bits_per_rb) // 8)

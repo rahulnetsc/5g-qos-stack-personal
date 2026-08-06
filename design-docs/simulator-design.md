@@ -45,6 +45,7 @@ Where to be careful, where to approximate.
 | Header overhead | Constant tax per grant | Captures the "small grant inefficiency" effect |
 | PDCCH | Count CCEs against a per-slot budget | The control bottleneck is real and matters |
 | HARQ ACK / k1 timing | Counted but not full simulated | Just enforce that DL needs a downstream PUCCH slot within k1_max |
+| UL Buffer Status Report | Fixed per-UL-flow delay (`ul_bsr_delay_slots`, default 8 in the study, 0 in tests) between arrival and scheduler visibility; **Configured Grants bypass** | Captures the ~4–8 ms SR/BSR round-trip that makes dynamic UL scheduling laggy vs SPS; loss/quantization not modeled |
 | Multi-antenna / MIMO | Single-stream only | MU-MIMO is future work |
 
 `[OPEN]` Whether to model packet boundaries at all, or strictly fluid bits. Fluid is simpler and probably sufficient for scheduler-level questions; packet-aware is needed if we want to simulate concatenation overhead per SDU. Recommendation: start fluid, add packet-awareness only if a metric demands it.

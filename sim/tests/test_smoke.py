@@ -65,6 +65,63 @@ def test_buffer_pdb_expiry():
     assert b.state(1, 9).bytes_queued == 0
 
 
+def test_buffer_bsr_delay_none_when_disabled_or_dl():
+    """bytes_reported tracks bytes_queued instantly for DL flows and for
+    UL flows when ul_bsr_delay_slots = 0."""
+    b = BufferModel(ul_bsr_delay_slots=0)
+    b.register(1, 9, is_ul=True)
+    b.enqueue(1, 9, 500, 0.0)
+    b.snapshot_bsr()
+    assert b.state(1, 9).bytes_reported == 500  # no delay configured
+
+    b2 = BufferModel(ul_bsr_delay_slots=4)
+    b2.register(2, 9, is_ul=False)  # DL flow -- always instant
+    b2.enqueue(2, 9, 500, 0.0)
+    b2.snapshot_bsr()
+    assert b2.state(2, 9).bytes_reported == 500
+
+
+def test_buffer_bsr_delay_lags_ul_by_configured_slots():
+    """For a UL flow with ul_bsr_delay_slots = 4, bytes_reported at slot t
+    equals bytes_queued as it was at slot t-4. Before the pipeline has
+    filled, bytes_reported is 0 (no BSR has reached the gNB yet)."""
+    b = BufferModel(ul_bsr_delay_slots=4)
+    b.register(1, 9, is_ul=True)
+
+    # Slots 0..3: arrivals accumulate, but no BSR is visible yet.
+    for slot in range(4):
+        b.enqueue(1, 9, 100, slot * 0.001)
+        b.snapshot_bsr()
+        assert b.state(1, 9).bytes_reported == 0, f"slot {slot}"
+
+    # Slot 4: the first snapshot from slot 0 (100 bytes) becomes visible.
+    b.enqueue(1, 9, 100, 4 * 0.001)
+    b.snapshot_bsr()
+    assert b.state(1, 9).bytes_reported == 100
+    assert b.state(1, 9).bytes_queued == 500
+
+    # Slot 8: sees slot 4's snapshot = 500 bytes.
+    for slot in range(5, 9):
+        b.enqueue(1, 9, 100, slot * 0.001)
+        b.snapshot_bsr()
+    assert b.state(1, 9).bytes_reported == 500
+    assert b.state(1, 9).bytes_queued == 900
+
+
+def test_buffer_bsr_sps_bypass_uses_bytes_queued():
+    """A CG / SPS-served flow reads bytes_queued (real) not bytes_reported.
+    The BufferState carries both so the scheduler can choose which to use;
+    SPS uses bytes_queued directly."""
+    b = BufferModel(ul_bsr_delay_slots=8)
+    b.register(1, 9, is_ul=True)
+    b.enqueue(1, 9, 1000, 0.0)
+    b.snapshot_bsr()
+    # bytes_reported still 0 (pipeline not filled), but bytes_queued is
+    # 1000 -- an SPS pathway reading bytes_queued sees the data instantly.
+    assert b.state(1, 9).bytes_reported == 0
+    assert b.state(1, 9).bytes_queued == 1000
+
+
 def test_resource_grid_dsuuu_pattern():
     grid = ResourceGrid(CarrierConfig(numerology=1), tdd_config())
     kinds = [grid.slot_grid(i).direction for i in range(5)]

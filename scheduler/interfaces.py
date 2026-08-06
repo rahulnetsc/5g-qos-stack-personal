@@ -50,12 +50,26 @@ class GridView(Protocol):
 
 
 class BufferStateView(Protocol):
+    # Actual queued bytes (gNB's exact view). For a UE-side (uplink) buffer
+    # in real 5G the gNB only learns this via a delayed and lossy BSR;
+    # ``bytes_reported`` below is the *scheduling-visible* view that lags
+    # ``bytes_queued`` for uplink flows when a BSR delay is configured.
+    # For downlink (gNB-side buffer) and when no BSR delay is configured,
+    # bytes_reported == bytes_queued.
+    #
+    # Dynamic scheduling decisions (eligibility, UE ranking, grant sizing)
+    # should read ``bytes_reported``. Once a UE has a grant, the MAC
+    # multiplexer fills the transport block with ``bytes_queued`` (real
+    # data) -- BSR only affects the *decision*, not the fill. SPS /
+    # Configured Grants read ``bytes_queued`` directly (they need no BSR).
     bytes_queued: int
+    bytes_reported: int
 
 
 class BufferView(Protocol):
     """Per-(UE, QFI) buffer status the scheduler reads -- a buffer-status
-    report in 5G terms."""
+    report in 5G terms. See BufferStateView for the bytes_queued vs
+    bytes_reported split (real vs BSR-visible)."""
 
     def state(self, ue_id: int, qfi: int) -> BufferStateView: ...
 
