@@ -188,6 +188,64 @@ correction and lowers the floor again. Recommended default: `k = 0`; treat
 Knob: `gbr_penalty_se_exponent` on `TwoTier`; `se_penalty_exponent` on
 `solve_tier1`.
 
+### Max-min GBR stage (two-stage solve) — the Finding 1 fix
+
+Both knobs above reweight the penalty vector `p`, and **neither can work**.
+At the default `p = 1e3` the penalty term outweighs the log utility by ~1e7
+(measured: 2.4e10 vs 709 on `factory_robots`), so the program is effectively
+the LP `min Σ(GFBR_i − r_i)` s.t. `Σ r_i/SE_i ≤ C` — a fractional knapsack
+whose optimum is greedy in spectral efficiency, and whose solution therefore
+sits at a **vertex**: flows are served in full or abandoned, with at most one
+partially-served flow per SE tier. Reweighting `p` chooses a different
+vertex; it never removes the abandonment. `k < 0` permutes the victim set,
+dual ascent promotes one flow and demotes another. Only changing the
+*feasible region* — a constraint, not a weight — changes the outcome.
+
+So Tier-1 optionally runs a **max-min satisfaction stage first**:
+
+```
+stage A:   maximize  t
+           s.t.  r_i ≥ t · contract_i        ∀ i: c(i) = GBR
+                 capacity, demand caps, soft slice floors
+                 0 ≤ t ≤ 1
+
+stage B:   the objective above, plus the hard floor
+                 r_i ≥ scale · t* · contract_i
+```
+
+- `t*` is the largest fraction of its contracted floor that *every* GBR flow
+  can hold at once. `t* = 1` means the GBR set is jointly feasible and the
+  floor is non-binding — the stage is self-disabling exactly where the
+  single-stage solve is already right.
+- `contract_i = min(GFBR_i, demand_i)`. The demand cap is load-bearing: an
+  under-offered GBR flow would otherwise pin `t*` at its own unreachable
+  ratio and drag the whole set down with it.
+- The soft GFBR constraint is **kept** in stage B, so the utility term still
+  has an incentive to close the gap from the floor up to full GFBR wherever
+  that is cheap. Stage B is feasible by construction.
+- `scale ∈ [0,1]` trades the guarantee against throughput; `0` recovers the
+  single-stage solve exactly. On `factory_robots` at 1.0× load the curve is
+  smooth and monotone (min GBR delivery 0 → 40% as scale goes 0 → 1, for
+  −10% total throughput), with the knee near `0.75`.
+
+Both stages are posed in **normalised units** — rates as a fraction of the
+largest contract, capacity usage as a fraction of each direction's budget.
+This is not cosmetic: posed in raw bps, maximising a unit-scale `t` against
+1e7-scale rates made the solver return `optimal` on a `t*` that was
+*non-monotone in capacity*, which is impossible for a max-min level. See
+NOTES.md 2026-08-06.
+
+Knobs: `gbr_maxmin`, `gbr_maxmin_scale` on `TwoTier`; `gbr_floor_bps` on
+`solve_tier1`, built by `gbr_maxmin_floors` from `solve_maxmin_gbr_level`.
+Default **off**, so the published study numbers reproduce unchanged.
+
+**What it does not do.** It cannot raise the count of flows *meeting* GFBR:
+a contract is a step function, and a uniform 59% satisfies nobody. Max-min
+and contract-count are genuinely opposed objectives — the latter is a
+knapsack over contracts, i.e. an admission-control decision, out of scope
+here. Tier-1 does hand that gate a clean signal for free: `t* < 1` is the
+infeasibility detector and `t*` measures how far off the GBR set is.
+
 ### Network slicing (soft RB-share floors)
 
 Each flow carries a `slice_id`. An operator gives each network slice a
@@ -233,10 +291,22 @@ This caps how many UEs can be dynamically scheduled per slot. SPS UEs don't cons
 **HARQ feedback feasibility (TDD):** for each UL transmission slot, there must be a downstream D-slot or S-slot DL portion within k1_max for the ACK/NACK. In DSUUU this is tight — the single D-slot per cycle has to carry HARQ feedback for 3+ U-slots.
 
 ### Infeasibility handling
-`[OPEN]` What does Tier-1 do when GBR demand exceeds capacity?
-- Option A: hard constraints + admission control rejects new flows.
-- Option B: soft GBR with steep penalty, scheduler "fails gracefully" by under-serving lowest-priority GBR.
-- Recommendation: B for runtime, plus a separate admission-control gate that uses A's logic for new-flow decisions.
+What does Tier-1 do when GBR demand exceeds capacity? **Decided** (2026-08-06):
+soft GBR floors for runtime feasibility, plus the optional max-min stage
+above when the sacrifice must be shared rather than concentrated.
+
+- Option A (hard constraints) is unusable alone — the program goes
+  infeasible the moment GBR demand exceeds capacity, which is exactly when
+  an answer is still needed.
+- Option B (soft penalty) does *not* "fail gracefully by under-serving the
+  lowest-priority GBR": with a uniform penalty it under-serves the
+  **lowest-spectral-efficiency** flow, to zero, regardless of priority. That
+  is the fractional-knapsack result above, and it is why the max-min stage
+  exists.
+- Runtime answer: B, with `gbr_maxmin` when a shared floor is wanted.
+- `t* < 1` from stage A is the admission-control trigger — it detects
+  infeasibility *and* quantifies it before any flow is starved to reveal it.
+  The admission gate itself is out of scope for the scheduler.
 
 ### Cadence
 - Full re-solve: 1 s (configurable). Triggered also on join/leave of a UE or new flow.
@@ -555,6 +625,8 @@ For each flow class:
 - Tier-1 solver: **CVXPY** with log objective and slack-penalty GBR.
 - Tier-1 cadence: **1 s full re-solve, no intermediate refresh** — drift-plus-penalty handles drift.
 - GBR infeasibility: **soft penalty** (slack with `1e3` weight). Keeps LP feasible under any overload; admission control can layer on top later.
+- Cell-edge starvation (Finding 1) is caused by the **slack penalty, not the log utility**. At `p ≳ 1` the penalty outweighs the utility by ~1e7, making Tier-1 a total-shortfall minimiser — a fractional knapsack solved greedily by spectral efficiency, whose optimum is a vertex (serve in full or abandon). No linear reweighting of `p` removes that; the log utility on its own is in fact *protective* of low-SE flows. Fix is a **max-min GBR stage** producing hard floors (`gbr_maxmin`), not a penalty tweak.
+- Tier-1 programs are posed in **normalised units**. Mixing O(1) and O(1e7) magnitudes made CVXPY report `optimal` on a max-min level that was non-monotone in capacity — a silent wrong answer, not a solver error.
 - Tier-2 metric form: **drift-plus-penalty (Lyapunov virtual queues)**, not multiplicative urgency. Multiplier saturates and cannot enforce unequal targets.
 - Delay urgency: scaled by **max-system-Q**, not per-flow target. Allows small periodic flows to preempt bulk flows when near PDB.
 - Tier-2 grants **per UE, not per flow**: one DCI per UE, one transport block, filled by a MAC logical-channel multiplexer across the UE's flows (`priority_level`, then drift-plus-penalty deficit). Mirrors the 5G MAC.

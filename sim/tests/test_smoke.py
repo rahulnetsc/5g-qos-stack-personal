@@ -12,6 +12,12 @@ from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
 from scheduler import TwoTier
 from scheduler import bler_for_mcs, grid_capacity_prbsym_per_sec, mcs_threshold_for_snr, solve_tier1
+from scheduler import (
+    estimate_demand_bps,
+    gbr_contract_bps,
+    gbr_maxmin_floors,
+    solve_maxmin_gbr_level,
+)
 
 
 def test_channel_stationary_variance():
@@ -1063,3 +1069,205 @@ def test_pf_fairness_two_equal_ues():
     # Within 20% of each other
     ratio = min(t1, t2) / max(t1, t2)
     assert ratio > 0.8, f"PF unfair: ue1={t1} ue2={t2} ratio={ratio:.2f}"
+
+
+# --- Tier-1 max-min GBR stage (Finding 1: cell-edge starvation) -------------
+
+
+def _cell_edge_starvation_scenario():
+    """Four equal-GFBR GBR flows spread across the SNR range, on a carrier
+    that cannot carry them all -- the minimal reproduction of Finding 1.
+
+    The single-stage Tier-1 solve serves this set greedily by spectral
+    efficiency: the top two SNRs get 100% of GFBR, and the bottom two are
+    abandoned outright (targets ~2% and 0%). 6 Tier-1 solves over the
+    horizon.
+    """
+    from sim.config import TDDConfig
+
+    snrs = (24.0, 20.0, 16.0, 10.0)
+    gfbr = 6_000_000
+    return ScenarioConfig(
+        name="cell_edge_starvation",
+        horizon_slots=12000,
+        carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
+        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
+        ues=[
+            UEConfig(ue_id=i + 1, mean_snr_db=snr, coherence_slots=4000)
+            for i, snr in enumerate(snrs)
+        ],
+        flows=[
+            FlowConfig(ue_id=i + 1, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=gfbr, pdb_ms=100, traffic_kind="poisson",
+                       traffic_params={"rate_bps": gfbr})
+            for i in range(len(snrs))
+        ],
+        seed=3,
+    )
+
+
+def _maxmin_inputs(scenario):
+    """(flows, snr_by_ue, demand_bps) for a scenario, as Tier-1 sees them."""
+    snr = {ue.ue_id: ue.mean_snr_db for ue in scenario.ues}
+    demand = {
+        (f.ue_id, f.qfi): estimate_demand_bps(f) for f in scenario.flows
+    }
+    return scenario.flows, snr, demand
+
+
+def _grid_at_bandwidth(scenario, bandwidth_hz):
+    import dataclasses
+
+    carrier = dataclasses.replace(scenario.carrier, bandwidth_hz=bandwidth_hz)
+    return ResourceGrid(carrier, scenario.tdd)
+
+
+def test_maxmin_level_monotone_and_saturating_in_capacity():
+    """The max-min level must never fall as capacity rises, and must reach
+    1.0 once the GBR set is jointly feasible.
+
+    Regression guard for a conditioning bug: posed in raw bps, maximising a
+    unit-scale t against rate variables of order 1e7 made the solver report
+    `optimal` on a level that was both inaccurate and *non-monotone* --
+    it peaked mid-sweep and then decreased as capacity grew.
+    """
+    scenario = _cell_edge_starvation_scenario()
+    flows, snr, demand = _maxmin_inputs(scenario)
+
+    levels = []
+    for bw_mhz in (5, 10, 20, 40, 80, 160):
+        grid = _grid_at_bandwidth(scenario, bw_mhz * 1_000_000)
+        levels.append(solve_maxmin_gbr_level(flows, snr, grid, demand))
+
+    for lo, hi in zip(levels, levels[1:]):
+        assert hi >= lo - 1e-6, f"max-min level fell as capacity rose: {levels}"
+    assert levels[0] < 0.99, f"expected overload at 5 MHz, got t*={levels[0]}"
+    assert levels[-1] > 0.999, (
+        f"expected a feasible GBR set at 160 MHz, got t*={levels[-1]}"
+    )
+    # And the level tracks capacity proportionally while it is the binding
+    # constraint -- 5 -> 10 -> 20 MHz should roughly double each step.
+    assert levels[1] > 1.7 * levels[0], f"level not scaling with capacity: {levels}"
+
+
+def test_maxmin_level_is_one_without_gbr_flows():
+    """No GBR flows -> nothing to protect -> no floors, so the scenarios
+    that carry only Delay/PF flows are structurally untouched by the stage."""
+    from sim.scenarios import latency_bound_scenario, sensor_dense_scenario
+
+    for scenario in (sensor_dense_scenario(), latency_bound_scenario()):
+        flows, snr, demand = _maxmin_inputs(scenario)
+        grid = ResourceGrid(scenario.carrier, scenario.tdd)
+        assert solve_maxmin_gbr_level(flows, snr, grid, demand) == 1.0
+        assert gbr_maxmin_floors(flows, demand, level=1.0) == {}
+
+
+def test_gbr_contract_is_capped_by_offered_demand():
+    """A GBR flow offering less than its GFBR can never reach 100% of it, so
+    its contract is the demand -- otherwise it would pin the max-min level at
+    its own unreachable ratio and drag every other flow down with it."""
+    from sim.config import TDDConfig
+
+    scenario = ScenarioConfig(
+        name="underoffered_gbr",
+        horizon_slots=4000,
+        carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
+        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
+        ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=4000),
+             UEConfig(ue_id=2, mean_snr_db=20.0, coherence_slots=4000)],
+        flows=[
+            # Contracted for 8 Mbps but only ever offers 1 Mbps.
+            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=8_000_000, pdb_ms=100, traffic_kind="poisson",
+                       traffic_params={"rate_bps": 1_000_000}),
+            FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=4_000_000, pdb_ms=100, traffic_kind="poisson",
+                       traffic_params={"rate_bps": 4_000_000}),
+        ],
+        seed=1,
+    )
+    flows, snr, demand = _maxmin_inputs(scenario)
+    assert gbr_contract_bps(flows[0], demand) == 1_000_000  # capped by demand
+    assert gbr_contract_bps(flows[1], demand) == 4_000_000  # GFBR binds
+
+    grid = ResourceGrid(scenario.carrier, scenario.tdd)
+    # 5 Mbps of reachable contract on a 20 MHz carrier at 20 dB: feasible.
+    # Without the demand cap the under-offered flow would hold t* at 1/8.
+    assert solve_maxmin_gbr_level(flows, snr, grid, demand) > 0.999
+
+
+def test_tier1_hard_floor_overrides_the_slack_penalty_sacrifice():
+    """The single-stage solve abandons the low-SE GBR flow; passing the
+    max-min floors back in as a hard bound is what stops it.
+
+    This is the core of the Finding 1 fix: the sacrifice is driven by the
+    *linear slack penalty* (minimising total shortfall bits under a capacity
+    constraint is a fractional knapsack, solved greedily by spectral
+    efficiency), so no reweighting of that penalty removes the vertex
+    solution -- only a constraint does.
+    """
+    scenario = _cell_edge_starvation_scenario()
+    flows, snr, demand = _maxmin_inputs(scenario)
+    grid = ResourceGrid(scenario.carrier, scenario.tdd)
+    gfbr = flows[0].gfbr_bps
+
+    single = solve_tier1(flows, snr, grid, demand)
+    rich, poor = (1, 2), (4, 2)  # ue1 at 24 dB, ue4 at 10 dB
+    assert single[rich] > 0.95 * gfbr, "expected the high-SE flow served in full"
+    assert single[poor] < 0.05 * gfbr, (
+        f"expected the single-stage solve to abandon the low-SE flow, "
+        f"got {single[poor] / gfbr:.0%} of GFBR"
+    )
+
+    level = solve_maxmin_gbr_level(flows, snr, grid, demand)
+    assert 0.0 < level < 1.0, f"expected partial infeasibility, t*={level}"
+    floors = gbr_maxmin_floors(flows, demand, level=level)
+    staged = solve_tier1(flows, snr, grid, demand, gbr_floor_bps=floors)
+
+    for key, floor in floors.items():
+        assert staged[key] >= floor * 0.999, (
+            f"{key} target {staged[key]:.0f} below its floor {floor:.0f}"
+        )
+    assert staged[poor] > single[poor], "the hard floor must lift the low-SE flow"
+
+
+def test_two_tier_maxmin_lifts_the_worst_served_gbr_flow():
+    """End to end: gbr_maxmin=True raises min GBR delivery, and the gain
+    lands on the poor-SNR flow that the single-stage form starves."""
+    single = run(_cell_edge_starvation_scenario(),
+                 TwoTier(tier1_period_slots=2000))
+    maxmin = run(_cell_edge_starvation_scenario(),
+                 TwoTier(tier1_period_slots=2000, gbr_maxmin=True))
+
+    def min_delivery(summary):
+        return min(f["delivery_ratio"] for f in summary["flows"].values())
+
+    assert min_delivery(maxmin) > min_delivery(single) + 0.05, (
+        f"max-min min delivery {min_delivery(maxmin):.1%} should beat "
+        f"single-stage {min_delivery(single):.1%}"
+    )
+    # ue4 (10 dB) is the flow the single-stage solve abandons.
+    assert single["flows"]["ue4_qfi2"]["delivery_ratio"] < 0.10
+    assert maxmin["flows"]["ue4_qfi2"]["delivery_ratio"] > 0.20
+
+
+def test_two_tier_maxmin_scale_zero_matches_single_stage():
+    """gbr_maxmin_scale=0 claims none of the achievable floor, so it must be
+    byte-identical to the single-stage default -- the knob's null setting."""
+    single = run(_two_gbr_partial_infeasible_scenario(),
+                 TwoTier(tier1_period_slots=2000))
+    zero = run(_two_gbr_partial_infeasible_scenario(),
+               TwoTier(tier1_period_slots=2000, gbr_maxmin=True,
+                       gbr_maxmin_scale=0.0))
+    for fk, m in single["flows"].items():
+        assert zero["flows"][fk]["bytes_delivered"] == m["bytes_delivered"]
+
+
+def test_two_tier_maxmin_disabled_by_default():
+    """The stage is opt-in: the default scheduler never solves it."""
+    from sim.scenarios import overload_scenario
+
+    sched = TwoTier(tier1_period_slots=2000)
+    run(overload_scenario(), sched)
+    assert sched.gbr_maxmin is False
+    assert sched.maxmin_level != sched.maxmin_level  # NaN -- never solved
