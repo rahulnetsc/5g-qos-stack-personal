@@ -199,9 +199,13 @@ def _slice_floor_constraints(
     constraints keep it work-conserving -- a busy slice borrows the unused
     share of an idle one.
 
-    Returns (constraints, [(slack_var, direction_capacity)]). The capacity is
-    handed back so the caller can weigh a slack in the original PRB-symbol
-    units, keeping `slice_slack_penalty` comparable with the GBR penalty.
+    Returns (constraints, [(slack_var, bps_per_unit_slack)]). A slice slack
+    is natively in *PRB-symbols*, while a GBR slack is in *bps*, so the two
+    cannot be compared until one is converted. The conversion factor handed
+    back turns a unit of normalised slice slack into the bps that slice
+    would have carried on those PRB-symbols -- `cap * SE_slice`, with
+    `SE_slice` the demand-weighted spectral efficiency of the slice's flows
+    in this direction. See `solve_tier1` for why this matters.
     """
     cons: list = []
     slacks: list[tuple[cp.Variable, float]] = []
@@ -216,19 +220,29 @@ def _slice_floor_constraints(
             ]
             if share <= 0.0 or not idx or cap <= 0.0:
                 continue
-            slice_demand = sum(
-                demand_bps.get((flows[i].ue_id, flows[i].qfi), 1e12) / se[i]
-                for i in idx
-            )
+            demands = [
+                demand_bps.get((flows[i].ue_id, flows[i].qfi), 1e12) for i in idx
+            ]
+            slice_demand = sum(d / se[i] for d, i in zip(demands, idx))
             floor = min(share * cap, slice_demand)
             if floor <= 0.0:
                 continue
+            # Demand-weighted SE: the rate this slice realises per PRB-symbol
+            # it is granted. Falls back to a plain mean when demand is all
+            # sentinel (no meaningful weights).
+            total_demand = sum(demands)
+            if 0.0 < total_demand < float("inf"):
+                se_slice = sum(
+                    d * se[i] for d, i in zip(demands, idx)
+                ) / total_demand
+            else:
+                se_slice = float(np.mean([se[i] for i in idx]))
             ss = cp.Variable(nonneg=True)
             usage = cp.sum(cp.hstack(
                 [u[i] * (rate_scale / (se[i] * cap)) for i in idx]
             ))
             cons.append(usage + ss >= floor / cap)
-            slacks.append((ss, cap))
+            slacks.append((ss, cap * se_slice))
     return cons, slacks
 
 
@@ -472,15 +486,25 @@ def solve_tier1(
     )
     constraints += slice_cons
 
-    # Total weighted shortfall, in the *original* units (bps for GBR slack,
-    # PRB-symbols for slice slack) so the two penalties stay comparable,
-    # then divided by a common factor to bring the expression back to O(1).
-    shortfall_scale = max(1.0, float(penalty.max()) * scale)
-    shortfall = cp.sum(cp.multiply(penalty * scale / shortfall_scale, v))
+    # Total weighted shortfall. Both slacks are converted to **bps of denied
+    # rate** first -- a GBR slack already is one, a slice slack is
+    # PRB-symbols and is multiplied by the slice's spectral efficiency -- so
+    # that gbr_slack_penalty and slice_slack_penalty are quoted in the same
+    # currency. Without the conversion the ratio between them silently
+    # scales with the UEs' SE: measured on a designed GBR-vs-slice conflict,
+    # the crossover sat at exactly `gbr_slack_penalty * SE`, a 4.3x swing
+    # across a 10-30 dB SNR range. The whole sum is then divided by a common
+    # factor to bring it back to O(1).
+    gbr_weights = penalty * scale
+    slice_weights = [slice_slack_penalty * bps for _, bps in slice_slacks]
+    shortfall_scale = max(
+        1.0, float(gbr_weights.max(initial=0.0)), *(slice_weights or [0.0])
+    )
+    shortfall = cp.sum(cp.multiply(gbr_weights / shortfall_scale, v))
     if slice_slacks:
         shortfall = shortfall + sum(
-            (slice_slack_penalty * cap / shortfall_scale) * ss
-            for ss, cap in slice_slacks
+            (w / shortfall_scale) * ss
+            for w, (ss, _) in zip(slice_weights, slice_slacks)
         )
 
     # Phase 1 -- how much shortfall is unavoidable?

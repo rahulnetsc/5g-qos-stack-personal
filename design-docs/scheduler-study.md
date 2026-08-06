@@ -374,7 +374,10 @@ subject to
   nothing) and soft (so slice and GBR floors can both be stated without
   risking infeasibility). The capacity constraint above makes it
   **work-conserving** — a busy slice freely borrows an idle slice's unused
-  share.
+  share. Its slack is weighed in **bps** — PRB-symbols times the slice's
+  demand-weighted SE — so `p_slice` and `pᵢ` are quoted in one currency.
+  Compared raw the crossover between them sits at `pᵢ · SEᵢ`, making the
+  slice-vs-GBR priority a function of the channel rather than of policy.
 
 The program is a small convex problem (log objective, linear constraints);
 CVXPY solves the study scenarios in well under 100 ms.
@@ -1231,9 +1234,10 @@ metrics are what surface the real, regime-dependent value.
    class was under-served by 28% against the analytic optimum. Rescaling
    alone did not fix it (a term *ratio* is a property of the model, not the
    units); the fix was to state the lexicographic order as two phases
-   (§4.1). All studies were re-measured; no conclusion changed. Remaining
-   item of the same shape: `slice_slack_penalty` is still a `1e3` constant
-   whose relative weight against the GBR penalty has never been studied.
+   (§4.1). All studies were re-measured; no conclusion changed. The
+   follow-on item of the same shape — `slice_slack_penalty` being compared
+   against the GBR penalty in different units — was measured and fixed the
+   same day; it had made the slice-vs-GBR priority a function of SNR.
 4. **Finding 3.** Treat as a contract/source issue: encoder pacing, I-frame
    staggering across cameras, and burst-aware PDB sizing — none of which is
    a scheduler change. Surface `bytes_dropped_pdb` correlated with I-frame

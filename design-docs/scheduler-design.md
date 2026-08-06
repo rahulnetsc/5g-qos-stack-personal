@@ -276,8 +276,20 @@ as a soft floor — the same shape as the GBR floor:
   busy slice freely borrows an idle slice's unused share. Modelling the
   share as a guaranteed *minimum* (not a hard cap) is what makes that
   borrowing free.
-- The slack is penalised (`slice_slack_penalty`), so the LP stays feasible
-  when slice floors and GBR floors cannot all be met.
+- The slack is penalised (`slice_slack_penalty`), so the program stays
+  feasible when slice floors and GBR floors cannot all be met.
+- **The slack is weighed in bps, not PRB-symbols.** A slice shortfall is
+  natively in PRB-symbols and a GBR shortfall in bps, so before the two can
+  be compared the slice slack is multiplied by the slice's demand-weighted
+  SE — the rate it would have carried on the PRB-symbols it was denied.
+  Without that conversion the slice-vs-GBR priority scales with the UEs'
+  spectral efficiency: measured, the crossover sat at exactly
+  `gbr_penalty × SE`, a 4.3× policy swing across a 10–30 dB SNR range, and
+  the shipped equal defaults silently ranked GBR 16–70× above the slice
+  floor. Converted, the crossover is at `slice_slack_penalty =
+  gbr_penalty` on any channel. (The GBR slack is deliberately *not*
+  normalised by GFBR — that would change the weighting among GBR flows,
+  which is the knapsack ordering behind Finding 1.)
 
 Tier-2 needs no slice logic — it tracks the now slice-aware Tier-1 targets.
 
@@ -644,7 +656,7 @@ For each flow class:
 - Delay urgency: scaled by **max-system-Q**, not per-flow target. Allows small periodic flows to preempt bulk flows when near PDB.
 - Tier-2 grants **per UE, not per flow**: one DCI per UE, one transport block, filled by a MAC logical-channel multiplexer across the UE's flows (`priority_level`, then drift-plus-penalty deficit). Mirrors the 5G MAC.
 - Virtual-queue clamp: a **windowed ceiling** (`min(target·W, arrived_W) − delivered_W` over a trailing Tier-1 window), not a clamp to instantaneous backlog — the latter zeroes a bursty flow's debt between frames.
-- Network slicing: **soft per-(slice, direction) RB-share floor** in the Tier-1 LP, capped at the slice's demand and work-conserving (a busy slice borrows an idle one's share).
+- Network slicing: **soft per-(slice, direction) RB-share floor** in the Tier-1 LP, capped at the slice's demand and work-conserving (a busy slice borrows an idle one's share). Its slack is weighed in **bps** (PRB-symbols × the slice's SE) so that `slice_slack_penalty` and the GBR penalty are quoted in one currency; compared raw, the slice-vs-GBR priority scales with the channel.
 - SPS implementation: **per-UE configured grant, each flow's reservation sized to its contracted floor (GFBR / deterministic rate)**, allocated in `priority_level` tiers with proportional scale-back and a viability floor (drop a tier to dynamic when SPS would be undersized, unless PDCCH-bound). Right-sized to the buffer each slot, released on empty. SPS flows still spill I-frame bursts into the dynamic pool; their dynamic urgency is the real backlog, not Q.
 - SPS spillover bug to remember: SPS + dynamic-spillover for the same flow can double-drain the buffer if `bytes_capacity` is computed twice against the same backlog. The scheduler must track per-slot per-flow committed bytes and net them out before the dynamic pass.
 - **SPS only shows visible benefit when PDCCH is binding.** With unlimited PDCCH, the dynamic scheduler keeps up and SPS adds no value. The simulator now models PDCCH as a per-slot CCE budget; in the sensor-dense scenario (30 small periodic UEs), TwoTier+SPS hits 100% delivery while PF caps out at 88% because dynamic allocations exhaust the CCE budget. Without modeling PDCCH, the simulator would have led to the wrong conclusion that "SPS is unnecessary."

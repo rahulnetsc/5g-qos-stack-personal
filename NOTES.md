@@ -1380,3 +1380,87 @@ it is no longer competing with the utility, but its *relative* weight
 against the GBR penalty has never been studied.
 
 ---
+
+## 2026-08-06 — slice vs GBR penalty: the ratio was a function of the channel
+
+Third and last item on today's list, flagged at the end of the rescale
+entry. Same family as lesson 6 above, in a different disguise: not an
+oversized weight this time, but a weight compared against something in
+**different units**.
+
+### The defect
+
+Phase 1 minimises `Σ p_gbr,i · s_i + p_slice · Σ ss_j`. But `s_i` is a GBR
+shortfall in **bps** and `ss_j` is a slice shortfall in **PRB-symbols/s**.
+Those are not the same thing, and the conversion between them is the
+spectral efficiency — so the *relative priority of a slice floor against a
+GBR floor was a function of the UEs' SNR.*
+
+Measured on a designed conflict (slice 1 holds a GBR flow wanting 80% of DL;
+slice 2 has a 50% DL floor and unbounded demand — only one can be met),
+bisecting for the `p_slice` at which the winner flips, with `p_gbr = 1e3`:
+
+| SNR | SE (bits/PRB-sym) | crossover `p_slice` | `p_gbr × SE` | ratio |
+|---|---|---|---|---|
+| 10 dB | 16.2 | 1.620e4 | 1.620e4 | 1.00 |
+| 14 dB | 21.6 | 2.160e4 | 2.160e4 | 1.00 |
+| 20 dB | 37.8 | 3.780e4 | 3.780e4 | 1.00 |
+| 25 dB | 59.4 | 5.940e4 | 5.940e4 | 1.00 |
+| 30 dB | 70.2 | 7.020e4 | 7.020e4 | 1.00 |
+
+Exact, to two decimal places, at every point. The consequences:
+
+- **A 4.3× policy swing across the SNR range these scenarios already use.**
+  Same deployment, same contracts, same config file — move a UE from the
+  cell edge to the cell centre and the operator's slice guarantee changes
+  rank against the GBR guarantee.
+- **With the shipped defaults (`p_gbr = p_slice = 1e3`) the GBR floor
+  outranked the slice floor by 16–70×** — not as a policy decision, but as
+  an artifact of the units. Nobody chose that.
+
+### Fix
+
+Convert the slice slack to bps before weighing it: multiply by the slice's
+**demand-weighted spectral efficiency** over its flows in that direction —
+the rate the slice would actually have realised on the PRB-symbols it was
+denied. Both penalties are then quoted in the same currency, "cost per bps
+of denied rate", and the crossover lands at exactly `p_slice = p_gbr` for
+every SNR (re-measured: 1.000e3 at all five points).
+
+The GBR side is deliberately left in raw bps. Normalising it by GFBR would
+have been the tidier-looking move and is *wrong*: it changes the relative
+weighting **among** GBR flows, which is precisely the fractional-knapsack
+ordering behind Finding 1. This fix touches only the slice-vs-GBR
+comparison, nothing else.
+
+`slice_slack_penalty` now has a stable meaning: at the default `1e3`, equal
+to `gbr_penalty_init`, a bit denied to a slice floor costs the same as a bit
+denied to a GBR floor. Whether tenant-level slice guarantees *should* rank
+equal with per-flow GBR guarantees is a genuine policy question and is now
+an explicit, single-number choice rather than an emergent property of the
+link budget. Default left at parity.
+
+### Blast radius: none
+
+No scenario YAML sets `slice_shares`, and the two existing slice tests carry
+only PF flows — with no GBR flow there is no GBR slack, and phase 1 is then
+minimising the single remaining term, whose optimum is independent of its
+own coefficient. Every study number is byte-identical to the pre-change run.
+This was latent, caught before slicing was used in anger.
+
+New guard: `test_slice_vs_gbr_priority_is_channel_independent`, which asserts
+the tie-break goes the same way an order of magnitude either side of the
+crossover at 10, 20 and 30 dB. Tests 62 → 63.
+
+### Why the two-phase form made this findable
+
+Worth recording the sequence. Under the old single-objective form, both
+penalties were mainly busy overpowering the log utility, and their ratio to
+*each other* was buried. Once phase 1 became "minimise shortfall" on its
+own, the absolute magnitudes stopped mattering entirely and the ratio became
+the only thing those knobs control — at which point a ratio that silently
+tracked the channel was the obvious next question to ask. Fixing the
+conditioning did not just make the answer accurate; it made the next bug
+visible.
+
+---

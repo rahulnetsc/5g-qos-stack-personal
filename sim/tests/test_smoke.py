@@ -1365,3 +1365,57 @@ def test_tier1_is_solver_independent():
     assert worst < 200_000, (
         f"{available[0]} and {available[1]} disagree by {worst:.0f} bps"
     )
+
+
+def test_slice_vs_gbr_priority_is_channel_independent():
+    """The GBR-floor / slice-floor tie-break must depend on the configured
+    penalties, not on the UEs' spectral efficiency.
+
+    A slice slack is natively in PRB-symbols and a GBR slack in bps, so
+    comparing them raw makes the crossover land at `gbr_penalty * SE` --
+    i.e. the same deployment, same contracts, different channel, different
+    policy. Measured before the fix: crossover exactly `1e3 * SE`, a 4.3x
+    swing over a 10-30 dB range. Converting the slice slack to bps at the
+    slice's own SE pins the crossover at `gbr_penalty` for every channel.
+    """
+    from sim.config import TDDConfig
+    from scheduler.tier1 import _spectral_efficiency, grid_capacity_prbsym_per_sec
+
+    grid = ResourceGrid(
+        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
+    )
+    cap_dl, _ = grid_capacity_prbsym_per_sec(grid)
+    gbr_penalty = 1e3
+
+    def gbr_fraction_met(snr_db, slice_penalty):
+        """Slice 1 carries a GBR flow wanting 80% of DL; slice 2 has a 50%
+        DL floor and unbounded demand. Only one of them can be satisfied."""
+        flows = [
+            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+                       gfbr_bps=1, pdb_ms=100, slice_id=1,
+                       traffic_kind="poisson", traffic_params={"rate_bps": 1}),
+            FlowConfig(ue_id=2, qfi=9, direction="DL", flow_class="PF",
+                       slice_id=2, traffic_kind="poisson",
+                       traffic_params={"rate_bps": 500_000_000}),
+        ]
+        snr = {1: snr_db, 2: snr_db}
+        se = _spectral_efficiency(flows, snr)
+        gfbr = 0.8 * cap_dl * se[0]
+        flows[0].gfbr_bps = gfbr
+        targets = solve_tier1(
+            flows, snr, grid, {(1, 2): gfbr, (2, 9): 500_000_000},
+            gbr_slack_penalty=gbr_penalty,
+            slice_shares={2: {"DL": 0.5}},
+            slice_slack_penalty=slice_penalty,
+        )
+        return targets[(1, 2)] / gfbr
+
+    for snr_db in (10.0, 20.0, 30.0):
+        # An order of magnitude either side of the crossover must decide it
+        # the same way regardless of channel quality.
+        assert gbr_fraction_met(snr_db, gbr_penalty / 10) > 0.99, (
+            f"at {snr_db} dB the GBR floor should win a 10x cheaper slice"
+        )
+        assert gbr_fraction_met(snr_db, gbr_penalty * 10) < 0.90, (
+            f"at {snr_db} dB a 10x dearer slice floor should win"
+        )
