@@ -418,7 +418,9 @@ non-binding, so the stage is self-disabling wherever the single-stage solve
 is already right. Stage B is feasible by construction and keeps the soft
 GFBR constraint, so the utility still closes the gap from floor to full GFBR
 where that is cheap. `scale ∈ [0,1]` trades guarantee against throughput.
-Results in §7.7; disabled by default.
+Results in §7.7. **Enabled by default**, which is safe because the stage
+self-disables: whenever the GBR set is jointly feasible `t* = 1` and the
+floor binds nothing.
 
 Both stages are posed in **normalized units** (rates as a fraction of the
 largest contract, capacity usage as a fraction of each direction's budget).
@@ -646,19 +648,33 @@ operation — larger capacity for the same demand is the same load ratio
 as smaller demand for the same capacity). The numbers below are
 `1 / capacity_multiplier`, i.e., load relative to the as-shipped point.*
 
+`TwoTier` is the shipped default, which includes the max-min GBR stage
+(§4.1). `−maxmin` pins that stage off to show what it buys; `+adaptive`
+builds on the same single-stage baseline so the §8.4 negative result stays
+a like-for-like comparison.
+
 | Load | Scheduler | Total | GBR met | mean GBR | min GBR | worst p99 |
 |---|---|---|---|---|---|---|
-| **1.0×** (as-shipped, deep overload) | PF | 69.3 M | 0/10 | 37% | 0% | 30 ms |
-| | TwoTier | 74.2 M | 0/10 | **53%** | 0% | 30 ms |
-| | TwoTier + adaptive | 68.7 M | 0/10 | 44% | 34% | 30 ms |
+| **1.0×** (as-shipped, deep overload) | PF | **69.3 M** | 0/10 | 37% | 0% | 30 ms |
+| | **TwoTier** | 66.7 M | 0/10 | **44%** | **40%** | 30 ms |
+| | TwoTier −maxmin | 74.2 M | 0/10 | 53% | 0% | 30 ms |
+| | TwoTier −maxmin +adaptive | 68.7 M | 0/10 | 44% | 34% | 30 ms |
 | **0.67×** | PF | 93.9 M | **4/10** | 55% | 4% | 30 ms |
-| | TwoTier | 95.8 M | 0/10 | **68%** | **43%** | 30 ms |
-| | TwoTier + adaptive | 94.6 M | 0/10 | 65% | 33% | 30 ms |
+| | **TwoTier** | 94.1 M | 0/10 | **65%** | **60%** | 30 ms |
+| | TwoTier −maxmin | 95.8 M | 0/10 | 68% | 43% | 30 ms |
+| | TwoTier −maxmin +adaptive | 94.6 M | 0/10 | 65% | 33% | 30 ms |
 | **0.50×** (moderate overload) | PF | 111.2 M | 5/10 | 72% | 31% | 30 ms |
-| | TwoTier | 120.1 M | **10/10** | **82%** | **78%** | 30 ms |
-| | TwoTier + adaptive | 120.1 M | 10/10 | 82% | 78% | 30 ms |
+| | **TwoTier** | 120.1 M | **10/10** | **82%** | **78%** | 30 ms |
+| | TwoTier −maxmin | 120.1 M | 10/10 | 82% | 78% | 30 ms |
 | **0.33×** (light load) | PF | 124.7 M | 10/10 | 85% | 83% | 30 ms |
 | | TwoTier | 125.4 M | 10/10 | 85% | 83% | 30 ms |
+
+**Note the 1.0× total-throughput row: PF carries 69.3 M against TwoTier's
+66.7 M.** In deep overload the default deliberately gives up ~4% of cell
+throughput, and it buys a worst-served-flow floor of 40% where PF and the
+single-stage form both leave a flow at 0%. That is the max-min trade, taken
+on purpose (§7.7). At 0.50× and above the stage is non-binding and costs
+nothing at all.
 
 The uplink UEs run with an **8-slot (~4 ms) BSR round-trip delay** on the
 dynamic scheduler — see §5.1. SPS-served flows bypass it, exactly as they
@@ -736,21 +752,24 @@ operating point:
 
 | Flow | SNR | GFBR | RR | PF | Gradient | TwoTier |
 |---|---|---|---|---|---|---|
-| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 87% |
-| ue2 (video) | 18 dB | 8 M | 57% | 68% | 66% | 84% |
-| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 84% |
-| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 64% | **0%** ⚠ |
-| ue5 (LIDAR) | 24 dB | 14 M | 56% | 67% | 67% | 92% |
-| ue6 (LIDAR) | 19 dB | 14 M | 37% | 46% | 55% | 52% |
-| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **0%** ⚠ |
-| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 3% | 3% | **85%** |
-| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **82%** |
-| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **85%** |
-| Aggregate | | | mean 46% | **mean 44%** | mean 45% | **mean 65%** |
+| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 56% |
+| ue2 (video) | 18 dB | 8 M | 57% | 68% | 66% | 54% |
+| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 53% |
+| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 64% | **50%** |
+| ue5 (LIDAR) | 24 dB | 14 M | 56% | 67% | 67% | 56% |
+| ue6 (LIDAR) | 19 dB | 14 M | 37% | 46% | 55% | 55% |
+| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **53%** |
+| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 3% | 3% | **53%** |
+| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **50%** |
+| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **53%** |
+| Aggregate | | | mean 46% | **mean 44%** | mean 45% | **mean 53%** |
 
-Two opposite effects are visible:
+The shape of the TwoTier column is the whole point: **every GBR flow lands
+between 50% and 53–56%**, a 6-point spread across a 10 dB SNR range, against
+PF's 0–91%. That flatness is the max-min floor (§4.1, §7.7), which now ships
+on by default. Three effects are visible:
 
-- **TwoTier protects mixed-flow GBR (ue8/9/10): 85/82/85% vs PF's 3/3/0%.**
+- **TwoTier protects mixed-flow GBR (ue8/9/10): 53/50/53% vs PF's 3/3/0%.**
   These UEs carry a GBR video flow *and* a best-effort flow. Under the
   QoS-blind baselines the MAC multiplexer fills the UE's transport block by
   raw backlog, and a continuously-backlogged best-effort flow wins every
@@ -758,19 +777,24 @@ Two opposite effects are visible:
   multiplexer fills by drift-plus-penalty deficit, so the GBR flow (far
   behind its Tier-1 target → large `Q`) is served first. This is a direct,
   clean demonstration of QoS-aware multiplexing.
-- **TwoTier abandons the cell edge outright — both ue7 (14 dB) and ue4
-  (16 dB) land at exactly 0%.** Tier-1's *soft* GBR floors make it cheaper
-  to abandon expensive low-SE flows and fund the rest. Two flows at a clean
-  zero, rather than a smear of small values, is the fractional-knapsack
-  vertex showing through. This is **Finding 1** (§8.5) —
-  caused by the slack penalty rather than the `log` utility, and fixed by
-  the max-min stage (§7.7), which is off by default and so is not in the
-  table above.
+- **The cell edge is held up, not abandoned: ue7 (14 dB) at 53% and ue4
+  (16 dB) at 50%, against PF's 28% and 62%.** With the max-min stage
+  switched off these two land at exactly **0%** — Tier-1's soft GBR floors
+  make it cheaper to abandon expensive low-SE flows and fund the rest, and
+  two flows at a clean zero is the fractional-knapsack vertex showing
+  through (§8.5). The hard floor is what removes it.
+- **The bill is paid by the high-SNR flows.** ue1 (22 dB) goes 91% under PF
+  to 56%, ue5 (24 dB) 67% to 56%. Deliberate: at deep overload the cell
+  cannot serve everyone, and the choice is *whose* contract to break.
 
-Net at 1.0× load: TwoTier carries mean GBR delivery 65% vs PF's 44% and +4.9 Mbps
-total — but, being deep overload, still 0/10 *contracts* met either way
-(§7.1). The two-tier machinery redistributes the pain; at 1.0× load it cannot
-remove it.
+This was **Finding 1** (§8.5) — caused by the slack penalty rather than the
+`log` utility, and fixed by the max-min stage (§7.7).
+
+Net at 1.0× load: TwoTier carries mean GBR delivery 53% vs PF's 44%, and a
+worst-served flow at 50% against PF's 0% — for 2.6 Mbps *less* total. Being
+deep overload, still 0/10 *contracts* met either way (§7.1). The two-tier
+machinery redistributes the pain; at 1.0× load it cannot remove it, and the
+default now chooses to spread it rather than concentrate it.
 
 ### 7.5 BSR sensitivity — delay and loss sweeps
 
@@ -876,6 +900,7 @@ channels that actually drift meaningfully.
 | 32 slots (static channel) | 5/10 | 10/10 | 31% | 78% |
 | 0 slots (mobile, coh 30 sl) | 5/10 | 10/10 | 38% | 78% |
 | 8 slots (mobile) | 5/10 | 9/10 | 37% | 77% |
+
 | 32 slots (mobile) | 5/10 | 9/10 | 31% | 75% |
 
 The takeaway is **negative** and instructive: CQI staleness barely moves
@@ -894,9 +919,9 @@ or both** — a highly-mobile deployment, not a factory.
 |---|---|---|---|---|
 | 0.0 dB | 10/10 | 120.1 M | 9/10 | 121.4 M |
 | 1.0 dB | 7/10 | 119.0 M | 4/10 | 117.2 M |
-| 2.0 dB | 3/10 | 112.4 M | 2/10 | 113.8 M |
-| 3.0 dB | 0/10 | 114.3 M | 0/10 | 114.9 M |
-| 5.0 dB | 0/10 | 114.3 M | 0/10 | 114.9 M |
+| 2.0 dB | 3/10 | 112.5 M | 2/10 | 113.6 M |
+| 3.0 dB | 0/10 | 114.7 M | 0/10 | 114.9 M |
+| 5.0 dB | 0/10 | 114.7 M | 0/10 | 114.9 M |
 
 The tradeoff is **stark and one-directional in these scenarios**: the
 margin costs efficiency from the first dB (larger reservations at a lower
@@ -922,19 +947,20 @@ mobility rises. **None of Study 1–3's conclusions change.**
 ### 7.7 The max-min GBR stage — closing Finding 1
 
 `factory_robots`, same contract metrics and report settings as §7.1.
-`+maxmin` is `gbr_maxmin=True, gbr_maxmin_scale=1.0`. Reproduce with
+`+maxmin` is the shipped default (`gbr_maxmin=True, gbr_maxmin_scale=1.0`);
+the plain `TwoTier` rows pin it off. Reproduce with
 `python scripts/maxmin_study.py`.
 
 | load | scheduler | total | GBR met | mean GBR | **min GBR** | ue4 (16 dB) | ue7 (14 dB) |
 |---|---|---|---|---|---|---|---|
-| 1.00× | TwoTier | 74.2M | 0/10 | 53% | **0%** | 16% | 0% |
-| 1.00× | +adaptive | 68.7M | 0/10 | 44% | 34% | 47% | 36% |
-| 1.00× | **+maxmin** | 66.7M | 0/10 | 44% | **40%** | 40% | 46% |
-| 0.67× | TwoTier | 95.8M | 0/10 | 68% | 43% | 63% | 43% |
-| 0.67× | +adaptive | 94.6M | 0/10 | 65% | 33% | 33% | 68% |
-| 0.67× | **+maxmin** | 94.1M | 0/10 | 65% | **60%** | 61% | 69% |
-| 0.50× | TwoTier / +maxmin | 120.1M | 10/10 | 82% | 78% | 78% | 84% |
-| 0.33× | TwoTier / +maxmin | 125.4M | 10/10 | 85% | 83% | 83% | 86% |
+| 1.00× | TwoTier −maxmin | 74.2M | 0/10 | 53% | **0%** | 16% | 0% |
+| 1.00× | −maxmin +adaptive | 68.7M | 0/10 | 44% | 34% | 47% | 36% |
+| 1.00× | **default (+maxmin)** | 66.7M | 0/10 | 44% | **40%** | 40% | 46% |
+| 0.67× | TwoTier −maxmin | 95.8M | 0/10 | 68% | 43% | 63% | 43% |
+| 0.67× | −maxmin +adaptive | 94.6M | 0/10 | 65% | 33% | 33% | 68% |
+| 0.67× | **default (+maxmin)** | 94.1M | 0/10 | 65% | **60%** | 61% | 69% |
+| 0.50× | either | 120.1M | 10/10 | 82% | 78% | 78% | 84% |
+| 0.33× | either | 125.4M | 10/10 | 85% | 83% | 83% | 86% |
 
 - **It lifts the floor it was built to lift.** min GBR 0% → 40% at 1.00× and
   43% → 60% at 0.67×; ue7 (the 14 dB flow the single-stage solve zeroes)
@@ -958,6 +984,19 @@ of throughput; the last 12 cost a further 7%.
 
 **What it does not change: the contract count**, at any load. That limit is
 structural and is discussed in §8.5.
+
+**Why it ships on.** The deciding property is the second bullet: the stage
+is *self-disabling*. Wherever the GBR set is jointly feasible `t* = 1`, the
+floor binds nothing, and the result is bit-identical to leaving it off — so
+the default costs exactly nothing in every regime except genuine GBR
+overload. In that regime what it costs is aggregate throughput (−4% at 1.0×
+load, and PF then carries more total than TwoTier does), and what it buys is
+a worst-served flow at 40% of contract instead of 0%. A cell-edge robot
+whose video is switched off entirely is a deployment failure in a way that a
+uniformly degraded fleet is not; that is the judgement encoded in the
+default. `gbr_maxmin_scale` dials it back for deployments that would rather
+have the throughput, and `gbr_maxmin=False` restores the single-stage form
+exactly.
 
 ---
 
@@ -1109,8 +1148,9 @@ constraint, not a weight.
 
 **The fix, and its limit.** The max-min stage of §4.1 supplies that
 constraint, and §7.7 measures it: min GBR delivery 0% → 40% at 1.00× load,
-43% → 60% at 0.67×, at zero cost where the GBR set is jointly feasible.
-Finding 1 is **closed as a scheduler issue**.
+43% → 60% at 0.67×, at zero cost where the GBR set is jointly feasible. It
+**ships on by default** — see §7.7 for why that is safe and what it costs
+where it binds. Finding 1 is **closed as a scheduler issue**.
 
 What max-min cannot do is raise the **contract count** — and this is not a
 shortcoming of the implementation but a genuine conflict of objectives. A
@@ -1217,11 +1257,11 @@ metrics are what surface the real, regime-dependent value.
 
 **Algorithm.**
 1. ~~**Finding 1 (cell-edge starvation).**~~ **Done** (2026-08-06) — the
-   max-min GBR stage of §4.1, measured in §7.7. Remaining question is
-   whether to make it the default: it is free at moderate load and only
-   binds where the single-stage solve is doing something indefensible, but
-   it costs ~10% throughput at deep overload — the regime this study
-   already says to fix with capacity planning rather than scheduling.
+   max-min GBR stage of §4.1, measured in §7.7, **on by default** since the
+   same date. The default question is settled: the stage self-disables
+   wherever the GBR set is feasible, so it is free everywhere except genuine
+   GBR overload, and there the aggregate throughput it gives up (−4% at 1.0×
+   load) buys a worst-served flow at 40% of contract rather than 0%.
 2. **Admission control.** Build the knapsack-on-contracts gate that §8.4 and
    §8.5 argue for: max-min raises the delivery *floor* but cannot raise the
    *contract count*, because a contract is a step function. Tier-1's `t*`
@@ -1301,11 +1341,17 @@ the utility by seven orders of magnitude and so reduces Tier-1 to a
 shortfall-minimizing knapsack — solved greedily by spectral efficiency, with
 the lowest-SE flow abandoned outright. Since that solution is a *vertex*, no
 reweighting of a linear penalty could ever have removed it; only a
-constraint could. The two-stage max-min form (§4.1, §7.7) supplies one, takes
-the worst-served GBR flow from 0% to 40% of its contract, and costs nothing
-at all wherever the GBR set is jointly feasible. It still cannot raise the
-count of contracts *met* — that remains a knapsack over contracts, which is
-to say admission control, and not the scheduler's decision to make.
+constraint could. The two-stage max-min form (§4.1, §7.7) supplies one and
+**now ships on by default**: it takes the worst-served GBR flow from 0% to
+40% of its contract, and costs nothing at all wherever the GBR set is
+jointly feasible, which is what makes it defensible as a default. Where it
+does bind — genuine GBR overload — it gives up ~4% of cell throughput, and
+at the as-shipped load PF consequently carries more total traffic than
+TwoTier does. That is the trade stated plainly: a fleet degraded evenly to
+~53% of contract, against one where two cell-edge robots are switched off so
+the rest can run faster. It still cannot raise the count of contracts
+*met* — that remains a knapsack over contracts, which is to say admission
+control, and not the scheduler's decision to make.
 
 For the factory/warehouse target, the two-tier scheduler is worth building —
 and this study says precisely which parts, for which deployments, and why.

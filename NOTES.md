@@ -1464,3 +1464,92 @@ conditioning did not just make the answer accurate; it made the next bug
 visible.
 
 ---
+
+## 2026-08-06 — gbr_maxmin is now the default
+
+Owner's decision, taken with the tradeoff on the table. `TwoTier` now ships
+`gbr_maxmin=True, gbr_maxmin_scale=1.0`.
+
+### The case that decided it
+
+The stage is **self-disabling**. Whenever the GBR set is jointly feasible
+`t* = 1`, the floor binds nothing, and the run is bit-identical to leaving
+it off. So the default is free in every regime except genuine GBR overload —
+verified as a test, not an argument
+(`test_two_tier_maxmin_default_is_free_when_gbr_set_is_feasible`, byte-equal
+delivery on `smoke`). Confirmed at scale too: the BSR study is byte-identical
+and the CQI study moves by tenths of a Mbps, because both run at 0.50× load
+where `t* = 1`.
+
+Where it does bind, it is the difference between a fleet degraded evenly and
+a fleet with two robots switched off. That is the judgement.
+
+### What the default now looks like — `factory_robots` per-flow, 1.0× load
+
+| flow | SNR | RR | PF | Gradient | **TwoTier** |
+|---|---|---|---|---|---|
+| ue1 | 22 dB | 77% | 91% | 77% | 56% |
+| ue2 | 18 dB | 57% | 68% | 66% | 54% |
+| ue3 | 20 dB | 63% | 74% | 71% | 53% |
+| ue4 | 16 dB | 51% | 62% | 64% | **50%** |
+| ue5 | 24 dB | 56% | 67% | 67% | 56% |
+| ue6 | 19 dB | 37% | 46% | 55% | 55% |
+| ue7 | 14 dB | 23% | 28% | 41% | **53%** |
+| ue8 | 21 dB | 3% | 3% | 3% | 53% |
+| ue9 | 17 dB | 3% | 3% | 3% | 50% |
+| ue10 | 20 dB | 89% | 0% | 0% | 53% |
+| **mean** | | 46% | 44% | 45% | **53%** |
+
+**Every GBR flow between 50% and 56% — a 6-point spread over a 10 dB SNR
+range**, against PF's 0–91%. That column is the clearest single picture of
+what the two-tier design does that PF cannot.
+
+### The honest cost, stated where it will be read
+
+**At 1.0× load PF now carries more total throughput than TwoTier: 69.3 M vs
+66.7 M.** That reverses a claim the study made at every load point until
+today. It is the max-min trade taken deliberately — −4% aggregate for a
+worst-served flow at 40% of contract instead of 0% — but it is a real
+reversal and §7.1 now says so in bold rather than leaving a reader to notice.
+
+Load-by-load, default vs the single-stage form it replaces:
+
+| load | metric | −maxmin | **default** |
+|---|---|---|---|
+| 1.00× | total / mean / min GBR | 74.2 M / 53% / **0%** | 66.7 M / 44% / **40%** |
+| 0.67× | total / mean / min GBR | 95.8 M / 68% / 43% | 94.1 M / 65% / **60%** |
+| 0.50× | — | identical | identical |
+| 0.33× | — | identical | identical |
+
+GBR contract counts are unchanged at every load (0/10, 0/10, 10/10, 10/10),
+as are Studies 2 and 3 — neither has a GBR flow. The value-of-QoS hump still
+peaks at 0.50× load, 10/10 contracts against PF's 5/10; that headline is
+untouched.
+
+### Consequences for the harness
+
+- `scripts/scheduler_study.py` Study 1 now runs four rows: PF, TwoTier
+  (default), TwoTier−maxmin, and TwoTier−maxmin+adaptive. The adaptive row
+  had to be re-based on the single-stage form or it became a duplicate of
+  the default — max-min dominates it, so with both on the rows were
+  identical. §8.4's negative result needs the like-for-like baseline.
+- Three tests had to pin `gbr_maxmin=False` because they measure mechanisms
+  the floor would otherwise mask — notably
+  `test_two_tier_adaptive_penalty_helps_poor_snr_gbr`, which is precisely a
+  test that the adaptive penalty protects the poor-SNR flow. With the floor
+  on, it protects it first and the test measures nothing.
+- `test_two_tier_maxmin_disabled_by_default` became
+  `test_two_tier_maxmin_enabled_by_default`, so the default cannot be
+  flipped back silently.
+
+Tests 63 → 64.
+
+### Still not settled
+
+`gbr_maxmin_scale` stays at 1.0 — full claim on the achievable floor. The
+scale sweep at 1.0× load (§7.7) shows the curve is smooth, with the knee
+around 0.75 (min GBR 28% for 3.1% of throughput, against 40% for 10%). A
+deployment that wants the throughput back has a one-number dial, and 0.75 is
+the defensible alternative if the −4% ever becomes contentious.
+
+---

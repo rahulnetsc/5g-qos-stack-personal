@@ -141,10 +141,15 @@ def study_overload_sweep() -> None:
         "GBR contract = delivered throughput >= 95% of GFBR.\n"
     )
     base = factory_robots_scenario()
+    # TwoTier ships with the max-min GBR stage on. The two comparison rows
+    # pin it off: one isolates what the stage buys, the other keeps the
+    # adaptive-penalty negative result (section 8.4) a like-for-like
+    # comparison against the same single-stage baseline.
     scheds = [
         ("PF", _pf),
         ("TwoTier", lambda: _tt()),
-        ("TwoTier+adaptive", lambda: _tt(gbr_penalty_lr=1e5)),
+        ("TwoTier-nomaxmin", lambda: _tt(gbr_maxmin=False)),
+        ("  +adaptive", lambda: _tt(gbr_maxmin=False, gbr_penalty_lr=1e5)),
     ]
     print(
         f"{'capacity':>9}  {'scheduler':<18}{'total':>9}"

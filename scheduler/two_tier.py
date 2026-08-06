@@ -87,7 +87,7 @@ class TwoTier:
         gbr_penalty_lr: float = 0.0,
         gbr_penalty_max: float = 1e6,
         gbr_penalty_se_exponent: float = 0.0,
-        gbr_maxmin: bool = False,
+        gbr_maxmin: bool = True,
         gbr_maxmin_scale: float = 1.0,
         slice_shares: "dict[int, dict[str, float]] | None" = None,
         slice_slack_penalty: float = 1e3,
@@ -125,15 +125,22 @@ class TwoTier:
         # Spectral-efficiency tilt exponent k on the GBR slack penalty (see
         # solve_tier1): 0 = off, k>0 efficiency-first, k<0 RB-level parity.
         self.gbr_penalty_se_exponent = gbr_penalty_se_exponent
-        # Two-stage GBR protection. With gbr_maxmin=True a max-min stage runs
-        # ahead of the utility solve and pins every GBR flow at
-        # gbr_maxmin_scale * t* of its contracted floor, where t* is the
-        # largest fraction all of them can hold at once. This is the fix for
-        # cell-edge starvation: the single-stage utility form concentrates
-        # its shortfall on the lowest-SE flows, and a hard floor is what
-        # stops it. gbr_maxmin_scale trades the guarantee back for
-        # throughput -- 1.0 claims the whole achievable floor, 0.0 is the
-        # single-stage behaviour. See scheduler/tier1.py.
+        # Two-stage GBR protection, ON by default. A max-min stage runs ahead
+        # of the utility solve and pins every GBR flow at gbr_maxmin_scale *
+        # t* of its contracted floor, where t* is the largest fraction all of
+        # them can hold at once. Without it the utility solve is a
+        # shortfall-minimising knapsack that abandons the lowest-SE GBR flows
+        # outright -- a hard floor is the only thing that stops it, since
+        # reweighting a linear penalty just picks a different victim.
+        #
+        # The default is on because the stage is *self-disabling* where it is
+        # not needed: whenever the GBR set is jointly feasible t* = 1, the
+        # floor is non-binding, and the result is identical to leaving it
+        # off. It costs something only in genuine GBR overload, and there
+        # what it costs is aggregate throughput bought by starving a
+        # cell-edge flow to zero. gbr_maxmin_scale dials the guarantee back:
+        # 1.0 claims the whole achievable floor, 0.0 restores the
+        # single-stage behaviour exactly. See scheduler/tier1.py.
         self.gbr_maxmin = gbr_maxmin
         self.gbr_maxmin_scale = gbr_maxmin_scale
         # Last max-min level solved, for diagnostics/telemetry. NaN until

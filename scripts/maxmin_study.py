@@ -125,11 +125,13 @@ def study_load_sweep() -> None:
         "flow.\n"
     )
     base = factory_robots_scenario()
+    # gbr_maxmin is now the shipped default, so the single-stage form has to
+    # be asked for explicitly to keep the comparison meaningful.
     scheds = [
         ("PF", _pf),
-        ("TwoTier", lambda: _tt()),
-        ("TwoTier+adaptive", lambda: _tt(gbr_penalty_lr=1e5)),
-        ("TwoTier+maxmin", lambda: _tt(gbr_maxmin=True)),
+        ("TwoTier-nomaxmin", lambda: _tt(gbr_maxmin=False)),
+        ("TwoTier+adaptive", lambda: _tt(gbr_penalty_lr=1e5, gbr_maxmin=False)),
+        ("TwoTier (default)", lambda: _tt()),
     ]
     print(
         f"{'load':>6}  {'scheduler':<18}{'total':>8}{'GBR met':>10}"
@@ -159,8 +161,8 @@ def study_scale_sweep() -> None:
     _hr("PART 2 -- Scale sweep: the fairness/efficiency curve")
     print(
         "gbr_maxmin_scale is the fraction of the achievable max-min level t*\n"
-        "claimed as a hard floor. 0.0 == single-stage TwoTier; 1.0 == full\n"
-        "max-min protection. The point is to see what the floor costs.\n"
+        "claimed as a hard floor. 0.0 == single-stage TwoTier; 1.0 == the\n"
+        "shipped default. The point is to see what the floor costs.\n"
     )
     base = factory_robots_scenario()
     print(
@@ -170,7 +172,7 @@ def study_scale_sweep() -> None:
     for mult, label in ((1.0, "1.00x"), (2.0, "0.50x")):
         sc = _scale_capacity(base, mult)
         for scale in (0.0, 0.25, 0.5, 0.75, 1.0):
-            sched = _tt(gbr_maxmin=True, gbr_maxmin_scale=scale)
+            sched = _tt(gbr_maxmin_scale=scale)
             p = _profile(sc, run(
                 sc, sched,
                 ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS,
@@ -197,9 +199,9 @@ def study_per_flow() -> None:
     meta = _flow_meta(sc)
     snr_by_ue = {ue.ue_id: ue.mean_snr_db for ue in sc.ues}
     variants = [
-        ("TwoTier", lambda: _tt()),
-        ("maxmin", lambda: _tt(gbr_maxmin=True)),
-        ("maxmin s=0.5", lambda: _tt(gbr_maxmin=True, gbr_maxmin_scale=0.5)),
+        ("no maxmin", lambda: _tt(gbr_maxmin=False)),
+        ("default", lambda: _tt()),
+        ("s=0.5", lambda: _tt(gbr_maxmin_scale=0.5)),
         ("PF", _pf),
     ]
     results = {}

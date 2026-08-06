@@ -954,11 +954,17 @@ def _two_gbr_partial_infeasible_scenario():
 
 def test_two_tier_adaptive_penalty_helps_poor_snr_gbr():
     """Adaptive per-flow penalty (b>0) rebalances the GBR sacrifice toward
-    the poor-SNR flow, improving the worst-served GBR flow vs fixed b=0."""
+    the poor-SNR flow, improving the worst-served GBR flow vs fixed b=0.
+
+    The max-min stage is switched off here: it protects the same flow by a
+    stronger mechanism, which would mask what this test is measuring.
+    """
     fixed = run(_two_gbr_partial_infeasible_scenario(),
-                TwoTier(tier1_period_slots=2000, gbr_penalty_lr=0.0))
+                TwoTier(tier1_period_slots=2000, gbr_penalty_lr=0.0,
+                        gbr_maxmin=False))
     adaptive = run(_two_gbr_partial_infeasible_scenario(),
-                   TwoTier(tier1_period_slots=2000, gbr_penalty_lr=1e5))
+                   TwoTier(tier1_period_slots=2000, gbr_penalty_lr=1e5,
+                           gbr_maxmin=False))
 
     def min_delivery(summary):
         return min(f["delivery_ratio"] for f in summary["flows"].values())
@@ -1235,7 +1241,7 @@ def test_two_tier_maxmin_lifts_the_worst_served_gbr_flow():
     """End to end: gbr_maxmin=True raises min GBR delivery, and the gain
     lands on the poor-SNR flow that the single-stage form starves."""
     single = run(_cell_edge_starvation_scenario(),
-                 TwoTier(tier1_period_slots=2000))
+                 TwoTier(tier1_period_slots=2000, gbr_maxmin=False))
     maxmin = run(_cell_edge_starvation_scenario(),
                  TwoTier(tier1_period_slots=2000, gbr_maxmin=True))
 
@@ -1253,9 +1259,9 @@ def test_two_tier_maxmin_lifts_the_worst_served_gbr_flow():
 
 def test_two_tier_maxmin_scale_zero_matches_single_stage():
     """gbr_maxmin_scale=0 claims none of the achievable floor, so it must be
-    byte-identical to the single-stage default -- the knob's null setting."""
+    byte-identical to switching the stage off -- the knob's null setting."""
     single = run(_two_gbr_partial_infeasible_scenario(),
-                 TwoTier(tier1_period_slots=2000))
+                 TwoTier(tier1_period_slots=2000, gbr_maxmin=False))
     zero = run(_two_gbr_partial_infeasible_scenario(),
                TwoTier(tier1_period_slots=2000, gbr_maxmin=True,
                        gbr_maxmin_scale=0.0))
@@ -1263,14 +1269,36 @@ def test_two_tier_maxmin_scale_zero_matches_single_stage():
         assert zero["flows"][fk]["bytes_delivered"] == m["bytes_delivered"]
 
 
-def test_two_tier_maxmin_disabled_by_default():
-    """The stage is opt-in: the default scheduler never solves it."""
+def test_two_tier_maxmin_enabled_by_default():
+    """The stage is on by default, and the default solves it for real.
+
+    It is safe as a default because it self-disables: whenever the GBR set
+    is jointly feasible t* == 1 and the floor binds nothing. Guarded here so
+    the default cannot be flipped back silently.
+    """
     from sim.scenarios import overload_scenario
 
     sched = TwoTier(tier1_period_slots=2000)
+    assert sched.gbr_maxmin is True
+    assert sched.gbr_maxmin_scale == 1.0
     run(overload_scenario(), sched)
-    assert sched.gbr_maxmin is False
-    assert sched.maxmin_level != sched.maxmin_level  # NaN -- never solved
+    # A level was actually solved (not the NaN sentinel) and is a fraction.
+    assert sched.maxmin_level == sched.maxmin_level
+    assert 0.0 <= sched.maxmin_level <= 1.0
+
+
+def test_two_tier_maxmin_default_is_free_when_gbr_set_is_feasible():
+    """The default must not cost anything on a workload whose GBR floors all
+    fit -- that is the whole justification for having it on."""
+    from sim.scenarios import smoke_scenario
+
+    on = run(smoke_scenario(), TwoTier(tier1_period_slots=2000))
+    off = run(smoke_scenario(), TwoTier(tier1_period_slots=2000,
+                                        gbr_maxmin=False))
+    for fk, m in off["flows"].items():
+        assert on["flows"][fk]["bytes_delivered"] == m["bytes_delivered"], (
+            f"{fk}: the max-min default changed a feasible-GBR workload"
+        )
 
 
 # --- Tier-1 numerical accuracy (the two-phase lexicographic form) -----------

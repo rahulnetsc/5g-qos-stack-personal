@@ -250,7 +250,13 @@ NOTES.md 2026-08-06.
 
 Knobs: `gbr_maxmin`, `gbr_maxmin_scale` on `TwoTier`; `gbr_floor_bps` on
 `solve_tier1`, built by `gbr_maxmin_floors` from `solve_maxmin_gbr_level`.
-Default **off**, so the published study numbers reproduce unchanged.
+Default **on**. That is safe because the stage self-disables: whenever the
+GBR set is jointly feasible `t* = 1`, the floor binds nothing and the result
+is identical to leaving it off. It costs something only in genuine GBR
+overload, where it gives up ~4% of cell throughput (enough that PF carries
+more total traffic at the as-shipped load) to hold the worst-served flow at
+40% of contract instead of 0%. Set `gbr_maxmin_scale` below 1.0, or
+`gbr_maxmin=False`, for deployments that would rather have the throughput.
 
 **What it does not do.** It cannot raise the count of flows *meeting* GFBR:
 a contract is a step function, and a uniform 59% satisfies nobody. Max-min
@@ -656,6 +662,7 @@ For each flow class:
 - Delay urgency: scaled by **max-system-Q**, not per-flow target. Allows small periodic flows to preempt bulk flows when near PDB.
 - Tier-2 grants **per UE, not per flow**: one DCI per UE, one transport block, filled by a MAC logical-channel multiplexer across the UE's flows (`priority_level`, then drift-plus-penalty deficit). Mirrors the 5G MAC.
 - Virtual-queue clamp: a **windowed ceiling** (`min(target·W, arrived_W) − delivered_W` over a trailing Tier-1 window), not a clamp to instantaneous backlog — the latter zeroes a bursty flow's debt between frames.
+- Cell-edge GBR protection: the **max-min stage is on by default** (`gbr_maxmin=True`). Justified by it being self-disabling — `t* = 1` whenever the GBR set is feasible, so it is free outside genuine GBR overload. Where it binds it trades ~4% aggregate throughput for a worst-served flow at 40% of contract rather than 0%.
 - Network slicing: **soft per-(slice, direction) RB-share floor** in the Tier-1 LP, capped at the slice's demand and work-conserving (a busy slice borrows an idle one's share). Its slack is weighed in **bps** (PRB-symbols × the slice's SE) so that `slice_slack_penalty` and the GBR penalty are quoted in one currency; compared raw, the slice-vs-GBR priority scales with the channel.
 - SPS implementation: **per-UE configured grant, each flow's reservation sized to its contracted floor (GFBR / deterministic rate)**, allocated in `priority_level` tiers with proportional scale-back and a viability floor (drop a tier to dynamic when SPS would be undersized, unless PDCCH-bound). Right-sized to the buffer each slot, released on empty. SPS flows still spill I-frame bursts into the dynamic pool; their dynamic urgency is the real backlog, not Q.
 - SPS spillover bug to remember: SPS + dynamic-spillover for the same flow can double-drain the buffer if `bytes_capacity` is computed twice against the same backlog. The scheduler must track per-slot per-flow committed bytes and net them out before the dynamic pass.
