@@ -1542,7 +1542,7 @@ def test_documented_defaults_match_the_code():
         "bsr_lag_slots": 0,
         "demand_track_gain_up": 0.5,
         "demand_track_gain_down": 0.1,
-        "apply_demand_cap": True,
+        "apply_demand_cap": False,
     }
     actual = inspect.signature(TwoTier.__init__).parameters
     assert set(documented) == set(actual) - {"self"}, (

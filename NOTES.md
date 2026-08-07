@@ -2249,3 +2249,83 @@ by a BSR-derived estimate, and the same windowed ceiling in Tier-2 already
 doing the real work.
 
 ---
+
+## 2026-08-07 — apply_demand_cap=False shipped; full re-measure after the fidelity work
+
+`apply_demand_cap` now defaults to `False`. With that, every study re-run
+against the cumulative effect of today's three changes: UE-side uplink LCP,
+5QI-derived priorities, and the demand-cap removal.
+
+### Study 1 — the headline result is substantially weakened
+
+| load | scheduler | before today | after |
+|---|---|---|---|
+| 1.00× | PF | 69.3M, 0/10, 37%, min 0% | 69.3M, **1/10**, **51%**, min 1% |
+| | TwoTier | 66.7M, 0/10, 44%, min 40% | 65.9M, 0/10, 49%, **min 44%** |
+| 0.67× | PF | 93.9M, 4/10, 55%, min 4% | **96.5M**, **6/10**, **69%**, **min 21%** |
+| | TwoTier | 94.1M, 0/10, 65%, min 60% | 93.2M, **1/10**, 71%, **min 67%** |
+| 0.50× | PF | 111.2M, 5/10, 72%, min 31% | **116.8M**, **8/10**, **80%**, **min 52%** |
+| | TwoTier | 120.1M, 10/10, 82%, min 78% | 119.4M, 10/10, 83%, min 81% |
+| 0.33× | both | 10/10 | 10/10 |
+
+**PF improved sharply and TwoTier barely moved.** The paper's central number
+— "10/10 GBR contracts against PF's 5/10 at 0.50× load" — is now **10/10
+against 8/10**. At 0.67× load PF meets **6/10** against TwoTier's 1/10, so on
+contract count PF is now ahead at three of the four load points.
+
+The cause is the uplink fix, not the demand cap: the UE's PBR bucket protects
+a GBR flow from the best-effort flow sharing its UE, and that protection is a
+*configuration* item every scheduler gets for free. We were previously
+crediting the two-tier design for it.
+
+**What survives, and it is not nothing.** TwoTier's advantage is now almost
+entirely *distributional* rather than contract-count:
+
+| load | min GBR: PF | min GBR: TwoTier |
+|---|---|---|
+| 1.00× | 1% | **44%** |
+| 0.67× | 21% | **67%** |
+| 0.50× | 52% | **81%** |
+
+Per-flow at 1.0×, TwoTier spans 53–89% while PF spans 1–100%. So the honest
+claim is no longer "meets more contracts" but "does not abandon anyone" —
+which is the max-min floor doing exactly what it was built for, and is a
+weaker but more defensible claim.
+
+### Studies 2 and 3 are untouched — and they are the load-bearing ones
+
+| | before | after |
+|---|---|---|
+| Study 2, on-time | TwoTier 30/30, PF 2/30 | **unchanged** |
+| Study 3, on-time | TwoTier 8/8, PF 5/8 | **unchanged** |
+| Study 3, TwoTier p99 | 10.5 ms | **4.5 ms** (improved) |
+| Study 3, bulk DL | 15.2 M | 13.2 M |
+
+Neither scenario has a multi-flow uplink UE, so neither was exposed to the
+fidelity error. **The two results the study calls load-bearing — configured
+grants and deadline awareness — are exactly the two that survived
+untouched.** That is a good sign for the design and a bad sign for how much
+of Study 1's margin was real.
+
+### A correction to how this relates to OAI
+
+Removing the demand cap does **not** move us closer to the OAI port. OAI
+*has* the cap (`glp_set_col_bnds(..., GLP_DB, 0.0, demand_bps)`), fed by a
+BSR-derived estimate with EWMA smoothing. So:
+
+- **UL LCP and 5QI priorities**: closer to reality *and* closer to OAI, which
+  already models both correctly. These close a gap where the simulator was
+  the less faithful of the two.
+- **Demand-cap removal**: closer to correct, *further from OAI as built*. It
+  is a change the port should adopt, not one that aligns us with it. Added to
+  design-docs/oai-phase1-review.md as a fifth item.
+
+### The paper is now materially stale
+
+Abstract, §7.1, §7.4, §7.7, §8.1 and §8.5 all quote numbers that have moved,
+and the abstract's headline claim has weakened from 5/10 to 8/10. This needs
+a decision rather than a mechanical find-and-replace: the *story* changes
+from "honours contracts PF misses" to "refuses to abandon flows PF
+abandons". Not yet done.
+
+---

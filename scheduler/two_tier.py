@@ -99,7 +99,7 @@ class TwoTier:
         bsr_lag_slots: int = 0,
         demand_track_gain_up: float = 0.5,
         demand_track_gain_down: float = 0.1,
-        apply_demand_cap: bool = True,
+        apply_demand_cap: bool = False,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -211,9 +211,17 @@ class TwoTier:
         self.bsr_lag_slots = max(0, int(bsr_lag_slots))
         self.demand_track_gain_up = demand_track_gain_up
         self.demand_track_gain_down = demand_track_gain_down
-        # Whether Tier-1 caps each flow at its offered load at all. See
-        # solve_tier1 -- the cap is what converts a demand under-estimate into
-        # unrecoverable starvation, and the log utility may already do its job.
+        # Whether Tier-1 caps each flow at its offered load at all.
+        #
+        # OFF by default (2026-08-07). The cap was redundant: Tier-2's windowed
+        # ceiling already clamps a flow's virtual queue to what actually
+        # arrived, so a quiet flow is never scheduled however generous its
+        # Tier-1 target -- and the ceiling does it from *observation* where the
+        # cap needed a *prediction*. Requiring that prediction was the whole
+        # reason Tier-1 had to estimate demand from delayed, lossy BSRs with an
+        # unobservable discard term, and a cap that collapses is what turns an
+        # estimation error into unrecoverable starvation. Measured free to
+        # remove on both study scenarios. See NOTES.md 2026-08-07.
         self.apply_demand_cap = apply_demand_cap
         self._buf_est: dict[tuple[int, int], float] = {}
         self._buf_hist: dict[tuple[int, int], deque] = {}
