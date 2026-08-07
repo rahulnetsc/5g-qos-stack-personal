@@ -570,7 +570,7 @@ measured, and defaulted off, with the negative result cited.
 | `pᵢ` | `gbr_penalty_init` | `1e3` | decided | Per-flow weight on GBR shortfall in B1. Since B1/B2 are lexicographic, only the *ratio* between flows matters — the absolute value is inert. |
 | `p_slice` | `slice_slack_penalty` | `1e3` | deployment | Weight on slice-floor shortfall, in the same bps currency as `pᵢ`. At parity a bit denied to a slice floor costs the same as a bit denied to a GBR floor. Whether tenant slice guarantees *should* rank equal with per-flow GBR guarantees is a policy call. |
 | `φ(σ,d)` | `slice_shares` | `None` | deployment | `{slice_id: {"DL": frac, "UL": frac}}`. Guaranteed, work-conserving share of each direction's capacity. `None` disables slicing. |
-| — | `capacity_safety_factor` | `1.0` | deployment | Scales `C_d`. Headroom for control overhead the model does not itemise. `solve_tier1` only. |
+| — | `capacity_safety_factor` | `1.0` | deployment | Scales `C_d` in both LP stages (max-min and utility). Typical deployment values 0.85–0.95 shave headroom for control overhead, HARQ retransmits, and interference not itemised in the sim. See §6.1 for how peak vs achievable capacity relate. |
 | `b` | `gbr_penalty_lr` | `0.0` | **rejected** | Dual-ascent learning rate on `pᵢ`. Equalises normalised shortfall, which is the wrong objective for a step-function contract — §8.4. |
 | — | `gbr_penalty_max` | `1e6` | rejected | Cap on the adaptive `pᵢ`. Inert while `gbr_penalty_lr = 0`. Hitting it is the admission-control reject signal. |
 | `k` | `gbr_penalty_se_exponent` | `0.0` | **rejected** | Tilts `pᵢ` by `(SEᵢ/SE_max)^k`. `k < 0` relocates starvation rather than removing it — §8.4, §8.5. |
@@ -614,7 +614,7 @@ nothing else.**
 | **PDCCH/CCE budget** per slot, with variable DCI aggregation level | HARQ as a fixed delay + BLER discount, not a full state machine |
 | **UL Buffer Status Report round-trip** as a fixed per-flow delay (8 slots ≈ 4 ms at μ=1) + Bernoulli loss; Configured Grants bypass | BSR quantisation not modelled (delay + loss capture the first-order effect) |
 | **DL/UL CQI report round-trip** as a per-UE delay + Bernoulli loss; scheduler reads `get_reported_snr_db`, driver applies mismatch-BLER (`bler_for_mcs`) at the true SNR against the picked MCS; SPS uses a semi-static conservative MCS (`sps_snr_margin_db`) | CQI quantisation is implicit in the SNR→MCS staircase; direction-agnostic (see §7.6 for the effect on our scenarios — small) |
-| Per-UE SNR as an AR(1) process → MCS → bits/PRB | RLC as a fluid byte buffer, no per-packet segmentation |
+| Per-UE SNR as an AR(1) process → MCS → bits/PRB via a **0.75 × Shannon staircase** (`_MCS_TABLE` in [`scheduler/link.py`](../scheduler/link.py)), capped at 7.5 bits/RE (~5.8 bps/Hz effective) at 31 dB. Typical factory UEs at 22 dB sit at 4.5 bits/RE; cell-edge at 14 dB at 2.0. See §6.1 for the resulting per-scenario throughput ceilings. **Roadmap:** replace with a real 3GPP TBS extract for absolute-claim credibility. | RLC as a fluid byte buffer, no per-packet segmentation |
 | BLER as a discount on delivered bits | Single-stream only — no MU-MIMO |
 | Per-flow buffers with HoL timestamps and PDB expiry | Single cell — no mobility, no inter-cell interference |
 
@@ -696,6 +696,46 @@ load around that point (§7.1). In sim terms this is done by scaling the
 carrier bandwidth (an equivalent knob); the tables express the sweep as
 load × the as-shipped operating point, matching how an operator sees the
 axis in a real deployment where capacity is fixed by spectrum.
+
+#### 6.1.1 RAN parameters per scenario
+
+The scenarios share the sim's fidelity discipline (§5.1) but differ in
+carrier, TDD pattern, and numerology. "Peak" is the ceiling MCS at the
+top of the [MCS table](../scheduler/link.py) (SE = 7.5 bits/RE ≈ 5.8 bps/Hz
+effective at 31 dB SNR — nothing in these scenarios reaches it).
+"Typical" uses SE = 4.5 bits/RE, roughly what a 22 dB UE gets (QAM64
+region), which is where the good-channel factory UEs actually sit; the
+cell-edge UEs at 14–16 dB get SE 2.0–2.75 and half or less of these
+figures. Peak and typical are read as *directional* throughputs — the
+same TDD cell serves both DL and UL, not either at its own peak
+simultaneously.
+
+| Scenario | BW | μ | TDD | PRBs | peak DL | peak UL | typical DL | typical UL |
+|---|---|---|---|---|---|---|---|---|
+| `smoke` | 30 MHz | 1 | DSUUU | 83 | 39 M | 120 M | 23 M | 72 M |
+| `overload` | 10 MHz | 1 | DSUUU | 27 | 13 M | 39 M | 8 M | 23 M |
+| `vision` | 30 MHz | 1 | DSUUU | 83 | 39 M | 120 M | 23 M | 72 M |
+| `sensor_dense` | 30 MHz | 1 | DSUUU | 83 | 39 M | 120 M | 23 M | 72 M |
+| `latency_bound` | 40 MHz | 1 | DDDSU | 111 | **168 M** | 48 M | 101 M | 29 M |
+| **`factory_robots`** | **40 MHz** | 2 | DSUUU | 55 | 51 M | **158 M** | 31 M | 95 M |
+
+The two headline scenarios (`factory_robots`, `latency_bound`) use 40 MHz
+— the private-5G reference. `overload` is a deliberately small cell used
+for the stress-overload sanity checks. The 30 MHz DSUUU scenarios pre-date
+the "40 MHz is the private-5G default" convergence; they are kept for
+back-compat with earlier results and are perfectly adequate for the
+mechanism these scenarios test (PDCCH-bound sensor_dense) since the
+control-plane bottleneck is orthogonal to the data-channel ceiling. A
+site with a fixed 40 MHz allocation can hold `factory_robots`'
+as-shipped UL demand (~92 Mbps GBR floor) once the load is at the ≤ 0.5×
+shipped point of §7.1 — matching the demand ≈ capacity moderate-overload
+band where the two-tier scheduler wins.
+
+The **`capacity_safety_factor`** knob (§4.5) shaves this budget
+symmetrically in both LP stages; a deployment sets it to ~0.85–0.95 to
+carve out real HARQ / retransmit / control overhead the sim does not
+itemise. Default here is 1.0 (raw grid), so peak and typical numbers in
+the table above are un-shaved.
 
 ### 6.2 Schedulers compared
 

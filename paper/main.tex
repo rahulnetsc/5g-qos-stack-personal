@@ -485,10 +485,18 @@ Three workloads isolate three bottlenecks. \texttt{factory\_robots}: 10
 mobile robots, 24 flows---uplink camera and LIDAR (GBR), downlink
 motion-control (Delay), best-effort uploads and a TCP flow---with an SNR
 spread of 14--24\,dB and uplink demand roughly twice carrier capacity as
-shipped. \texttt{sensor\_dense}: 30 small periodic uplink sensors with a
-15\,ms PDB, sized so the control channel binds before the data channel.
-\texttt{latency\_bound}: 8 interactive 5\,Mbps streams with a 12\,ms PDB
-sharing a saturated downlink with 80\,Mbps of bulk.
+shipped. Carrier: 40\,MHz, numerology $\mu=2$, DSUUU TDD (uplink-heavy).
+\texttt{sensor\_dense}: 30 small periodic uplink sensors with a 15\,ms
+PDB, sized so the control channel binds before the data channel.
+Carrier: 30\,MHz, $\mu=1$, DSUUU. \texttt{latency\_bound}: 8 interactive
+5\,Mbps streams with a 12\,ms PDB sharing a saturated downlink with
+80\,Mbps of bulk. Carrier: 40\,MHz, $\mu=1$, DDDSU (downlink-heavy).
+
+The MCS staircase is a fitted $0.75\times$ Shannon curve capped at
+7.5\,bits/RE ($\approx$5.8\,bps/Hz effective) at 31\,dB. A typical
+factory UE at 22\,dB sits at 4.5\,bits/RE; a cell-edge UE at 14\,dB at
+2.0. This is deliberately approximate---good enough for the
+comparative claims here; a 3GPP TBS extract is future work.
 
 The load sweep varies offered load around the shipped operating point.
 Because capacity in a real deployment is fixed by spectrum, we report the

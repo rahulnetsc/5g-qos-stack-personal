@@ -1637,3 +1637,49 @@ nobody had re-run since the formulation changed underneath it.
 Every quantitative claim in `paper/main.tex` now maps to a committed script.
 
 ---
+
+## 2026-08-07 — RAN assumptions surfaced; capacity_safety_factor on TwoTier
+
+Housekeeping after a reader-level question: what bandwidth / TDD / MCS the
+sim actually uses. Three things landed together.
+
+**`capacity_safety_factor` promoted to a TwoTier knob.** It was a
+`solve_tier1` kwarg from the start, listed as *deployment* in
+scheduler-study.md §4.5 but not forwarded through `TwoTier.__init__`,
+so users could only reach it via the LP directly. `TwoTier` now accepts
+and forwards it to both LP stages (max-min and utility). Added to
+`scheduler/scheduler_config.yaml`; §4.5 row updated to drop the
+"`solve_tier1` only" caveat. Two new tests
+(`test_tier1_capacity_safety_factor_shaves_targets` and
+`test_two_tier_forwards_capacity_safety_factor`) lock in the shaving
+behaviour at both surfaces. Default stays 1.0, so all existing study
+numbers are byte-identical.
+
+**RAN parameters per scenario, tabulated.** New §6.1.1 in
+scheduler-study.md carries a per-scenario table (BW, μ, TDD, PRB count,
+peak DL/UL Mbps at the MCS ceiling, typical DL/UL at SE = 4.5 bits/RE
+which is a 22 dB UE in QAM64). Numbers computed via
+`grid_capacity_prbsym_per_sec` — reproducible. Adds one paragraph on the
+"40 MHz as private-5G default" convergence: `factory_robots` and
+`latency_bound` are already there; `smoke`/`vision`/`sensor_dense` are on
+30 MHz for back-compat and it doesn't matter for the PDCCH-bound
+mechanism they test. Same content, compact form, in the paper's §V-B
+(`paper/main.tex`).
+
+**MCS staircase called out in §5.1.** The 0.75-of-Shannon fit, its
+7.5 bits/RE cap ($\approx$5.8 bps/Hz effective at 31 dB), and the
+typical-factory-UE landing at 4.5 bits/RE were previously invisible
+outside a code comment. §5.1's fidelity table now names all three, with
+"replace with 3GPP TBS extract" left as a Roadmap item.
+
+None of this changed any study number. It closes a genuine reader-level
+gap flagged by the reasonable "40 MHz × 8 bps/Hz = 320 Mbps" mental
+model, which our peak arithmetic doesn't hit for three separately-
+identifiable reasons (TDD split, 0.75 fit, and typical UE SNRs sitting
+below the ceiling MCS) — all now written down.
+
+Tests 66 → 67. Paper PDF is one build behind: main.tex is current, but
+tectonic/latexmk aren't installed on this workstation. Rebuild with
+`cd paper && make` on a TeX host before submitting.
+
+---

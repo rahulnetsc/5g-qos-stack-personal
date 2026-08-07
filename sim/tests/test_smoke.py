@@ -444,6 +444,59 @@ def test_tier1_protects_gbr_under_overload():
     )
 
 
+def test_tier1_capacity_safety_factor_shaves_targets():
+    """A capacity_safety_factor < 1 shaves the LP's PRB budget symmetrically.
+    Under overload where the LP would otherwise saturate DL, the total of
+    per-flow targets must fall roughly in proportion."""
+    from sim.config import TDDConfig
+    grid = ResourceGrid(CarrierConfig(numerology=1, bandwidth_hz=10_000_000), TDDConfig())
+    flows = [
+        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF",
+                   traffic_kind="poisson",
+                   traffic_params={"rate_bps": 50_000_000}),
+        FlowConfig(ue_id=2, qfi=9, direction="DL", flow_class="PF",
+                   traffic_kind="poisson",
+                   traffic_params={"rate_bps": 50_000_000}),
+    ]
+    common = dict(
+        flows=flows,
+        snr_db_per_ue={1: 20.0, 2: 20.0},
+        grid=grid,
+        demand_bps={(1, 9): 50_000_000, (2, 9): 50_000_000},
+    )
+    t_full = solve_tier1(**common, capacity_safety_factor=1.0)
+    t_shaved = solve_tier1(**common, capacity_safety_factor=0.5)
+    total_full = sum(t_full.values())
+    total_shaved = sum(t_shaved.values())
+    # 0.5 factor should cut total rate by ~half (within ~5% for solver
+    # slack). The direction matters most: shaved < full, and specifically
+    # near half.
+    assert total_shaved < total_full * 0.6, (
+        f"safety_factor=0.5 should shave total ~half; got "
+        f"{total_shaved/1e6:.1f} Mbps vs {total_full/1e6:.1f} Mbps"
+    )
+    assert total_shaved > total_full * 0.4
+
+
+def test_two_tier_forwards_capacity_safety_factor():
+    """TwoTier(capacity_safety_factor=…) must reach solve_tier1. Inspected
+    at the Tier-1 target-rate layer (Tier-2 tracks these; the actual sim
+    PRB budget is unchanged, so end-to-end delivery only shifts if
+    Tier-1's shaved targets no longer saturate the grid)."""
+    scen = _overload_scenario()
+    tt_full = TwoTier(tier1_period_slots=2000, gbr_maxmin=False)
+    tt_shaved = TwoTier(tier1_period_slots=2000, gbr_maxmin=False,
+                        capacity_safety_factor=0.5)
+    run(scen, tt_full)
+    run(scen, tt_shaved)
+    full_total = sum(tt_full._targets_bps.values())
+    shaved_total = sum(tt_shaved._targets_bps.values())
+    assert shaved_total < full_total * 0.7, (
+        f"capacity_safety_factor=0.5 should shave the LP's total target ~half; "
+        f"got {shaved_total/1e6:.1f} Mbps vs {full_total/1e6:.1f} Mbps"
+    )
+
+
 def test_grid_capacity_helper():
     """Capacity computation should be > 0 and respect TDD pattern."""
     from sim.config import TDDConfig
@@ -1479,6 +1532,7 @@ def test_documented_defaults_match_the_code():
         "gbr_penalty_se_exponent": 0.0,
         "gbr_maxmin": True,
         "gbr_maxmin_scale": 1.0,
+        "capacity_safety_factor": 1.0,
         "slice_shares": None,
         "slice_slack_penalty": 1e3,
     }
@@ -1492,10 +1546,12 @@ def test_documented_defaults_match_the_code():
             f"scheduler-study.md 4.5 documents {want!r}"
         )
 
-    # capacity_safety_factor is documented as a solve_tier1-only knob.
+    # capacity_safety_factor lives on both surfaces -- solve_tier1 accepts
+    # it directly, TwoTier forwards it (added late so it wasn't in the
+    # original 17-knob table). Defaults must match.
     t1 = inspect.signature(solve_tier1).parameters
     assert t1["capacity_safety_factor"].default == 1.0
-    assert "capacity_safety_factor" not in actual
+    assert actual["capacity_safety_factor"].default == 1.0
 
     # Section 5.1: the fidelity knobs default to perfect information, so a
     # unit test never has to reason about report latency...

@@ -65,6 +65,14 @@ gbr_maxmin: true
 # contentious (see NOTES.md 2026-08-06 for the cost curve).
 gbr_maxmin_scale: 1.0
 
+# Scales the LP's per-direction PRB-symbol budget. 1.0 = raw grid
+# capacity. Typical deployment values 0.85-0.95, shaving headroom for
+# control-plane overhead / HARQ retransmits / interference not itemised
+# in the sim. Both stages (max-min and utility) see the scaled budget,
+# so it's a symmetric budget-tightening knob, not a way to bias one
+# stage against the other. See scheduler-study.md §4.5 / §6.1.
+capacity_safety_factor: 1.0
+
 # ─── Tier-1: network slicing (optional) ─────────────────────────────────
 # Per-slice share of PRB-symbol capacity per direction, as a soft floor
 # in phase 1. `null` (unset) disables slicing entirely.

@@ -89,6 +89,7 @@ class TwoTier:
         gbr_penalty_se_exponent: float = 0.0,
         gbr_maxmin: bool = True,
         gbr_maxmin_scale: float = 1.0,
+        capacity_safety_factor: float = 1.0,
         slice_shares: "dict[int, dict[str, float]] | None" = None,
         slice_slack_penalty: float = 1e3,
     ) -> None:
@@ -143,6 +144,13 @@ class TwoTier:
         # single-stage behaviour exactly. See scheduler/tier1.py.
         self.gbr_maxmin = gbr_maxmin
         self.gbr_maxmin_scale = gbr_maxmin_scale
+        # Scales the LP's per-direction PRB-symbol budget in both stages
+        # (max-min and utility). 1.0 = the sim's raw grid capacity;
+        # <1.0 shaves off headroom for control-plane / HARQ / retransmit
+        # overhead the model does not itemise (typical deployment values
+        # 0.85-0.95). See `scheduler-study.md` §4.5 and scenario RAN table
+        # in §6.1 for how peak vs achievable capacity relate.
+        self.capacity_safety_factor = capacity_safety_factor
         # Last max-min level solved, for diagnostics/telemetry. NaN until
         # the first Tier-1 solve; stays NaN when gbr_maxmin is off.
         self.maxmin_level = float("nan")
@@ -201,6 +209,7 @@ class TwoTier:
                 snr_db_per_ue=snr_in,
                 grid=self._grid,
                 demand_bps=self._demand_bps,
+                capacity_safety_factor=self.capacity_safety_factor,
                 slice_shares=self.slice_shares,
                 slice_slack_penalty=self.slice_slack_penalty,
             )
@@ -217,6 +226,7 @@ class TwoTier:
             grid=self._grid,
             demand_bps=self._demand_bps,
             gbr_slack_penalty=self._gbr_penalty,
+            capacity_safety_factor=self.capacity_safety_factor,
             se_penalty_exponent=self.gbr_penalty_se_exponent,
             slice_shares=self.slice_shares,
             slice_slack_penalty=self.slice_slack_penalty,
