@@ -26,6 +26,13 @@ OAI integration is planned but not yet started.
   Tier-2 metric, OAI integration plan).
 - [design-docs/simulator-design.md](design-docs/simulator-design.md) — what
   the simulator models and (more importantly) what it deliberately doesn't.
+- [scheduler/HOWTO.md](scheduler/HOWTO.md) — for a gNB developer wiring
+  this scheduler into OpenAirInterface (or any other gNB codebase): the
+  four structural views to satisfy from host structs, per-slot integration,
+  Tier-1 threading pattern, configuration binding, and the deviations to
+  expect vs the sim. Its companion is
+  [scheduler/scheduler_config.yaml](scheduler/scheduler_config.yaml) —
+  the reference/default config for `TwoTier` with per-parameter comments.
 
 The design docs have `[OPEN]` markers on remaining decisions.
 
@@ -97,6 +104,9 @@ required. Full results and a build/don't-build decision table are in
 │   ├── scheduler-design.md
 │   └── simulator-design.md
 ├── scheduler/                    the two-tier scheduler — a self-contained library
+│   ├── HOWTO.md                  gNB-developer guide: integrating into OAI / other gNB
+│   ├── scheduler_config.yaml     reference/default TwoTier config, per-parameter comments
+│   ├── config_loader.py          YAML -> TwoTier kwargs (lazy PyYAML import)
 │   ├── flow.py                   FlowConfig: per-flow QoS / traffic descriptor
 │   ├── link.py                   link adaptation (SNR -> bits/PRB, PDCCH AL)
 │   ├── interfaces.py             Allocation + Scheduler / slot / buffer / channel views
