@@ -42,7 +42,9 @@ from sim.config import ScenarioConfig, UEConfig
 from sim.driver import run
 from sim.scenarios import factory_robots_scenario
 from sim.baselines.pf import ProportionalFair
-from scheduler import TwoTier
+from scheduler import load_two_tier
+
+SCHEDULER_CONFIG = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
 
 GBR_CONTRACT_FRACTION = 0.95
 
@@ -65,12 +67,7 @@ def _pf():
 
 
 def _tt(sps_margin_db: float = 0.0):
-    return TwoTier(
-        tier1_period_slots=2000,
-        delay_urgency_weight=4.0,
-        delay_exponent=2.0,
-        sps_snr_margin_db=sps_margin_db,
-    )
+    return load_two_tier(SCHEDULER_CONFIG, sps_snr_margin_db=sps_margin_db)
 
 
 def _scale_capacity(scenario: ScenarioConfig, mult: float) -> ScenarioConfig:

@@ -37,7 +37,9 @@ from sim.config import ScenarioConfig
 from sim.driver import run
 from sim.scenarios import factory_robots_scenario
 from sim.baselines.pf import ProportionalFair
-from scheduler import TwoTier
+from scheduler import load_two_tier
+
+SCHEDULER_CONFIG = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
 
 # Same contract definitions and channel-report settings as
 # scripts/scheduler_study.py, so numbers are directly comparable.
@@ -54,11 +56,8 @@ def _pf():
     return ProportionalFair(ewma_window_slots=200)
 
 
-def _tt(**kw):
-    return TwoTier(
-        tier1_period_slots=2000, delay_urgency_weight=4.0,
-        delay_exponent=2.0, **kw,
-    )
+def _tt(**overrides):
+    return load_two_tier(SCHEDULER_CONFIG, **overrides)
 
 
 def _scale_capacity(scenario: ScenarioConfig, mult: float) -> ScenarioConfig:

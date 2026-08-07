@@ -36,7 +36,13 @@ from sim.scenarios import (
 )
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
-from scheduler import TwoTier
+from scheduler import load_two_tier
+
+# TwoTier is configured from the reference YAML in scheduler/, so every
+# study run uses the shipped defaults documented alongside the code
+# (see scheduler/scheduler_config.yaml). Sensitivity rows override
+# individual keys via kwargs to load_two_tier.
+SCHEDULER_CONFIG = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
 
 # GBR rate contract is "met" at >= this fraction of GFBR.
 GBR_CONTRACT_FRACTION = 0.95
@@ -63,11 +69,8 @@ def _pf():
     return ProportionalFair(ewma_window_slots=200)
 
 
-def _tt(**kw):
-    return TwoTier(
-        tier1_period_slots=2000, delay_urgency_weight=4.0,
-        delay_exponent=2.0, **kw,
-    )
+def _tt(**overrides):
+    return load_two_tier(SCHEDULER_CONFIG, **overrides)
 
 
 def _flow_meta(scenario: ScenarioConfig) -> dict:

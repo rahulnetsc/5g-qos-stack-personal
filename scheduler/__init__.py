@@ -28,6 +28,7 @@ from .tier1 import (
     solve_tier1,
 )
 from .two_tier import TwoTier
+from .config_loader import load_two_tier, load_two_tier_config
 
 __all__ = [
     "FlowConfig",
@@ -48,4 +49,6 @@ __all__ = [
     "grid_capacity_prbsym_per_sec",
     "estimate_demand_bps",
     "TwoTier",
+    "load_two_tier",
+    "load_two_tier_config",
 ]
