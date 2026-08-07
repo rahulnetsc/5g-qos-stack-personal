@@ -6,6 +6,7 @@ mixed result, the three fidelity corrections, and the adoption decision.
 | file | what it is |
 |---|---|
 | `build_deck.py` | the source of truth — the deck is generated, never hand-edited |
+| `eq/` | equations typeset by LaTeX, cached by content hash |
 | `two-tier-scheduler.pptx` | the deck |
 | `two-tier-scheduler.pdf` | same, for reading without PowerPoint |
 
@@ -13,9 +14,24 @@ mixed result, the three fidelity corrections, and the adoption decision.
 make        # rebuild both
 ```
 
-`build_deck.py` needs `python-pptx` on the *system* interpreter
-(`pip install --user python-pptx`) — it is not a project dependency, since the
-deck is not part of the simulator. The PDF step needs LibreOffice.
+`build_deck.py` needs `python-pptx` and `pillow` on the *system* interpreter
+(`pip install --user python-pptx pillow`) — they are not project dependencies,
+since the deck is not part of the simulator. The PDF step needs LibreOffice.
+
+## Equations
+
+Unicode approximations of mathematics look like what they are, so the
+equations are set by a real TeX engine: `render_eq()` compiles a snippet with
+`tectonic`, converts it to a transparent PNG with `pdftocairo`, and caches the
+result in `eq/` under a hash of its source. Those PNGs are committed, so
+**LaTeX is needed only when the mathematics changes** — an ordinary rebuild
+just reuses them, and entries whose equations have left the deck are pruned
+automatically. `make distclean` forces a full re-typeset.
+
+Equations are rendered at 16 pt and placed at natural size, scaled down only
+if a block would overrun its column — so check the reported widths if you
+edit one. Glosses are set in the same run (`\gloss{...}`), which keeps the
+per-line comments aligned as a column.
 
 **Do not edit the `.pptx` by hand.** Every number in it is a measured result;
 if one changes, change it in `build_deck.py` and rebuild, or the deck and the

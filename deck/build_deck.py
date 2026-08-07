@@ -17,6 +17,12 @@ machine to re-run the validator, so the fixed order is relied on rather than
 re-derived.
 """
 
+import hashlib
+import subprocess
+import tempfile
+from pathlib import Path
+
+from PIL import Image
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
@@ -184,16 +190,71 @@ def callout(slide, x, y, w, body, accent=SERIES_2, size=16, gap=0.2):
     return y + h + Inches(gap)
 
 
-def math(slide, x, y, w, lines, size=14, line=1.3, gap=0.18):
-    """A block of set-in-monospace formulae. lines: list of (expr, gloss)."""
-    runs = []
-    for expr, gloss in lines:
-        runs.append((expr, {"font": MONO, "size": size, "color": INK,
-                            "space_after": 0 if gloss else 7, "line": line}))
-        if gloss:
-            runs.append((gloss, {"size": size - 3, "color": INK_3,
-                                 "space_after": 7, "line": 1.1}))
-    return block(slide, x, y, w, runs, gap=gap)
+# --- LaTeX equation rendering ----------------------------------------------
+# Unicode approximations of mathematics look like what they are. Equations are
+# set by a real TeX engine and embedded as transparent PNGs. Results are cached
+# in deck/eq/ by content hash and committed, so a rebuild needs LaTeX only when
+# the mathematics itself changes.
+EQ_DIR = Path(__file__).resolve().parent / "eq"
+EQ_DPI = 300
+_EQ_USED = set()
+EQ_PREAMBLE = r"""
+\documentclass[border=2pt,preview]{standalone}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.92]{helvet}
+\usepackage{xcolor}
+\definecolor{ink}{HTML}{1A1A19}
+\definecolor{muted}{HTML}{8A8980}
+\newcommand{\gloss}[1]{\textnormal{\sffamily
+  \fontsize{%(glosspt).1f}{%(glosslead).1f}\selectfont\color{muted}#1}}
+\begin{document}
+\fontsize{%(pt)d}{%(lead)d}\selectfont\color{ink}
+\(\displaystyle %(body)s\)
+\end{document}
+"""
+
+
+def render_eq(body, pt=16):
+    """Typeset a LaTeX snippet; return (png_path, width_in, height_in).
+
+    Cached by a hash of the source, so this costs nothing on a rebuild that
+    does not touch the mathematics.
+    """
+    src = EQ_PREAMBLE % {"pt": pt, "lead": int(pt * 1.2),
+                         "glosspt": pt * 0.80, "glosslead": pt * 0.95,
+                         "body": body}
+    key = hashlib.sha1(src.encode()).hexdigest()[:16]
+    png = EQ_DIR / f"eq-{key}.png"
+    if not png.exists():
+        EQ_DIR.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            tex = Path(tmp) / "e.tex"
+            tex.write_text(src)
+            subprocess.run(["tectonic", "-X", "compile", str(tex),
+                            "--outdir", tmp], check=True,
+                           capture_output=True)
+            subprocess.run(["pdftocairo", "-png", "-r", str(EQ_DPI), "-transp",
+                            "-singlefile", str(Path(tmp) / "e.pdf"),
+                            str(png.with_suffix(""))], check=True)
+        print(f"  typeset {png.name}")
+    _EQ_USED.add(png.name)
+    with Image.open(png) as im:
+        w, h = im.size
+    return png, w / EQ_DPI, h / EQ_DPI
+
+
+def equation(slide, x, y, w, body, pt=16, gap=0.2, max_w=None):
+    """Place a typeset equation, scaled down only if it would overrun w.
+
+    Returns the y just below it.
+    """
+    png, ew, eh = render_eq(body, pt=pt)
+    limit = (max_w or w / 914400.0)
+    if ew > limit:
+        eh *= limit / ew
+        ew = limit
+    slide.shapes.add_picture(str(png), x, y, Inches(ew), Inches(eh))
+    return y + Inches(eh + gap)
 
 
 # ===========================================================================
@@ -287,26 +348,34 @@ callout(s, MARGIN, max(yl, yr) + Inches(0.15), BODY_W,
 s = slide_base(prs, "Tier-1: what rate should each flow target?",
                "the design  ·  every ~1 s")
 y = block(s, COL_L, Inches(1.82), Inches(6.3),
-          "Rates r_i ≥ 0, slacks s ≥ 0, one feasible set F(floor):",
-          size=15, color=INK_2, gap=0.14)
-y = math(s, COL_L, y, Inches(6.3), [
-    ("Σ_{i∈d} r_i / SE_i  ≤  C_d",
-     "capacity in PRB-symbols, special slot included"),
-    ("r_i + s_i  ≥  G_i",
-     "GBR contract — soft, so overload stays feasible"),
-    ("r_i  ≥  floor_i",
-     "max-min floor — hard"),
-    ("Σ_{i∈σ} r_i/SE_i + s_σ  ≥  φ_σ·C_d",
-     "slice share — soft, demand-capped, work-conserving"),
-], gap=0.16)
+          "Decision variables are a target rate per flow and the "
+          "shortfall slacks. All solves share one feasible set:",
+          size=15, color=INK_2, gap=0.16)
+y = equation(s, COL_L, y, Inches(6.3), r"""
+\begin{aligned}
+  \sum_{i:\,d(i)=d} \frac{r_i}{\mathrm{SE}_i} &\;\le\; C_d
+    &&\gloss{capacity in PRB-symbols, special slot included}\\[3pt]
+  r_i + s_i &\;\ge\; G_i
+    &&\gloss{GBR contract --- soft, so overload stays feasible}\\[3pt]
+  r_i &\;\ge\; \mathrm{floor}_i
+    &&\gloss{max-min floor --- hard}\\[3pt]
+  \sum_{i\in\sigma} \frac{r_i}{\mathrm{SE}_i} + s_\sigma
+    &\;\ge\; \phi_\sigma C_d
+    &&\gloss{slice share --- soft, demand-capped, work-conserving}
+\end{aligned}""", gap=0.16)
 y = block(s, COL_L, y, Inches(6.3), "Solved in three stages, in that order:",
           size=15, color=INK_2, gap=0.14)
-math(s, COL_L, y, Inches(6.3), [
-    ("A.  t* = max t  s.t.  r_i ≥ t·Ĝ_i  ∀ GBR",
-     "then  floor_i = α·t*·Ĝ_i"),
-    ("B1. S* = min Σ p_i·s_i + p_σ Σ SE_σ·s_σ", ""),
-    ("B2.      max Σ w_c·log(r_i+ε)  s.t. Σ p_i·s_i ≤ S*", ""),
-])
+equation(s, COL_L, y, Inches(6.3), r"""
+\begin{aligned}
+  \textsf{A}\quad t^\star &= \max\; t \quad\text{s.t.}\quad
+    r_i \ge t\,\hat{G}_i \;\; \forall\, i{:}\, c(i){=}\mathrm{GBR},
+    \quad \mathrm{floor}_i = \alpha\, t^\star \hat{G}_i \\[4pt]
+  \textsf{B1}\quad S^\star &= \min\; \sum_i p_i s_i
+    \;+\; p_\sigma \sum_\sigma \mathrm{SE}_\sigma s_\sigma \\[4pt]
+  \textsf{B2}\quad &\phantom{{}={}}\max\;
+    \sum_i w_{c(i)} \log(r_i + \epsilon)
+    \quad\text{s.t.}\quad \sum_i p_i s_i \le S^\star
+\end{aligned}""")
 y = callout(s, Inches(7.6), Inches(1.85), Inches(4.85),
             "**Order the objectives; do not weight them.** Folded into "
             "one, the two terms sit 3.3×10⁷ apart — two solvers returned "
@@ -326,26 +395,35 @@ s = slide_base(prs, "Tier-2: hit that target, slot by slot",
 y = block(s, COL_L, Inches(1.82), Inches(6.3),
           "Every flow carries a virtual queue — an accumulator in bits, "
           "not a buffer of data:", size=15, color=INK_2, gap=0.14)
-y = math(s, COL_L, y, Inches(6.3), [
-    ("Q_i += r_i·Δ ;  Q_i ← min(Q_i, ceil_i)",
-     "grow by the Tier-1 target, then clamp"),
-    ("serve ;  Q_i ← max(0, Q_i − delivered_i)", ""),
-    ("ceil_i = max(0, min(r_i·W, A_i^W) − D_i^W)",
-     "the debt the flow legitimately accrued over the window W"),
-], gap=0.16)
+y = equation(s, COL_L, y, Inches(6.3), r"""
+\begin{aligned}
+  Q_i &\mathrel{+}= r_i\Delta
+    &&\gloss{grow by the Tier-1 target}\\[3pt]
+  Q_i &\leftarrow \min(Q_i,\ \mathrm{ceil}_i)
+    &&\gloss{clamp to the legitimate debt}\\[3pt]
+  Q_i &\leftarrow \max(0,\ Q_i - \mathrm{delivered}_i)
+    &&\gloss{serve, then drain}\\[3pt]
+  \mathrm{ceil}_i &= \max\!\big(0,\ \min(r_i W,\ A_i^W) - D_i^W\big)
+    &&\gloss{arrived minus delivered over the window $W$}
+\end{aligned}""", gap=0.16)
 y = block(s, COL_L, y, Inches(6.3), "Ranking, and then the transport block:",
           size=15, color=INK_2, gap=0.14)
-math(s, COL_L, y, Inches(6.3), [
-    ("Q̃_i = Q_i + w_d·(HoL_i/PDB_i)^κ · max_j Q_j",
-     "deadline urgency, scaled by the system-wide max queue"),
-    ("M_u = ( Σ_{i∈u} Q̃_i ) · SE_u",
-     "rank UEs — opportunistic and rate-tracking at once"),
-    ("fill the TB by TS 38.321 LCP: priority, then Q̃_i", ""),
-])
+y = equation(s, COL_L, y, Inches(6.3), r"""
+\begin{aligned}
+  \tilde{Q}_i &= Q_i + w_{\mathrm{d}}
+    \Big(\frac{\mathrm{HoL}_i}{\mathrm{PDB}_i}\Big)^{\!\kappa} \max_j Q_j
+    &&\gloss{urgency, scaled by the system-wide max queue}\\[4pt]
+  M_u &= \Big(\sum_{i\in u} \tilde{Q}_i\Big) \cdot \mathrm{SE}_u
+    &&\gloss{rank UEs --- opportunistic and rate-tracking at once}
+\end{aligned}""", gap=0.14)
+block(s, COL_L, y, Inches(6.3),
+      "The granted transport block is then filled by TS 38.321 "
+      "logical-channel prioritisation: by priority level, then by adjusted "
+      "queue.", size=15, color=INK_2)
 y = callout(s, Inches(7.6), Inches(1.85), Inches(4.85),
-            "Q_i is a **non-saturating integrator**, so it can reach an "
-            "arbitrary, unequal target vector — precisely what a "
-            "multiplicative urgency metric cannot do at any weight.",
+            "The virtual queue is a **non-saturating integrator**, so it "
+            "can reach an arbitrary, unequal target vector — precisely what "
+            "a multiplicative urgency metric cannot do at any weight.",
             size=15)
 y = callout(s, Inches(7.6), y, Inches(4.85),
             "Clamping to a **windowed arrival count**, not instantaneous "
@@ -585,6 +663,12 @@ callout(s, MARGIN, max(ys) + Inches(0.15), BODY_W,
         "and a control-channel path, at a cost we can state and bound. "
         "**The open work is landing it on real hardware** — everything above "
         "is comparative, in a simulator, and silicon is the next step.")
+
+# Drop cache entries for mathematics that is no longer on a slide.
+for stale in sorted(p for p in EQ_DIR.glob("eq-*.png")
+                    if p.name not in _EQ_USED):
+    stale.unlink()
+    print(f"  dropped stale {stale.name}")
 
 prs.save("deck/two-tier-scheduler.pptx")
 print(f"wrote deck/two-tier-scheduler.pptx  ({len(prs.slides.__iter__.__self__._sldIdLst)} slides)")
