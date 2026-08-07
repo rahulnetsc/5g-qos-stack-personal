@@ -269,3 +269,65 @@ Access tested 2026-08-07: OpenAlex (search + abstracts, including for
 paywalled works) and Unpaywall (legal OA full text by DOI) both work;
 IEEE Xplore returns HTTP 202 and ACM DL 403 to automated requests. So
 triage is unblocked; only paywalled *full text* needs a human.
+
+
+---
+
+## Round 3 (2026-08-07): the two paywalled papers, supplied
+
+The owner supplied the IEEE VTC papers the shortlist asked for. Both confirm
+the demotion, and one contained something better than confirmation.
+
+**Monghal et al. 2008 — metric-based, priority-partitioned.** TD-PSS splits
+users into a below-target set with *absolute priority* over the rest,
+sorting Set 1 by blind-equal-throughput and Set 2 by PF. Frequency-domain
+fairness is a multiplicative weight `W[n] = max(1, TBR/R[n])`. No penalty,
+no slack variable, no objective function at all.
+
+**Zaki et al. 2011 — strict priority.** GBR bearers are served first as a
+class; non-GBR bearers are ordered by `M-QoS_weight / R_accum`. A bearer
+leaves the candidate list once its guaranteed rate is met. Again no penalty.
+
+**Verdict: the demotion stands**, now on direct evidence rather than on a
+third party's description of these papers.
+
+### Two things worth more than the confirmation
+
+**1. Monghal measured our saturation argument.** §II-B argues analytically
+that a multiplicative urgency metric cannot drive delivered rate to an
+arbitrary target. Monghal et al. built exactly that — a `max(1, TBR/R)`
+weight — and report that it "is not efficient enough to allow 95% of the
+users to reach their TBR". That is our argument, measured, in the setting it
+was designed for, by the people who designed it. Now cited in §II-B. This is
+the single most valuable citation the whole search produced.
+
+**2. "Contracts first" has a clear precedent, and we should say so.** Both
+papers order contracts ahead of utility — Monghal by absolute priority for
+below-target users, Zaki by strict GBR priority. Our lexicographic two-phase
+form is therefore not novel in *intent*. What it adds is that an
+optimisation must also decide how a shortfall is *divided* among contracts
+that cannot all be met, where a priority partition only decides who is
+served first. §IV-B now says this outright. It is a weaker novelty claim
+than the draft implied, and a more defensible one.
+
+### A citation error these PDFs caught
+
+`refs.bib` had the first author as **"Mongha, Gilberto"**. The surname is
+**Monghal** — I had transcribed "G Mongha" from Ameigeiras' reference list,
+which is itself a typo, and then *invented* the first name "Gilberto" to
+fill out the field. The paper gives only "G. Monghal". Corrected to printed
+initials for all four authors.
+
+This is the failure mode the whole verification discipline exists to catch,
+and it still got through, because the citation came from a secondary source
+that looked authoritative. **Rule going forward: never expand an initial to
+a full first name, and never cite from another paper's reference list
+without seeing the paper.**
+
+### Cost, and what paid for it
+
+The additions pushed the draft to 9 pages. Reclaimed to 8 by, in order:
+consolidating five 3GPP specification citations to two, IEEE-style
+abbreviated journal names, *et al.* past six authors, and tightening §II-D.
+The 3GPP and author-list changes are house style anyway — the paper is
+better for them, not just shorter.

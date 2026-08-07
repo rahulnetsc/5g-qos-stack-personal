@@ -175,7 +175,12 @@ they share a subtler defect: a multiplicative urgency metric of the form
 $(r_{\mathrm{inst}}/R_{\mathrm{avg}})\cdot(1+w\cdot\mathrm{deficit})$ has
 an equilibrium that equalises a weighted $1/R_{\mathrm{avg}}$ across flows.
 It cannot drive delivered rate to an \emph{arbitrary, unequal} target
-vector however large $w$ is. This saturation argument is why our Tier-2 is
+vector however large $w$ is. This is not only an analytical objection.
+Monghal et al.~\cite{monghal2008qos} weight their frequency-domain metric
+by $\max(1, \mathrm{TBR}/R_n)$ for users below a target bit rate and
+report that the weighting ``is not efficient enough to allow 95\% of the
+users to reach their TBR''---the saturation, measured, in the setting it
+was designed for. This saturation argument is why our Tier-2 is
 a drift-plus-penalty integrator rather than a tuned PF variant; we include
 a class-aware ``Gradient'' baseline of exactly this shape to make the
 difference measurable.
@@ -200,16 +205,14 @@ Most recent work in this space is learned rather than declarative. xSlice
 places an online deep-RL agent on the near-RT RIC and adapts MAC-layer
 allocation against a combined throughput/latency/reliability
 objective~\cite{yan2026xslice}, evaluated---unlike this paper---on a real
-O-RAN testbed. We deliberately do not take that route, and it is worth
-saying why rather than leaving the omission unexplained. Kela et
+O-RAN testbed. We deliberately do not take that route, and it is worth saying why. Kela et
 al.~\cite{kela2024deep}, arguing from inside that literature, find that
-practically deployable deep schedulers do not yet exist, and name the
-obstacles: real-time execution cost, 3GPP compliance, and poor
-generalisation across bandwidth, MIMO and traffic configurations. For a
-deployment that must be commissioned, certified and reasoned about by plant
-engineers, a convex program with an auditable objective and a single
-fairness dial is a defensible alternative to a policy network---and its
-failure modes, as Section~\ref{sec:knapsack} shows, can be characterised
+deployable deep schedulers do not yet exist, citing real-time execution
+cost, 3GPP compliance and poor generalisation across bandwidth, MIMO and
+traffic configurations. For a deployment that must be commissioned and
+certified by plant engineers, a convex program with an auditable objective
+and a single fairness dial is a defensible alternative---and its failure
+modes, as Section~\ref{sec:knapsack} shows, can be characterised
 analytically rather than only measured.
 
 \subsection{Industrial and private 5G}
@@ -239,13 +242,13 @@ it are now well established~\cite{villa2024x5g}.
 \section{System Model}\label{sec:model}
 % ===========================================================================
 
-We consider a single NR cell~\cite{ts38300} with a static TDD pattern. Time is slotted;
+We consider a single NR cell with a static TDD pattern. Time is slotted;
 each slot offers a set of physical resource blocks (PRBs) in one direction,
 with the special slot contributing partial DL and UL symbol counts. Let
 $d(i)\in\{\mathrm{DL},\mathrm{UL}\}$ be flow $i$'s direction and $C_d$ the
 capacity of direction $d$ in \emph{PRB-symbols per second} over the TDD
 cycle. Per-UE SNR evolves as an AR(1) process in dB and maps through a
-link-adaptation staircase~\cite{ts38214} to $\mathrm{SE}_i$, bits per
+link-adaptation staircase to $\mathrm{SE}_i$, bits per
 PRB-symbol, discounted by target BLER.
 
 Each flow is uni-directional and carries a 5G QoS profile~\cite{ts23501}:
@@ -261,7 +264,7 @@ costs one DCI at an aggregation level that grows as SNR falls. Second, the
 \textbf{uplink buffer-status-report round-trip}: a real gNB learns of UL
 data only via a delayed BSR, so the scheduler sees a lagged view of UL
 backlog. Semi-persistent scheduling (SPS, ``Configured
-Grants''~\cite{ts38321,ts38331}) bypasses both---a CG user transmits on a standing allocation with no DCI and no BSR.
+Grants''~\cite{ts38321}) bypasses both---a CG user transmits on a standing allocation with no DCI and no BSR.
 Section~\ref{sec:pdcch} shows this double bypass is decisive.
 
 % ===========================================================================
@@ -291,6 +294,14 @@ busy slice borrows freely---the allocation remains work-conserving.
 
 \subsection{Shortfall before utility: an ordering, not a weight}
 \label{sec:lex}
+
+Ordering contracts ahead of utility is not new: Monghal et
+al.~\cite{monghal2008qos} give below-target users absolute priority over
+the rest, and Zaki et al.~\cite{zaki2011multi} give GBR bearers strict
+priority over non-GBR. Both express it as a \emph{priority partition} over
+a metric scheduler, which says who is served first but not how a shortfall
+is divided among them. An optimisation formulation must answer that second
+question too---and Section~\ref{sec:knapsack} is about the answer it gives.
 
 The conventional formulation is a single objective,
 \begin{equation}
@@ -381,13 +392,15 @@ optimum of the objective as written.
 
 \textbf{This is a property of our formulation, not of QoS-aware scheduling.}
 Enforcing a rate contract through a linear penalty on shortfall is a
-natural modelling choice, but it is not the common one. The LTE and NR
-scheduling literature more often encodes the contract either in a per-flow
-\emph{metric}---a PF ratio multiplied by a GBR-deficit
-factor~\cite{mongha2008qos,ameigeiras2016qos}---or in the shape of the
-\emph{utility function} itself, and such utilities are deliberately kept
-\emph{concave} precisely so that the allocation problem has a unique
-solution~\cite{gora2014qos}. A strictly concave contract utility has an
+natural modelling choice, but it is not the common one. We checked the
+canonical GBR-scheduling papers directly: none uses a shortfall penalty.
+The LTE and NR literature encodes the contract either in a per-flow
+\emph{metric} under a priority partition---a PF ratio weighted by a
+target-rate factor, with below-target users promoted
+wholesale~\cite{monghal2008qos,zaki2011multi,ameigeiras2016qos}---or in
+the shape of the \emph{utility function} itself, and such utilities are
+deliberately kept \emph{concave} precisely so that the allocation problem
+has a unique solution~\cite{gora2014qos}. A strictly concave contract utility has an
 interior optimum and therefore cannot abandon a flow the way
 Table~\ref{tab:knapsack} shows. We keep the penalty form because the
 lexicographic pair of Section~\ref{sec:lex} expresses ``contracts first,
