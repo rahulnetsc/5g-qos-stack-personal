@@ -392,6 +392,7 @@ def solve_tier1(
     slice_shares: "dict[int, dict[str, float]] | None" = None,
     slice_slack_penalty: float = 1e3,
     gbr_floor_bps: "dict[tuple[int, int], float] | None" = None,
+    apply_demand_cap: bool = True,
 ) -> dict[tuple[int, int], float]:
     """Solve Tier-1. Returns target rate (bps) per (ue_id, qfi).
 
@@ -468,7 +469,14 @@ def solve_tier1(
 
     constraints: list = []
     constraints += _capacity_constraints(u, flows, se, cap_by_dir, scale)
-    constraints += _demand_constraints(u, flows, demand_bps, scale)
+    # The offered-load cap is optional. It exists to stop Tier-1 handing rate
+    # to a flow that cannot use it, but the log utility already has
+    # diminishing returns and the windowed ceiling stops the virtual queue
+    # accruing credit for data that does not exist -- so the cap may be
+    # redundant. It is also the constraint that turns a bad demand estimate
+    # into unrecoverable starvation, since it is hard.
+    if apply_demand_cap:
+        constraints += _demand_constraints(u, flows, demand_bps, scale)
 
     for i, f in enumerate(flows):
         d = demand_bps.get((f.ue_id, f.qfi), _DEMAND_SENTINEL)

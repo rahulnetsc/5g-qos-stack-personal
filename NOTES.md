@@ -2167,3 +2167,85 @@ is wasted effort.
 Default stays `"oracle"` until that is settled.
 
 ---
+
+## 2026-08-07 — The demand cap was redundant. Removing it deletes the whole estimation problem.
+
+Testing the question the tracking estimator raised: if a *safe* demand bound
+sits 2–6× above true demand, is `r_i ≤ D_i` earning its place at all?
+`TwoTier(apply_demand_cap=False)` drops the constraint entirely.
+
+### It is not earning its place
+
+Adaptive sources — the scenario where the cap actually binds:
+
+| config | total | Jain | per-flow Mbps |
+|---|---|---|---|
+| oracle demand, cap on | 32.4 M | 0.97 | 3.9 4.9 5.3 5.5 5.9 7.0 |
+| measured demand, cap on | 29.2 M | 0.89 | 3.4 3.4 3.5 5.1 5.5 8.2 |
+| tracking demand, cap on | 32.2 M | 0.92 | 3.1 4.2 4.4 6.3 6.4 7.8 |
+| **no cap at all** | **32.4 M** | **0.97** | 3.9 4.9 5.3 5.5 5.8 7.0 |
+
+`factory_robots`, where the cap is mostly slack:
+
+| config | total | mean GBR | min GBR |
+|---|---|---|---|
+| oracle demand, cap on | 65.9 M | 59% | 54% |
+| **no cap at all** | **65.9 M** | **59%** | **53%** |
+
+**Removing the cap reproduces the oracle exactly, and needs no demand
+estimate to do it.** Not "close to" — identical on the adaptive scenario and
+within a point of noise on factory.
+
+### Why it was redundant
+
+We had the same constraint twice, in two places with very different
+information requirements.
+
+- **Tier-1's `r_i ≤ D_i`** needs to *predict* what a flow will offer over the
+  next second. That prediction requires estimating demand from delayed, lossy
+  BSRs with an unobservable discard term — the entire problem of the last
+  three entries.
+- **Tier-2's windowed ceiling** clamps the virtual queue to
+  `max(0, min(target·W, arrived_W) − delivered_W)`. A flow with no data has
+  `arrived_W = 0`, so `Q = 0`, so it is never scheduled however generous its
+  Tier-1 target. This needs no prediction at all — only *observation* of what
+  actually arrived.
+
+The ceiling was already doing the job, one tier down, from measured rather
+than predicted quantities. Tier-1's cap was a second, weaker copy that
+happened to sit where the information is worst.
+
+That is why the log utility "handles fairness on its own": it does not have
+to. Tier-1 may hand a quiet flow a generous target; Tier-2 declines to act on
+it. What the log utility does contribute is the shape of the allocation among
+flows that *do* have data — `r_i ∝ w_i·SE_i` — which is exactly proportional
+fairness and cannot drive any flow to zero, unlike a collapsing demand cap.
+
+### What this deletes
+
+- The demand estimator, in all three variants, and its tuning.
+- The starvation lock-in, at the root rather than by compensating for it.
+- The failure mode where `D_i` collapses below `G_i` and a hard cap silently
+  overrides a GBR contract (2026-08-07 entry). With no cap there is nothing
+  to override it.
+- The BSR-filtering problem for Tier-1 specifically. Tier-2 still reads BSR
+  for eligibility and sizing; that is unaffected and still matters.
+
+The estimator work is not wasted — it is what established the cap was the
+problem, and `demand_estimator="tracking"` remains available for anyone who
+wants a bounded demand figure for admission control or reporting. But the
+scheduler no longer needs it.
+
+### Recommendation, not yet applied
+
+`apply_demand_cap` defaults to `True` — unchanged, pending a decision. The
+case for flipping it is strong: it is measurably free on both scenarios, and
+the constraint it removes is the one that converts an estimation error into
+unrecoverable starvation. Leaving a harmful default in place because it is
+the incumbent is not a good reason.
+
+Also worth telling the OAI port: it has the same hard `r_i ≤ D_i` bound fed
+by a BSR-derived estimate, and the same windowed ceiling in Tier-2 already
+doing the real work.
+
+---

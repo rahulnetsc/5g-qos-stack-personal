@@ -99,6 +99,7 @@ class TwoTier:
         bsr_lag_slots: int = 0,
         demand_track_gain_up: float = 0.5,
         demand_track_gain_down: float = 0.1,
+        apply_demand_cap: bool = True,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -210,6 +211,10 @@ class TwoTier:
         self.bsr_lag_slots = max(0, int(bsr_lag_slots))
         self.demand_track_gain_up = demand_track_gain_up
         self.demand_track_gain_down = demand_track_gain_down
+        # Whether Tier-1 caps each flow at its offered load at all. See
+        # solve_tier1 -- the cap is what converts a demand under-estimate into
+        # unrecoverable starvation, and the log utility may already do its job.
+        self.apply_demand_cap = apply_demand_cap
         self._buf_est: dict[tuple[int, int], float] = {}
         self._buf_hist: dict[tuple[int, int], deque] = {}
         self._served_this_slot: dict[tuple[int, int], int] = {}
@@ -406,6 +411,7 @@ class TwoTier:
             slice_shares=self.slice_shares,
             slice_slack_penalty=self.slice_slack_penalty,
             gbr_floor_bps=floors,
+            apply_demand_cap=self.apply_demand_cap,
         )
         self._tier1_solve_count += 1
         self._update_gbr_penalties()
