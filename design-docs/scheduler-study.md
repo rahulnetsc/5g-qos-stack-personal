@@ -1166,11 +1166,11 @@ for contract satisfaction. Study 1 traces a *hump*:
 
 - **Deep overload (1.0× shipped load — the as-shipped operating point).**
   GBR demand far exceeds capacity — the shipped load is deeply overloaded
-  for this cell. No scheduler can honor the contracts; PF ≈ TwoTier on the
-  contract count. A smarter MAC cannot manufacture capacity. What the
-  scheduler still decides here is *how the shortfall is distributed*, and
-  the two answers are genuinely different: TwoTier holds every flow near
-  50% of contract, PF leaves one at 0% and carries 2.6 Mbps more total.
+  for this cell. Essentially no scheduler honours the contracts (0–1/10). A
+  smarter MAC cannot manufacture capacity. What the scheduler still decides
+  is *how the shortfall is distributed*, and the two answers differ sharply:
+  TwoTier holds every flow at or above 53% of contract, PF leaves its worst
+  at 1% and carries 3.4 Mbps more total.
 - **Moderate overload (0.50–0.67× shipped load).** Capacity is *enough to
   honor the contracts but only if allocated deliberately*. This is where
   TwoTier wins: at 0.50× load, 10/10 vs 5/10 contracts; at 0.67× load, a
