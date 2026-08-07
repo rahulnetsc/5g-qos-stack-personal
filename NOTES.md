@@ -2071,3 +2071,99 @@ has stopped offering or the estimator is broken, and the scheduler should
 say which it believes.
 
 ---
+
+## 2026-08-07 — Demand estimation posed properly: a tracking filter, and what it really produces
+
+Reframing prompted by the right question: we do not have demand, we have
+**delayed, lossy BSRs plus perfect knowledge of our own grants**. That is a
+state-estimation problem, and the differencing estimator was the wrong shape
+for it.
+
+### The state equation
+
+For a flow, `B_k = B_{k-1} + A_k − S_k − X_k`, with
+
+| term | meaning | observable? |
+|---|---|---|
+| `B_k` | buffer occupancy | only at `k ≤ i−d`, and lossy |
+| `A_k` | **arrivals — the demand we want** | no |
+| `S_k` | what our grant served | **yes**, we issued it |
+| `X_k` | UE-side PDB discard | **no**, for uplink |
+
+The previous estimator computed `Â = ΔB + S + X` over a window, which
+assumes `X` is known. It is for downlink; for uplink it is not, and it is
+exactly the term that grows when a flow starves — hence the lock-in.
+
+### The estimator built instead
+
+`demand_estimator = "tracking"`: dead-reckon the buffer forward from the last
+BSR using the current demand estimate and our known grants, then correct the
+estimate from the residual when the next BSR lands.
+
+```
+predict:  B̂_k = B̂_{k-1} + D̂·Δ/8 − S_k
+correct:  residual = BSR_{i−d} − B̂_{i−d}      (kept in a history deque)
+          D̂ ← D̂ + gain · residual·8 / (d·Δ)
+```
+
+A lost BSR is simply a slot with no correction — the predictor keeps running.
+That graceful degradation is structural here and absent from differencing.
+
+**The gains are deliberately asymmetric** (`up = 0.5`, `down = 0.1`). A
+positive residual can only mean under-estimated arrivals. A negative one is
+ambiguous: over-estimated arrivals, *or* a silent UE discard. Since
+`r_i ≤ D_i` is a hard cap, an under-estimate is unrecoverable within the
+window while an over-estimate only wastes headroom.
+
+Note the inversion against the token-bucket sync (2026-08-07 entry), which
+failed because *arrivals contaminated the residual*. Here arrivals **are**
+the quantity being estimated, so the same contamination is the signal.
+
+### It works on outcomes, and that is not the same as being accurate
+
+`factory_robots`, BSR lag 8:
+
+| estimator | total | mean GBR | min GBR |
+|---|---|---|---|
+| oracle | 65.9 M | 59% | 54% |
+| measured (differencing) | 57.0 M | 51% | 14% |
+| **tracking** | **65.9 M** | **59%** | **54%** |
+
+Exactly oracle. But the estimate itself is nowhere near the truth:
+
+| flow | true offered | tracked `D̂` | error |
+|---|---|---|---|
+| ue1_qfi2 | 8.71 M | 24.12 M | **+177%** |
+| ue2_qfi2 | 8.71 M | 52.64 M | **+504%** |
+| ue7_qfi2 | 14.85 M | 43.40 M | **+192%** |
+
+It matches oracle because a wildly over-estimated cap is simply *not
+binding*. **What was built is a demand upper bound, not a demand estimate**,
+and it should be described that way.
+
+Where the cap does bind — the adaptive-source scenario — it earns its keep:
+
+| estimator | total | Jain | per-flow Mbps |
+|---|---|---|---|
+| oracle | 32.4 M | 0.97 | 3.9 4.9 5.3 5.5 5.9 7.0 |
+| measured | 29.2 M | 0.89 | 3.4 3.4 3.5 5.1 5.5 8.2 |
+| **tracking** | **32.2 M** | **0.92** | 3.1 4.2 4.4 6.3 6.4 7.8 |
+
+Throughput essentially recovered, fairness most of the way. The starvation
+lock-in is gone.
+
+### The question this raises
+
+If a *safe* bound sits 2–6× above true demand, the `r_i ≤ D_i` constraint is
+close to vacuous most of the time. So: **is the demand cap earning its place
+at all?** It exists to stop Tier-1 allocating rate to a flow that cannot use
+it — but the log utility already discourages that, and the windowed ceiling
+stops the virtual queue accumulating credit a flow has no data for. Dropping
+the cap for non-GBR flows and keeping it only where a contract needs bounding
+may be the honest simplification. Untested, and worth a measurement before
+the estimator is tuned any further: tuning a constraint that should not exist
+is wasted effort.
+
+Default stays `"oracle"` until that is settled.
+
+---

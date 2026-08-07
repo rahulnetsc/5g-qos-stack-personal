@@ -1539,6 +1539,9 @@ def test_documented_defaults_match_the_code():
         "ul_bucket_sync_gain": 0.0,
         "demand_estimator": "oracle",
         "demand_ewma_alpha": 0.3,
+        "bsr_lag_slots": 0,
+        "demand_track_gain_up": 0.5,
+        "demand_track_gain_down": 0.1,
     }
     actual = inspect.signature(TwoTier.__init__).parameters
     assert set(documented) == set(actual) - {"self"}, (

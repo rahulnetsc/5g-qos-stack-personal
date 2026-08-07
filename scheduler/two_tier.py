@@ -96,6 +96,9 @@ class TwoTier:
         ul_bucket_sync_gain: float = 0.0,
         demand_estimator: str = "oracle",
         demand_ewma_alpha: float = 0.3,
+        bsr_lag_slots: int = 0,
+        demand_track_gain_up: float = 0.5,
+        demand_track_gain_down: float = 0.1,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -190,6 +193,26 @@ class TwoTier:
         # slower than that period is what damps it.
         self.demand_ewma_alpha = demand_ewma_alpha
         self._demand_smooth: dict[tuple[int, int], float] = {}
+        # --- "tracking" estimator state -------------------------------------
+        # The buffer obeys  B_k = B_{k-1} + A_k - S_k - X_k, where A is the
+        # demand we want, S is what our own grant served (known), and X is
+        # what the UE discarded on PDB expiry (never reported for uplink).
+        # We dead-reckon B forward from the last BSR using our current demand
+        # estimate, then correct that estimate from the residual when the next
+        # BSR lands.
+        #
+        # The gains are deliberately asymmetric. A positive residual (buffer
+        # bigger than predicted) can only mean we under-estimated arrivals.
+        # A negative one is ambiguous: either we over-estimated arrivals, or
+        # the UE silently discarded. Since r_i <= D_i is a *hard* cap, an
+        # under-estimate is unrecoverable while an over-estimate only wastes
+        # headroom -- so correct up briskly and down cautiously.
+        self.bsr_lag_slots = max(0, int(bsr_lag_slots))
+        self.demand_track_gain_up = demand_track_gain_up
+        self.demand_track_gain_down = demand_track_gain_down
+        self._buf_est: dict[tuple[int, int], float] = {}
+        self._buf_hist: dict[tuple[int, int], deque] = {}
+        self._served_this_slot: dict[tuple[int, int], int] = {}
         # Shadow bucket state, per UL flow: [tokens_bits, capacity_bits, pbr]
         self._ul_shadow_bucket: dict[tuple[int, int], list[float]] = {}
         # What the gNB thinks each UL flow's backlog is after its last grant,
@@ -238,6 +261,12 @@ class TwoTier:
         # backlog, which is where the two copies drift apart.
         self._ul_shadow_bucket = {}
         self._ul_predicted_backlog = {}
+        self._buf_est = {(f.ue_id, f.qfi): 0.0 for f in flows}
+        self._buf_hist = {
+            (f.ue_id, f.qfi): deque(maxlen=self.bsr_lag_slots + 1)
+            for f in flows
+        }
+        self._served_this_slot = {(f.ue_id, f.qfi): 0 for f in flows}
         for f in flows:
             if f.direction != "UL":
                 continue
@@ -250,6 +279,49 @@ class TwoTier:
             (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
         }
 
+    def _track_demand(self, buffers) -> None:
+        """One step of the buffer-tracking demand estimator, per slot.
+
+        Predict:  B_hat_k = B_hat_{k-1} + D_hat*dt - S_k
+        Correct:  when the BSR from `bsr_lag_slots` ago lands, compare it with
+                  what we predicted the buffer was at that instant and push the
+                  residual into D_hat.
+
+        A missing BSR is simply a slot with no correction -- the predictor
+        keeps running on the last estimate, which is the graceful-degradation
+        property the differencing estimator did not have.
+        """
+        if self.demand_estimator != "tracking":
+            return
+        dt = self.slot_duration_s
+        for f in self._flows:
+            key = (f.ue_id, f.qfi)
+            d_hat = self._demand_smooth.get(key, 0.0)
+            served = self._served_this_slot.get(key, 0)
+            # --- predict -------------------------------------------------
+            b = self._buf_est.get(key, 0.0) + d_hat * dt / 8.0 - served
+            self._buf_est[key] = max(0.0, b)
+            hist = self._buf_hist[key]
+            # --- correct -------------------------------------------------
+            # hist[0] is what we predicted the buffer was bsr_lag_slots ago,
+            # which is the instant the BSR now in hand describes.
+            if len(hist) == hist.maxlen and hist.maxlen > 0:
+                st = buffers.state(f.ue_id, f.qfi)
+                observed = (
+                    st.bytes_reported if f.direction == "UL" else st.bytes_queued
+                )
+                residual = observed - hist[0]
+                lag_s = max(dt, self.bsr_lag_slots * dt)
+                gain = (self.demand_track_gain_up if residual > 0
+                        else self.demand_track_gain_down)
+                d_hat = max(0.0, d_hat + gain * residual * 8.0 / lag_s)
+                self._demand_smooth[key] = d_hat
+                # Re-anchor the predictor to the measurement so the error does
+                # not accumulate; the residual has been accounted for above.
+                self._buf_est[key] = max(0.0, self._buf_est[key] + residual)
+            hist.append(self._buf_est[key])
+        self._served_this_slot = {k: 0 for k in self._served_this_slot}
+
     def _update_demand_estimate(self, buffers) -> None:
         """Re-estimate each flow's offered rate from what actually arrived.
 
@@ -258,6 +330,15 @@ class TwoTier:
         way a real one does -- cumulative delivered plus the BSR-reported
         backlog -- which inherits the BSR's lag and loss.
         """
+        if self.demand_estimator == "tracking":
+            # Already tracked per slot; just publish it to Tier-1.
+            for f in self._flows:
+                key = (f.ue_id, f.qfi)
+                if key in self._demand_smooth:
+                    self._demand_bps[key] = max(
+                        self._demand_smooth[key], f.gfbr_bps
+                    )
+            return
         if self.demand_estimator != "measured":
             return
         window_s = max(1, self.tier1_period) * self.slot_duration_s
@@ -510,6 +591,7 @@ class TwoTier:
         # the shadow copy back towards the real one.
         self._refill_ul_shadow()
         self._sync_ul_buckets(buffers)
+        self._track_demand(buffers)
         if slot.slot_index - self._last_solve_slot >= self.tier1_period:
             self._update_demand_estimate(buffers)
             self._resolve_tier1()
@@ -665,6 +747,8 @@ class TwoTier:
                 delivered_bits = byts * 8 * (1.0 - bler)
                 self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
                 committed[key] += int(byts * (1.0 - bler))
+                if key in self._served_this_slot:
+                    self._served_this_slot[key] += int(byts * (1.0 - bler))
             return [
                 Allocation(
                     ue_id=ue_id, qfi=-1, direction=direction,
@@ -680,6 +764,8 @@ class TwoTier:
             delivered_bits = byts * 8 * (1.0 - bler)
             self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
             committed[key] += int(byts * (1.0 - bler))
+            if key in self._served_this_slot:
+                self._served_this_slot[key] += int(byts * (1.0 - bler))
             out.append(
                 Allocation(
                     ue_id=ue_id, qfi=key[1], direction=direction,
