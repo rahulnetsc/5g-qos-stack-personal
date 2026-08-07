@@ -77,6 +77,10 @@ class BufferModel:
         """Cumulative bytes ever enqueued for this flow."""
         return self._arrived_cum[(ue_id, qfi)]
 
+    def dropped_cum(self, ue_id: int, qfi: int) -> int:
+        """Cumulative bytes discarded on PDB expiry for this flow."""
+        return self.state(ue_id, qfi).bytes_dropped_pdb
+
     def delivered_cum(self, ue_id: int, qfi: int) -> int:
         """Cumulative bytes ever drained (delivered) for this flow.
 

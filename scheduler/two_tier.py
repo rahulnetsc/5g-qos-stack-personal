@@ -268,7 +268,18 @@ class TwoTier:
             visible_backlog = (
                 st.bytes_reported if f.direction == "UL" else st.bytes_queued
             )
-            arr_now = (buffers.delivered_cum(*key) + visible_backlog) * 8
+            # Discarded bytes were offered. Omitting them is what turns a
+            # starved flow into one that appears to have stopped asking: its
+            # data ages out on PDB expiry, so delivered + backlog stops
+            # growing while its true offered rate is unchanged. The estimate
+            # then caps it lower, it starves harder, and more of its data is
+            # discarded -- a lock-in with no physical cause. A real gNB knows
+            # its own RLC discards, so counting them is not cheating.
+            arr_now = (
+                buffers.delivered_cum(*key)
+                + visible_backlog
+                + buffers.dropped_cum(*key)
+            ) * 8
             hist = self._arr_hist[key]
             arrived_w = arr_now - (hist[0] if hist else 0)
             raw = max(0.0, arrived_w / window_s)

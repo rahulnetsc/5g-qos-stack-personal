@@ -1990,3 +1990,84 @@ yet safe to make default** — it would hand us a fairness collapse we do not
 understand well enough to defend. This entry is the finding, not the fix.
 
 ---
+
+## 2026-08-07 — Correction: most of the demand lock-in was my estimator, not physics
+
+The previous entry attributed the demand-estimate lock-in to *sources whose
+arrivals respond to service*. A check on `factory_robots` — whose sources are
+all **open-loop** (`video_frame` and `poisson`, no feedback) — shows it locks
+in there too, so that attribution was wrong.
+
+### The real mechanism: discarded bytes were not counted as offered
+
+The estimator read `arrived ≈ delivered_cum + visible_backlog`. That omits
+bytes discarded on PDB expiry. ue7 at 1.0× load:
+
+| demand | arrived | delivered | dropped |
+|---|---|---|---|
+| oracle | 2.03 MB | 0.95 MB | 0.90 MB |
+| measured (old) | 2.03 MB | **0.00 MB** | **1.85 MB** |
+
+Arrivals are identical — the source never changed. But as the flow starves,
+its data ages out, so `delivered + backlog` stops growing while the true
+offered rate is unchanged. The estimate collapses, Tier-1 caps the flow
+lower, it starves harder, more of its data is discarded. **A lock-in with no
+physical cause: the flow never stopped asking, we stopped counting.**
+
+Fixed by counting discards: `delivered_cum + backlog + dropped_cum`, with
+`dropped_cum` added to `BufferView`. This is not cheating — a real gNB knows
+its own RLC discards.
+
+| demand estimator | total | mean GBR | min GBR |
+|---|---|---|---|
+| oracle | 65.9 M | 59% | 54% |
+| measured, before fix | 54.8 M | 52% | **0%** |
+| measured, after fix | 57.0 M | 51% | **14%** |
+
+### What is left is real, and still large
+
+min GBR 14% against the oracle's 54% is not a rounding difference. Estimating
+demand still costs something structural, and the remaining candidates are:
+
+- **Window lag.** The estimate trails a Tier-1 window, so a flow whose
+  offered rate moves is capped on stale information.
+- **The residual drop feedback.** Counting discards fixes the *accounting*,
+  but a starved flow still has a genuinely lower *delivered* rate, and the
+  BSR view of its backlog is lagged, so the estimate is still biased low
+  exactly when the flow is worst off.
+- **The cap is hard.** `r_i ≤ D_i` is an inequality with no slack. Any
+  under-estimate is unrecoverable within that Tier-1 window, whereas an
+  over-estimate merely wastes a little headroom. The error is asymmetric in
+  its consequences but symmetric in the estimator.
+
+That last one suggests the cleanest mitigation: **bias the estimate upward**,
+or floor it (never below GFBR for a GBR flow), rather than trying to make it
+unbiased. Untested.
+
+### Answering the question that prompted this
+
+**GBR demand is not locked at GFBR, and never was.** They are independent
+quantities and both are needed:
+
+| symbol | what it is | where it enters |
+|---|---|---|
+| `D_i` | offered load — what the flow is actually asking for | `r_i ≤ D_i`, a hard cap |
+| `G_i` | GFBR — the contract floor | `r_i + s_i ≥ G_i`, soft, penalised |
+| `Ĝ_i` | `min(G_i, D_i)`, the *reachable* contract | max-min stage only |
+
+On `factory_robots` the camera flows have `G_i = 8.00 Mbps` but
+`D_i = 8.71 Mbps`, because the demand estimate accounts for I-frame
+inflation while the contract does not. So demand exceeds GFBR, and the cap is
+not the binding constraint — until the estimator breaks, at which point
+`D_i` collapses *below* `G_i` and the demand cap silently overrides the
+contract. The soft GBR floor cannot rescue it: `r_i ≤ D_i` is hard, so the
+flow simply registers a large unavoidable shortfall.
+
+**That is the sharpest statement of the risk**: a mis-estimated demand cap
+can override a GBR contract entirely, and it does so silently, because
+nothing in the formulation flags that the cap and the floor are in conflict.
+Worth an assertion — if `D_i < G_i` for a GBR flow, either the flow really
+has stopped offering or the estimator is broken, and the scheduler should
+say which it believes.
+
+---

@@ -98,6 +98,12 @@ class BufferView(Protocol):
 
     def delivered_cum(self, ue_id: int, qfi: int) -> int: ...
 
+    # Cumulative bytes discarded on PDB expiry. A demand estimate built from
+    # delivered + backlog alone silently omits these, so a starved flow whose
+    # data ages out looks like it stopped asking -- see
+    # TwoTier._update_demand_estimate. A real gNB knows its own RLC discards.
+    def dropped_cum(self, ue_id: int, qfi: int) -> int: ...
+
 
 class ChannelView(Protocol):
     """Per-UE channel quality the scheduler reads -- a CQI report in 5G
