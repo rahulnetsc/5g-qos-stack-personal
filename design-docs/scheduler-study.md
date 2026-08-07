@@ -832,16 +832,16 @@ Reading the table:
   the regime where the two-tier scheduler unambiguously earns its
   complexity.
 - **At 0.67× load — a distributional win the contract count hides.**
-  TwoTier meets *fewer* knife-edge contracts (0/10 vs PF's 4/10) yet
-  delivers a far better *distribution*: minimum delivery **60%** vs PF's 4%,
-  mean 65% vs 55%. PF lets a few good-channel flows run clear of the 95%
-  line while abandoning the rest to near-zero; TwoTier holds everyone near
-  their target, so the flows cluster tightly and none crosses the exact 95%
-  threshold. "Every robot at ≥60%, mean 65%" is operationally better than
-  "4 robots at 100%, 6 robots below 30%" — but a 95% threshold metric scores
-  it lower. (See §8.1.)
-- **At 1.0× — convergence on contracts only.** No scheduler honours a
-  contract here (0/10 everywhere), and in that sense the choice is
+  TwoTier meets *far fewer* knife-edge contracts (1/10 vs PF's 6/10) yet
+  delivers a better *distribution*: minimum delivery **67%** vs PF's 21%,
+  mean 71% vs 69%. PF lets good-channel flows run clear of the 95% line
+  while leaving the worst at 21%; TwoTier holds everyone near their target,
+  so the flows cluster tightly and almost none crosses the exact 95%
+  threshold. "Every robot at ≥67%" is operationally better than "6 robots
+  at 100%, the worst at 21%" — but a threshold metric scores it lower, and
+  scores it lower by *more* than it used to. (See §8.1.)
+- **At 1.0× — convergence on contracts only.** Essentially no scheduler
+  honours a contract here (0–1/10), and in that sense the choice is
   immaterial. Distributionally it is not: TwoTier holds its worst flow at
   40% of contract where PF leaves one at 0%, and pays 2.6 Mbps of total
   throughput for it. What converges at deep overload is the *contract
@@ -908,31 +908,31 @@ different questions.*
 
 | Flow | SNR | GFBR | RR | PF | Gradient | TwoTier |
 |---|---|---|---|---|---|---|
-| ue1 (video) | 22 dB | 8 M | 77% | 91% | 77% | 56% |
+| ue1 (video) | 22 dB | 8 M | 77% | 92% | 77% | 56% |
 | ue2 (video) | 18 dB | 8 M | 57% | 68% | 66% | 54% |
-| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 53% |
-| **ue4 (video)** | **16 dB** | 8 M | 51% | 62% | 64% | **50%** |
-| ue5 (LIDAR) | 24 dB | 14 M | 56% | 67% | 67% | 56% |
+| ue3 (video) | 20 dB | 8 M | 63% | 74% | 71% | 54% |
+| **ue4 (video)** | **16 dB** | 8 M | 51% | 63% | 64% | **53%** |
+| ue5 (LIDAR) | 24 dB | 14 M | 56% | 68% | 67% | 59% |
 | ue6 (LIDAR) | 19 dB | 14 M | 37% | 46% | 55% | 55% |
-| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **53%** |
-| **ue8 (video + BE)** | 21 dB | 6 M | 3% | 3% | 3% | **53%** |
-| **ue9 (video + BE)** | 17 dB | 6 M | 3% | 3% | 3% | **50%** |
-| **ue10 (video + TCP)** | 20 dB | 6 M | 89% | 0% | 0% | **53%** |
-| Aggregate | | | mean 46% | **mean 44%** | mean 45% | **mean 53%** |
+| **ue7 (LIDAR)** | **14 dB** | 14 M | 23% | 28% | 41% | **54%** |
+| **ue8 (video + BE)** | 21 dB | 6 M | 100% | 100% | 72% | 89% |
+| **ue9 (video + BE)** | 17 dB | 6 M | 90% | 83% | 75% | 55% |
+| **ue10 (video + TCP)** | 20 dB | 6 M | 92% | 1% | 0% | 59% |
+| Aggregate | | | **mean 65%** | mean 62% | mean 59% | mean 59% |
 
-The shape of the TwoTier column is the whole point: **every GBR flow lands
-between 50% and 53–56%**, a 6-point spread across a 10 dB SNR range, against
-PF's 0–91%. That flatness is the max-min floor (§4.1, §7.7), which now ships
-on by default. Three effects are visible:
+The shape of the TwoTier column is the point: **every GBR flow lands between
+53% and 89%, and none below 53%**, against PF's 1–100%. That compression is
+the max-min floor (§4.1, §7.7). Two effects are visible:
 
-- **TwoTier protects mixed-flow GBR (ue8/9/10): 53/50/53% vs PF's 3/3/0%.**
-  These UEs carry a GBR video flow *and* a best-effort flow. Under the
-  QoS-blind baselines the MAC multiplexer fills the UE's transport block by
-  raw backlog, and a continuously-backlogged best-effort flow wins every
-  time — cannibalizing its own UE's GBR flow down to ~3%. TwoTier's
-  multiplexer fills by drift-plus-penalty deficit, so the GBR flow (far
-  behind its Tier-1 target → large `Q`) is served first. This is a direct,
-  clean demonstration of QoS-aware multiplexing.
+- **Mixed-flow UEs (ue8/9/10) are protected under *every* scheduler, and
+  that is not our doing.** An earlier revision of this table showed the
+  QoS-blind baselines collapsing these flows to ~3% while TwoTier held them
+  near 53%, and read it as a clean demonstration of QoS-aware multiplexing.
+  It was an artifact: the simulator let the *scheduler* choose the uplink
+  transport-block split, which no gNB may do. Once the UE fills its own
+  block by prioritised bit rate (TS 38.321 §5.4.3.1), RR and PF reach
+  100/90/92% on these flows unaided. The protection comes from the PBR
+  configuration, not the scheduler. See [NOTES.md](../NOTES.md) 2026-08-07.
 - **The cell edge is held up, not abandoned: ue7 (14 dB) at 53% and ue4
   (16 dB) at 50%, against PF's 28% and 62%.** With the max-min stage
   switched off these two land at exactly **0%** — Tier-1's soft GBR floors
