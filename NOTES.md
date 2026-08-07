@@ -1899,3 +1899,94 @@ stream it is not.
 Tests 67 → 70.
 
 ---
+
+## 2026-08-07 — Tier-1 must estimate demand. It did not oscillate; it locked in.
+
+Second fidelity gap from the OAI review, and the **third and last instance**
+of the "perfect knowledge" pattern (NOTES.md 2026-05-17): the simulator read
+each flow's offered rate straight from the traffic generator's own
+parameters, exactly and forever. No gNB has that.
+
+Built: `demand_estimator = "measured"` estimates each flow's offered rate
+from arrivals over the trailing Tier-1 window, with `demand_ewma_alpha`
+smoothing. For uplink the arrivals are inferred the way a gNB must —
+cumulative delivered plus BSR-reported backlog — so the estimate inherits the
+BSR's lag and loss. Default stays `"oracle"`, matching how BSR and CQI are
+handled: library default is perfect information, studies opt into the
+realistic setting (§5.1 of the study doc).
+
+Also built `traffic_kind: "adaptive"` — an AIMD source whose offered rate
+responds to what it was served. Deliberately generic: TCP is the obvious
+case, but an adaptive video encoder backing off, or a UE-side rate
+controller, close the same loop. Reproduce: `python scripts/demand_study.py`.
+
+### I did not reproduce the resonance
+
+The OAI finding was that a source whose response period is near the Tier-1
+window makes the demand estimate oscillate, costing ~40% of uplink
+throughput, and that an EWMA slower than the oscillation fixes it. Sweeping
+the adapt period against a fixed 1000 ms Tier-1 window:
+
+| adapt period | ratio | oracle | measured raw | measured α=0.3 |
+|---|---|---|---|---|
+| 250 ms | 0.25 | 31.4M | 26.3M | 26.9M |
+| 500 ms | 0.50 | 32.4M | 27.8M | 24.4M |
+| **1000 ms** | **1.00** | 32.4M | 28.9M | 26.5M |
+| 2000 ms | 2.00 | 31.6M | 27.7M | 25.0M |
+| 4000 ms | 4.00 | 33.3M | 29.6M | 24.8M |
+
+**No peak at ratio 1.0.** The penalty for estimating demand is roughly flat
+at 10–15% regardless of where the source's period sits relative to the
+window. Either our AIMD source is too unlike a real TCP sender, or the
+resonance needs something we do not model (RTT-scale dynamics, slow start,
+loss-driven backoff rather than served-ratio-driven).
+
+### What we found instead is worse, and it is a real risk
+
+Per-flow throughput, six contending adaptive uplink sources:
+
+| demand | per-flow Mbps | Jain |
+|---|---|---|
+| oracle | 3.9 4.9 5.3 5.5 5.9 7.0 | **0.97** |
+| measured, raw | 0.2 0.2 0.5 4.6 11.5 11.8 | **0.47** |
+| measured, α=0.3 | 0.2 0.2 0.4 2.1 7.9 **15.7** | **0.37** |
+
+**Estimating demand from arrivals creates a starvation lock-in.** Tier-1
+caps each flow at `r_i ≤ D_i`. When `D_i` is measured from arrivals *and the
+source's arrivals respond to service*, a flow that loses out offers less,
+which lowers its measured demand, which lowers its cap, which keeps it
+losing. Positive feedback. Three of six flows collapse to ~0.2 Mbps while
+two run away with 12–16 Mbps.
+
+**Smoothing makes it worse, not better.** EWMA lengthens the memory of the
+depressed estimate, so α=0.3 is *less* fair than the raw estimate
+(0.37 vs 0.47) and the runaway flow gets further ahead (15.7 vs 11.8 Mbps).
+That is the opposite of the OAI fix, and it is consistent: their EWMA
+targeted an oscillation, and we do not have one.
+
+### Why this matters beyond the simulator
+
+The same structure is in the OAI port — a demand estimate from BSR-derived
+arrivals feeding a hard `r_i ≤ D_i` upper bound. If a deployment carries
+rate-adaptive uplink sources (any TCP bulk transfer, any adaptive encoder),
+the lock-in is available to it. **Added to design-docs/oai-phase1-review.md.**
+
+Candidate mitigations, none yet tested:
+- Floor the demand cap: never let it ratch down below, say, the flow's GFBR,
+  or below a configured minimum for non-GBR.
+- Estimate demand from *backlog* rather than arrivals — a starved flow's
+  buffer grows, which is the opposite signal to its arrival rate.
+- Drop the upper bound entirely for non-GBR flows and let the utility term
+  handle them; the cap exists to stop Tier-1 over-allocating to a flow that
+  cannot use it, which the log utility already discourages.
+
+The second looks most promising and is closest to what the windowed ceiling
+already does for the virtual queues.
+
+### Status
+
+`demand_estimator` stays `"oracle"` by default. **The measured path is not
+yet safe to make default** — it would hand us a fairness collapse we do not
+understand well enough to defend. This entry is the finding, not the fix.
+
+---

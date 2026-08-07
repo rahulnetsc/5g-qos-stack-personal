@@ -558,6 +558,11 @@ def estimate_demand_bps(f: FlowConfig) -> float:
     kind = f.traffic_kind
     if kind == "poisson":
         return float(p.get("rate_bps", 0.0))
+    if kind == "adaptive":
+        # A rate-adaptive source has no fixed offered rate. This is only the
+        # starting point; with demand_estimator="measured" the scheduler
+        # tracks the real thing from observed arrivals instead.
+        return float(p.get("initial_rate_bps", p.get("max_rate_bps", 1e7)))
     if kind == "deterministic":
         period_s = p["period_ms"] / 1000.0
         return p["bytes_per_period"] * 8 / period_s

@@ -94,6 +94,8 @@ class TwoTier:
         slice_slack_penalty: float = 1e3,
         ul_split_estimator: str = "shadow_lcp",
         ul_bucket_sync_gain: float = 0.0,
+        demand_estimator: str = "oracle",
+        demand_ewma_alpha: float = 0.3,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -170,6 +172,24 @@ class TwoTier:
         # contradicts the predicted backlog, the residual is fed back into the
         # bucket at this gain. 0 disables it (pure open-loop shadow).
         self.ul_bucket_sync_gain = ul_bucket_sync_gain
+        # Where Tier-1's per-flow demand cap comes from.
+        #   "oracle"   -- the flow's configured offered rate, known exactly and
+        #                 forever. No gNB has this; it is the remaining
+        #                 instance of the "perfect knowledge" pattern that the
+        #                 BSR and CQI work closed (NOTES.md 2026-05-17).
+        #   "measured" -- estimated from observed arrivals over the trailing
+        #                 Tier-1 window, then EWMA-smoothed. For uplink the
+        #                 arrivals are inferred the way a gNB must:
+        #                 delivered + BSR-reported backlog.
+        # Unlike BSR/CQI staleness, this gap flatters *Tier-1*: a perfect
+        # demand cap is exactly right, an estimated one is not.
+        self.demand_estimator = demand_estimator
+        # EWMA smoothing on the measured estimate. A rate-adaptive source
+        # forms a closed loop with the scheduler, and if its response period
+        # is near the Tier-1 window the raw estimate oscillates; smoothing
+        # slower than that period is what damps it.
+        self.demand_ewma_alpha = demand_ewma_alpha
+        self._demand_smooth: dict[tuple[int, int], float] = {}
         # Shadow bucket state, per UL flow: [tokens_bits, capacity_bits, pbr]
         self._ul_shadow_bucket: dict[tuple[int, int], list[float]] = {}
         # What the gNB thinks each UL flow's backlog is after its last grant,
@@ -229,6 +249,34 @@ class TwoTier:
         self._del_hist = {
             (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
         }
+
+    def _update_demand_estimate(self, buffers) -> None:
+        """Re-estimate each flow's offered rate from what actually arrived.
+
+        Arrivals over the trailing Tier-1 window, converted to a rate. For
+        uplink the gNB cannot see arrivals directly, so it infers them the
+        way a real one does -- cumulative delivered plus the BSR-reported
+        backlog -- which inherits the BSR's lag and loss.
+        """
+        if self.demand_estimator != "measured":
+            return
+        window_s = max(1, self.tier1_period) * self.slot_duration_s
+        a = self.demand_ewma_alpha
+        for f in self._flows:
+            key = (f.ue_id, f.qfi)
+            st = buffers.state(f.ue_id, f.qfi)
+            visible_backlog = (
+                st.bytes_reported if f.direction == "UL" else st.bytes_queued
+            )
+            arr_now = (buffers.delivered_cum(*key) + visible_backlog) * 8
+            hist = self._arr_hist[key]
+            arrived_w = arr_now - (hist[0] if hist else 0)
+            raw = max(0.0, arrived_w / window_s)
+            prev = self._demand_smooth.get(key)
+            self._demand_smooth[key] = raw if prev is None else (
+                a * raw + (1.0 - a) * prev
+            )
+            self._demand_bps[key] = self._demand_smooth[key]
 
     def _resolve_tier1(self) -> None:
         snr_in = {
@@ -452,6 +500,7 @@ class TwoTier:
         self._refill_ul_shadow()
         self._sync_ul_buckets(buffers)
         if slot.slot_index - self._last_solve_slot >= self.tier1_period:
+            self._update_demand_estimate(buffers)
             self._resolve_tier1()
             self._last_solve_slot = slot.slot_index
 

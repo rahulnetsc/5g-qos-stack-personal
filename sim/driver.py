@@ -144,6 +144,9 @@ def run(
             else:
                 ul_prbs_used_this_slot += alloc.prbs
         metrics.record_cce(cce_used_this_slot, slot_grid.pdcch_cce_budget)
+        # Close the loop for rate-adaptive sources: their offered load
+        # responds to what they actually got.
+        traffic.observe_delivery(per_flow_delivered)
 
         per_flow_dropped: dict[tuple[int, int], int] = defaultdict(int)
         for ue_id, qfi in buffers.keys():

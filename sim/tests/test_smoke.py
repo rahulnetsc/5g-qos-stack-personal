@@ -1537,6 +1537,8 @@ def test_documented_defaults_match_the_code():
         "slice_slack_penalty": 1e3,
         "ul_split_estimator": "shadow_lcp",
         "ul_bucket_sync_gain": 0.0,
+        "demand_estimator": "oracle",
+        "demand_ewma_alpha": 0.3,
     }
     actual = inspect.signature(TwoTier.__init__).parameters
     assert set(documented) == set(actual) - {"self"}, (
