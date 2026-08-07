@@ -21,6 +21,8 @@ from pathlib import Path
 
 import yaml
 
+from scheduler.flow import priority_for_5qi
+
 from .config import (
     CarrierConfig,
     FlowConfig,
@@ -81,8 +83,19 @@ def _flow_from_dict(ue_id: int, flow_dict: dict) -> FlowConfig:
         flow_class=flow_dict.get("flow_class", "PF"),
         pdb_ms=float(flow_dict.get("max_delay_budget_ms", 100.0)),
         gfbr_bps=float(flow_dict.get("min_data_rate_bps", 0.0)),
-        priority_level=int(flow_dict.get("priority_level", 100)),
+        # Default the priority from the standardised 5QI table rather than a
+        # neutral constant: two flows on one UE sharing a priority makes the
+        # MAC multiplexer's order depend on YAML listing order. An explicit
+        # priority_level in the scenario still wins.
+        priority_level=int(
+            flow_dict.get("priority_level", priority_for_5qi(flow_dict["qfi"]))
+        ),
         slice_id=int(flow_dict.get("slice_id", 0)),
+        # UE-side LCP config (uplink). pbr_bps unset means "use the GFBR"
+        # for a GBR flow and "no prioritised rate" otherwise -- see
+        # FlowConfig.effective_pbr_bps.
+        pbr_bps=float(flow_dict.get("prioritised_bit_rate_bps", 0.0)),
+        bsd_ms=float(flow_dict.get("bucket_size_duration_ms", 100.0)),
         traffic_kind=traffic_kind,
         traffic_params=traffic_params,
     )

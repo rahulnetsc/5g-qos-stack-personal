@@ -1858,3 +1858,44 @@ priorities per 5QI and we should too** — otherwise a scenario-file reordering
 silently changes results. Worth fixing before any UL number is quoted.
 
 ---
+
+## 2026-08-07 — Priorities derived from the 5QI table, not left at a constant
+
+Closing the second caveat from the shadow-bucket entry. Every flow carried
+`priority_level = 100`, so the MAC multiplexer's priority sort was a stable
+sort over equal keys and fell back to the order flows happen to appear in the
+scenario YAML. Round 1 of the UE LCP was unaffected (it gates on `PBR > 0`),
+but the round-2 remainder was decided by file order.
+
+`scheduler/flow.py` now carries the standardised 5QI → priority table from
+3GPP TS 23.501 Table 5.7.4-1, and `sim/config_loader.py` defaults each flow's
+priority from its 5QI. An explicit `priority_level:` in a scenario still wins.
+On `factory_robots` the multi-flow UEs now read 5QI 2 → 40 (GBR video) ahead
+of 5QI 9 → 90 / 5QI 8 → 80 (best effort), which is the ordering the stable
+sort had been producing by luck.
+
+**Results are unchanged.** That is the point: this removes a latent fragility
+rather than fixing a wrong number. A scenario-file reordering can no longer
+silently change UL results.
+
+Scenarios can now also set `prioritised_bit_rate_bps` and
+`bucket_size_duration_ms` per flow; unset still means "GFBR for a GBR flow,
+nothing otherwise".
+
+### A test that was measuring the wrong thing
+
+The obvious regression test — run the scenario twice with the flow list
+reversed, require identical delivery — **fails**, and not because of the
+scheduler. Reversing `scenario.flows` also changes which RNG draws each flow
+receives from the shared traffic generator, so the two runs have different
+*workloads*. It was measuring the RNG, not the ordering.
+
+Replaced with a unit test of `UeLcp.fill` under a reversed flow list, which
+isolates the property actually claimed. Worth remembering the general shape:
+**a whole-run A/B is only a valid test of ordering if the workload is
+provably identical across the two arms**, and with a shared per-flow RNG
+stream it is not.
+
+Tests 67 → 70.
+
+---

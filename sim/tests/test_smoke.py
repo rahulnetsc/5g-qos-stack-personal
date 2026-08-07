@@ -1571,3 +1571,94 @@ def test_documented_defaults_match_the_code():
     study = Path("scripts/scheduler_study.py").read_text()
     assert "UL_BSR_DELAY_SLOTS = 8" in study
     assert "CQI_DELAY_SLOTS = 8" in study
+
+
+# --- UE-side uplink LCP and 5QI priorities ---------------------------------
+
+
+def test_five_qi_priorities_are_distinct_on_multi_flow_ues():
+    """A UE's flows must not share a priority level.
+
+    The MAC multiplexer orders a UE's flows by priority; if two share one,
+    the sort falls back to whatever order the scenario file lists them in,
+    and a harmless-looking YAML reordering silently changes results. Deriving
+    the priority from the standardised 5QI (TS 23.501 Table 5.7.4-1) is what
+    prevents that.
+    """
+    from collections import defaultdict
+
+    from sim.scenarios import factory_robots_scenario
+
+    scenario = factory_robots_scenario()
+    by_ue_dir = defaultdict(list)
+    for f in scenario.flows:
+        by_ue_dir[(f.ue_id, f.direction)].append(f)
+
+    for (ue_id, direction), flows in by_ue_dir.items():
+        prios = [f.priority_level for f in flows]
+        assert len(prios) == len(set(prios)), (
+            f"ue{ue_id} {direction} has flows sharing a priority: "
+            f"{[(f.qfi, f.priority_level) for f in flows]}"
+        )
+
+
+def test_ue_lcp_split_is_independent_of_flow_listing_order():
+    """The UE's LCP output must not depend on the order its flows are listed.
+
+    This is the property distinct 5QI priorities buy. Deliberately a unit
+    test of the LCP rather than a full run: reversing a scenario's flow list
+    also changes which RNG draws each flow receives, so a whole-run
+    comparison would measure a different workload, not a different order.
+    """
+    from sim.scenarios import factory_robots_scenario
+    from sim.ue_lcp import UeLcp
+
+    scenario = factory_robots_scenario()
+    ue_flows = [f for f in scenario.flows
+                if f.ue_id == 8 and f.direction == "UL"]
+    assert len(ue_flows) > 1, "need a multi-flow UE for this to mean anything"
+
+    buffers = BufferModel()
+    for f in ue_flows:
+        buffers.register(f.ue_id, f.qfi, is_ul=True)
+        buffers.enqueue(f.ue_id, f.qfi, 40_000, 0.0)
+
+    def split(order):
+        lcp = UeLcp(order)
+        lcp.refill(0.02)
+        return sorted(lcp.fill(order, 6_000, buffers))
+
+    assert split(ue_flows) == split(list(reversed(ue_flows))), (
+        "LCP split changed when the flow list was reversed -- flows on this "
+        "UE probably share a priority level"
+    )
+
+
+def test_ue_lcp_pbr_round_protects_gbr_from_a_greedy_best_effort_flow():
+    """Round 1 of the UE's LCP is gated on a prioritised bit rate, so a
+    continuously-backlogged best-effort flow cannot crowd out a GBR flow on
+    the same UE however large its buffer gets."""
+    from sim.ue_lcp import UeLcp
+
+    gbr = FlowConfig(ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+                     gfbr_bps=8_000_000, pdb_ms=30, priority_level=40,
+                     traffic_kind="poisson",
+                     traffic_params={"rate_bps": 8_000_000})
+    be = FlowConfig(ue_id=1, qfi=9, direction="UL", flow_class="PF",
+                    priority_level=90, traffic_kind="poisson",
+                    traffic_params={"rate_bps": 50_000_000})
+
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True)
+    buffers.register(1, 9, is_ul=True)
+    buffers.enqueue(1, 2, 2_000, 0.0)        # modest GBR backlog
+    buffers.enqueue(1, 9, 1_000_000, 0.0)    # enormous best-effort backlog
+
+    lcp = UeLcp([gbr, be])
+    lcp.refill(0.05)                          # 50 ms of tokens
+    fills = dict(lcp.fill([gbr, be], 3_000, buffers))
+
+    assert fills.get(2, 0) == 2_000, (
+        f"GBR flow should be served first from its PBR bucket, got {fills}"
+    )
+    assert fills.get(9, 0) == 1_000, "best-effort gets only the remainder"
