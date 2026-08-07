@@ -587,6 +587,8 @@ measured, and defaulted off, with the negative result cited.
 | — | `sps_budget_fraction` | `0.85` | decided | Ceiling on the carrier fraction SPS may reserve, leaving a dynamic pool for burst spillover. |
 | — | `sps_min_scale` | `0.75` | decided | Viability floor. If a priority tier's reservations would be scaled below this, the tier runs dynamically instead — unless dropping it would overrun the CCE budget. This is what stops SPS being net-negative on an oversubscribed uplink. |
 | — | `sps_snr_margin_db` | `0.0` | deployment | Conservatism of the semi-static SPS MCS, chosen at reservation time from `snr_avg − margin`. A mobility hedge: `0` for fixed/slow deployments; anything ≥ 1 dB costs contracts on this channel (§7.6). |
+| — | `ul_split_estimator` | `shadow_lcp` | decided | How the gNB guesses the UE's uplink TB split, which drains the UL virtual queues — it never observes the real one. `occupancy` apportions by BSR buffer; `shadow_lcp` re-runs the UE's own LCP on a shadow copy of its PBR buckets, which the gNB can do because it configured them. |
+| — | `ul_bucket_sync_gain` | `0.0` | deployment | Closed-loop correction feeding BSR-vs-prediction residuals back into the shadow buckets. `0` is open-loop. The residual is contaminated by unseen arrivals, so keep the gain small. |
 
 Per-flow contract fields (`gfbr_bps`, `pdb_ms`, `priority_level`,
 `slice_id`) are workload inputs rather than tuning knobs; see

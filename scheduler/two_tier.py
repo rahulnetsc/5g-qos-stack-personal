@@ -92,6 +92,8 @@ class TwoTier:
         capacity_safety_factor: float = 1.0,
         slice_shares: "dict[int, dict[str, float]] | None" = None,
         slice_slack_penalty: float = 1e3,
+        ul_split_estimator: str = "shadow_lcp",
+        ul_bucket_sync_gain: float = 0.0,
     ) -> None:
         self.tier1_period = max(1, tier1_period_slots)
         self.snr_window = max(1, snr_window_slots)
@@ -154,6 +156,25 @@ class TwoTier:
         # Last max-min level solved, for diagnostics/telemetry. NaN until
         # the first Tier-1 solve; stays NaN when gbr_maxmin is off.
         self.maxmin_level = float("nan")
+        # How the gNB guesses the UE's uplink transport-block split, which
+        # is what drains the uplink virtual queues. It never observes the
+        # real split (TS 38.321 sec 5.4.3.1 runs in the UE).
+        #   "occupancy"  -- apportion by BSR-reported buffer. What the OAI
+        #                   port does today; uses only the BSR.
+        #   "shadow_lcp" -- run the UE's own LCP against a shadow copy of
+        #                   its PBR token buckets. Strictly more information:
+        #                   the gNB configured those PBRs, so it can predict
+        #                   the algorithm rather than approximate its result.
+        self.ul_split_estimator = ul_split_estimator
+        # Closed-loop correction on the shadow buckets. Each time a fresh BSR
+        # contradicts the predicted backlog, the residual is fed back into the
+        # bucket at this gain. 0 disables it (pure open-loop shadow).
+        self.ul_bucket_sync_gain = ul_bucket_sync_gain
+        # Shadow bucket state, per UL flow: [tokens_bits, capacity_bits, pbr]
+        self._ul_shadow_bucket: dict[tuple[int, int], list[float]] = {}
+        # What the gNB thinks each UL flow's backlog is after its last grant,
+        # used to detect BSR disagreement for the closed-loop correction.
+        self._ul_predicted_backlog: dict[tuple[int, int], float] = {}
         # Network-slice RB shares {slice_id: {"DL": frac, "UL": frac}};
         # None disables slicing. Enforced as a soft Tier-1 floor.
         self.slice_shares = slice_shares
@@ -191,6 +212,20 @@ class TwoTier:
         self._arr_hist = {
             (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
         }
+        # Shadow copy of every uplink flow's PBR token bucket. Same PBR and
+        # bucket-size-duration the network configured on the UE, so the gNB
+        # can run the UE's algorithm -- it just cannot see the UE's real
+        # backlog, which is where the two copies drift apart.
+        self._ul_shadow_bucket = {}
+        self._ul_predicted_backlog = {}
+        for f in flows:
+            if f.direction != "UL":
+                continue
+            pbr = f.effective_pbr_bps()
+            self._ul_shadow_bucket[(f.ue_id, f.qfi)] = [
+                0.0, pbr * (f.bsd_ms / 1000.0), pbr
+            ]
+            self._ul_predicted_backlog[(f.ue_id, f.qfi)] = 0.0
         self._del_hist = {
             (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
         }
@@ -412,6 +447,10 @@ class TwoTier:
         self, slot: SlotView, buffers: BufferView, channel: ChannelView
     ) -> list[Allocation]:
         self._update_snr_ewma(channel)
+        # Mirror the UE's token-bucket refill, then let any fresh BSR nudge
+        # the shadow copy back towards the real one.
+        self._refill_ul_shadow()
+        self._sync_ul_buckets(buffers)
         if slot.slot_index - self._last_solve_slot >= self.tier1_period:
             self._resolve_tier1()
             self._last_solve_slot = slot.slot_index
@@ -596,16 +635,22 @@ class TwoTier:
     def _estimate_ul_split(self, ue_flows, tbs_bytes, buffers, committed):
         """The gNB's guess at how a UE will fill an uplink grant.
 
-        A real gNB never learns the true split, so it apportions the block
-        across the UE's flows in proportion to their *reported* (BSR) buffer
-        occupancy. This is what drives the virtual-queue drain; the actual
-        transmission is decided by the UE (see sim/ue_lcp.py).
+        A real gNB never learns the true split -- the LCP runs in the UE --
+        so the drain of the uplink virtual queues rests on an estimate. Two
+        are offered; see ``ul_split_estimator``.
         """
+        if self.ul_split_estimator == "shadow_lcp":
+            return self._shadow_lcp_split(ue_flows, tbs_bytes, buffers, committed)
+        return self._occupancy_split(ue_flows, tbs_bytes, buffers, committed)
+
+    def _occupancy_split(self, ue_flows, tbs_bytes, buffers, committed):
+        """Apportion the block by BSR-reported occupancy. Uses only the BSR,
+        and is what the OAI port does today."""
         occ = []
         for f in ue_flows:
             key = (f.ue_id, f.qfi)
-            st = buffers.state(f.ue_id, f.qfi)
-            free = max(0, st.bytes_reported - committed.get(key, 0))
+            free = max(0, buffers.state(f.ue_id, f.qfi).bytes_reported
+                       - committed.get(key, 0))
             if free > 0:
                 occ.append((key, free))
         total = sum(v for _, v in occ)
@@ -617,6 +662,95 @@ class TwoTier:
             if share > 0:
                 out.append((key, min(share, v)))
         return out
+
+    def _shadow_lcp_split(self, ue_flows, tbs_bytes, buffers, committed):
+        """Predict the split by running the UE's own LCP on shadow buckets.
+
+        The gNB configured each channel's PBR and bucket-size duration, so it
+        can reproduce the *algorithm* exactly. What it cannot reproduce is the
+        UE's view of its own backlog: BSR is delayed, lossy, and reported per
+        logical channel *group* rather than per channel. Where the two views
+        differ the shadow bucket is debited differently from the real one and
+        the copies drift.
+
+        The drift is bounded, and self-correcting at both rails: a bucket
+        cannot leave [0, PBR*BSD], so a persistently starved channel pins both
+        copies at 0 and an idle one pins both at the cap. Divergence survives
+        only in the middle of the range. ``ul_bucket_sync_gain`` adds an
+        explicit closed-loop correction on top -- see _sync_ul_buckets.
+        """
+        order = sorted(ue_flows, key=lambda f: f.priority_level)
+        taken: dict[tuple[int, int], int] = {}
+        remaining = tbs_bytes
+
+        def believed_backlog(f):
+            key = (f.ue_id, f.qfi)
+            return max(0, buffers.state(f.ue_id, f.qfi).bytes_reported
+                       - committed.get(key, 0) - taken.get(key, 0))
+
+        # Round 1 -- prioritised bit rate, bounded by the shadow bucket.
+        for f in order:
+            if remaining <= 0:
+                break
+            key = (f.ue_id, f.qfi)
+            b = self._ul_shadow_bucket.get(key)
+            if b is None or b[0] <= 0.0:
+                continue
+            take = min(int(b[0] / 8.0), believed_backlog(f), remaining)
+            if take > 0:
+                taken[key] = taken.get(key, 0) + take
+                b[0] = max(0.0, b[0] - take * 8.0)
+                remaining -= take
+
+        # Round 2 -- strict priority for the remainder.
+        for f in order:
+            if remaining <= 0:
+                break
+            key = (f.ue_id, f.qfi)
+            take = min(believed_backlog(f), remaining)
+            if take > 0:
+                taken[key] = taken.get(key, 0) + take
+                remaining -= take
+
+        for f in ue_flows:
+            key = (f.ue_id, f.qfi)
+            self._ul_predicted_backlog[key] = max(
+                0.0, buffers.state(f.ue_id, f.qfi).bytes_reported
+                - committed.get(key, 0) - taken.get(key, 0)
+            )
+        return [(k, v) for k, v in taken.items() if v > 0]
+
+    def _refill_ul_shadow(self) -> None:
+        """Advance the shadow buckets one slot, mirroring the UE."""
+        for b in self._ul_shadow_bucket.values():
+            b[0] = min(b[1], b[0] + b[2] * self.slot_duration_s)
+
+    def _sync_ul_buckets(self, buffers) -> None:
+        """Closed-loop correction of the shadow buckets from fresh BSRs.
+
+        The bucket itself is never reported, but its error shows up in the
+        backlog: if the gNB predicted a channel would be drained to X and the
+        BSR says Y > X, the UE served that channel less than predicted, so it
+        spent fewer tokens and the shadow bucket is too low. Feed the residual
+        back at ``ul_bucket_sync_gain``.
+
+        The signal is contaminated -- new arrivals also raise the reported
+        backlog, and they are indistinguishable from a mis-prediction in a
+        single sample. That argues for a small gain: this is a slow nudge to
+        stop drift accumulating, not a per-slot correction. It is off by
+        default so the open-loop shadow can be measured on its own.
+        """
+        if self.ul_bucket_sync_gain <= 0.0:
+            return
+        for key, b in self._ul_shadow_bucket.items():
+            predicted = self._ul_predicted_backlog.get(key, 0.0)
+            reported = buffers.state(key[0], key[1]).bytes_reported
+            residual_bits = (reported - predicted) * 8.0
+            if residual_bits > 0.0:
+                # Served less than predicted -> tokens were not spent.
+                b[0] = min(b[1], b[0] + self.ul_bucket_sync_gain * residual_bits)
+            elif residual_bits < 0.0:
+                b[0] = max(0.0, b[0] + self.ul_bucket_sync_gain * residual_bits)
 
     def _allocate_sps(
         self,

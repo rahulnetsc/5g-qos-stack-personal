@@ -170,6 +170,10 @@ def run(
         )
 
     summary = metrics.summary(horizon_s)
+    # Diagnostic handle on the UE model, so a study can compare the gNB's
+    # shadow token buckets against the UE's real ones. Not part of the
+    # metrics contract -- see scripts/ul_shadow_study.py.
+    summary["_ue_lcp"] = ue_lcp
     if record_timeseries:
         summary["timeseries"] = metrics.timeseries()
     return summary

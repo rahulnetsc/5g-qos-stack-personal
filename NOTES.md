@@ -1780,3 +1780,81 @@ and §7.4 of the study doc and the paper's Table V need rewriting once the
 estimator question above is settled.
 
 ---
+
+## 2026-08-07 — Can the gNB shadow the UE's token bucket? Yes; the closed loop hurts
+
+Follow-up to the UL LCP change. The gNB configured every PBR over RRC, so it
+can run the UE's LCP itself against a *shadow* copy of the buckets instead of
+apportioning the grant by BSR occupancy. Built as
+`ul_split_estimator = "shadow_lcp"` (now the default) with an optional
+closed-loop correction `ul_bucket_sync_gain`. Reproduce:
+`python scripts/ul_shadow_study.py`.
+
+### Does it drift? Yes, but not far, and it is bounded by construction
+
+Bucket error is |gNB shadow − UE real| as a fraction of bucket capacity,
+`factory_robots`, BSR delay 8 slots:
+
+| estimator | sync gain | mean err | max err | mean GBR | min GBR | total |
+|---|---|---|---|---|---|---|
+| occupancy | — | 2.2% | 18.1% | 59% | 53% | 65.8M |
+| shadow_lcp | 0.00 | **1.9%** | 18.1% | 59% | 54% | 65.9M |
+| shadow_lcp | 0.01 | 1.9% | 18.1% | 59% | 54% | 65.9M |
+| shadow_lcp | 0.05 | **7.1%** | **70.1%** | 59% | 54% | 65.9M |
+| shadow_lcp | 0.20 | 5.6% | 36.3% | 59% | 54% | 65.9M |
+
+The two copies are debited from different views of backlog — the UE's exact
+one, the gNB's delayed and (in real 5G) per-LCG-aggregated one — so they must
+drift. They do, by ~2% of capacity on average.
+
+**The drift cannot run away.** A bucket is clamped to `[0, PBR·BSD]`, so both
+copies re-synchronise at either rail: a persistently starved channel pins
+both at 0, an idle one pins both at the cap. Divergence survives only in the
+middle of the range, which is why the mean stays small.
+
+### The closed-loop correction makes it worse — a clean negative result
+
+Feeding the BSR-vs-prediction residual back into the bucket **increases**
+divergence, 1.9% → 7.1% mean and 18% → 70% max at gain 0.05. The mechanism is
+the contamination the code comment predicted: the residual is
+`reported_backlog − predicted_backlog`, and **new arrivals raise the reported
+backlog exactly as a mis-prediction would.** The controller cannot tell the
+two apart in one sample, reads unseen arrivals as "the UE served this channel
+less than I thought", and credits tokens back that were never there. It
+systematically over-credits, pushing the shadow above the real bucket.
+
+So: the answer to "can BSR nudge it back" is **not with this signal**. A
+usable correction would need to separate arrivals from service error — e.g.
+by differencing over a window where arrivals can be estimated independently,
+or by correcting only when the reported backlog *falls* (unambiguous
+service). Left at gain 0 (open loop), which is both the default and the best
+measured setting.
+
+### Neither estimator changes the delivered outcome here
+
+mean GBR 59% and total ~65.9 M under both; min GBR moves 53% → 54%. That
+matters for the open question from the previous entry: TwoTier trailing RR
+and PF on mean GBR delivery after the UL fix is **not** an artifact of a
+crude drain estimate. Improving the estimator to the best available does not
+recover it. Explanation (1) — that it is the max-min floor spreading pain at
+1.0× load, as already documented — is the surviving one.
+
+### Two caveats that limit what this scenario can show
+
+**1. The buckets are saturated, so their dynamics are inert here.** A bucket
+only binds when a flow is being served at or above its PBR. `factory_robots`
+at 1.0× load is deep overload, so GBR flows are served *below* GFBR, their
+buckets sit at the cap, and round 1 never runs out of tokens. What actually
+protects the GBR flow is therefore the cruder fact that it has `PBR > 0` and
+the best-effort flow has `PBR = 0` — not the bucket's rate-limiting. Bucket
+dynamics should matter at moderate load; untested.
+
+**2. Round-2 ordering is scenario-file-order dependent.** Every flow in
+`factory_robots` has `priority_level = 100`, so the LCP's priority sort is a
+stable sort over equal keys and falls back to the order the YAML lists flows
+in. Round 1 is unaffected (it is gated on `PBR > 0`, which is principled),
+but the round-2 remainder is not. **Real deployments assign distinct
+priorities per 5QI and we should too** — otherwise a scenario-file reordering
+silently changes results. Worth fixing before any UL number is quoted.
+
+---

@@ -1535,6 +1535,8 @@ def test_documented_defaults_match_the_code():
         "capacity_safety_factor": 1.0,
         "slice_shares": None,
         "slice_slack_penalty": 1e3,
+        "ul_split_estimator": "shadow_lcp",
+        "ul_bucket_sync_gain": 0.0,
     }
     actual = inspect.signature(TwoTier.__init__).parameters
     assert set(documented) == set(actual) - {"self"}, (
