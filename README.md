@@ -173,12 +173,24 @@ cvxpy / numpy, never `sim/`) intended for OpenAirInterface integration.
 
 ## Roadmap
 
+All three factory-robots findings from May 2026 are now closed (Finding 1
+via a max-min GBR stage in Tier-1, Finding 2 via priority-tiered SPS
+reservations, Finding 3 as a contract-dimensioning problem, not a
+scheduler one). See [NOTES.md](NOTES.md) for each fix.
+
 Near-term:
+- **OAI integration** — happening in a parallel workstream; see
+  [scheduler/HOWTO.md](scheduler/HOWTO.md) for the integration guide.
+  Rank-3 UL k2 grant-to-transmission timing is expected to surface there
+  (see NOTES.md gap audit, 2026-05-17).
+- Fill in the paper's §VII OAI results (see [paper/README.md](paper/README.md)).
 - Real 3GPP TBS table extract (currently a fitted curve).
-- Deep dive on Findings 2 and 3 (see [NOTES.md](NOTES.md)).
+- Study `slice_slack_penalty` vs `gbr_penalty_init` relative weight — the
+  unit fix landed but the policy ratio has never been swept.
 
 Longer-term:
-- OAI integration (see [scheduler-design.md §10](design-docs/scheduler-design.md)).
+- Proper HARQ state machine (retransmits consuming PRBs, not just a BLER
+  discount).
 - MU-MIMO awareness in the LP.
 - Trace-driven traffic from real factory measurements.
 
