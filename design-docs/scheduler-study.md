@@ -622,6 +622,23 @@ nothing else.**
 | BLER as a discount on delivered bits | Single-stream only — no MU-MIMO |
 | Per-flow buffers with HoL timestamps and PDB expiry | Single cell — no mobility, no inter-cell interference |
 
+**The uplink transport block is filled by the UE, not by us.** The gNB
+grants a block and the UE splits it across its logical channels by its own
+prioritised-bit-rate LCP (TS 38.321 §5.4.3.1); the gNB configured those PBRs
+but does not run the algorithm and never learns the result. The simulator
+models the UE's fill over its real backlog, and separately the gNB's
+*estimate* of that split, which is what drains the uplink virtual queues —
+deliberately two different views of the same event. An earlier version let
+the scheduler choose the split, which manufactured a result; see §7.4 and
+[NOTES.md](../NOTES.md) 2026-08-07.
+
+That correction generalises into the check we now apply to every quantity
+the scheduler reads: **which network element learns this, and how?** Three
+gaps have been found this way — buffer status (BSR delay and loss), channel
+quality (CQI staleness), and the uplink split — and every one had been
+flattering the scheduler rather than the baselines, because a simulator
+written from the scheduler's point of view grants its conveniences there.
+
 The discipline cuts both ways. The PDCCH budget is modeled *because the
 control channel is a genuine bottleneck* — and §7.2 shows that omitting it
 would have led to the wrong conclusion that Configured Grants are

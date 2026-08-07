@@ -26,6 +26,14 @@ OAI integration is planned but not yet started.
   Tier-2 metric, OAI integration plan).
 - [design-docs/simulator-design.md](design-docs/simulator-design.md) — what
   the simulator models and (more importantly) what it deliberately doesn't.
+- [design-docs/adoption-decision.md](design-docs/adoption-decision.md) —
+  should this replace proportional fair? The regimes where it wins, the one
+  metric it loses on and why that is a metric choice, and why a
+  scheduler-level fallback is the wrong instrument.
+- [design-docs/oai-phase1-review.md](design-docs/oai-phase1-review.md) —
+  review of the OpenAirInterface port against this design, with a
+  prioritised change list.
+- [paper/](paper/) — a conference draft built from these documents.
 - [scheduler/HOWTO.md](scheduler/HOWTO.md) — for a gNB developer wiring
   this scheduler into OpenAirInterface (or any other gNB codebase): the
   four structural views to satisfy from host structs, per-slot integration,
@@ -132,6 +140,8 @@ required. Full results and a build/don't-build decision table are in
 │   ├── cqi_study.py              DL CQI staleness / SPS MCS margin sensitivity
 │   ├── maxmin_study.py           max-min GBR stage (cell-edge starvation)
 │   ├── knapsack_diagnostic.py    why soft GBR floors abandon the cell edge
+│   ├── ul_shadow_study.py        gNB shadow of the UE's PBR token buckets
+│   ├── demand_study.py           Tier-1 demand estimation and its failure modes
 │   ├── transient_check.py        long-run windowed steady-state check
 │   └── plot_timeseries.py
 └── ...

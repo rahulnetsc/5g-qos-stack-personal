@@ -2329,3 +2329,39 @@ from "honours contracts PF misses" to "refuses to abandon flows PF
 abandons". Not yet done.
 
 ---
+
+## 2026-08-07 — Documents brought in line; adoption decision recorded
+
+Housekeeping entry closing the day.
+
+- **[design-docs/adoption-decision.md](design-docs/adoption-decision.md)** —
+  new. Answers the question the whole exercise was for: adopt, and do not
+  build a scheduler-level fallback to PF, because it would surrender the two
+  mechanisms that work to fix a metric artifact in the one that does not.
+  Contains the measurement that settles the fallback question: sweeping
+  `gbr_maxmin_scale` from 1 to 0 moves the contract count only 1/10 → 2/10
+  against PF's 6/10, so the gap is not the max-min floor.
+
+- **[design-docs/oai-phase1-review.md](design-docs/oai-phase1-review.md)** —
+  updated with three new items. §B9: the port's hard demand cap
+  (`glp_set_col_bnds(..., GLP_DB, 0.0, demand_bps)`) is redundant with its
+  own windowed ceiling and is a starvation trap; dropping it is a one-line
+  change. §B10: `arr_cum = del_cum + backlog` omits PDB-discarded bytes at
+  four sites, feeding *both* the demand estimate and the DL and UL ceilings —
+  worse there than it was here, because we only had it in one place. §B11:
+  the shadow-LCP split estimator, with the caveat that it did not change
+  outcomes and that closing the loop on it made things worse. §C1 records
+  that adopting their uplink model cost us a headline result, which changes
+  how their own Phase-1 multi-flow-UE measurements should be read.
+
+- **scheduler-study.md** — §5.1 now describes the UE-side uplink fill and
+  states the general check the three fidelity gaps produced: *which network
+  element learns this, and how?* All affected result tables were updated
+  earlier today.
+
+- **paper/** — reframed as an engineering study. No novelty claim for the
+  design; the contributions are independent reproduction, the three
+  fidelity corrections, and the adoption decision. Still one column over an
+  8-page budget.
+
+---

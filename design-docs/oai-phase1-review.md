@@ -9,9 +9,15 @@ and against [scheduler-design.md](scheduler-design.md).
 **Overall: the port is faithful in structure and mostly faithful in
 mechanism.** The virtual-queue mathematics, the Tier-1 constraint set, the
 LCP fill rule and the thread/atomic-snapshot split all match the design.
-What has drifted is *where the metric sits in the decision*, and two
-capacity/conditioning details. One issue (§B1) substantially defeats the
-purpose of Tier-1 and should be fixed before any further measurement.
+What has drifted is *where the metric sits in the decision*, and some
+capacity and conditioning details. One issue (§B1) substantially defeats
+the purpose of Tier-1 and should be fixed before any further measurement.
+
+**Updated 2026-08-07** after further simulator work: §B9–§B11 are new, and
+§B9 (the demand cap) is a one-line change that removes a starvation trap.
+§C1 records that adopting the port's uplink model removed one of *our*
+headline results, which changes how Phase-1 measurements of multi-flow
+uplink UEs should be read.
 
 ---
 
@@ -31,7 +37,8 @@ purpose of Tier-1 and should be fixed before any further measurement.
 3. **Tier-1 constraint set** (`ia_p5g_sca_solve`) matches ours:
    per-direction capacity `Σ r_i/SE_i ≤ C_d`, soft GBR floor
    `r_i + s_i ≥ G_i`, demand cap `r_i ≤ D_i`, `s_i` fixed to 0 for non-GBR.
-   Class weights `w_Delay = 5`, `w_PF = 1`.
+   Class weights `w_Delay = 5`, `w_PF = 1`. *(Faithful to the design as it
+   stood. We have since removed the demand cap from ours — see §B9.)*
 
 4. **DL LCP fill** (`ia_p5g_compute_lcp_budget`): sort by
    `(priority ASC, Q DESC)` then greedy fill. Matches our MAC multiplexer.
@@ -44,17 +51,17 @@ purpose of Tier-1 and should be fixed before any further measurement.
    detection and graceful fallback before the first solve. This is exactly
    the integration architecture §10 of the design doc specifies.
 
-7. **Two adaptations that are better than the simulator**, and should flow
-   back into it rather than being "corrected":
+7. **Two adaptations that were better than the simulator.** Both have since
+   been adopted into `sim/`; recorded here because the port had them first.
    - **UL LCP is the UE's decision** (TS 38.321 §5.4.3.1). The gNB grants
      PRBs and the UE splits the TB. `ia_p5g_drain_vq_ul` approximates
-     per-LCG delivery proportionally to BSR occupancy and notes the
-     approximation self-corrects. Our simulator wrongly assumes the gNB
-     controls the UL split. **The sim is less faithful than the port here.**
-   - **UL demand EWMA (α=0.3)** to stop TCP congestion-control oscillation
-     (~1–2 s) resonating with the 1 s Tier-1 window. This is a real-
-     deployment failure mode the simulator cannot produce, and the fix is
-     well reasoned.
+     per-LCG delivery proportionally to BSR occupancy. The simulator wrongly
+     assumed the gNB controls the split; correcting it (2026-08-07) removed
+     a headline result that turned out to be an artifact — see §C1 below,
+     because it changes how the port should be evaluated too.
+   - **UL demand EWMA (α=0.3)** against TCP/Tier-1 window resonance. We could
+     not reproduce the resonance with an AIMD source, but the reasoning is
+     sound and the deployment evidence is direct; we defer to it.
 
 ---
 
@@ -223,27 +230,140 @@ codebases will not produce comparable absolute numbers until they agree.
 
 ---
 
+### B9. HIGH — the Tier-1 demand cap is redundant, and it is a starvation trap
+
+`ia_p5g_sca_solve` line 415 sets a hard upper bound per flow:
+
+```c
+glp_set_col_bnds(lp, i + 1, GLP_DB, 0.0, flows[i].demand_bps);
+```
+
+fed by a BSR-derived estimate (line 630, `arr_W * 8 / elapsed_s`) with EWMA
+smoothing. We built the same thing in the simulator, and then measured it
+away.
+
+**It is redundant.** Tier-2's windowed ceiling already clamps a flow's
+virtual queue to what actually arrived, so a quiet flow is never scheduled
+however generous its Tier-1 target. The ceiling does this from
+*observation*; the cap needs a *prediction*. Removing the cap reproduced
+oracle-demand performance exactly in our simulator (32.4 M, Jain 0.97, with
+no demand estimate at all) and left `factory_robots` unchanged.
+
+**It is also actively harmful.** Because the bound is hard, an
+under-estimate is unrecoverable within the window while an over-estimate
+merely wastes headroom. With demand estimated from arrivals, a flow that
+loses out appears to be asking for less, its cap falls, and it loses more:
+six contending flows went from 3.9–7.0 Mbps to 0.2–11.8 Mbps, Jain
+0.97 → 0.47. And when the estimate collapses below a GBR flow's GFBR, the
+hard cap **silently overrides the contract** — the soft floor `r+s ≥ G`
+cannot rescue it, the flow simply books a large unavoidable shortfall.
+
+**Recommendation: drop the demand column bound.** Replace
+`GLP_DB, 0.0, demand_bps` with `GLP_LO, 0.0` (lower bound only). The EWMA
+machinery can stay for reporting and for admission control, where a demand
+figure is genuinely wanted. This also deletes the estimator-tuning problem
+the UL-demand-oscillation work was fighting.
+
+### B10. HIGH — `arrived_cum` omits discarded bytes, in four places
+
+The port computes cumulative arrivals as delivered plus current backlog:
+
+```c
+const uint64_t arr_cum = del_cum + <bytes_in_buffer | estimated_ul_buffer>;
+```
+
+at lines 620 and 650 (Tier-1 demand estimate) and 1168 and 2072 (the DL and
+UL windowed ceilings). **Bytes discarded on PDB expiry are counted in
+neither term**, so they vanish from the arrival history.
+
+The consequence is a feedback loop with no physical cause. As a flow
+starves, its data ages out; `delivered + backlog` stops growing while its
+true offered rate is unchanged; the flow appears to have stopped asking. In
+our simulator this drove a flow to 0% delivery whose arrivals never changed
+(2.03 MB offered either way; delivered 0.95 → 0.00 MB, dropped 0.90 → 1.85 MB).
+
+This is worse in the port than it was for us, because the same expression
+feeds **both** the demand estimate *and* the windowed ceiling. Even after
+B9 removes the demand cap, an arrival count that omits discards makes the
+ceiling too low for exactly the flows that are already suffering — clamping
+the virtual queue of a starved bursty flow and de-prioritising it further.
+
+**Recommendation:** add a per-LCID discard counter and use
+`delivered + backlog + discarded`. The gNB knows its own RLC discards for
+DL. For UL the UE discards and does not report it, so the uplink estimate
+stays biased; that is an argument for B9 (drop the cap) rather than for
+trying to fix the uplink estimate.
+
+### B11. MEDIUM — a better UL split estimator is available
+
+`ia_p5g_drain_vq_ul` apportions a grant across LCGs proportionally to BSR
+occupancy. The gNB configured each channel's PBR and bucket-size duration
+over RRC, so it can instead run the UE's LCP against a *shadow* copy of the
+token buckets and predict the split. We implemented both.
+
+Measured: the shadow copy tracks the UE's real buckets to within ~2% of
+capacity on average, and the drift cannot run away because a bucket is
+clamped to `[0, PBR·BSD]` — both copies re-synchronise at either rail.
+
+Two caveats worth having before you build it. First, on our workload the
+choice **did not change delivered outcomes** (mean GBR 59% either way), so
+this is a fidelity improvement rather than a performance one. Second, we
+tried closing the loop — feeding BSR-vs-prediction residuals back into the
+shadow bucket — and it made divergence *worse* (mean 1.9% → 7.1%), because
+new arrivals raise the reported backlog exactly as a mis-prediction would
+and the controller cannot tell them apart. If you attempt a correction, use
+an unambiguous signal: only correct when the reported backlog *falls*.
+
 ## Suggested order of work
 
 1. **B1** (comparator) — smallest diff, largest behavioural effect, and it
    determines whether anything else in Tier-1 is observable.
-2. **B2** (S-slot capacity) — contained, and removes a systematic bias.
-3. **B3** (lexicographic split) — removes the conditioning risk and the
+2. **B9** (drop the demand cap) — a one-line change that deletes a
+   starvation trap and an entire estimation problem. Measured free.
+3. **B10** (count discards in `arrived_cum`) — small, and it fixes the
+   windowed ceiling as well as the demand estimate. Do it even if B9 lands,
+   because the ceiling needs it independently.
+4. **B2** (S-slot capacity) — contained, removes a systematic bias.
+5. **B3** (lexicographic split) — removes the conditioning risk and the
    magic constant; also *simplifies* the solver path, since Phase 1 needs
    no SCA.
-4. **B4** (max-min floors) — the new work, and it slots in cleanly once B3
-   has established a two-solve structure.
-5. **B6**, **B7** — small correctness fixes, any time.
+6. **B4** (max-min floors) — slots in cleanly once B3 has established a
+   two-solve structure.
+7. **B6**, **B7**, **B11** — correctness and fidelity, any time.
 
-B1 and B2 are worth measuring individually before B3/B4 land, so the
-Phase-1 baseline is attributable.
+B1, B9 and B10 are each worth measuring individually before the bigger
+Tier-1 changes land, so the Phase-1 baseline stays attributable.
 
-## What should flow back into the simulator
+## C. What flowed back into the simulator, and what it cost
 
-- **UL LCP is the UE's decision.** Our simulator gives Tier-2 control of
-  the UL intra-TB split, which no real gNB has. The OAI approximation
-  (drain proportional to BSR occupancy) is the honest model and we should
-  adopt it — it likely changes our UL results, and the paper's §V should
-  say the gNB does not control the UL split.
-- **TCP/Tier-1 window resonance.** The UL demand oscillation the EWMA fixes
-  is a genuine finding our workload model cannot produce. Worth a scenario.
+### C1. The UL LCP correction removed one of our headline results
+
+Adopting the port's model — the UE fills its own uplink transport block —
+changed the simulator's conclusions materially, and the change is relevant
+to how Phase-1 measurements should be read.
+
+Our study had reported that the two-tier scheduler protected multi-flow
+uplink UEs (a GBR video flow sharing a UE with a greedy best-effort flow)
+where the QoS-blind baselines collapsed them to ~3% of contract. With the UE
+filling its own block by prioritised bit rate, **the baselines reach
+100/90/92% unaided**. The protection was the UE's PBR configuration, not the
+scheduler. Correcting it also raised PF's GBR contract count at moderate
+overload from 5/10 to 8/10 — most of the margin we had been claiming.
+
+**Implication for the port:** any Phase-1 measurement of multi-flow uplink
+UEs should be read the same way. If PBRs are configured sensibly, a large
+part of what looks like two-tier benefit on those UEs will be present under
+the stock PF scheduler too. Worth checking directly on the testbed, since
+it is cheap: configure the PBRs, run stock PF, and see how much of the gap
+survives.
+
+### C2. Still owed
+
+**TCP/Tier-1 window resonance.** We built a rate-adaptive source and swept
+its period against the Tier-1 window and **could not reproduce** the
+oscillation the EWMA was introduced to fix — no peak at ratio 1.0, just a
+flat 10–15% cost for estimating demand at all. Either our AIMD source is too
+unlike a real TCP sender, or the effect needs dynamics we do not model. The
+deployment evidence for it is direct, so we defer to it, but the mechanism is
+not yet reproduced outside the testbed and it would be worth a targeted
+measurement there.
