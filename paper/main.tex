@@ -28,8 +28,8 @@
 
 \begin{document}
 
-\title{When Does QoS-Aware Scheduling Earn Its Complexity?\\
-A Two-Tier Scheduler for Private 5G Factory Networks}
+\title{Evaluation of a Two-Tier QoS-Aware Scheduler\\
+for Single-Cell Private 5G Networks}
 
 % Double-blind submission: anonymised. Restore the real author block and
 % affiliations for camera-ready.
@@ -39,7 +39,8 @@ A Two-Tier Scheduler for Private 5G Factory Networks}
 \maketitle
 
 \begin{abstract}
-Private 5G networks for factories carry traffic whose classes want
+Private 5G networks for factories, typically will be covered by a single base
+station and will carry traffic whose classes want
 qualitatively different things: guaranteed-bitrate uplink video, motion
 control with millisecond deadlines, and elastic best-effort. Proportional
 fair (PF), the de facto default in LTE and NR and the scheduler shipped by
@@ -51,17 +52,20 @@ overhead?} We design a two-tier scheduler---a network-utility-maximisation
 program setting per-flow rate targets on a ${\sim}1$\,s horizon, and a
 per-slot drift-plus-penalty tracker that realises them under a
 symbol-accurate PRB and PDCCH budget---and evaluate it against RR, PF and a
-class-aware gradient baseline. Our headline result is that the value of
+class-aware gradient baseline. Our main result is that the value of
 QoS-awareness is a \emph{hump, not a slope}: in deep overload and under
 light load the two-tier design is indistinguishable from PF on contract
-satisfaction, and it decides outcomes only in a moderate-overload band,
-where it honours 10/10 GBR contracts against PF's 5/10. We further show
-that the soft GBR penalty used by utility-based schedulers reduces the
-strategic program to a fractional knapsack whose optimum \emph{abandons}
-the lowest-spectral-efficiency flow outright, that no reweighting of that
-penalty can prevent this, and that a max-min satisfaction stage does---
-raising the worst-served flow from 0\% to 40\% of its contract. We report
-two negative results and release the simulator and all scripts.
+satisfaction, and it decides outcomes only in a moderate-load band,
+where it honours 10/10 GBR contracts against PF's 5/10. Two features
+account for most of the benefit: configured grants, which bypass both the
+control-channel budget and the buffer-status-report round trip and meet
+30/30 deadlines where PF meets 2/30; and a deadline-aware per-slot tracker,
+without which PF's deadline misses are silent rather than visible. We also
+report the design lesson that cost us the most---enforcing rate contracts
+through a linear shortfall penalty makes the strategic program abandon the
+worst-channel flow outright, which no reweighting of that penalty prevents
+and a hard max-min floor does---together with two negative results, and we
+release the simulator and all scripts.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -122,17 +126,21 @@ band does the scheduler decide outcomes---10/10 GBR contracts against PF's
 5/10. A study reporting mean throughput alone would have concluded the
 design was not worth building.
 
-\item \textbf{A structural result on soft GBR penalties}
-(Section~\ref{sec:knapsack}). In the standard formulation---maximise
-utility, minus a large penalty on GBR shortfall---the penalty outweighs the
-utility by a factor we measure at $3.3\times10^{7}$. The program is then
+\item \textbf{A structural result on penalty-based contract enforcement}
+(Section~\ref{sec:knapsack}). If GBR floors are enforced by a linear
+penalty on shortfall---a natural choice, and the one we made---that penalty
+outweighs the utility by a factor we measure at $3.3\times10^{7}$. The program is then
 effectively \emph{minimise total shortfall bits under a PRB budget}: a
 fractional knapsack whose optimum is greedy in spectral efficiency and
 therefore a \emph{vertex}. The lowest-SE GBR flow is not degraded but
 abandoned, at exactly $0$---where the same flow receives 23\% under the
-utility term alone. We show no reweighting of the penalty can remove this,
-and that a max-min satisfaction stage does, lifting the worst-served flow
-from 0\% to 40\% of contract at a cost of 4\% of cell throughput.
+utility term alone. No reweighting of the penalty removes this; a max-min
+satisfaction stage does, lifting the worst-served flow from 0\% to 40\% of
+contract at a cost of 4\% of cell throughput. We are explicit that this is
+a property of the penalty formulation rather than of QoS-aware scheduling
+generally: the more common device in the literature is a \emph{concave}
+utility encoding the contract, which is deliberately kept concave for
+solution uniqueness~\cite{gora2014qos} and so cannot exhibit it.
 
 \item \textbf{Evidence that Configured Grants are structurally decisive}
 (Section~\ref{sec:pdcch}). When the control channel binds, the two-tier
@@ -362,16 +370,31 @@ SE-favouring, and the worst-channel flow receives 23\% of its contract
 against the best flow's 89\%. But it serves that flow \emph{something}.
 Adding the shortfall term takes the same flow to exactly $0$.
 
-The distinction matters, and it is worth being precise about which part is
-new. That utility maximisation favours high-SNR users, and so does not by
-itself protect heterogeneous channels, is established~\cite{capozzi2013};
-our control confirms it rather than discovering it. The sharper claim is
-what the \emph{shortfall term} adds: it converts a merely SE-favouring
-allocation into a \emph{vertex} one, in which the worst flow receives
-exactly zero rather than merely too little, and it does so for every
+The distinction matters, and it is worth being precise about its scope.
+That utility maximisation favours high-SNR users is
+established~\cite{capozzi2013}; our control confirms it rather than
+discovering it. What the \emph{shortfall term} adds is the vertex: the
+worst flow receives exactly zero rather than merely too little, for every
 positive penalty vector. Cell-edge starvation under this formulation is
 therefore not a tuning failure to be corrected by reweighting---it is the
 optimum of the objective as written.
+
+\textbf{This is a property of our formulation, not of QoS-aware scheduling.}
+Enforcing a rate contract through a linear penalty on shortfall is a
+natural modelling choice, but it is not the common one. The LTE and NR
+scheduling literature more often encodes the contract either in a per-flow
+\emph{metric}---a PF ratio multiplied by a GBR-deficit
+factor~\cite{mongha2008qos,ameigeiras2016qos}---or in the shape of the
+\emph{utility function} itself, and such utilities are deliberately kept
+\emph{concave} precisely so that the allocation problem has a unique
+solution~\cite{gora2014qos}. A strictly concave contract utility has an
+interior optimum and therefore cannot abandon a flow the way
+Table~\ref{tab:knapsack} shows. We keep the penalty form because the
+lexicographic pair of Section~\ref{sec:lex} expresses ``contracts first,
+then utility'' exactly where a concave utility only approximates it, and
+because the max-min stage then delivers a \emph{guarantee} rather than a
+soft preference. But a reader adopting a penalty formulation should know
+what it carries, which is the point of this subsection.
 
 It also explains why penalty-shaped fixes cannot work. Since the optimum is
 a vertex, reweighting $p$ selects a \emph{different} vertex and nothing

@@ -177,3 +177,95 @@ README.md for the revised space accounting.
   but the search was not aimed at it.
 - Find a citable reference for the piecewise-linear GBR utility, and add a
   sentence contrasting it with the hard floor.
+
+
+---
+
+# Round 2 (2026-08-07): how does the literature actually enforce a rate contract?
+
+The question that decides whether the §IV-C knapsack result belongs in the
+abstract. If enforcing GBR with a **linear penalty on shortfall** is standard
+practice, the result is a field-level finding. If it is our own modelling
+choice, it is a design lesson about our formulation.
+
+## Verdict: it is our choice, not the field's. Demote it.
+
+I found **no** instance of the linear-shortfall-penalty formulation we
+critique. The devices that recur are:
+
+| Mechanism | Seen in | Vulnerable to the vertex? |
+|---|---|---|
+| Per-flow **metric** (PF ratio × GBR-deficit factor) | Mongha 2008, Zaki 2011, Ameigeiras 2016 | No — not an optimisation program at all |
+| **Concave utility** encoding the contract | Góra 2014 | **No** — unique interior optimum |
+| **Hard** min-rate constraint + admission control | several slicing papers | No — infeasible rather than abandoning |
+| Penalty term | *slicing papers, but for **integrality*** | N/A — different use of the word |
+
+The decisive quote is Góra 2014 §4.3, on why GBR utilities are shaped as
+they are:
+
+> "it is often forced to make the utility functions concave to guarantee
+> that there always is a unique solution to the resource assignment
+> optimization problem"
+
+That is exactly the property our formulation lacks. A strictly concave
+contract utility has an interior optimum and *cannot* zero a flow. The
+field appears to have adopted concavity deliberately, for uniqueness — and
+gets vertex-avoidance as a consequence.
+
+**One near-miss worth recording.** A 2020 IEEE Access RAN-slicing paper
+matched my "penalty" grep, but its penalty is `P(X) = X − X²`, used to push
+a relaxed binary allocation variable back to {0,1}. That is an integrality
+device, not a rate-shortfall penalty. Machine triage on the word "penalty"
+would have produced a false positive here; reading the formulation did not.
+
+## What changed in the paper
+
+- **Abstract**: knapsack claim demoted from a headline finding to one clause
+  framed as "the design lesson that cost us the most". The abstract now
+  leads with evaluation results, matching the retitle.
+- **Contribution 3**: "a structural result on soft GBR penalties" →
+  "on penalty-based contract enforcement", with "the standard formulation"
+  replaced by "a natural choice, and the one we made".
+- **§IV-C** gains a paragraph stating outright that this is a property of
+  our formulation and not of QoS-aware scheduling, naming the metric and
+  concave-utility alternatives, and defending why we keep the penalty form
+  anyway (the lexicographic pair expresses "contracts first" exactly; the
+  max-min stage then gives a guarantee rather than a preference).
+
+This is a net gain for the paper. A reviewer who knows the GBR literature
+would have asked "why not just use a concave utility?" — the paper now
+answers that question instead of being caught by it.
+
+## Method, and what it cannot support
+
+Two rounds, both web-based:
+1. **Abstract triage failed.** 401 works scanned, 4 named both a contract
+   and a mechanism. Abstracts do not describe the formulation — that detail
+   lives in the model section. Any claim of the form "X% of the literature
+   uses mechanism Y" is not supportable this way.
+2. **Full-text harvest is throttled by publishers.** Of 60 open-access
+   candidates, ~9 downloaded; the rest returned 403/405 from publisher
+   sites despite being flagged open access.
+
+So the verdict above rests on a small number of *carefully read* papers —
+principally Góra 2014 and Ameigeiras 2016's survey of GBR strategies —
+rather than on a frequency count. That is enough to demote a claim (one
+counterexample to "this is standard" suffices) but would **not** be enough
+to assert the opposite as a positive finding.
+
+## Shortlist for institutional access
+
+Only two items are worth pulling, both IEEE and likely paywalled. Both are
+cited in §IV-C on the strength of Ameigeiras 2016's description of them; if
+either turns out to use a penalty formulation after all, the demotion needs
+revisiting.
+
+| Paper | Venue | Why |
+|---|---|---|
+| Mongha et al., "QoS oriented time and frequency domain packet schedulers for the UTRAN long term evolution" | IEEE VTC Spring 2008 | The canonical GBR-targeting LTE scheduler; confirm it is metric-based |
+| Zaki et al., "Multi-QoS-aware fair scheduling for LTE" | IEEE VTC Spring 2011 | Same, with inter-QCI prioritisation |
+
+Access tested 2026-08-07: OpenAlex (search + abstracts, including for
+paywalled works) and Unpaywall (legal OA full text by DOI) both work;
+IEEE Xplore returns HTTP 202 and ACM DL 403 to automated requests. So
+triage is unblocked; only paywalled *full text* needs a human.
