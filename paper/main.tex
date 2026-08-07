@@ -90,8 +90,7 @@ before a deadline, after which they are worthless.
 The scheduler that ships in OpenAirInterface (OAI), and the de facto
 default across LTE and NR, is proportional fair (PF)~\cite{jalali2000}.
 PF ranks users by instantaneous rate over smoothed average rate; its fixed
-point maximises $\sum_i \log R_i$~\cite{kelly1998}. It is a good answer to
-a question the factory is not asking, because it has no representation of a
+point maximises $\sum_i \log R_i$~\cite{kelly1998} but has no representation of a
 rate contract or a deadline.
 
 A substantial literature adds QoS-awareness by modifying the PF metric with
@@ -99,21 +98,22 @@ an urgency term---M-LWDF~\cite{andrews2001}, EXP/PF and the
 Exp-rule~\cite{shakkottai2002}, and the variants surveyed
 in~\cite{capozzi2013}. A parallel thread casts allocation as network
 utility maximisation (NUM)~\cite{kelly1998} or as Lyapunov drift-plus-penalty
-control~\cite{neely2010,tassiulas1992,stolyar2005}. What is scarcer is an
-answer to the question an operator actually faces before adopting any of
-it: a two-tier scheduler means an LP solver, a control loop, and a
+control~\cite{neely2010,tassiulas1992,stolyar2005}. The question we ask is when is 
+it worth for an operator to use a more sophisticated two level scheduler which
+might involve an LP or RL type solver, a control loop, and a
 non-trivial port into a real-time MAC. \emph{When is that worth paying
 for?}
 
-This paper answers that question for a private-5G factory target, and in
-doing so surfaces a structural pathology in a mechanism that utility-based
-schedulers commonly rely on.
+This paper answers that question for a private-5G factory target, where our two level
+scheduler uses a Linear Programming Formulation to determine rate allocations
+at a coarse time granularity and the MAC scheduler uses a simpler delay plus drift
+based formulation to meet those rate targets.
 
 \subsection*{Contributions}
 
 \begin{enumerate}
 \item \textbf{A two-tier scheduler} (Section~\ref{sec:design}) composing a
-NUM program on a ${\sim}1$\,s horizon with a per-slot drift-plus-penalty
+NUM program on a (configurable) ${\sim}1$\,s horizon with a per-slot drift-plus-penalty
 tracker, granting resources \emph{per UE} with a MAC logical-channel
 multiplexer so that grant granularity and DCI cost match the 5G MAC.
 The strategic tier is dependency-isolated for an OAI port.

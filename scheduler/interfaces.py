@@ -39,6 +39,13 @@ class Allocation:
     cce_cost: int = 0
     is_sps: bool = False
     snr_used_db: float = math.nan
+    # True for an *uplink* grant, where the scheduler sizes the transport
+    # block but does not choose how the UE fills it: the UE runs its own
+    # logical-channel prioritisation (TS 38.321 sec 5.4.3.1). ``qfi`` is then
+    # meaningless (-1) and ``bytes_capacity`` is the whole block; the host
+    # splits it across the UE's flows. Downlink grants keep ue_grant=False
+    # and are emitted per flow, because there the gNB really does choose.
+    ue_grant: bool = False
 
 
 class SlotView(Protocol):

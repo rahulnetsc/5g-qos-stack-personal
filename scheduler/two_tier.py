@@ -554,6 +554,27 @@ class TwoTier:
         conservative reference SNR for a configured grant. Stamped on every
         Allocation so the driver can compute mismatch-aware BLER.
         """
+        if direction == "UL":
+            # The gNB sizes the block; the UE fills it (TS 38.321 sec
+            # 5.4.3.1). We emit one grant and let the host split it, and we
+            # drain the virtual queues from an *estimate* of that split --
+            # BSR-reported backlog is all a real gNB has to go on. The
+            # estimate self-corrects: over-drain a flow's queue and it grows
+            # faster next slot, raising that UE's metric again.
+            fills = self._estimate_ul_split(ue_flows, tbs_bytes, buffers, committed)
+            for key, byts in fills:
+                delivered_bits = byts * 8 * (1.0 - bler)
+                self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
+                committed[key] += int(byts * (1.0 - bler))
+            return [
+                Allocation(
+                    ue_id=ue_id, qfi=-1, direction=direction,
+                    prbs=prbs_used, bytes_capacity=tbs_bytes,
+                    cce_cost=cce_cost, is_sps=is_sps,
+                    snr_used_db=snr_used_db, ue_grant=True,
+                )
+            ]
+
         fills = self._mac_lcp_fill(ue_flows, tbs_bytes, q_by_key, buffers, committed)
         out: list[Allocation] = []
         for i, (key, byts) in enumerate(fills):
@@ -570,6 +591,31 @@ class TwoTier:
                     snr_used_db=snr_used_db,
                 )
             )
+        return out
+
+    def _estimate_ul_split(self, ue_flows, tbs_bytes, buffers, committed):
+        """The gNB's guess at how a UE will fill an uplink grant.
+
+        A real gNB never learns the true split, so it apportions the block
+        across the UE's flows in proportion to their *reported* (BSR) buffer
+        occupancy. This is what drives the virtual-queue drain; the actual
+        transmission is decided by the UE (see sim/ue_lcp.py).
+        """
+        occ = []
+        for f in ue_flows:
+            key = (f.ue_id, f.qfi)
+            st = buffers.state(f.ue_id, f.qfi)
+            free = max(0, st.bytes_reported - committed.get(key, 0))
+            if free > 0:
+                occ.append((key, free))
+        total = sum(v for _, v in occ)
+        if total <= 0:
+            return []
+        out = []
+        for key, v in occ:
+            share = int(tbs_bytes * v / total)
+            if share > 0:
+                out.append((key, min(share, v)))
         return out
 
     def _allocate_sps(

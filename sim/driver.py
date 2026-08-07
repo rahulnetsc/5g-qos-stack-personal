@@ -8,6 +8,7 @@ from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
 from .metrics import Metrics
 from .resource import ResourceGrid
+from .ue_lcp import UeLcp
 from scheduler import Scheduler, bler_for_mcs, mcs_threshold_for_snr
 from .traffic import TrafficModel
 
@@ -60,10 +61,20 @@ def run(
 
     scheduler.configure(scenario.flows, grid.slot_duration_s, grid)
 
+    # The UE side of uplink scheduling: the gNB grants a transport block and
+    # the UE fills it by its own LCP. Modelled here, not in the scheduler
+    # library, because no gNB can do it (TS 38.321 sec 5.4.3.1).
+    ue_lcp = UeLcp(scenario.flows)
+    ue_flows_by_ue: dict[int, list] = defaultdict(list)
+    for _f in scenario.flows:
+        if _f.direction == "UL":
+            ue_flows_by_ue[_f.ue_id].append(_f)
+
     pdb_by_flow = {(f.ue_id, f.qfi): f.pdb_ms / 1000.0 for f in scenario.flows}
     horizon_s = scenario.horizon_slots * grid.slot_duration_s
 
     for slot_index in range(scenario.horizon_slots):
+        ue_lcp.refill(grid.slot_duration_s)
         now_s = slot_index * grid.slot_duration_s
 
         per_flow_arrived: dict[tuple[int, int], int] = defaultdict(int)
@@ -111,10 +122,22 @@ def run(
                 mcs_thresh = mcs_threshold_for_snr(alloc.snr_used_db)
                 bler = bler_for_mcs(mcs_thresh, true_snr)
             delivered = int(alloc.bytes_capacity * (1.0 - bler))
-            buffers.drain(alloc.ue_id, alloc.qfi, delivered)
-            metrics.record_delivery(alloc.ue_id, alloc.qfi, delivered)
+            if alloc.ue_grant:
+                # Uplink: the scheduler sized the block but the UE chooses
+                # the split, so apply the UE's own LCP over its *real*
+                # backlog. The scheduler's virtual-queue drain used a
+                # BSR-based estimate of this split and will differ.
+                for qfi, byts in ue_lcp.fill(
+                    ue_flows_by_ue.get(alloc.ue_id, []), delivered, buffers
+                ):
+                    buffers.drain(alloc.ue_id, qfi, byts)
+                    metrics.record_delivery(alloc.ue_id, qfi, byts)
+                    per_flow_delivered[(alloc.ue_id, qfi)] += byts
+            else:
+                buffers.drain(alloc.ue_id, alloc.qfi, delivered)
+                metrics.record_delivery(alloc.ue_id, alloc.qfi, delivered)
+                per_flow_delivered[(alloc.ue_id, alloc.qfi)] += delivered
             metrics.record_prb_use(alloc.direction, alloc.prbs)
-            per_flow_delivered[(alloc.ue_id, alloc.qfi)] += delivered
             cce_used_this_slot += alloc.cce_cost
             if alloc.direction == "DL":
                 dl_prbs_used_this_slot += alloc.prbs

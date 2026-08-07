@@ -57,6 +57,20 @@ def emit_grant(
     MCS for this grant; the driver uses it to compute a mismatch-aware
     BLER against the true SNR at transmission time (see driver.py).
     """
+    if direction == "UL":
+        # Uplink: the gNB sizes the block, the UE fills it. Emit a single
+        # per-UE grant and let the host apply the UE's own LCP -- the
+        # baselines must model this the same way the two-tier scheduler
+        # does, or the comparison stops being like-for-like.
+        return [
+            Allocation(
+                ue_id=ue_id, qfi=-1, direction=direction,
+                prbs=prbs_used, bytes_capacity=tbs_bytes,
+                cce_cost=cce_cost, is_sps=False,
+                snr_used_db=snr_used_db, ue_grant=True,
+            )
+        ]
+
     fills = lcp_fill(ue_flows, tbs_bytes, buffers)
     out: list[Allocation] = []
     for i, (qfi, byts) in enumerate(fills):

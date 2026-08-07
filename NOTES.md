@@ -1683,3 +1683,100 @@ tectonic/latexmk aren't installed on this workstation. Rebuild with
 `cd paper && make` on a TeX host before submitting.
 
 ---
+
+## 2026-08-07 — UL transport blocks are filled by the UE, not by us
+
+Closing the first of two fidelity gaps the OAI review surfaced
+(design-docs/oai-phase1-review.md §A7). **This one invalidates a headline
+per-flow claim.**
+
+### The gap
+
+`_mac_lcp_fill` was direction-agnostic: the same code filled DL and UL
+transport blocks, ordering a UE's flows by `(priority_level, −Q)` where `Q`
+is the gNB's own drift-plus-penalty virtual queue. In the uplink no gNB can
+do that. It grants a transport block and the **UE** fills it, by its own
+logical-channel prioritisation (TS 38.321 §5.4.3.1): two rounds in priority
+order, the first bounded by each channel's PBR token bucket. The gNB
+configured those PBRs over RRC but does not run the algorithm and never
+learns the resulting split.
+
+So the simulator handed Tier-2 a per-slot lever on the uplink byte split
+that does not exist.
+
+### What was built
+
+- `FlowConfig.pbr_bps` / `.bsd_ms`, with `effective_pbr_bps()` defaulting a
+  GBR flow to its GFBR — what an operator would actually configure.
+- `sim/ue_lcp.py`: the UE's two-round LCP with PBR token buckets. It lives
+  in `sim/`, **not** `scheduler/`, because putting it in the library would
+  be the same fidelity error in a new place.
+- `Allocation.ue_grant`: an uplink grant is now emitted once per UE with the
+  whole TB, `qfi = -1`. The driver applies the UE's LCP over its *real*
+  backlog to decide what is actually sent.
+- `TwoTier._estimate_ul_split`: the gNB's *guess* at that split, apportioned
+  by BSR-reported occupancy, drives the virtual-queue drain. Fill and drain
+  are now deliberately different views of the same event — which is the
+  point. Matches what the OAI port does.
+- The RR / PF / Gradient baselines emit UE grants too, or the comparison
+  would stop being like-for-like.
+
+Single-flow UEs are unchanged (ue1 56%, ue7 53% before and after), which is
+the sanity check: with one flow per UE there is nothing to split.
+
+### The finding: we were crediting the scheduler for the UE's work
+
+`factory_robots`, per-flow delivery as a fraction of GFBR, mixed-flow UEs:
+
+| flow | RR | PF | Gradient | TwoTier |
+|---|---|---|---|---|
+| ue8 | 3% → **100%** | 3% → **100%** | 3% → 72% | 53% → 86% |
+| ue9 | 3% → **90%** | 3% → **83%** | 3% → 75% | 50% → 59% |
+| ue10 | 89% → 92% | 0% → 1% | 0% → 0% | 53% → 59% |
+| **mean (all GBR)** | 46% → **65%** | 44% → **62%** | 45% → 59% | 53% → **59%** |
+
+**§7.4 of the study doc claims "TwoTier protects mixed-flow GBR (85/82/85%)
+vs PF's 3/3/0%" and calls it "a direct, clean demonstration of QoS-aware
+multiplexing". That claim does not survive.** The protection comes from the
+UE's PBR token bucket, which is a *configuration* item available to every
+scheduler, not from the two-tier design. Under a correct UL model the
+QoS-blind baselines get it for free, and RR and PF now beat TwoTier on mean
+GBR delivery (65% and 62% against 59%).
+
+The old numbers were not a bug in the sense of a coding error — they were
+the honest output of a model that gave the scheduler a lever it should not
+have had. That is worse.
+
+### Why TwoTier ends up *behind* here, and whether that is real
+
+Two candidate explanations, and they have different implications:
+
+1. **Real.** With PBR doing the within-UE protection, the remaining job is
+   cross-UE, and at 1.0× load the max-min floor deliberately spreads pain
+   (2026-08-06 entry) — so a lower mean is the trade we already documented.
+2. **An artifact of the drain estimate.** `_estimate_ul_split` apportions by
+   BSR occupancy, while the UE actually serves PBR-first. For a UE with a
+   small GBR flow and a large best-effort backlog these differ a lot: the
+   GBR flow's queue under-drains and the best-effort flow's over-drains.
+   Since the UE metric is the *sum* of its flows' queues, systematic
+   mis-estimation shifts the whole UE's rank, not just the order within it.
+
+Not yet separated. **This must be resolved before any paper claim is
+rewritten**, because (1) is a finding and (2) is a modelling choice we could
+improve.
+
+**And there is a better estimator available, for us and for OAI.** The gNB
+*configured* the PBRs, so it can run the UE's token-bucket algorithm itself
+and predict the split, rather than apportioning by occupancy. That is
+strictly more information than BSR alone. Worth adding as an option and
+measuring against the naive estimate — if it closes the gap, explanation (2)
+is confirmed and the OAI port should adopt it (added to the review).
+
+### Not yet done
+
+Every study number involving uplink is now stale. `factory_robots` is
+uplink-heavy, so Studies 1 and the per-flow breakdown both need re-running,
+and §7.4 of the study doc and the paper's Table V need rewriting once the
+estimator question above is settled.
+
+---
