@@ -29,17 +29,35 @@ corrections — they match
 | # | slide | source |
 |---|---|---|
 | 1 | title | — |
-| 2 | one cell, three kinds of promise | scheduler-design §1 |
-| 3 | the design — and no novelty claim | scheduler-design §2–4 |
-| 4 | win 1: the control channel binds (`sensor_dense`) | scheduler-study §8.2 |
-| 5 | win 2: deadline-blindness is silent (`latency_bound`) | scheduler-study §8.3 |
-| 6 | the mixed one: metric differs, not outcome (`factory_robots`) | adoption-decision §2 |
-| 7 | the turn — results are mediated by a simulator | — |
-| 8 | shortcut 1: uplink transport-block fill | oai-phase1-review §C |
-| 9 | shortcuts 2 and 3: priorities, demand | oai-phase1-review §C |
-| 10 | the decision: adopt, no PF fallback | adoption-decision §3–4 |
-| 11 | what this is and is not | adoption-decision §5 |
+| 2 | motivation: the factory floor asks for three different things | scheduler-design §1 |
+| 3 | what the prior art told us to do — and not to | paper §II |
+| 4 | Tier-1: the strategic solve, with the formulation | paper §IV-A…D |
+| 5 | Tier-2: virtual queues, UE ranking, LCP, configured grants | paper §IV-E…G |
+| 6 | the simulator: what it models and what it does not | simulator-design |
+| 7 | result 1: the control channel binds (`sensor_dense`) | scheduler-study §8.2 |
+| 8 | result 2: deadline-blindness is silent (`latency_bound`) | scheduler-study §8.3 |
+| 9 | result 3: rate contracts across load (`factory_robots`) | adoption-decision §2 |
+| 10 | what the design adds, and what it costs | adoption-decision §3–4 |
+| 11 | where this stands, and what remains (OAI) | oai-phase1-review |
 
-Slide 6's chart uses slots 1 and 2 of the reference categorical palette in
+Slide 9's chart uses slots 1 and 2 of the reference categorical palette in
 fixed order (`#2a78d6`, `#eb6834`); the series are also legend-labelled, so
 identity is never carried by colour alone.
+
+## A note on layout
+
+python-pptx cannot measure text, and PowerPoint will happily render a
+paragraph out of the bottom of its box and over whatever sits below. So
+`build_deck.py` estimates rendered height (`est_h`) and the `block()`,
+`callout()` and `math()` helpers each return the y-coordinate just below
+themselves, letting a slide stack its own content. The per-point character
+widths in `CW_PROP` / `CW_MONO` are calibrated against LibreOffice's
+rendering at this deck's sizes.
+
+**After any edit, rebuild and look at the pages** — the estimator has
+headroom but is not exact, and a slide that grows by a line can push its
+last element off the bottom:
+
+```
+make && pdftoppm -png -r 55 two-tier-scheduler.pdf /tmp/deck
+```
