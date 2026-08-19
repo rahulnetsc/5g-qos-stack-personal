@@ -1,8 +1,9 @@
-# factory-sim-v2 — a realistic 5G QoS simulator, and the two-tier-vs-reservation regime map
+# feat/high-fidelity-sim — a realistic 5G QoS simulator, and the two-tier-vs-reservation regime map
 
-**Status:** Pre-implementation. This branch is a rebuild, not a patch — nothing
-in `scheduler/` or `sim/` from `main` is assumed correct or reused as-is.
-**Branch:** `factory-sim-v2`, forked from `main`.
+**Status:** Phase 1 in progress — WP0 and WP1 landed (§4). This branch is a
+rebuild, not a patch — nothing in `scheduler/` or `sim/` from `main` is
+assumed correct or reused as-is.
+**Branch:** `feat/high-fidelity-sim`, forked from `main`.
 **Not merged into this branch, by decision:** `feat/harq-bler-retx`,
 `feat/sim-fidelity-phy-layer`, `feat/oai-integration`. All three diverged
 from `main` in May–June 2026 and none are ancestors of current `main`. Their
@@ -105,16 +106,16 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 
 ### Phase 1 — realistic simulator (no scheduler logic changes; scored against `sim/baselines/`)
 
-| Order | WP | Scope | Source of truth |
-|---|---|---|---|
-| 1 | WP0 | Harness, pre-registered metric panel, regression corpus | `p5g-sim-plan.md` §9, extended per §5/§6 below |
-| 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) |
-| 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) |
-| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; this WP owns the SR-chain inversion calibration target (§11 of that doc) |
-| 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) |
-| 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) |
-| 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) |
-| 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all |
+| Order | WP | Scope | Source of truth | Status |
+|---|---|---|---|---|
+| 1 | WP0 | Harness, pre-registered metric panel, regression corpus | `p5g-sim-plan.md` §9, extended per §5/§6 below | Done |
+| 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) | Done |
+| 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) | Pending |
+| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; this WP owns the SR-chain inversion calibration target (§11 of that doc) | Pending |
+| 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Pending |
+| 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Pending |
+| 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Pending |
+| 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all | Pending |
 
 ### Phase 2 — both schedulers, written fresh against verified OAI source
 
@@ -263,6 +264,23 @@ they survive it:
   reservation branch's files were kept in a separate directory from
   two-tier's (`oai-branches/{two-tier,reservation}/`) rather than one
   flat folder.
+- **`min_rb` is a static config constant, not an SNR-derived value.**
+  `nr_ue_max_mcs_min_rb`'s `minRb` parameter, and reservation's
+  follower-budget formula (`budget = bwpSize − n_followers×min_rb`), both
+  trace to `nrmac->min_grant_prb` (`gNB_scheduler_ulsch.c:2055`) — a fixed
+  gNB config value with no dependence on channel quality or payload size.
+  WP1's `scheduler/link.py::snr_to_prb_floor` computes something related
+  but distinct — the fewest PRBs a payload could ever fit into at a given
+  SNR — and is explicitly not a stand-in for `min_grant_prb`. Keep the two
+  separate when WP2 builds reservation's follower budget.
+- **`nr_ue_max_mcs_min_rb`'s `tbs` parameter is dead.** The function opens
+  with `int tbs_bits = tbs << 3;`, then immediately overwrites `tbs_bits`
+  via `nr_compute_tbs()` before that initial value is ever read
+  (`gNB_scheduler_ulsch.c` ~L1792-1798). Same species of comment/code
+  oddity as the Tier-1 period and the deficit-drain mismatch above. WP1's
+  `sim/power.py::shrink_to_power_budget` correctly omits a `tbs`-equivalent
+  parameter — its caller-supplied `tbs_bits_fn(rb, mcs)` already replaces
+  what `nr_compute_tbs()` would have computed.
 
 ---
 

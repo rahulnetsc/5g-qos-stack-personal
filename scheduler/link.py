@@ -6,6 +6,8 @@ deployment these would be the real 3GPP MCS and CCE-aggregation tables;
 here they are crude staircases, good enough for comparative scheduler work.
 """
 
+import math
+
 # (snr_db_threshold, spectral_efficiency_bps_per_hz, target_BLER)
 # Crude staircase derived from a 0.75-of-Shannon curve. Captures the macro
 # behaviour (higher SNR -> more bits/RB) without being defensible at the PHY
@@ -28,6 +30,19 @@ _MCS_TABLE = [
 ]
 
 
+def _mcs_row_for_snr(snr_db: float) -> tuple[float, float, float] | None:
+    """Return the (threshold, se, bler) row of _MCS_TABLE the scheduler
+    would pick at ``snr_db``, walking the staircase from the bottom. None
+    if snr_db is below the lowest threshold (no viable MCS)."""
+    row = None
+    for entry in _MCS_TABLE:
+        if snr_db >= entry[0]:
+            row = entry
+        else:
+            break
+    return row
+
+
 def bits_per_prb(snr_db: float, symbols: int = 14) -> tuple[int, float]:
     """Return (bits_per_PRB_for_given_symbols, expected_BLER) for the MCS
     the scheduler would pick at ``snr_db``. BLER here is the target BLER at
@@ -35,16 +50,11 @@ def bits_per_prb(snr_db: float, symbols: int = 14) -> tuple[int, float]:
     assuming the true SNR equals ``snr_db``. When the scheduler's ``snr_db``
     differs from the true SNR at transmission time (CQI staleness), use
     ``bler_for_mcs`` instead to get the mismatch-adjusted BLER."""
-    se = 0.0
-    bler = 1.0  # below the lowest MCS, treat as untransmittable
-    for thresh, eff, b in _MCS_TABLE:
-        if snr_db >= thresh:
-            se = eff
-            bler = b
-        else:
-            break
-    bits = int(se * 12 * symbols)
-    return bits, bler
+    row = _mcs_row_for_snr(snr_db)
+    if row is None:
+        return 0, 1.0  # below the lowest MCS, treat as untransmittable
+    _, se, bler = row
+    return int(se * 12 * symbols), bler
 
 
 def mcs_threshold_for_snr(snr_db: float) -> float:
@@ -53,13 +63,33 @@ def mcs_threshold_for_snr(snr_db: float) -> float:
     the target BLER (10%) is met; below it, BLER climbs (see bler_for_mcs).
     Returns the lowest threshold - 3 dB when snr_db is below the whole
     table (representing an unusable MCS)."""
-    picked = _MCS_TABLE[0][0] - 3.0
-    for thresh, _, _ in _MCS_TABLE:
-        if snr_db >= thresh:
-            picked = thresh
-        else:
-            break
-    return picked
+    row = _mcs_row_for_snr(snr_db)
+    if row is None:
+        return _MCS_TABLE[0][0] - 3.0
+    return row[0]
+
+
+def snr_to_prb_floor(snr_db: float, payload_bytes: int, symbols: int = 14) -> int:
+    """Sim-only PRB floor: the minimum PRBs needed to carry one MAC PDU of
+    ``payload_bytes`` at the MCS ``bits_per_prb`` would pick for ``snr_db``.
+
+    This is NOT OAI's min_rb -- that is ``nrmac->min_grant_prb``, a static
+    gNB config constant unrelated to SNR or payload size
+    (gNB_scheduler_ulsch.c:2055). This is a distinct, sim-only floor: how
+    few PRBs a UE's payload could ever fit into at its current channel
+    quality.
+
+    Raises ValueError below the lowest MCS threshold. This deliberately
+    diverges from bits_per_prb, which returns (0, 1.0) in that regime:
+    bits_per_prb is reporting a rate, where zero bits/PRB is a valid
+    answer, but for a PRB floor "zero PRBs suffice" would be a wrong
+    answer, not a degenerate one.
+    """
+    bits_per_rb, _ = bits_per_prb(snr_db, symbols)
+    if bits_per_rb <= 0:
+        raise ValueError(f"no viable MCS at snr_db={snr_db}")
+    payload_bits = payload_bytes * 8
+    return math.ceil(payload_bits / bits_per_rb)
 
 
 def bler_for_mcs(
