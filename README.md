@@ -1,212 +1,337 @@
-# 5G QoS-Optimized Scheduler
+# factory-sim-v2 — a realistic 5G QoS simulator, and the two-tier-vs-reservation regime map
 
-Research / exploration project: a two-tier scheduler for a private 5G
-deployment (factory / warehouse / port), targeted at OpenAirInterface (OAI)
-once the design is validated.
+**Status:** Pre-implementation. This branch is a rebuild, not a patch — nothing
+in `scheduler/` or `sim/` from `main` is assumed correct or reused as-is.
+**Branch:** `factory-sim-v2`, forked from `main`.
+**Not merged into this branch, by decision:** `feat/harq-bler-retx`,
+`feat/sim-fidelity-phy-layer`, `feat/oai-integration`. All three diverged
+from `main` in May–June 2026 and none are ancestors of current `main`. Their
+ideas are mined below (§3); their code is not reused directly — see §2.
 
-The scheduler combines:
-- **Tier-1** — a CVXPY LP that runs once per ~1 s, computes per-flow target
-  rates that respect GBR floors, delay-class priority, and per-direction
-  PRB-symbol capacity.
-- **Tier-2** — a per-slot drift-plus-penalty (Lyapunov virtual queues)
-  scheduler that tracks Tier-1's targets opportunistically.
+This document is the entry point. It records the decisions made before
+writing any code and reconciles three source documents that don't fully
+agree with each other by default. Read in this order:
 
-A lightweight Python simulator validates the design comparatively against
-round-robin, pure proportional fair, and a class-aware gradient baseline.
-OAI integration is planned but not yet started.
+1. **This README** — objective, scope decisions, the work-package list as it
+   actually stands now (not as originally drafted), guarantee traceability.
+2. [`docs/p5g-sim-plan.md`](docs/p5g-sim-plan.md) — the original fidelity +
+   regime-map plan. Still authoritative for: the channel/traffic/BSR/HARQ
+   technical specs (§9's WP1–WP9 file-level detail), the H1–H7 hypotheses,
+   the base metric panel (§7), and the calibration targets (§11).
+   **Not authoritative for: work-package ordering** — superseded by §4 below.
+3. [`docs/IA_P5G_Factory_Guarantee_Test_Plan.md`](docs/IA_P5G_Factory_Guarantee_Test_Plan.md) —
+   authoritative G1–G12 definitions and pass criteria (this is what
+   `p5g-sim-plan.md` cites for its own G1–G12).
+4. [`docs/IA_P5G_Guarantee_Validation_Suite.md`](docs/IA_P5G_Guarantee_Validation_Suite.md) —
+   an earlier draft with its own, superseded G1–G10 numbering. Not used for
+   thresholds. Mined for test *mechanism* detail the newer plan states more
+   tersely (per-leg latency decomposition, the RTSP/TCP back-pressure
+   coupling, frame-freeze definitions) — see §6.
 
-## Documents
+---
 
-- [design-docs/scheduler-study.md](design-docs/scheduler-study.md) — start
-  here: the scientific rationale — design goals, state of the art (incl. the
-  OAI default scheduler), the mathematical formulation, the comparative
-  results, and when the two-tier design earns its complexity.
-- [design-docs/scheduler-design.md](design-docs/scheduler-design.md) — the
-  scheduler architecture (workload model, TDD/numerology, Tier-1 LP form,
-  Tier-2 metric, OAI integration plan).
-- [design-docs/simulator-design.md](design-docs/simulator-design.md) — what
-  the simulator models and (more importantly) what it deliberately doesn't.
-- [design-docs/adoption-decision.md](design-docs/adoption-decision.md) —
-  should this replace proportional fair? The regimes where it wins, the one
-  metric it loses on and why that is a metric choice, and why a
-  scheduler-level fallback is the wrong instrument.
-- [design-docs/oai-phase1-review.md](design-docs/oai-phase1-review.md) —
-  review of the OpenAirInterface port against this design, with a
-  prioritised change list.
-- [paper/](paper/) — a conference draft built from these documents.
-- [scheduler/HOWTO.md](scheduler/HOWTO.md) — for a gNB developer wiring
-  this scheduler into OpenAirInterface (or any other gNB codebase): the
-  four structural views to satisfy from host structs, per-slot integration,
-  Tier-1 threading pattern, configuration binding, and the deviations to
-  expect vs the sim. Its companion is
-  [scheduler/scheduler_config.yaml](scheduler/scheduler_config.yaml) —
-  the reference/default config for `TwoTier` with per-parameter comments.
+## 1. Objective
 
-The design docs have `[OPEN]` markers on remaining decisions.
+Two deliverables, in this priority order:
 
-## Quick start
+1. **Validate the client-facing guarantees (G1–G12) in simulation**, with
+   enough fidelity that a pass/fail here is informative — not just a
+   simplified analogue — before committing testbed or OAI time to it.
+2. **A regime map**: under what traffic, load, and channel conditions does
+   two-tier beat reservation, lose, or tie — expressed against G1–G12, not
+   raw latency percentiles.
 
-The project is managed by [uv](https://docs.astral.sh/uv/) — see
-[installation_usage.md](installation_usage.md) for the full guide,
-including OS-specific install commands, troubleshooting, and the
-maintainer workflow.
+Both objectives are answered by the same simulator and the same runs; they
+are not separate pieces of work. A scenario that stresses the scheduler
+comparison (§8 of `p5g-sim-plan.md`) should also be scoreable against the
+guarantee panel, and vice versa.
 
-```bash
-# One-time: install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+---
 
-# Setup (downloads Python 3.12, creates .venv, installs all pinned deps)
-make install
+## 2. Why a rebuild, not a patch
 
-# Run the test suite
-make test
+Two structural problems in `main`'s current `scheduler/two_tier.py`, found by
+diffing it against the verified OAI source (§7):
 
-# Single smoke scenario, JSON output
-make smoke
+- **It has SPS/Configured-Grant** (`_SPSReservation`, `_allocate_sps`). The
+  real hardware two-tier scheduler (`ia_p5g_scheduler.h`) explicitly defers
+  SPS to "Phase 2" — never built. The Python "two-tier" and the deployed
+  two-tier are not the same scheduler in this dimension, and every SPS-
+  driven result in `main`'s benchmark output describes a scheduler that
+  doesn't exist on the testbed.
+- **It models intra-TB per-flow byte splits on uplink**
+  (`_shadow_lcp_split`, `_occupancy_split`, `_mac_lcp_fill`). The real gNB
+  cannot see this — the UE decides its own intra-TB split via its own LCP,
+  and the gNB only ever sees aggregate per-LCG BSR. This is the exact
+  failure mode `p5g-sim-plan.md` §5.6 warns about ("which network element
+  learns this, and how?"), and it's currently in `main`, not just in a
+  historical mistake.
 
-# Five scenarios x four schedulers, side-by-side
-make compare
+There is also no `reservation.py` on `main` at all. Rather than port one
+scheduler, audit it, then build the second one afterward (the original
+WP2a → WP2b → WP8 sequence), **both schedulers are written once, at the end
+of Phase 1, directly against verified OAI source** (§7) — collapsing
+port-then-audit into build-it-right-the-first-time.
 
-# Three contract-oriented studies: overload sweep, PDCCH-limited, latency-bound
-uv run python scripts/scheduler_study.py
+**Consequence for `p5g-sim-plan.md` §5.5.** That principle — land the
+reservation baseline early, not last, so each fidelity change is measured
+against the actual comparison the branch exists to make — assumed we were
+*patching* an already-partially-unfaithful two-tier port. That's not what's
+happening here. The risk §5.5 guards against (fidelity deltas measured
+against the wrong scheduler) doesn't apply when both schedulers are written
+fresh against source at the end. The cost: no per-work-package attribution
+of how the two-tier-vs-reservation gap moves during Phase 1 (§4).
+**Mitigation:** the regression corpus (WP0) still runs after every Phase 1
+work package against the existing `sim/baselines/` (PF, RoundRobin,
+Gradient) — so simulator bugs are caught as they land, just not
+scheduler-comparison deltas.
 
-# Sensitivity studies: UL BSR delay/loss, DL CQI staleness + SPS MCS margin,
-# and the max-min GBR stage that fixes cell-edge starvation
-uv run python scripts/bsr_study.py
-uv run python scripts/cqi_study.py
-uv run python scripts/maxmin_study.py
+---
 
-# Per-slot time-series plots
-uv run python scripts/plot_timeseries.py --scenario sensor --schedulers pf twotier
-uv run python scripts/plot_timeseries.py --scenario smoke --scheduler twotier
-```
+## 3. What was mined from the stale branches vs. left behind
 
-## Comparing schedulers
+| Branch | What it has | Disposition |
+|---|---|---|
+| `feat/harq-bler-retx` | Real, tested HARQ/BLER/IR-combining code; a worked combining-gain formula (`effective_SE(Δ) = SE × Σp_reach·(1−BLER) / Σp_reach`); PRB-budget correction for retransmissions; per-UE-grant baseline refactor; network slicing | The combining-gain formula is reused conceptually in WP5 (below). The code itself is not merged — it's 2.5 months behind `main` and touches files (`buffer.py`, `driver.py`, baselines) that have since diverged. Network slicing is out of scope for this branch. |
+| `feat/sim-fidelity-phy-layer` | Docs only, no code. Per-UE BLER sigmoid curve, waypoint mobility + Doppler coherence, CQI reporting delay, OLLA closed-loop link adaptation | CQI delay already landed on `main` independently (`simulator-design.md`, 2026-08-06). OLLA and mobility are **not** in `p5g-sim-plan.md`'s scope and are **not** added here either — no guarantee test in §6 requires UE mobility or OLLA specifically, and adding them now would widen scope past what G1–G12 need. Revisit only if a specific GT/T test fails and mobility/OLLA is the diagnosed cause. |
+| `feat/oai-integration` | A checked-in `openairinterface5g/` source tree | Not touched. Parallel workstream per `main`'s README; the 5 files already hand-verified (§7) are sufficient for this branch's needs. |
 
-`scripts/compare_schedulers.py` (`make compare`) runs five scenarios
-(smoke / overload / vision / sensor-dense / YAML-driven) through four
-schedulers for a side-by-side per-flow view.
+---
 
-`scripts/scheduler_study.py` runs three contract-oriented studies — an
-overload sweep, a PDCCH-limited regime, and a latency-bound regime — to
-establish *where* the two-tier scheduler changes outcomes users feel.
-Headline: the value of QoS-awareness is a hump — it shows at moderate
-overload, not at deep overload or light load; for dense periodic traffic
-SPS / Configured Grants is a structural win plain PF cannot match; and
-for medium-rate latency-critical flows a deadline-aware scheduler is
-required. Full results and a build/don't-build decision table are in
-[NOTES.md](NOTES.md).
+## 4. Phasing
 
-## Layout
+Restructured from `p5g-sim-plan.md`'s original `WP0→WP1→WP2a→WP2b→WP3→WP4→
+WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
+
+### Phase 1 — realistic simulator (no scheduler logic changes; scored against `sim/baselines/`)
+
+| Order | WP | Scope | Source of truth |
+|---|---|---|---|
+| 1 | WP0 | Harness, pre-registered metric panel, regression corpus | `p5g-sim-plan.md` §9, extended per §5/§6 below |
+| 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) |
+| 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) |
+| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; this WP owns the SR-chain inversion calibration target (§11 of that doc) |
+| 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) |
+| 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) |
+| 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) |
+| 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all |
+
+### Phase 2 — both schedulers, written fresh against verified OAI source
+
+| Scheduler | Must reproduce | Must *not* include |
+|---|---|---|
+| Two-tier | Tier-1 LP (0.1 s period — confirmed, not the header's stated 1.0 s default), windowed-ceiling VQs, UL service-interval floor (fruitless-counter backoff + ADQ crumb-run trigger), two-pass DL LCP | SPS/Configured-Grant (real scheduler defers it); per-flow intra-TB UL split (UE is a black box) |
+| Reservation | Follower budget (`bwpSize − n_followers_need×min_rb`, floored at `min_rb`), four-tier sort (SRB→liveness→GBR deficit→PDB/coef), GBR/BE byte split, two-pass DL LCP | — |
+| Both | The "full `tb_size` credited to every active LCG" deficit-drain behavior on reservation, reproduced **as measured, bug-for-bug** — the code's comment claims "proportional," the code doesn't do that (§7). Porting the comment's *intent* instead of the code's *behavior* would silently un-fix nothing and mismatch whatever hardware numbers exist. | — |
+
+This absorbs the original WP2a (confound spec), WP2b (reservation build),
+and WP8 (alignment audit) into one pass, since both schedulers are being
+written against already-verified source rather than ported-then-checked.
+
+### Phase 3 — characterization sweep
+
+WP9 as originally specified: the full grid (N, offered load, burst duty
+cycle, SNR spread, PDB/tier1-period ratio, flows-per-LCG, GFBR-to-offered
+ratio), 10 seeds/cell paired across arms, scored against the full metric
+panel (§5), testing H1–H7. Regime-selection discipline unchanged: a cell
+with 0% loss on both arms is excluded.
+
+---
+
+## 5. Guarantee traceability (G1–G12 → what the simulator needs)
+
+Per `IA_P5G_Factory_Guarantee_Test_Plan.md` §3. "Sim-answerable" means the
+simulator can produce an informative pass/fail with the fidelity above, not
+that the number is certifiable — certifiable numbers still require real RF.
+
+| G | Guarantee | Needs (beyond baseline scheduling) | WP | Sim-answerable? |
+|---|---|---|---|---|
+| G1 | Drive command p98 ≤ PDB | T1/T2 shared-bearer modeling, DL LCP | WP7, Phase 2 | Yes |
+| G2 | STOP always lands fast | Rule-of-three sample sizing (already in panel), DL priority | WP0, Phase 2 | Yes |
+| G3 | No false-failsafe | Real BSR/grant chain, liveness gap distribution | WP3, WP4 | Yes |
+| G4 | Prompt resume after silence | SR-path fidelity, floor arming window | WP4 | Yes |
+| G5 | Fresh, complete video | XR frame model, PDU-set completeness, frame age | WP7 | Yes |
+| G6 | BG traffic never impairs fleet | Non-GBR containment, per-class accounting | WP0 metric panel | Yes |
+| G7 | One misbehaving UE contained | MFBR clamp, per-flow accounting | Phase 2 (scheduler logic) | Yes |
+| G8 | Equal entitlement, continuously | Per-1s Jain (already flagged as new in `p5g-sim-plan.md` §7) | WP0 | Yes |
+| G9 | Fast join / re-join | **Join/RLF state machine — does not exist yet** | **WP-Join** | **No, until WP-Join lands** |
+| G10 | Admissible fleet size | N-sweep (this is what simulation buys that hardware can't — `p5g-sim-plan.md` §2) | Phase 3 | Yes |
+| G11 | Holds for a shift, reproducibly | Long-run soak, communication service availability metric (new, §6) | WP0 metric panel | Yes |
+| G12 | Ordered degradation under overload | First-violation-order metric (already in panel) | Phase 3 | Yes |
+
+**G9 is the one guarantee this simulator currently cannot address at all**,
+not just imprecisely — there is no concept anywhere in `sim/` of a UE
+joining, leaving, or losing sync mid-run. This is why WP-Join is a named
+work package rather than a line item under WP6 or WP7.
+
+---
+
+## 6. New fidelity requirements surfaced by the guarantee documents
+
+Not in `p5g-sim-plan.md`'s original scope. Organized by category per the
+guarantee-document review.
+
+**Traffic:**
+- **UAV telemetry is multi-rate, not scaled-down UGV telemetry.** MAVLink
+  multiplexes a 1 Hz HEARTBEAT with 4–10 Hz other streams onto one port.
+  WP7's `periodic_control` generator (one rate per flow) can't express
+  this — needs a multi-stream-per-port generator variant.
+- **RTSP-pulled UAV video couples DL delay into UL throughput** via its TCP
+  control channel (`IA_P5G_Guarantee_Validation_Suite.md` T9). No flow in
+  `sim/traffic.py` has any UL/DL coupling today. Needs a minimal AIMD/
+  windowed abstraction on the RTSP control channel — not full TCP, but
+  more than an independent flow. Without this, G10's mixed-fleet (UGV+UAV)
+  column and T9 are unanswerable in principle.
+- **Aggressor/fault-injection knobs** (GT-4.3, T6a–e: 2×/3×/5×/10× rate
+  multipliers on a named flow, mid-run) should be first-class scenario
+  parameters, not one-off scripts, since the guarantee campaign runs six
+  variants of essentially the same test.
+
+**Channel:**
+- **A sync-loss threshold, separate from the BLER discount.** WP6's
+  blockage model discounts delivered bits continuously; real RLF is a
+  discrete state transition (channel below a sync floor for long enough
+  that the UE declares link failure) that feeds into WP-Join. Calibration
+  anchor: `contention.log`'s startup banner gives the actual OAI timer
+  constants — `t300 400, t301 400, t310 2000, n310 10, t311 3000, n311 1,
+  t319 400` (ms/counts) — real values from the deployed gNB config, not
+  invented ones.
+- **`[OPEN]`** WP-Join's attach/RACH/reestablishment timing should be a
+  **calibrated delay distribution keyed to the timers above**, not a
+  contention-based RACH simulation (preamble collision probability etc.).
+  Full RACH contention is PHY-layer fidelity the simulator's own
+  non-goals correctly exclude, and no G9/GT-6/T8 pass criterion needs it —
+  they need realistic *timing*, not realistic *contention resolution*.
+  This needs your sign-off before WP-Join is built, since it's a scope
+  boundary, not an implementation detail.
+
+**Metrics (extend WP0's panel):**
+- **Communication service availability** (TS 22.104): fraction of transfer
+  intervals within (max latency + survival time). This is the number that
+  actually fills in G11's Guarantee Sheet row; not currently a first-class
+  metric.
+- **Command jitter as p99 − p50** (not stddev), per `IA_P5G_Guarantee_
+  Validation_Suite.md` T2.
+- **UL/DL correlation on the shared T1/T2 bearer** — whether both
+  directions degrade together (a robot both blind and unresponsive at
+  once is a distinct, worse failure than either alone).
+- **Frame-level freeze events** (gaps > 2 frame intervals) and
+  **effective-fps-vs-source-fps**, distinct from PDU-set completeness —
+  needs packets tagged by frame/PDU-set id, which WP7's XR model already
+  produces the structure for.
+
+---
+
+## 7. Ground truth from OAI source (what Phase 2 must reproduce)
+
+Verified directly against the uploaded OAI source
+(`gNB_scheduler.c`/`_dlsch.c`/`_ulsch.c` for both branches, `ia_p5g_
+scheduler.{c,h}`), not inferred from behavior. Full detail in the design
+conversation that produced this branch; load-bearing facts recorded here so
+they survive it:
+
+- **Tier-1 period is 0.1 s in practice**, despite `ia_p5g_scheduler.h`'s doc
+  comment stating a 1.0 s default — the macro is hoisted in the `.c` file
+  specifically because of a past build failure, and `contention.log`'s
+  startup banner confirms `tier1_period=100ms` is what actually ran. This
+  is what makes H4 (Tier-1 mismatched to 1–10 ms motion-control PDBs) the
+  first hypothesis to test.
+- **The two-tier `.c` file's top-of-file comment describing every function
+  as a Checkpoint-1 stub is stale** — the real implementation is fully
+  built (SCA/GLPK solver, VQs, LCP budget pass, the UL floor subsystem).
+- **An anti-starvation subsystem exists that no prior document mentions**:
+  `IA_P5G_UL_FLOOR_*` — a service-interval floor with an exponential-
+  backoff "fruitless counter" (caps at 16×) and a separate "ADQ" trigger
+  firing on 8+ consecutive `min_rb` crumb grants.
+- **Reservation's confound-table entries (`p5g-sim-plan.md` §9 WP2a) are
+  now verified against source, not inferred**: PF coefficient `tbs/thr`
+  (thr floored at 1.0), the `has_srb`-tier starvation fix, the follower
+  budget formula (`budget = bwpSize − n_followers_need×min_rb`, floored at
+  `min_rb`), the four-tier sort (SRB→liveness→GBR deficit→PDB/coef), and
+  the two-pass DL LCP (SRB pass, then DRB pass, per TS 38.321 §5.4.3.1).
+- **The deficit-drain comment/code mismatch**: reservation's post-grant
+  drain comment says "distribute tb_size drain proportionally across
+  active LCGs"; the code credits the **full** `tb_size` to every active
+  LCG independently. Reproduce the code's behavior, not the comment's
+  intent (§4, Phase 2 table).
+- **A previously-fixed sort bug**, visible in a live comment: sched-
+  inactive UEs used to sort to the *front* of the queue ("a bug"), now
+  fixed to sort last. Relevant for provenance if any existing hardware
+  run predates this fix.
+- **`gNB_scheduler.c` is identical across both branches** (shared/common
+  dispatcher); only `_dlsch.c`/`_ulsch.c` diverge — this is why the
+  reservation branch's files were kept in a separate directory from
+  two-tier's (`oai-branches/{two-tier,reservation}/`) rather than one
+  flat folder.
+
+---
+
+## 8. Open decisions
+
+- `[OPEN]` WP-Join's RACH/RLF depth: calibrated delay distribution
+  (recommended, §6) vs. contention-based simulation. **Needs confirmation
+  before WP-Join is built.**
+- `[OPEN]` `T_live` (MEC liveness timeout) — assumed 2 s in the guarantee
+  docs; both `p5g-sim-plan.md` and the guarantee test plan flag this as
+  unconfirmed. Calibrates every G3/G9 pass line.
+- `[OPEN]` The uplink capacity constant (`p5g-sim-plan.md` §4.2) — resolve
+  against GT-3.2's ceiling re-measurement, or sweep it as an axis.
+- `[OPEN]` InF sub-scenario (SL/DL/SH/HH) for the headline configuration —
+  deployment-dependent, sweep in WP6 rather than picking blind.
+- `[OPEN]` Survival-time threshold N (`p5g-sim-plan.md` §7) — start at 3,
+  report H6 as a function of N.
+- `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
+  not merged (§2, §3).
+- `[RESOLVED]` Phase ordering: simulator fidelity fully before either
+  scheduler is written (§4), superseding `p5g-sim-plan.md` §5.5's
+  original early-reservation sequencing, with the regression-corpus
+  mitigation noted in §2.
+- `[RESOLVED]` This README, not an edit to `p5g-sim-plan.md`, is the record
+  of every place the two documents disagree. `p5g-sim-plan.md` is left
+  unmodified as the historical planning document; this README is
+  authoritative wherever the two conflict (§0 above states this per
+  section).
+
+---
+
+## 9. Repository layout (this branch)
 
 ```
 .
-├── README.md
-├── installation_usage.md         install + usage guide (uv workflow, troubleshooting)
-├── pyproject.toml                project metadata + dependencies
-├── uv.lock                       cross-platform pinned versions (37 packages)
-├── .python-version               pins CPython to 3.12
-├── Makefile                      thin wrapper over uv (install / test / smoke / ...)
-├── design-docs/                  scheduler + simulator design notes
-│   ├── scheduler-study.md        scientific rationale + comparative results
-│   ├── scheduler-design.md
-│   └── simulator-design.md
-├── scheduler/                    the two-tier scheduler — a self-contained library
-│   ├── HOWTO.md                  gNB-developer guide: integrating into OAI / other gNB
-│   ├── scheduler_config.yaml     reference/default TwoTier config, per-parameter comments
-│   ├── config_loader.py          YAML -> TwoTier kwargs (lazy PyYAML import)
-│   ├── flow.py                   FlowConfig: per-flow QoS / traffic descriptor
-│   ├── link.py                   link adaptation (SNR -> bits/PRB, PDCCH AL)
-│   ├── interfaces.py             Allocation + Scheduler / slot / buffer / channel views
-│   ├── tier1.py                  Tier-1 CVXPY LP solver
-│   └── two_tier.py               Tier-2 drift-plus-penalty + SPS + MAC multiplexer
-├── sim/                          simulation harness for comparative study
-│   ├── config.py                 scenario / UE / TDD dataclasses
-│   ├── config_loader.py          scenario YAML -> ScenarioConfig loader
-│   ├── resource.py               TDD pattern, per-slot grid
-│   ├── channel.py                stationary AR(1) SNR model
-│   ├── buffer.py                 fluid byte buffers w/ HoL timestamps
-│   ├── traffic.py                deterministic / Poisson / video-frame
-│   ├── metrics.py                per-flow stats, percentile latency
-│   ├── driver.py                 main simulation loop
-│   ├── scenarios/                ran / simulation / scenario YAML configs + loaders
-│   ├── baselines/                RoundRobin / ProportionalFair / Gradient (comparison)
-│   └── tests/                    unit + scenario tests
-├── scripts/                      entry points
-│   ├── run_smoke.py
-│   ├── compare_schedulers.py
-│   ├── scheduler_study.py        overload-sweep / PDCCH / latency studies
-│   ├── bsr_study.py              UL BSR delay / loss sensitivity
-│   ├── cqi_study.py              DL CQI staleness / SPS MCS margin sensitivity
-│   ├── maxmin_study.py           max-min GBR stage (cell-edge starvation)
-│   ├── knapsack_diagnostic.py    why soft GBR floors abandon the cell edge
-│   ├── ul_shadow_study.py        gNB shadow of the UE's PBR token buckets
-│   ├── demand_study.py           Tier-1 demand estimation and its failure modes
-│   ├── transient_check.py        long-run windowed steady-state check
-│   └── plot_timeseries.py
-└── ...
+├── README.md                     this document — start here
+├── docs/
+│   ├── p5g-sim-plan.md            original fidelity + regime-map plan (WP technical detail, H1-H7, base metric panel)
+│   ├── IA_P5G_Factory_Guarantee_Test_Plan.md    authoritative G1-G12 + GT-0..GT-7 test families
+│   └── IA_P5G_Guarantee_Validation_Suite.md     earlier draft; mined for mechanism detail only
+├── oai-branches/                 verified OAI source, ground truth for Phase 2 (§7)
+│   ├── README.md                 why these are kept separate per-branch
+│   ├── two-tier/                 gNB_scheduler{,_dlsch,_ulsch}.c, ia_p5g_scheduler.{c,h}
+│   └── reservation/               gNB_scheduler{,_dlsch,_ulsch}.c (no ia_p5g equivalent)
+├── calibration-logs/
+│   └── contention_twotier_run1.log   one traffic condition, two-tier only — guideline, not a fit target
+├── scheduler/                    [Phase 2] two_tier.py, reservation.py — rewritten from §7, not ported from main
+├── sim/                          [Phase 1] channel.py, buffer.py, traffic.py, driver.py, metrics.py, harq.py (new), join.py (new) — rebuilt per §4
+└── scripts/                      [Phase 3] regime_sweep.py, regression_corpus.py, scorecard.py
 ```
 
-`scheduler/` is the deliverable — a self-contained library (it imports only
-cvxpy / numpy, never `sim/`) intended for OpenAirInterface integration.
-`sim/` is the harness that exercises and benchmarks it.
+---
 
-## What works today
+## 10. Definition of done
 
-- Slot-driven simulation at any 5G NR numerology.
-- Configurable TDD pattern including S-slot DL/guard/UL split.
-- AR(1) per-UE SNR with stationary variance (regression-tested).
-- Four schedulers: RoundRobin, ProportionalFair, Gradient, TwoTier.
-- CVXPY-backed Tier-1 LP with soft GBR floors and weighted log utility.
-- Drift-plus-penalty Tier-2 with deadline-aware delay urgency.
-- SPS / Configured Grants in TwoTier with I-frame burst spillover.
-- Per-slot PDCCH/CCE budget enforcement across all schedulers (this is
-  what makes SPS' value visible — without it, dynamic scheduling keeps up).
-- Variable DCI aggregation level (AL ∈ {1,2,4,8,16}) per UE based on SNR.
-  High-SNR UEs get cheap DCIs; edge UEs pay more, making PDCCH bind sooner.
-- Per-slot time-series recording (opt-in) and matplotlib plots for
-  throughput, HoL latency, buffer occupancy, PRB and PDCCH utilization.
-- Scenarios in [sim/scenarios/](sim/scenarios/) are a three-file split —
-  `ran_config_<id>.yml` (radio), `simulation_config.yml` (run window), and
-  `scenario_config_<n>.yml` (workload, naming a `default_ran`) — so one
-  workload can be run on different radios. Assembled by
-  [sim/config_loader.py](sim/config_loader.py); see the
-  [scenarios README](sim/scenarios/README.md).
-- Contract-oriented scheduler study ([scripts/scheduler_study.py](scripts/scheduler_study.py)):
-  overload-sweep, PDCCH-limited, and latency-bound regimes scored on
-  GBR/Delay contract satisfaction and p99 latency.
-- 39 unit tests covering buffer mechanics, channel stationarity, GBR
-  protection under overload, fairness, Tier-1 feasibility, adaptive and
-  SE-tilt penalty behaviour, windowed-ceiling protection, SPS accounting,
-  PDCCH-limited and latency-bound deadline protection, AL monotonicity,
-  time-series shape, and every scenario YAML loading end to end.
+**Phase 1 exit criteria:** every WP0–WP-Join acceptance criterion in
+`p5g-sim-plan.md` §9 (extended per §6) met; regression corpus green against
+`sim/baselines/`; WP4's SR-chain inversion reproduced within the right
+order of magnitude (the branch's only real calibration target, per
+`p5g-sim-plan.md` §11).
 
-## Roadmap
+**Phase 2 exit criteria:** both schedulers pass the acceptance criteria in
+§4's table above; `n_followers=0` reservation reduces to plain PF
+(retroactively explains the historical N=2 tie); two-tier's UL floor fires
+and disarms correctly under the fruitless-counter logic.
 
-All three factory-robots findings from May 2026 are now closed (Finding 1
-via a max-min GBR stage in Tier-1, Finding 2 via priority-tiered SPS
-reservations, Finding 3 as a contract-dimensioning problem, not a
-scheduler one). See [NOTES.md](NOTES.md) for each fix.
-
-Near-term:
-- **OAI integration** — happening in a parallel workstream; see
-  [scheduler/HOWTO.md](scheduler/HOWTO.md) for the integration guide.
-  Rank-3 UL k2 grant-to-transmission timing is expected to surface there
-  (see NOTES.md gap audit, 2026-05-17).
-- Fill in the paper's §VII OAI results (see [paper/README.md](paper/README.md)).
-- Real 3GPP TBS table extract (currently a fitted curve).
-- Study `slice_slack_penalty` vs `gbr_penalty_init` relative weight — the
-  unit fix landed but the policy ratio has never been swept.
-
-Longer-term:
-- Proper HARQ state machine (retransmits consuming PRBs, not just a BLER
-  discount).
-- MU-MIMO awareness in the LP.
-- Trace-driven traffic from real factory measurements.
-
-## Status
-
-Pre-prototype. Numbers from the simulator are good for *comparing*
-schedulers on identical workloads but should not be cited as absolute
-performance claims (the link adaptation, BLER, and HARQ models are
-deliberately approximate).
+**Phase 3 exit criteria:** WP9's grid complete, regime-selection discipline
+satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
+(confirmed, refuted, or inconclusive-with-reason), guarantee traceability
+table (§5) fully populated with sim-answerable G1–G12 results, and every
+`[OPEN]` item in §8 either closed or explicitly carried to the hardware
+campaign.
