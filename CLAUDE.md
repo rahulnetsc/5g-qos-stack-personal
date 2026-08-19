@@ -22,6 +22,9 @@ bare `python` invocation that works.
 
 - `sim/` — simulator: `driver.py` (slot loop), `channel.py`, `buffer.py`,
   `traffic.py`, `resource.py`, `ue_lcp.py`, `metrics.py`.
+- `sim/power.py` — WP1. Tx power headroom (`ph_factor`, `shrink_to_power_budget`).
+  Dormant: not imported by `driver.py` or any scheduler. PHR is inert on
+  hardware (README §4).
 - `sim/run_record.py`, `sim/scorecard.py` — WP0. The scoring layer.
   `scorecard.py` must not import `sim/driver.py` or `sim/config.py`; it
   consumes `RunRecord` only, so it can score records from any producer.
@@ -61,6 +64,21 @@ would actually learn this and how.
 **Tier-1 period is 0.1 s, not the 1.0 s in `ia_p5g_scheduler.h`'s doc
 comment.** The `.c` file hoists the macro; the gNB startup banner confirms
 100 ms is what ran.
+
+**`min_rb` is a static gNB config constant (`nrmac->min_grant_prb`), not
+derived from SNR or payload.** Don't compute it from channel quality —
+that's a different, sim-only quantity (`scheduler/link.py::snr_to_prb_floor`,
+WP1). See README §7 for the full distinction; WP2's reservation follower
+budget needs the real one.
+
+**When porting an OAI C function, check every call site before collapsing
+or defaulting a parameter.** WP1 almost shipped `compute_ph_factor`'s
+`include_bw` as always-`true` after checking 3 of its 6 call sites; the
+other 3 (`phr_txpower_calc`) pass `false`. Also mirror `AssertFatal`
+preconditions as raises rather than dropping them (silently wrong beats
+loudly wrong), and mirror `roundf()` (half-away-from-zero) explicitly
+instead of Python's `round()` (half-to-even) — they disagree at exact
+`.5`. `sim/power.py` is the worked example for all three.
 
 **One fidelity change per commit.** Land it, run the full suite, run
 `regression_corpus.py --check`, and record which numbers moved and why.
