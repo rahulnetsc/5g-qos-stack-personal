@@ -44,6 +44,19 @@ class Metrics:
         self._flow[(ue_id, qfi)].bytes_dropped += byts
 
     def record_hol_delay(self, ue_id: int, qfi: int, delay_s: float) -> None:
+        # KNOWN ISSUE (flagged, not fixed here -- see WP0 in README.md, and
+        # docs/p5g-sim-plan.md sec 5.4 on landing fidelity changes one at a
+        # time): this only appends a sample when delay_s > 0. A message
+        # fully drained within the same slot it arrived produces
+        # hol_delay_s() == 0.0 and is silently excluded, not recorded as a
+        # zero. That means fast, successfully-served messages never
+        # contribute a sample, biasing hol_p50/p95/p98/p99 worse than the
+        # true delay distribution for lightly-loaded flows -- worst at low
+        # load, which is exactly the regime WP4's SR-chain calibration
+        # target cares about. Left as-is so scripts/regression_corpus.py's
+        # baseline snapshot matches today's published numbers exactly;
+        # fixing this is recommended as the *next* isolated change, scored
+        # by its own regression diff, not bundled into WP0.
         if delay_s > 0:
             self._flow[(ue_id, qfi)].hol_delay_samples_s.append(delay_s)
 
@@ -151,6 +164,11 @@ class Metrics:
                 ),
                 "hol_p50_ms": round(self._percentile(m.hol_delay_samples_s, 0.50) * 1000, 3),
                 "hol_p95_ms": round(self._percentile(m.hol_delay_samples_s, 0.95) * 1000, 3),
+                # p98 is the 3GPP conformance statistic (TS 23.501 sec
+                # 5.7.3.4): while within GFBR, 98% of packets shall not
+                # exceed the PDB. Added for WP0's metric panel (M01);
+                # p50/p95/p99 above are unchanged from their prior values.
+                "hol_p98_ms": round(self._percentile(m.hol_delay_samples_s, 0.98) * 1000, 3),
                 "hol_p99_ms": round(self._percentile(m.hol_delay_samples_s, 0.99) * 1000, 3),
             }
         return out

@@ -1,0 +1,254 @@
+# Pre-registered metric panel -- WP0, factory-sim-v2 / feat/high-fidelity-sim.
+#
+# Committed here BEFORE the first characterisation sweep (WP9), per the
+# multiplicity-guard discipline in docs/p5g-sim-plan.md sec 5.2: the panel
+# must not drift toward whatever happens to separate the two schedulers.
+# Every metric below traces to a guarantee; every guarantee that can be
+# sim-answered has a metric. See README.md sec 5 for the full G1-G12
+# traceability table this panel implements.
+#
+# `status` is load-bearing, not decoration:
+#   ok       -- computable now, exact, from data the driver already emits.
+#   proxy    -- computable now, but from a stand-in the fidelity work will
+#               replace (e.g. head-of-line age sampled per slot, standing in
+#               for true per-message completion latency until WP3/WP7 give
+#               the buffer/traffic model discrete per-message events).
+#   pending  -- not computable at all yet. The scorecard must still emit
+#               this metric's row (with status=pending and a reason), never
+#               silently omit it -- an omitted row is indistinguishable from
+#               "we forgot" versus "we can't yet", and the whole point of
+#               pre-registration is that the panel's shape doesn't change
+#               once sweeps start.
+#
+# `requires` names the WP (or simulator capability) that turns a proxy/
+# pending metric into `ok`. Re-run scripts/regression_corpus.py --check
+# after any WP lands and confirm the metrics it was supposed to unlock
+# actually flipped status -- a WP that doesn't change a status it claimed
+# to fix is itself a finding.
+
+schema_version: 1
+
+metrics:
+  - id: M01
+    name: flow_latency_percentiles
+    definition: >
+      p50 / p95 / p98 / p99 delay, per flow, worst asset. p98 is the 3GPP
+      conformance statistic (TS 23.501 sec 5.7.3.4): while within GFBR,
+      98% of packets shall not exceed the PDB.
+    guarantees: [G1, G2]
+    unit: ms
+    direction: lower_better
+    status: proxy
+    requires: WP3 (BSR realism), WP7 (discrete per-message traffic)
+    note: >
+      Currently sampled as head-of-line age once per slot (sim/metrics.py
+      record_hol_delay), not true per-message completion latency. This
+      under-samples fast-served messages -- see the known-issue note in
+      sim/metrics.py.
+
+  - id: M02
+    name: pdb_violation_rate
+    definition: >
+      Byte-weighted fraction of traffic later than its PDB, plus bytes
+      discarded on expiry.
+    guarantees: [G1, G5, G12]
+    unit: fraction
+    direction: lower_better
+    status: proxy
+    requires: WP3 (per-chunk completion timestamps in the buffer model)
+    note: >
+      The expiry-discard component (bytes_dropped_pdb / bytes_arrived) is
+      exact today. The "delivered, but later than PDB" component is not
+      trackable until the buffer model reports per-chunk completion time
+      (WP3) -- currently a byte that is drained before expiry is counted as
+      fully fine regardless of how late the drain was.
+
+  - id: M03
+    name: liveness_gap_distribution
+    definition: >
+      Max and count of telemetry inter-arrival gaps at the receiver, vs
+      {T_live/4, T_live/2, T_live}. The false-failsafe bound: consecutive-
+      loss tolerance, not average latency.
+    guarantees: [G3]
+    unit: ms
+    direction: lower_better
+    status: pending
+    requires: WP7 (discrete periodic message model), WP4 (uplink access chain)
+    note: >
+      Requires a per-message receive-timestamp sequence for a periodic
+      flow. The current fluid byte buffer has no notion of a discrete
+      "message" arriving and being fully received; only a delay proxy.
+
+  - id: M04
+    name: survival_time_failures
+    definition: >
+      Runs of >= N consecutive missed deadlines (TS 22.104: industrial
+      applications fail on consecutive misses, not averages).
+    guarantees: [G3, G11]
+    unit: count
+    direction: lower_better
+    status: proxy
+    requires: WP7 (discrete message model) for an exact per-message miss;
+      record_timeseries=True for the current proxy
+    note: >
+      Proxy: consecutive per-slot samples where head-of-line delay exceeds
+      the flow's PDB, from the opt-in per-slot timeseries. Requires
+      driver.run(..., record_timeseries=True). Without it this metric is
+      pending, not zero.
+
+  - id: M05
+    name: pdu_set_completeness
+    definition: >
+      >= 99% of frames complete within the set delay budget; partial
+      frames count as failed.
+    guarantees: [G5]
+    unit: fraction
+    direction: higher_better
+    status: pending
+    requires: WP7 (XR frame / PDU-set model)
+    note: No flow in the current traffic model is tagged by frame/PDU-set id.
+
+  - id: M06
+    name: frame_age_at_mec
+    definition: recv_ts - frame_generation_ts, p95.
+    guarantees: [G5]
+    unit: ms
+    direction: lower_better
+    status: pending
+    requires: WP7 (XR frame model)
+
+  - id: M07
+    name: gbr_contract_count
+    definition: Count of GBR flows delivering >= 95% of GFBR.
+    guarantees: [G10]
+    unit: count
+    direction: higher_better
+    status: ok
+    requires: null
+
+  - id: M08
+    name: worst_flow_gfbr_fraction
+    definition: "min_f(delivered_f / GFBR_f) over GBR flows -- the max-min floor."
+    guarantees: [G8, G10]
+    unit: fraction
+    direction: higher_better
+    status: ok
+    requires: null
+
+  - id: M09
+    name: per_second_jain_index
+    definition: >
+      Jain's index over per-flow delivery ratios, computed per 1s window
+      (aggregate Jain over a whole run is known to mask short-timescale
+      oscillation -- see docs/p5g-sim-plan.md sec 7).
+    guarantees: [G8]
+    unit: index [0,1]
+    direction: higher_better
+    status: proxy
+    requires: record_timeseries=True
+    note: Requires driver.run(..., record_timeseries=True); pending otherwise.
+
+  - id: M10
+    name: aggregate_throughput
+    definition: Total delivered bytes (cost side of every QoS gain).
+    guarantees: []
+    unit: bps
+    direction: neutral
+    status: ok
+    requires: null
+
+  - id: M11
+    name: prb_utilization
+    definition: Used / available PRBs, per direction.
+    guarantees: []
+    unit: fraction
+    direction: neutral
+    status: ok
+    requires: null
+    note: Detects reservation holding reserved-but-unused PRBs (H1).
+
+  - id: M12
+    name: pdcch_cce_utilization
+    definition: Used / budget CCEs.
+    guarantees: [G10]
+    unit: fraction
+    direction: neutral
+    status: ok
+    requires: null
+    note: Detects the control-plane bound (H1).
+
+  - id: M13
+    name: first_violation_order
+    definition: Which 5QI class first breaches under a load ramp.
+    guarantees: [G12]
+    unit: ordinal (5QI sequence)
+    direction: null
+    status: ok
+    requires: "a load-ramp study (multiple RunRecords, ascending load) -- not a single-run metric"
+    note: Computed by scorecard.first_violation_order() over an ordered run sequence.
+
+  # --- Added relative to docs/p5g-sim-plan.md sec 7, per the guarantee-test
+  # --- document review (README.md sec 6). Same numbering scheme continues.
+
+  - id: M14
+    name: communication_service_availability
+    definition: >
+      TS 22.104: fraction of transfer intervals where the message arrived
+      within (max latency + survival time).
+    guarantees: [G11]
+    unit: fraction
+    direction: higher_better
+    status: pending
+    requires: WP7 (discrete message model, same as M03/M04)
+    note: This is the number that fills in G11's row on the Guarantee Sheet.
+
+  - id: M15
+    name: command_jitter_p99_p50
+    definition: p99 minus p50 delay (not stddev), on a command/control flow.
+    guarantees: [G1, G2]
+    unit: ms
+    direction: lower_better
+    status: proxy
+    requires: same caveat as M01 (delay proxy)
+
+  - id: M16
+    name: ul_dl_shared_bearer_correlation
+    definition: >
+      Correlation between UL and DL delay/delivery series on a shared
+      bearer (T1/T2), across the run's timeseries. Whether both directions
+      degrade together -- a robot both blind and unresponsive at once is a
+      distinct, worse failure than either alone.
+    guarantees: [G1, G2, G3]
+    unit: Pearson r, [-1,1]
+    direction: null
+    status: proxy
+    requires: record_timeseries=True; caller must name the UL/DL flow pair
+    note: Computed by scorecard.correlate_flows(); no automatic bearer pairing yet.
+
+  - id: M17
+    name: frame_freeze_and_effective_fps
+    definition: >
+      Freeze events (gaps > 2 frame intervals), count and duration; and
+      effective fps at the MEC vs fps at the camera.
+    guarantees: [G5]
+    unit: mixed (count, ms, fps)
+    direction: lower_better
+    status: pending
+    requires: WP7 (XR frame model, same as M05/M06)
+
+# Statistical policy (docs/p5g-sim-plan.md sec 7 / sec 5.3): the rule of
+# three. Demonstrating a miss rate <= eps at 95% confidence with zero
+# observed misses needs n >= 3/eps samples. Every zero-miss claim produced
+# from this panel must state the demonstrated bound, never a tighter one --
+# this applies identically to simulated and measured results.
+statistical_policy:
+  rule_of_three: true
+  confidence: 0.95
+
+# Contract defaults. Override per-study; record the override in the study's
+# own output, since a changed default silently changes every downstream
+# guarantee-sheet row.
+defaults:
+  gbr_contract_fraction: 0.95   # M07 / M08: "delivering >=95% of GFBR"
+  survival_miss_n: 3            # M04: [OPEN] in docs/p5g-sim-plan.md sec 7 -- start at 3, report as f(N)
+  t_live_s: 2.0                 # [OPEN] in docs/p5g-sim-plan.md sec 13 -- MEC liveness timeout, unconfirmed

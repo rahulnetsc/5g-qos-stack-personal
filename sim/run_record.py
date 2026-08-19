@@ -1,0 +1,242 @@
+"""RunRecord -- the scorecard's input contract (WP0).
+
+``sim.driver.run()`` returns a loosely-typed dict (see ``Metrics.summary``).
+That's the right shape for the driver -- it doesn't know about QoS
+contracts, guarantees, or scoring. The scorecard needs more: per-flow QoS
+metadata (GFBR, PDB, flow class) joined against the delivery stats, plus
+enough run/scenario identity that a study can tell two rows apart.
+
+``RunRecord`` is that join, typed and JSON-round-trippable so
+``scripts/regression_corpus.py`` can snapshot it and diff a later run
+against the snapshot. Building it here, once, means the scorecard (and any
+future consumer) never re-derives the flow-key join or re-guesses which
+timeseries fields are optional.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, asdict
+from typing import Any, Optional
+
+from scheduler.flow import FlowConfig
+
+SCHEMA_VERSION = 1
+
+
+def flow_key(ue_id: int, qfi: int) -> str:
+    """The same key convention sim.metrics.Metrics.summary() uses."""
+    return f"ue{ue_id}_qfi{qfi}"
+
+
+@dataclass
+class FlowRecord:
+    """One flow's QoS contract joined against its measured delivery stats.
+
+    Fields ending ``_proxy`` carry the honesty flag from
+    config/metric_panel.yml inline, so a consumer never has to cross-
+    reference the panel to know whether a number is exact.
+    """
+
+    ue_id: int
+    qfi: int
+    direction: str  # "DL" or "UL"
+    flow_class: str  # "PF" | "GBR" | "Delay"
+    gfbr_bps: float
+    pdb_ms: float
+    priority_level: int
+
+    bytes_arrived: int
+    bytes_delivered: int
+    bytes_dropped_pdb: int
+    throughput_bps: float
+    offered_bps: float
+    delivery_ratio: float
+
+    # Proxy delay percentiles -- head-of-line age sampled per slot, NOT true
+    # per-message completion latency. See config/metric_panel.yml M01.
+    delay_p50_ms_proxy: float
+    delay_p95_ms_proxy: float
+    delay_p99_ms_proxy: float
+    delay_p98_ms_proxy: Optional[float] = None  # None on records from before p98 was added
+
+    # Populated only when driver.run(..., record_timeseries=True) was used.
+    # Per-slot series, aligned to RunRecord.timeseries_time_s.
+    ts_backlog_bytes: Optional[list[int]] = None
+    ts_hol_delay_s: Optional[list[float]] = None
+    ts_delivered_bytes: Optional[list[int]] = None
+    ts_arrived_bytes: Optional[list[int]] = None
+    ts_dropped_bytes: Optional[list[int]] = None
+
+    @property
+    def key(self) -> str:
+        return flow_key(self.ue_id, self.qfi)
+
+    def gfbr_fraction(self) -> Optional[float]:
+        """delivered / GFBR. None for non-GBR flows (GFBR is meaningless)."""
+        if self.flow_class != "GBR" or self.gfbr_bps <= 0:
+            return None
+        return self.throughput_bps / self.gfbr_bps
+
+    def meets_gbr_contract(self, fraction: float = 0.95) -> Optional[bool]:
+        g = self.gfbr_fraction()
+        return None if g is None else g >= fraction
+
+    def has_timeseries(self) -> bool:
+        return self.ts_hol_delay_s is not None
+
+
+@dataclass
+class SystemRecord:
+    horizon_s: float
+    dl_prb_utilization: float
+    ul_prb_utilization: float
+    cce_utilization: float
+    # System-level per-slot series, present only with record_timeseries=True.
+    ts_dl_prbs_used: Optional[list[int]] = None
+    ts_ul_prbs_used: Optional[list[int]] = None
+    ts_dl_prbs_avail: Optional[list[int]] = None
+    ts_ul_prbs_avail: Optional[list[int]] = None
+    ts_cce_used: Optional[list[int]] = None
+    ts_cce_budget: Optional[list[int]] = None
+
+
+@dataclass
+class RunRecord:
+    """One (scenario, scheduler, seed[, arm]) run, typed and scoreable."""
+
+    schema_version: int
+    scenario_name: str
+    scheduler_name: str
+    seed: int
+    arm: dict[str, Any]  # e.g. {"ul_bsr_delay_slots": 8, "cqi_delay_slots": 8}
+    flows: dict[str, FlowRecord]
+    system: SystemRecord
+    timeseries_time_s: Optional[list[float]] = None
+    timeseries_slot_index: Optional[list[int]] = None
+    meta: dict[str, Any] = field(default_factory=dict)
+
+    def has_timeseries(self) -> bool:
+        return self.timeseries_time_s is not None
+
+    def flow(self, ue_id: int, qfi: int) -> FlowRecord:
+        return self.flows[flow_key(ue_id, qfi)]
+
+    def flows_by(self, **predicates) -> list[FlowRecord]:
+        """Filter flows by attribute equality, e.g. flows_by(flow_class='GBR')."""
+        out = []
+        for fr in self.flows.values():
+            if all(getattr(fr, k) == v for k, v in predicates.items()):
+                out.append(fr)
+        return out
+
+    def to_dict(self) -> dict:
+        return {
+            "schema_version": self.schema_version,
+            "scenario_name": self.scenario_name,
+            "scheduler_name": self.scheduler_name,
+            "seed": self.seed,
+            "arm": self.arm,
+            "flows": {k: asdict(v) for k, v in self.flows.items()},
+            "system": asdict(self.system),
+            "timeseries_time_s": self.timeseries_time_s,
+            "timeseries_slot_index": self.timeseries_slot_index,
+            "meta": self.meta,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "RunRecord":
+        return cls(
+            schema_version=d["schema_version"],
+            scenario_name=d["scenario_name"],
+            scheduler_name=d["scheduler_name"],
+            seed=d["seed"],
+            arm=d["arm"],
+            flows={k: FlowRecord(**v) for k, v in d["flows"].items()},
+            system=SystemRecord(**d["system"]),
+            timeseries_time_s=d.get("timeseries_time_s"),
+            timeseries_slot_index=d.get("timeseries_slot_index"),
+            meta=d.get("meta", {}),
+        )
+
+    @classmethod
+    def from_summary(
+        cls,
+        *,
+        scenario_name: str,
+        scheduler_name: str,
+        seed: int,
+        flow_configs: list[FlowConfig],
+        summary: dict,
+        arm: Optional[dict[str, Any]] = None,
+        meta: Optional[dict[str, Any]] = None,
+    ) -> "RunRecord":
+        """Build a RunRecord from sim.driver.run()'s output dict.
+
+        ``flow_configs`` is ``scenario.flows`` -- the QoS metadata driver.run()
+        doesn't carry in its summary. ``summary["_ue_lcp"]`` (a live object,
+        not JSON-serialisable) is intentionally dropped here.
+        """
+        meta_by_key = {flow_key(f.ue_id, f.qfi): f for f in flow_configs}
+        ts = summary.get("timeseries") or {}
+        ts_per_flow = ts.get("per_flow", {})
+
+        flows: dict[str, FlowRecord] = {}
+        for fk, m in summary["flows"].items():
+            fc = meta_by_key.get(fk)
+            if fc is None:
+                raise KeyError(
+                    f"summary has flow {fk!r} with no matching FlowConfig in "
+                    f"flow_configs -- scenario/summary mismatch"
+                )
+            fts = ts_per_flow.get(fk)
+            flows[fk] = FlowRecord(
+                ue_id=fc.ue_id,
+                qfi=fc.qfi,
+                direction=fc.direction,
+                flow_class=fc.flow_class,
+                gfbr_bps=fc.gfbr_bps,
+                pdb_ms=fc.pdb_ms,
+                priority_level=fc.priority_level,
+                bytes_arrived=m["bytes_arrived"],
+                bytes_delivered=m["bytes_delivered"],
+                bytes_dropped_pdb=m["bytes_dropped"],
+                throughput_bps=m["throughput_bps"],
+                offered_bps=m["offered_bps"],
+                delivery_ratio=m["delivery_ratio"],
+                delay_p50_ms_proxy=m["hol_p50_ms"],
+                delay_p95_ms_proxy=m["hol_p95_ms"],
+                delay_p99_ms_proxy=m["hol_p99_ms"],
+                delay_p98_ms_proxy=m.get("hol_p98_ms"),
+                ts_backlog_bytes=fts["backlog_bytes"] if fts else None,
+                ts_hol_delay_s=fts["hol_delay_s"] if fts else None,
+                ts_delivered_bytes=fts["delivered_bytes"] if fts else None,
+                ts_arrived_bytes=fts["arrived_bytes"] if fts else None,
+                ts_dropped_bytes=fts["dropped_bytes"] if fts else None,
+            )
+
+        sysd = ts.get("system", {})
+        system = SystemRecord(
+            horizon_s=summary["horizon_s"],
+            dl_prb_utilization=summary["dl_prb_utilization"],
+            ul_prb_utilization=summary["ul_prb_utilization"],
+            cce_utilization=summary["cce_utilization"],
+            ts_dl_prbs_used=sysd.get("dl_prbs_used"),
+            ts_ul_prbs_used=sysd.get("ul_prbs_used"),
+            ts_dl_prbs_avail=sysd.get("dl_prbs_avail"),
+            ts_ul_prbs_avail=sysd.get("ul_prbs_avail"),
+            ts_cce_used=sysd.get("cce_used"),
+            ts_cce_budget=sysd.get("cce_budget"),
+        )
+
+        return cls(
+            schema_version=SCHEMA_VERSION,
+            scenario_name=scenario_name,
+            scheduler_name=scheduler_name,
+            seed=seed,
+            arm=dict(arm or {}),
+            flows=flows,
+            system=system,
+            timeseries_time_s=ts.get("time_s"),
+            timeseries_slot_index=ts.get("slot_index"),
+            meta=dict(meta or {}),
+        )
