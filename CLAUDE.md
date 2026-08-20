@@ -79,8 +79,8 @@ comment.** The `.c` file hoists the macro; the gNB startup banner confirms
 **`min_rb` is a static gNB config constant (`nrmac->min_grant_prb`), not
 derived from SNR or payload.** Don't compute it from channel quality —
 that's a different, sim-only quantity (`scheduler/link.py::snr_to_prb_floor`,
-WP1). See README §7 for the full distinction; WP2's reservation follower
-budget needs the real one.
+WP1). See README §7 for the full distinction; Phase 2's reservation
+follower budget needs the real one.
 
 **When porting an OAI C function, check every call site before collapsing
 or defaulting a parameter.** WP1 almost shipped `compute_ph_factor`'s
