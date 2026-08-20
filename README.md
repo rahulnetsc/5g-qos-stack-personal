@@ -1,6 +1,6 @@
 # feat/high-fidelity-sim — a realistic 5G QoS simulator, and the two-tier-vs-reservation regime map
 
-**Status:** Phase 1 in progress — WP0 and WP1 landed (§4). This branch is a
+**Status:** Phase 1 in progress — WP0, WP1, and WP3 landed (§4). This branch is a
 rebuild, not a patch — nothing in `scheduler/` or `sim/` from `main` is
 assumed correct or reused as-is.
 **Branch:** `feat/high-fidelity-sim`, forked from `main`.
@@ -110,7 +110,7 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 |---|---|---|---|---|
 | 1 | WP0 | Harness, pre-registered metric panel, regression corpus | `p5g-sim-plan.md` §9, extended per §5/§6 below | Done |
 | 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) | Done |
-| 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) | Pending |
+| 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) | Done — 3 commits (quantisation/LCG structure, event-triggering/crumb gate, M02 per-chunk tracking); crumb-fraction and H5-scenario gaps open (§8) |
 | 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; this WP owns the SR-chain inversion calibration target (§11 of that doc) | Pending |
 | 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Pending |
 | 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Pending |

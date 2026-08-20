@@ -25,15 +25,26 @@ bare `python` invocation that works.
 - `sim/power.py` — WP1. Tx power headroom (`ph_factor`, `shrink_to_power_budget`).
   Dormant: not imported by `driver.py` or any scheduler. PHR is inert on
   hardware (README §4).
-- `sim/run_record.py`, `sim/scorecard.py` — WP0. The scoring layer.
-  `scorecard.py` must not import `sim/driver.py` or `sim/config.py`; it
+- `sim/bsr.py` — WP3. UL BSR realism: per-LCG quantisation (TS 38.321
+  Tables 6.1.3.1-1/-2), short-BSR aliasing, event-triggering (regular/
+  periodic/retx), and the `sched_ul_bytes` crumb-collapse gate.
+  `sim/buffer.py` is purely the true-backlog store now — it does not model
+  BSR delay/loss/quantisation at all; `BsrModel` is the only writer of a
+  UL flow's `bytes_reported`/`estimated_ul_buffer_per_lcg`.
+- `sim/run_record.py`, `sim/scorecard.py` — WP0 (+ WP3 for M02). The scoring
+  layer. `scorecard.py` must not import `sim/driver.py` or `sim/config.py`; it
   consumes `RunRecord` only, so it can score records from any producer.
 - `config/metric_panel.yml` — the pre-registered metric panel. See rules below.
 - `scheduler/` — `two_tier.py`, `tier1.py`, `link.py`, `flow.py`.
+  `flow.py::FlowConfig.lcg` self-resolves from 5QI via `__post_init__` — see
+  invariants below.
 - `sim/baselines/` — PF, RoundRobin, Gradient. The Phase 1 comparison arms.
 - `oai-branches/{two-tier,reservation}/` — read-only verified OAI C source.
   Ground truth for Phase 2. Same filenames in both dirs with *different*
-  contents; never merge or dedupe them.
+  contents; never merge or dedupe them. `two-tier/nr_mac_common.c` and
+  `nr_ue_scheduler.c` (WP3) are vendored from a *different* upstream
+  directory (`NR_MAC_COMMON`/`NR_MAC_UE`, not `NR_MAC_gNB`) than the rest —
+  see `oai-branches/README.md` for per-file commit provenance.
 - `regression/baseline_studies_1_3.json` — 22-record numeric snapshot.
 - `docs/` — planning docs. `p5g-sim-plan.md` §9 has the per-WP technical spec.
 
@@ -85,6 +96,39 @@ instead of Python's `round()` (half-to-even) — they disagree at exact
 Bundling two changes makes the deltas uninterpretable, which is the whole
 point of the corpus.
 
+**A UL flow's `bytes_reported` deadlocks without a cold-start/re-arm probe
+— this is load-bearing, not a hack to remove.** Every scheduler's UL
+eligibility gate reads `bytes_reported > 0`, but only a grant updates it
+(`sim/bsr.py::BsrModel.on_ul_grant`), and a grant requires the gate to
+already be open. This isn't just a t=0 case: it recurs every time a flow's
+real backlog goes from empty back to non-empty, which is most UL traffic
+in this repo. `BsrModel.broadcast()`'s probe (fires when the gated value
+is 0 **and** a BSR is `pending`) stands in for the Scheduling Request real
+5G uses here — WP4's job, not WP3's. See README §8 for the full writeup;
+WP4 should treat properly retiring this stopgap as an acceptance
+criterion, not optional cleanup. Don't "simplify" it away — doing so
+silently breaks UL throughput on every scenario in the repo (verified:
+removing it drops a 30-UE sensor scenario from ~99% to ~0.2% delivery).
+
+**`sim/bsr.py`'s per-LCG array is frozen between BSRs — do not drain it on
+a grant, and do not resync it with the scalar `estimated_ul_buffer`.**
+Faithful to the OAI ground truth (README §7): a grant only drains a
+separate `ul_lcg_deficit_bytes`-style counter in the real C, never
+`estimated_ul_buffer_per_lcg` itself; the scalar *is* decremented on real
+data receipt but the per-LCG array is not, so the two legitimately desync
+between BSRs. Both are deliberate, not oversights.
+
+**BSR quantisation tables come from vendored OAI source, not the 3GPP
+spec text or memory.** `sim/bsr.py`'s `NR_SHORT_BSR_TABLE`/
+`NR_LONG_BSR_TABLE` are transcribed from `oai-branches/two-tier/
+nr_mac_common.c` (see that file's own citation for the exact commit) and
+checked byte-for-byte against it by `sim/tests/test_bsr.py` on every test
+run. If a future change touches these tables, re-verify against that
+vendored file, not by re-deriving from the spec — 38.321 tabulates rather
+than publishing a generating formula, so "reconstructing" a table by
+formula is exactly the same silent-wrongness risk as recalling it from
+memory.
+
 ## Rules for the WP0 machinery
 
 **`config/metric_panel.yml` is pre-registered.** Adding a metric is fine.
@@ -101,6 +145,13 @@ omit it. An omitted row is indistinguishable from a forgotten one.
 Re-baseline only when a change is *intended* to move the numbers, and say so
 in the commit message. `--check` failing is information.
 
+**Check `requires:` in the file, not from memory, before assuming which WP
+gates a metric.** M04's `requires` has always named WP7 (discrete message
+model) + `record_timeseries=True`, never WP3 — a plausible-sounding
+assumption that WP3 gates it (it's BSR-adjacent) is wrong. As of WP3
+landing: M01 stays `proxy` (still needs WP7), M02 flipped to `ok` (WP3's
+third commit), M04 unchanged.
+
 ## Known issues (flagged deliberately, do not fix as a drive-by)
 
 - `sim/metrics.py::record_hol_delay` drops zero-delay samples, biasing every
@@ -110,6 +161,19 @@ in the commit message. `--check` failing is information.
 - `average_agg_level` is hardcoded to 4 in the OAI DL scheduler
   (`// TODO find a better estimation`). Decide deliberately whether the sim
   models it fixed or SNR-dependent.
+- WP3's measured crumb fraction (grants ≤150 bytes) on
+  `factory_robots_scenario` @ 1.0× with TwoTier is **0.09%**, against the
+  hardware measurement's ~48-52% the charter asks to reproduce within a
+  factor of two — the crumbs that do occur average 79 bytes (matches
+  hardware's 72-107 byte range), only the *frequency* is off. Landed as-is
+  per user decision (README §8) rather than chased; plausibly scenario- or
+  timer-cadence-dependent, not necessarily a modeling bug. Revisit with
+  WP9's wider parameter sweep before deciding it's a real gap.
+- H5 (`p5g-sim-plan.md` line 338, two-tier degrades as flows-per-LCG
+  grows) is not demonstrable on any current scenario — WP3's default 5QI→
+  LCG mapping deliberately separates QoS classes into different LCGs, so
+  no scenario's multi-UL-flow UEs share one. Needs a small follow-up
+  scenario (README §8) before H5 can be tested in Phase 3.
 
 ## Style
 
