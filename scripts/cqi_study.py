@@ -52,7 +52,6 @@ GBR_CONTRACT_FRACTION = 0.95
 CQI_DELAY_SLOTS_SWEEP = (0, 4, 8, 16, 32)
 SPS_MARGIN_DB_SWEEP = (0.0, 1.0, 2.0, 3.0, 5.0)
 CQI_SWEEP_AT_DELAY = 8      # default when sweeping SPS margin
-UL_BSR_DELAY_SLOTS = 8      # kept consistent with scheduler_study.py
 FACTORY_CAPACITY_MULT = 2.0  # sim knob; expressed to the reader as
                              # `load = 1 / FACTORY_CAPACITY_MULT` shipped.
 FACTORY_LOAD_LABEL = f"{1.0 / FACTORY_CAPACITY_MULT:.2f}x load"
@@ -112,8 +111,7 @@ def _hr(title: str) -> None:
 
 def study_cqi_delay(coherence_slots: int, label: str) -> None:
     _hr(
-        f"STUDY E ({label}) -- CQI delay sweep, factory @ {FACTORY_LOAD_LABEL}, "
-        f"UL BSR delay = {UL_BSR_DELAY_SLOTS}"
+        f"STUDY E ({label}) -- CQI delay sweep, factory @ {FACTORY_LOAD_LABEL}"
     )
     print(
         f"UE coherence = {coherence_slots} slots. Default TwoTier (sps_snr_margin = 0).\n"
@@ -126,14 +124,8 @@ def study_cqi_delay(coherence_slots: int, label: str) -> None:
         + f"{'PF total':>12}{'TT total':>12}"
     )
     for d in CQI_DELAY_SLOTS_SWEEP:
-        pf = _gbr_summary(sc, run(
-            sc, _pf(),
-            ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=d,
-        ))
-        tt = _gbr_summary(sc, run(
-            sc, _tt(sps_margin_db=0.0),
-            ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=d,
-        ))
+        pf = _gbr_summary(sc, run(sc, _pf(), cqi_delay_slots=d))
+        tt = _gbr_summary(sc, run(sc, _tt(sps_margin_db=0.0), cqi_delay_slots=d))
         print(
             f"{d:>8}sl{'':>2}"
             f"{pf['met']:>6}/{pf['n']:<2}{tt['met']:>6}/{tt['n']:<2}"
@@ -145,7 +137,7 @@ def study_cqi_delay(coherence_slots: int, label: str) -> None:
 def study_sps_margin(coherence_slots: int, label: str) -> None:
     _hr(
         f"STUDY F ({label}) -- SPS margin sweep, factory @ {FACTORY_LOAD_LABEL}, "
-        f"CQI delay = {CQI_SWEEP_AT_DELAY}, UL BSR delay = {UL_BSR_DELAY_SLOTS}"
+        f"CQI delay = {CQI_SWEEP_AT_DELAY}"
     )
     print(
         f"UE coherence = {coherence_slots} slots. Sweep TwoTier's sps_snr_margin_db;\n"
@@ -154,10 +146,7 @@ def study_sps_margin(coherence_slots: int, label: str) -> None:
     sc = _scale_capacity(factory_robots_scenario(), FACTORY_CAPACITY_MULT)
     sc = _override_coherence(sc, coherence_slots)
     # PF reference row.
-    pf = _gbr_summary(sc, run(
-        sc, _pf(),
-        ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=CQI_SWEEP_AT_DELAY,
-    ))
+    pf = _gbr_summary(sc, run(sc, _pf(), cqi_delay_slots=CQI_SWEEP_AT_DELAY))
     print(
         f"{'PF (reference)':<24}"
         f"{pf['met']:>6}/{pf['n']:<2}{pf['mean']:>11.0%}"
@@ -169,8 +158,7 @@ def study_sps_margin(coherence_slots: int, label: str) -> None:
     )
     for margin in SPS_MARGIN_DB_SWEEP:
         tt = _gbr_summary(sc, run(
-            sc, _tt(sps_margin_db=margin),
-            ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS, cqi_delay_slots=CQI_SWEEP_AT_DELAY,
+            sc, _tt(sps_margin_db=margin), cqi_delay_slots=CQI_SWEEP_AT_DELAY,
         ))
         print(
             f"{margin:<24.1f}"

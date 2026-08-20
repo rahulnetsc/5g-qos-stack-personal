@@ -680,9 +680,9 @@ class TwoTier:
     def _remaining_reported(self, key, buffers, committed) -> int:
         """BSR-visible bytes for a flow, net of committed. This is what
         the dynamic scheduler can actually see for eligibility and grant
-        sizing -- ``bytes_reported`` lags ``bytes_queued`` for UL flows
-        by the driver's ul_bsr_delay_slots. For DL / no-delay flows it is
-        identical to _remaining_backlog."""
+        sizing -- ``bytes_reported`` is the sim/bsr.py-modelled, per-LCG,
+        quantised BSR view for UL flows (see BufferStateView). For DL
+        flows it is identical to _remaining_backlog."""
         return max(0, buffers.state(*key).bytes_reported - committed.get(key, 0))
 
     def _compute_flow_q(self, direction, buffers, committed, now_s):

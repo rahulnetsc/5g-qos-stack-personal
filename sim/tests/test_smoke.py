@@ -161,98 +161,31 @@ def test_buffer_pdb_expiry():
     assert b.state(1, 9).bytes_queued == 0
 
 
-def test_buffer_bsr_delay_none_when_disabled_or_dl():
-    """bytes_reported tracks bytes_queued instantly for DL flows and for
-    UL flows when ul_bsr_delay_slots = 0."""
-    b = BufferModel(ul_bsr_delay_slots=0)
+def test_buffer_bsr_managed_flow_ignores_enqueue_drain_expire():
+    """A BSR-managed UL flow's bytes_reported is NOT touched by
+    BufferModel's enqueue/drain/expire -- only sim/bsr.py::BsrModel writes
+    it (see test_bsr.py for that model). DL flows and any flow registered
+    with is_ul=False stay in lock-step, as before."""
+    b = BufferModel()
     b.register(1, 9, is_ul=True)
     b.enqueue(1, 9, 500, 0.0)
-    b.snapshot_bsr()
-    assert b.state(1, 9).bytes_reported == 500  # no delay configured
-
-    b2 = BufferModel(ul_bsr_delay_slots=4)
-    b2.register(2, 9, is_ul=False)  # DL flow -- always instant
-    b2.enqueue(2, 9, 500, 0.0)
-    b2.snapshot_bsr()
-    assert b2.state(2, 9).bytes_reported == 500
-
-
-def test_buffer_bsr_delay_lags_ul_by_configured_slots():
-    """For a UL flow with ul_bsr_delay_slots = 4, bytes_reported at slot t
-    equals bytes_queued as it was at slot t-4. Before the pipeline has
-    filled, bytes_reported is 0 (no BSR has reached the gNB yet)."""
-    b = BufferModel(ul_bsr_delay_slots=4)
-    b.register(1, 9, is_ul=True)
-
-    # Slots 0..3: arrivals accumulate, but no BSR is visible yet.
-    for slot in range(4):
-        b.enqueue(1, 9, 100, slot * 0.001)
-        b.snapshot_bsr()
-        assert b.state(1, 9).bytes_reported == 0, f"slot {slot}"
-
-    # Slot 4: the first snapshot from slot 0 (100 bytes) becomes visible.
-    b.enqueue(1, 9, 100, 4 * 0.001)
-    b.snapshot_bsr()
-    assert b.state(1, 9).bytes_reported == 100
+    assert b.state(1, 9).bytes_reported == 0  # untouched; no BsrModel involved
     assert b.state(1, 9).bytes_queued == 500
 
-    # Slot 8: sees slot 4's snapshot = 500 bytes.
-    for slot in range(5, 9):
-        b.enqueue(1, 9, 100, slot * 0.001)
-        b.snapshot_bsr()
-    assert b.state(1, 9).bytes_reported == 500
-    assert b.state(1, 9).bytes_queued == 900
-
-
-def test_buffer_bsr_loss_holds_last_reported_value():
-    """With a 100% BSR loss rate, bytes_reported never advances past its
-    initial value -- every update is lost, so the gNB keeps the (empty)
-    initial view forever. Confirms the loss branch actually short-circuits
-    the pipeline write."""
-    b = BufferModel(ul_bsr_delay_slots=2, ul_bsr_loss_rate=1.0, bsr_seed=1)
-    b.register(1, 9, is_ul=True)
-    for slot in range(10):
-        b.enqueue(1, 9, 100, slot * 0.001)
-        b.snapshot_bsr()
-    assert b.state(1, 9).bytes_queued == 1000
-    assert b.state(1, 9).bytes_reported == 0  # every update lost
-
-    # With a 0% loss rate the pipeline behaves normally (regression guard).
-    b2 = BufferModel(ul_bsr_delay_slots=2, ul_bsr_loss_rate=0.0, bsr_seed=2)
-    b2.register(2, 9, is_ul=True)
-    for slot in range(5):
-        b2.enqueue(2, 9, 100, slot * 0.001)
-        b2.snapshot_bsr()
-    # After 5 slots (indices 0..4) with delay=2: bytes_reported at slot 4
-    # is the value from slot 2, which is 3 * 100 = 300 bytes.
-    assert b2.state(2, 9).bytes_reported == 300
-
-
-def test_buffer_bsr_loss_rng_independent_of_seed_variation():
-    """Different bsr_seed values produce different loss draws (so runs are
-    varied) but bsr_seed=0 is deterministic across constructor calls."""
-    b1 = BufferModel(ul_bsr_delay_slots=1, ul_bsr_loss_rate=0.5, bsr_seed=0)
-    b1.register(1, 9, is_ul=True)
-    b2 = BufferModel(ul_bsr_delay_slots=1, ul_bsr_loss_rate=0.5, bsr_seed=0)
-    b2.register(1, 9, is_ul=True)
-    for slot in range(20):
-        b1.enqueue(1, 9, 100, slot * 0.001)
-        b1.snapshot_bsr()
-        b2.enqueue(1, 9, 100, slot * 0.001)
-        b2.snapshot_bsr()
-    assert b1.state(1, 9).bytes_reported == b2.state(1, 9).bytes_reported
+    b2 = BufferModel()
+    b2.register(2, 9, is_ul=False)  # DL flow -- always instant
+    b2.enqueue(2, 9, 500, 0.0)
+    assert b2.state(2, 9).bytes_reported == 500
 
 
 def test_buffer_bsr_sps_bypass_uses_bytes_queued():
     """A CG / SPS-served flow reads bytes_queued (real) not bytes_reported.
     The BufferState carries both so the scheduler can choose which to use;
-    SPS uses bytes_queued directly."""
-    b = BufferModel(ul_bsr_delay_slots=8)
+    SPS uses bytes_queued directly. bytes_reported stays at its default
+    until a BsrModel writes it -- an SPS UE needs no BSR at all."""
+    b = BufferModel()
     b.register(1, 9, is_ul=True)
     b.enqueue(1, 9, 1000, 0.0)
-    b.snapshot_bsr()
-    # bytes_reported still 0 (pipeline not filled), but bytes_queued is
-    # 1000 -- an SPS pathway reading bytes_queued sees the data instantly.
     assert b.state(1, 9).bytes_reported == 0
     assert b.state(1, 9).bytes_queued == 1000
 
@@ -1561,22 +1494,27 @@ def test_documented_defaults_match_the_code():
     assert t1["capacity_safety_factor"].default == 1.0
     assert actual["capacity_safety_factor"].default == 1.0
 
-    # Section 5.1: the fidelity knobs default to perfect information, so a
-    # unit test never has to reason about report latency...
+    # Section 5.1: the CQI fidelity knob defaults to perfect information, so
+    # a unit test never has to reason about report latency. UL BSR realism
+    # (sim/bsr.py) is not a delay-slots knob any more (WP3) -- it is always
+    # on, driven by each flow's `lcg`, with no "perfect information" toggle
+    # to default off.
     from sim.driver import run as _run
 
     sim_defaults = inspect.signature(_run).parameters
-    for name in ("ul_bsr_delay_slots", "ul_bsr_loss_rate",
-                 "cqi_delay_slots", "cqi_loss_rate"):
+    for name in ("cqi_delay_slots", "cqi_loss_rate"):
         assert sim_defaults[name].default in (0, 0.0), (
             f"{name} should default to perfect information (0)"
         )
 
-    # ...while the studies deliberately run the delays non-zero. That gap is
+    # ...while the studies deliberately run CQI delay non-zero. That gap is
     # the point of the 5.1 table, so guard both halves of it.
     study = Path("scripts/scheduler_study.py").read_text()
-    assert "UL_BSR_DELAY_SLOTS = 8" in study
     assert "CQI_DELAY_SLOTS = 8" in study
+    assert "UL_BSR_DELAY_SLOTS" not in study, (
+        "WP3 removed the UL BSR delay-slots knob -- scheduler_study.py "
+        "should no longer reference it"
+    )
 
 
 # --- UE-side uplink LCP and 5QI priorities ---------------------------------

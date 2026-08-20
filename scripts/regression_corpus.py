@@ -9,9 +9,9 @@ what moved and by how much. A metric that was supposed to change status
 (see config/metric_panel.yml) but didn't is itself a finding.
 
 Deliberately reuses scripts/scheduler_study.py's own scenario/scheduler/
-run-kwarg choices (same UL_BSR_DELAY_SLOTS, CQI_DELAY_SLOTS, same TwoTier
-config) rather than re-declaring them, so this corpus can never silently
-drift out of sync with what studies 1-3 actually measure.
+run-kwarg choices (same CQI_DELAY_SLOTS, same TwoTier config) rather than
+re-declaring them, so this corpus can never silently drift out of sync
+with what studies 1-3 actually measure.
 
 Usage:
     uv run python scripts/regression_corpus.py --capture
@@ -92,7 +92,6 @@ def collect_records() -> dict[str, dict]:
         sc: ScenarioConfig = case["scenario"]
         summary = run(
             sc, case["scheduler_factory"](),
-            ul_bsr_delay_slots=ss.UL_BSR_DELAY_SLOTS,
             cqi_delay_slots=ss.CQI_DELAY_SLOTS,
         )
         rec = RunRecord.from_summary(
@@ -102,7 +101,6 @@ def collect_records() -> dict[str, dict]:
             flow_configs=sc.flows,
             summary=summary,
             arm={
-                "ul_bsr_delay_slots": ss.UL_BSR_DELAY_SLOTS,
                 "cqi_delay_slots": ss.CQI_DELAY_SLOTS,
             },
             meta={"study": case["study"], "case": case["case"]},

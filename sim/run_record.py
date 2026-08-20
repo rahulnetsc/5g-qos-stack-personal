@@ -108,7 +108,7 @@ class RunRecord:
     scenario_name: str
     scheduler_name: str
     seed: int
-    arm: dict[str, Any]  # e.g. {"ul_bsr_delay_slots": 8, "cqi_delay_slots": 8}
+    arm: dict[str, Any]  # e.g. {"cqi_delay_slots": 8}
     flows: dict[str, FlowRecord]
     system: SystemRecord
     timeseries_time_s: Optional[list[float]] = None

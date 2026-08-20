@@ -15,7 +15,7 @@ def _run_record(record_timeseries=False):
         seed=sc.seed,
         flow_configs=sc.flows,
         summary=summary,
-        arm={"ul_bsr_delay_slots": 0},
+        arm={"cqi_delay_slots": 0},
     )
 
 

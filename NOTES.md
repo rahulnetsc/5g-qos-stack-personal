@@ -2365,3 +2365,15 @@ Housekeeping entry closing the day.
   8-page budget.
 
 ---
+
+## 2026-08-20 — WP3 (BSR realism) retires the fixed-delay/loss BSR model
+
+`sim/bsr.py` replaces `BufferModel`'s fixed-delay + Bernoulli-loss
+`snapshot_bsr()` pipeline (see 2026-05-17 above) with a per-LCG, quantised,
+event-riding-on-a-grant model ported from `oai-branches/two-tier/`. The
+`ul_bsr_delay_slots`/`ul_bsr_loss_rate`/`bsr_seed` knobs are gone —
+`scripts/bsr_study.py`, which existed solely to sweep them, is retired;
+its 2026-05-17 findings above are a historical record of the old model,
+not a live reproduction target (see `design-docs/scheduler-study.md` §7.5).
+
+---

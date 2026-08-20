@@ -1,50 +1,34 @@
 from collections import deque
 from dataclasses import dataclass
 
-import numpy as np
-
 
 @dataclass
 class BufferState:
     bytes_queued: int = 0            # real backlog (drain / fill work off this)
-    bytes_reported: int = 0          # BSR-visible view (see BufferModel.snapshot_bsr)
+    bytes_reported: int = 0          # BSR-visible view -- see sim/bsr.py
     hol_timestamp_s: float = 0.0
     bytes_dropped_pdb: int = 0
+    lcg: int = -1                    # this flow's logical channel group (-1 = DL / n/a)
+    estimated_ul_buffer_per_lcg: int = 0  # gNB's raw per-LCG estimate, uncapped by
+                                           # sched_ul_bytes (bytes_reported is capped)
 
 
 class BufferModel:
     """Per-(UE, QFI) fluid byte buffer. Tracks chunk timestamps for HoL
     accounting.
 
-    Uplink Buffer Status Report (BSR) delay is modelled cheaply. In real
-    5G the gNB does not directly see a UE's UL buffer -- it learns the
-    size via a delayed (and quantised, and sometimes lost) BSR MAC CE that
-    piggybacks on a UL grant that itself was triggered by a Scheduling
-    Request on PUCCH. The round-trip is ~4-8 ms for an idle UE. We model
-    this as a fixed per-UL-flow delay in slots: ``bytes_reported`` lags
-    ``bytes_queued`` by ``ul_bsr_delay_slots``. Dynamic schedulers read
-    ``bytes_reported`` (that is what BSR would tell them); SPS / Configured
-    Grants read ``bytes_queued`` directly because a CG UE just fills its
-    reserved PRBs with whatever it has -- no BSR needed. Downlink flows
-    (gNB-side buffer) always have ``bytes_reported == bytes_queued``.
-
-    ``ul_bsr_delay_slots = 0`` disables the pipeline entirely (bytes_reported
-    is kept in lock-step with bytes_queued), preserving the previous
-    zero-latency behaviour.
-
-    ``ul_bsr_loss_rate`` (0.0-1.0) is the probability that a BSR update
-    fails to reach the gNB on any given slot; on a loss the gNB keeps the
-    previously reported value (real 5G: SR-on-PUCCH loss or a lost BSR MAC
-    CE on PUSCH). Independent Bernoulli per slot per UL flow, seeded from
-    ``bsr_seed`` for reproducibility.
+    Uplink Buffer Status Report (BSR) realism -- quantisation, per-LCG
+    aggregation, short-BSR aliasing, and the sched_ul_bytes collapse-to-
+    crumb gate -- lives in ``sim/bsr.py::BsrModel``, not here. This class
+    is purely the true-backlog store: ``bytes_queued`` is exact and
+    instant. For a BSR-managed UL flow (registered with ``is_ul=True``),
+    ``bytes_reported`` is written only by ``BsrModel.broadcast()`` -- this
+    class does not touch it. For DL flows and any flow not BSR-managed,
+    ``bytes_reported`` stays in lock-step with ``bytes_queued`` here, same
+    as before (no BSR needed: the gNB IS the DL buffer).
     """
 
-    def __init__(
-        self,
-        ul_bsr_delay_slots: int = 0,
-        ul_bsr_loss_rate: float = 0.0,
-        bsr_seed: int = 0,
-    ) -> None:
+    def __init__(self) -> None:
         self._buffers: dict[tuple[int, int], BufferState] = {}
         # Each chunk is [timestamp_s, bytes_remaining]; FIFO via deque.
         self._chunks: dict[tuple[int, int], deque] = {}
@@ -52,26 +36,17 @@ class BufferModel:
         # windowed view of offered/served load.
         self._arrived_cum: dict[tuple[int, int], int] = {}
         self._delivered_cum: dict[tuple[int, int], int] = {}
-        # UL BSR-delay pipeline.
-        self._ul_bsr_delay = max(0, int(ul_bsr_delay_slots))
-        self._ul_bsr_loss_rate = float(min(1.0, max(0.0, ul_bsr_loss_rate)))
-        self._ul_flows: set[tuple[int, int]] = set()
-        self._bsr_history: dict[tuple[int, int], deque] = {}
-        # Independent RNG so BSR-loss draws don't perturb channel / traffic
-        # sequences when the loss rate is varied.
-        self._bsr_rng = np.random.default_rng(int(bsr_seed))
+        # Flows whose bytes_reported is externally driven by BsrModel.
+        self._bsr_managed: set[tuple[int, int]] = set()
 
-    def register(self, ue_id: int, qfi: int, is_ul: bool = False) -> None:
+    def register(self, ue_id: int, qfi: int, is_ul: bool = False, lcg: int = -1) -> None:
         key = (ue_id, qfi)
-        self._buffers[key] = BufferState()
+        self._buffers[key] = BufferState(lcg=lcg)
         self._chunks[key] = deque()
         self._arrived_cum[key] = 0
         self._delivered_cum[key] = 0
-        if is_ul and self._ul_bsr_delay > 0:
-            self._ul_flows.add(key)
-            # maxlen = delay + 1 so hist[0] is the value from `delay` slots ago
-            # once the pipeline has filled.
-            self._bsr_history[key] = deque(maxlen=self._ul_bsr_delay + 1)
+        if is_ul:
+            self._bsr_managed.add(key)
 
     def arrived_cum(self, ue_id: int, qfi: int) -> int:
         """Cumulative bytes ever enqueued for this flow."""
@@ -105,8 +80,8 @@ class BufferModel:
         chunks.append([timestamp_s, bytes_count])
         state.bytes_queued += bytes_count
         self._arrived_cum[key] += bytes_count
-        # DL / no-BSR-delay flows: report is exact and instant.
-        if key not in self._ul_flows:
+        # DL / non-BSR-managed flows: report is exact and instant.
+        if key not in self._bsr_managed:
             state.bytes_reported = state.bytes_queued
 
     def drain(self, ue_id: int, qfi: int, bytes_count: int) -> int:
@@ -129,7 +104,7 @@ class BufferModel:
         state.bytes_queued -= removed
         state.hol_timestamp_s = chunks[0][0] if chunks else 0.0
         self._delivered_cum[key] += removed
-        if key not in self._ul_flows:
+        if key not in self._bsr_managed:
             state.bytes_reported = state.bytes_queued
         return removed
 
@@ -145,7 +120,7 @@ class BufferModel:
         state.bytes_dropped_pdb += dropped
         state.bytes_queued -= dropped
         state.hol_timestamp_s = chunks[0][0] if chunks else 0.0
-        if key not in self._ul_flows:
+        if key not in self._bsr_managed:
             state.bytes_reported = state.bytes_queued
         return dropped
 
@@ -154,36 +129,3 @@ class BufferModel:
         if state.bytes_queued == 0:
             return 0.0
         return now_s - state.hol_timestamp_s
-
-    def snapshot_bsr(self) -> None:
-        """Advance the UL BSR-delay pipeline by one slot. Call once per
-        slot AFTER traffic arrivals are enqueued and drained/expired, but
-        BEFORE the scheduler reads state -- so ``bytes_reported`` reflects
-        the buffer as seen ``ul_bsr_delay_slots`` ago. No-op if no UL flow
-        has a delay configured (bytes_reported is already tracked in
-        enqueue/drain/expire for the zero-delay case).
-
-        If ``ul_bsr_loss_rate > 0``, each slot's update independently fails
-        with that probability per UL flow; on a loss the gNB keeps the last
-        successfully reported value (no explicit re-report -- the next
-        slot's BSR either arrives or is also lost).
-        """
-        if not self._ul_flows:
-            return
-        for key in self._ul_flows:
-            st = self._buffers[key]
-            hist = self._bsr_history[key]
-            hist.append(st.bytes_queued)
-            # Once the pipeline has filled (len > delay), hist[0] is the value
-            # from `delay` slots ago. Before that, nothing has been reported
-            # yet -- the scheduler sees an empty buffer, matching the real
-            # cold-start behaviour (no BSR has yet reached the gNB).
-            if len(hist) <= self._ul_bsr_delay:
-                continue
-            if (
-                self._ul_bsr_loss_rate > 0.0
-                and self._bsr_rng.random() < self._ul_bsr_loss_rate
-            ):
-                # BSR lost: keep the previously reported value.
-                continue
-            st.bytes_reported = hist[0]

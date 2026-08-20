@@ -45,7 +45,6 @@ SCHEDULER_CONFIG = str(Path(__file__).resolve().parent.parent / "scheduler" / "s
 # scripts/scheduler_study.py, so numbers are directly comparable.
 GBR_CONTRACT_FRACTION = 0.95
 DELAY_ONTIME_DELIVERY = 0.99
-UL_BSR_DELAY_SLOTS = 8
 CQI_DELAY_SLOTS = 8
 
 # The two cell-edge GBR flows Finding 1 is about (16 dB and 14 dB).
@@ -142,7 +141,6 @@ def study_load_sweep() -> None:
         for name, factory in scheds:
             p = _profile(sc, run(
                 sc, factory(),
-                ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS,
                 cqi_delay_slots=CQI_DELAY_SLOTS,
             ))
             c = p["canaries"]
@@ -174,7 +172,6 @@ def study_scale_sweep() -> None:
             sched = _tt(gbr_maxmin_scale=scale)
             p = _profile(sc, run(
                 sc, sched,
-                ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS,
                 cqi_delay_slots=CQI_DELAY_SLOTS,
             ))
             c = p["canaries"]
@@ -207,7 +204,6 @@ def study_per_flow() -> None:
     for name, factory in variants:
         summary = run(
             sc, factory(),
-            ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS,
             cqi_delay_slots=CQI_DELAY_SLOTS,
         )
         results[name] = summary["flows"]

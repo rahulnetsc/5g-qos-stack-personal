@@ -38,7 +38,6 @@ from sim.config import (
 )
 from sim.driver import run
 
-UL_BSR_DELAY_SLOTS = 8
 TIER1_PERIOD_SLOTS = 2000
 
 
@@ -110,8 +109,7 @@ def main() -> None:
     print(f"{'demand':<12}{'alpha':>7}{'total':>10}{'fairness':>11}")
     for est, alpha in (("oracle", 0.0), ("measured", 1.0), ("measured", 0.5),
                        ("measured", 0.3), ("measured", 0.1)):
-        s = run(sc, _tt(demand_estimator=est, demand_ewma_alpha=alpha),
-                ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS)
+        s = run(sc, _tt(demand_estimator=est, demand_ewma_alpha=alpha))
         label = est if est == "oracle" else "measured"
         a = "-" if est == "oracle" else f"{alpha:.1f}"
         print(f"{label:<12}{a:>7}{total_mbps(s):>9.1f}M{fairness(s):>11.2f}")
@@ -125,14 +123,11 @@ def main() -> None:
           f"{'measured raw':>14}{'measured a=0.3':>16}")
     for adapt_ms in (250.0, 500.0, 1000.0, 2000.0, 4000.0):
         sc = adaptive_scenario(adapt_period_ms=adapt_ms)
-        o = total_mbps(run(sc, _tt(demand_estimator="oracle"),
-                           ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
+        o = total_mbps(run(sc, _tt(demand_estimator="oracle")))
         raw = total_mbps(run(sc, _tt(demand_estimator="measured",
-                                     demand_ewma_alpha=1.0),
-                             ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
+                                     demand_ewma_alpha=1.0)))
         sm = total_mbps(run(sc, _tt(demand_estimator="measured",
-                                    demand_ewma_alpha=0.3),
-                            ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS))
+                                    demand_ewma_alpha=0.3)))
         print(f"{adapt_ms:>12.0f}ms{adapt_ms / tier1_ms:>8.2f}"
               f"{o:>9.1f}M{raw:>13.1f}M{sm:>15.1f}M")
 

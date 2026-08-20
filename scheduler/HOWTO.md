@@ -256,10 +256,14 @@ either modelled cheaply in the sim (with a knob you can leave at 0 in
 tests) or documented as a known gap. Expect them to bite on the OAI
 port:
 
-- **BSR round-trip.** Sim models this via `BufferModel(ul_bsr_delay_slots=8)`;
-  OAI has real BSR MAC CE latency, ~4-8 ms. Study `bsr_study.py` shows
-  the effect. Populate `BufferView.bytes_reported` from actual BSR
-  arrival, not from local RLC state.
+- **BSR round-trip.** Sim models this via `sim/bsr.py::BsrModel` (WP3):
+  per-LCG, quantised (38.321 Tables 6.1.3.1-1/-2), riding on a UL grant,
+  with the `sched_ul_bytes`/`estimated_ul_buffer` gate that collapses
+  grants to a `min_rb` crumb between BSRs — a direct port of OAI's
+  mechanism, not an approximation, once event-triggering (periodicBSR/
+  retxBSR timers, the regular-BSR trigger) lands in WP3's follow-up
+  commit. Populate `BufferView.bytes_reported` from actual BSR arrival,
+  not from local RLC state.
 - **CQI staleness and quantisation.** Sim models delay + Bernoulli loss;
   OAI has real CQI-report periodicity, quantisation to 4-bit indices,
   and occasional PUCCH loss. `ChannelView.get_reported_snr_db` should

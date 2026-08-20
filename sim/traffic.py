@@ -32,7 +32,7 @@ class TrafficModel:
         self.slot_duration_s = slot_duration_s
         self.rng = rng
         for f in flows:
-            buffers.register(f.ue_id, f.qfi, is_ul=(f.direction == "UL"))
+            buffers.register(f.ue_id, f.qfi, is_ul=(f.direction == "UL"), lcg=f.lcg)
 
     def observe_delivery(self, per_flow_delivered: dict) -> None:
         """Feed delivered bytes back to rate-adaptive sources.

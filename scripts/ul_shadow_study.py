@@ -30,7 +30,6 @@ from sim.driver import run
 from sim.scenarios import factory_robots_scenario
 from sim.ue_lcp import UeLcp
 
-UL_BSR_DELAY_SLOTS = 8
 CQI_DELAY_SLOTS = 8
 
 
@@ -94,9 +93,7 @@ def main() -> None:
     ]
     for est, gain in configs:
         sched = _tt(ul_split_estimator=est, ul_bucket_sync_gain=gain)
-        summary = run(sc, sched,
-                      ul_bsr_delay_slots=UL_BSR_DELAY_SLOTS,
-                      cqi_delay_slots=CQI_DELAY_SLOTS)
+        summary = run(sc, sched, cqi_delay_slots=CQI_DELAY_SLOTS)
         p = profile(summary, sc)
         ue_lcp = summary.get("_ue_lcp")
         d = divergence(sched, ue_lcp) if ue_lcp is not None else {"n": 0}

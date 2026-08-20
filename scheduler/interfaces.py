@@ -70,11 +70,10 @@ class GridView(Protocol):
 
 class BufferStateView(Protocol):
     # Actual queued bytes (gNB's exact view). For a UE-side (uplink) buffer
-    # in real 5G the gNB only learns this via a delayed and lossy BSR;
-    # ``bytes_reported`` below is the *scheduling-visible* view that lags
-    # ``bytes_queued`` for uplink flows when a BSR delay is configured.
-    # For downlink (gNB-side buffer) and when no BSR delay is configured,
-    # bytes_reported == bytes_queued.
+    # in real 5G the gNB only learns this via a quantised, event-triggered
+    # BSR (see sim/bsr.py); ``bytes_reported`` below is the *scheduling-
+    # visible* view. For downlink (gNB-side buffer) bytes_reported ==
+    # bytes_queued always -- no BSR needed, the gNB IS the DL buffer.
     #
     # Dynamic scheduling decisions (eligibility, UE ranking, grant sizing)
     # should read ``bytes_reported``. Once a UE has a grant, the MAC
@@ -83,6 +82,17 @@ class BufferStateView(Protocol):
     # Configured Grants read ``bytes_queued`` directly (they need no BSR).
     bytes_queued: int
     bytes_reported: int
+    # This flow's logical channel group (0-7; -1 for DL / not BSR-managed).
+    # A real BSR is per-LCG, not per-flow -- every UL flow sharing an LCG
+    # sees the identical estimated_ul_buffer_per_lcg, because that is all
+    # the gNB actually knows past that point (see README §4/§7).
+    lcg: int
+    # The gNB's raw per-LCG BSR estimate for this flow's lcg -- frozen
+    # since the last BSR (not drained by grants, per README §7's WP3
+    # finding), and NOT capped by the sched_ul_bytes gate the way
+    # bytes_reported is. Use this to reason about the per-LCG estimate
+    # itself, distinct from the UE-wide collapse-to-crumb view.
+    estimated_ul_buffer_per_lcg: int
 
 
 class BufferView(Protocol):

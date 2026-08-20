@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 
+from .bsr import BsrModel
 from .buffer import BufferModel
 from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
@@ -17,17 +18,14 @@ def run(
     scenario: ScenarioConfig,
     scheduler: Scheduler,
     record_timeseries: bool = False,
-    ul_bsr_delay_slots: int = 0,
-    ul_bsr_loss_rate: float = 0.0,
     cqi_delay_slots: int = 0,
     cqi_loss_rate: float = 0.0,
 ) -> dict:
     """Run one scenario through one scheduler.
 
-    ``ul_bsr_delay_slots`` / ``ul_bsr_loss_rate`` model the UE-to-gNB
-    Buffer Status Report round-trip on the *uplink* -- see BufferModel.
-    Configured Grants (SPS) bypass BSR entirely. Zero (the defaults)
-    preserve the old zero-latency behaviour.
+    Uplink Buffer Status Reports are modelled by ``sim/bsr.py::BsrModel``:
+    per-LCG, quantised, riding on a UL grant. Configured Grants (SPS)
+    bypass BSR entirely (they read ``bytes_queued`` directly).
 
     ``cqi_delay_slots`` / ``cqi_loss_rate`` model the UE-to-gNB Channel
     Quality Indicator report on the *downlink* -- ChannelModel exposes a
@@ -49,13 +47,8 @@ def run(
         # Independent seed so CQI-loss draws don't perturb the AR(1) stream.
         cqi_seed=scenario.seed ^ 0xC9C9C9C9,
     )
-    buffers = BufferModel(
-        ul_bsr_delay_slots=ul_bsr_delay_slots,
-        ul_bsr_loss_rate=ul_bsr_loss_rate,
-        # Derive a distinct seed so BSR-loss draws don't perturb the channel
-        # / traffic RNG stream when the loss rate is swept.
-        bsr_seed=scenario.seed ^ 0xB5B5B5B5,
-    )
+    buffers = BufferModel()
+    bsr = BsrModel(scenario.flows)
     traffic = TrafficModel(scenario.flows, buffers, grid.slot_duration_s, rng)
     metrics = Metrics(record_timeseries=record_timeseries)
 
@@ -84,10 +77,10 @@ def run(
 
         channel.update(slot_index)
 
-        # Advance the UL BSR-delay pipeline so bytes_reported reflects the
-        # buffer as seen `ul_bsr_delay_slots` ago -- what a real gNB would
-        # know from BSR. No-op when ul_bsr_delay_slots = 0.
-        buffers.snapshot_bsr()
+        # Recompute every UL flow's gNB-visible bytes_reported from the
+        # current BsrModel state (B = estimated_ul_buffer - sched_ul_bytes,
+        # capped per-LCG) -- must run before the scheduler reads state.
+        bsr.broadcast(buffers)
 
         slot_grid = grid.slot_grid(slot_index)
         metrics.record_grid_capacity(
@@ -127,12 +120,18 @@ def run(
                 # the split, so apply the UE's own LCP over its *real*
                 # backlog. The scheduler's virtual-queue drain used a
                 # BSR-based estimate of this split and will differ.
+                ue_delivered_bytes = 0
                 for qfi, byts in ue_lcp.fill(
                     ue_flows_by_ue.get(alloc.ue_id, []), delivered, buffers
                 ):
                     buffers.drain(alloc.ue_id, qfi, byts)
                     metrics.record_delivery(alloc.ue_id, qfi, byts)
                     per_flow_delivered[(alloc.ue_id, qfi)] += byts
+                    ue_delivered_bytes += byts
+                # BSR: assemble/quantise a report from the true post-drain
+                # per-LCG backlog and credit sched_ul_bytes -- see
+                # sim/bsr.py::BsrModel.on_ul_grant.
+                bsr.on_ul_grant(alloc.ue_id, alloc.bytes_capacity, ue_delivered_bytes, buffers)
             else:
                 buffers.drain(alloc.ue_id, alloc.qfi, delivered)
                 metrics.record_delivery(alloc.ue_id, alloc.qfi, delivered)

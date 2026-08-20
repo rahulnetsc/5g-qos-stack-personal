@@ -281,6 +281,24 @@ they survive it:
   `sim/power.py::shrink_to_power_budget` correctly omits a `tbs`-equivalent
   parameter — its caller-supplied `tbs_bits_fn(rb, mcs)` already replaces
   what `nr_compute_tbs()` would have computed.
+- **`estimated_ul_buffer_per_lcg` is never drained by a grant — only
+  reset-then-repopulated on the next BSR (found during WP3).**
+  `post_process_ulsch`'s comment (`gNB_scheduler_ulsch.c` ~L2732-2751)
+  claims the per-LCG array is consumed "exactly as the UE's strict-priority
+  LCP would"; the code that follows (~L2785-2802) only decrements a
+  separate `ul_lcg_deficit_bytes[]` field and never writes back to
+  `estimated_ul_buffer_per_lcg[]` itself. The array is frozen at its
+  last-BSR value between reports. WP3's Python port reproduces this
+  faithfully (does not drain it either) — Phase 2's reservation port reads
+  this same field and needs to know upfront that it's frozen, not live.
+- **The scalar `estimated_ul_buffer` and the per-LCG array can desync
+  between BSRs (found during WP3).** On actual SDU receipt
+  (`gNB_scheduler_ulsch.c` ~L544-547) the scalar *is* decremented by the
+  received bytes, but `estimated_ul_buffer_per_lcg[]` is not touched at
+  that site — no comment claims otherwise, so this isn't a mismatch, but
+  combined with the previous point it means the per-LCG breakdown can
+  drift arbitrarily from the scalar until the next BSR resets both.
+  Preserved deliberately in the port, not fixed.
 
 ---
 
@@ -298,6 +316,32 @@ they survive it:
   deployment-dependent, sweep in WP6 rather than picking blind.
 - `[OPEN]` Survival-time threshold N (`p5g-sim-plan.md` §7) — start at 3,
   report H6 as a function of N.
+- `[OPEN]` **WP3 exposed a UL scheduling deadlock that only WP4 can properly
+  close.** Every scheduler's UL eligibility gate (`bytes_reported > 0`) is
+  refreshed only by a grant, and a grant requires the gate to already be
+  open -- a deadlock for any flow whose real backlog goes from empty back
+  to non-empty (most bursty UL traffic here), not just a one-time cold
+  start. Real 5G breaks this with a Scheduling Request on PUCCH, a
+  control-channel signal needing no existing grant (WP4). Until WP4 lands,
+  `sim/bsr.py::BsrModel.broadcast()` reports a flow's true backlog directly
+  whenever its per-LCG estimate is exactly 0 -- a stopgap that is
+  load-bearing for every scenario's basic UL throughput today, not
+  a corner case. It does not defeat the crumb-collapse mechanism itself
+  (a nonzero estimate capped to 0 by `B` still gates correctly). See
+  `design-docs/scheduler-study.md` §5.1 for detail. **WP4 should treat
+  properly retiring this stopgap as part of its acceptance criteria, not
+  an optional cleanup.**
+- `[OPEN]` H5 (`p5g-sim-plan.md` line 338, "two-tier degrades as
+  flows-per-LCG grows") is not demonstrable on any current scenario. WP3's
+  default 5QI→LCG mapping (`scheduler/flow.py::FIVE_QI_LCG`) deliberately
+  separates QoS classes into different LCGs, matching real deployment
+  practice — but it means `scenario_config_6.yml`'s only multi-UL-flow UEs
+  (8, 9, 10: GBR video + a different-class best-effort/ack flow each)
+  never share an LCG, so short-BSR aliasing and per-LCG aggregation go
+  unexercised by every scenario in the repo today. Needs a small follow-up
+  scenario (two same-class UL flows forced onto one `lcg` via an explicit
+  override) before H5 can be confirmed, refuted, or ruled inconclusive in
+  Phase 3.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

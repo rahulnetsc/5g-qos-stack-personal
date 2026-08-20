@@ -42,6 +42,33 @@ def priority_for_5qi(qfi: int) -> int:
     return FIVE_QI_PRIORITY.get(int(qfi), DEFAULT_PRIORITY_LEVEL)
 
 
+LCG_COUNT = 8
+
+# Default 5QI -> logical channel group mapping for uplink flows (WP3, BSR
+# realism). Unlike FIVE_QI_PRIORITY (a 3GPP-standardised table), LCG
+# assignment is NOT standardised as a function of 5QI -- a real deployment
+# configures each logical channel's LCG via RRC, an operator/gNB policy
+# choice. This table is a simulator default only, grouping 5QIs by
+# QoS-class family so that same-class bearers plausibly land on one LCG
+# and different-class bearers don't; an explicit `lcg` in a scenario's flow
+# config always overrides it.
+FIVE_QI_LCG: dict[int, int] = {
+    1: 0, 3: 0,                   # GBR: voice / real-time gaming-V2X
+    2: 1,                         # GBR: conversational video
+    4: 2,                         # GBR: non-conversational buffered video
+    82: 3, 83: 3, 84: 3, 85: 3,   # delay-critical GBR: discrete automation / ITS
+    5: 4, 7: 4,                   # non-GBR: signalling / low-latency voice-video
+    6: 5, 8: 5,                   # non-GBR: buffered video (TCP)
+    9: 6,                         # non-GBR: default bearer / best effort
+}
+DEFAULT_LCG = 7
+
+
+def lcg_for_5qi(qfi: int) -> int:
+    """Default LCG for a 5QI, or the neutral fallback if unlisted."""
+    return FIVE_QI_LCG.get(int(qfi), DEFAULT_LCG)
+
+
 @dataclass
 class FlowConfig:
     ue_id: int
@@ -55,6 +82,11 @@ class FlowConfig:
     # Default is a single neutral level; set per-flow once the workload is
     # mapped to standardised 5QIs.
     priority_level: int = 100
+    # This flow's logical channel group, 0-7 (TS 38.321: BSR aggregates to
+    # 8 LCGs). -1 means "use lcg_for_5qi(qfi)" -- __post_init__ resolves it,
+    # so any explicit lcg always wins and every other FlowConfig still gets
+    # a valid default regardless of how it was constructed.
+    lcg: int = -1
     # Network-slice id. Tier-1 can give each slice a guaranteed share of PRB
     # capacity; default 0 puts every flow in one slice (no slicing).
     slice_id: int = 0
@@ -73,6 +105,12 @@ class FlowConfig:
 
     traffic_kind: str = "poisson"
     traffic_params: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.lcg == -1:
+            self.lcg = lcg_for_5qi(self.qfi)
+        if not (0 <= self.lcg < LCG_COUNT):
+            raise ValueError(f"lcg={self.lcg} outside 0..{LCG_COUNT - 1} (qfi={self.qfi})")
 
     def effective_pbr_bps(self) -> float:
         """Configured prioritised bit rate, defaulting a GBR flow to its GFBR."""

@@ -17,7 +17,7 @@ is reproducible:
 |---|---|
 | §7.1–7.3 (Studies 1–3) | `python scripts/scheduler_study.py` |
 | §7.4 (per-flow breakdown) | `python scripts/compare_schedulers.py` |
-| §7.5 (BSR sensitivity) | `python scripts/bsr_study.py` |
+| §7.5 (BSR sensitivity) | retired (WP3, see §7.5's note) |
 | §7.6 (CQI staleness, SPS margin) | `python scripts/cqi_study.py` |
 | §7.7 (max-min GBR stage) | `python scripts/maxmin_study.py` |
 
@@ -616,7 +616,7 @@ nothing else.**
 |---|---|
 | Slot-by-slot PRB grid, including the TDD **special slot** | No LDPC, no I/Q, no actual modulation |
 | **PDCCH/CCE budget** per slot, with variable DCI aggregation level | HARQ as a fixed delay + BLER discount, not a full state machine |
-| **UL Buffer Status Report round-trip** as a fixed per-flow delay (8 slots ≈ 4 ms at μ=1) + Bernoulli loss; Configured Grants bypass | BSR quantisation not modelled (delay + loss capture the first-order effect) |
+| **UL Buffer Status Report**, per-LCG and quantised (TS 38.321 Tables 6.1.3.1-1/-2), riding on a UL grant, with the `sched_ul_bytes`/`estimated_ul_buffer` gate that collapses grants toward a `min_rb` crumb between BSRs (`sim/bsr.py`, WP3); Configured Grants bypass it entirely | The Scheduling Request / PUCCH chain that lets a UE recover from an idle buffer (WP4); until then, a flow with zero known backlog reports its true backlog directly as a stopgap (see §5.1's note below) |
 | **DL/UL CQI report round-trip** as a per-UE delay + Bernoulli loss; scheduler reads `get_reported_snr_db`, driver applies mismatch-BLER (`bler_for_mcs`) at the true SNR against the picked MCS; SPS uses a semi-static conservative MCS (`sps_snr_margin_db`) | CQI quantisation is implicit in the SNR→MCS staircase; direction-agnostic (see §7.6 for the effect on our scenarios — small) |
 | Per-UE SNR as an AR(1) process → MCS → bits/PRB via a **0.75 × Shannon staircase** (`_MCS_TABLE` in [`scheduler/link.py`](../scheduler/link.py)), capped at 7.5 bits/RE (~5.8 bps/Hz effective) at 31 dB. Typical factory UEs at 22 dB sit at 4.5 bits/RE; cell-edge at 14 dB at 2.0. See §6.1 for the resulting per-scenario throughput ceilings. **Roadmap:** replace with a real 3GPP TBS extract for absolute-claim credibility. | RLC as a fluid byte buffer, no per-packet segmentation |
 | BLER as a discount on delivered bits | Single-stream only — no MU-MIMO |
@@ -642,32 +642,53 @@ written from the scheduler's point of view grants its conveniences there.
 The discipline cuts both ways. The PDCCH budget is modeled *because the
 control channel is a genuine bottleneck* — and §7.2 shows that omitting it
 would have led to the wrong conclusion that Configured Grants are
-unnecessary. The UL BSR delay is modeled for the same reason: dynamic UL
-scheduling in real 5G carries a ~4–8 ms SR/BSR/grant/data round-trip that
-Configured Grants sidestep entirely, and omitting it *understates* the
-value of SPS. (Ignoring BSR was the sim's largest fidelity gap; it surfaced
-during the parallel OAI-integration workstream and is closed here — see
-[NOTES.md](../NOTES.md).) Conversely, PHY detail is omitted because it does
-not change *which scheduler wins*.
+unnecessary. The UL BSR mechanism is modeled for the same reason: dynamic
+UL scheduling in real 5G learns a UE's backlog only via a quantised,
+event-triggered BSR that rides on a grant, and Configured Grants sidestep
+that entirely — omitting it *understates* the value of SPS. (Ignoring BSR
+was the sim's largest fidelity gap; it surfaced during the parallel
+OAI-integration workstream and was first closed as a fixed-delay
+approximation, then replaced with the real per-LCG/quantised/event-driven
+mechanism by WP3 — see [NOTES.md](../NOTES.md).) Conversely, PHY detail is
+omitted because it does not change *which scheduler wins*.
+
+**A gap WP3 found but does not close.** Modeling BSR realistically exposed
+that every scheduler's UL eligibility gate (`bytes_reported > 0`) only
+gets refreshed by a grant that itself requires the gate to already be
+open — a deadlock for any flow whose real backlog goes from empty back to
+non-empty, which describes most bursty UL traffic in this repo. Real 5G
+breaks this with a Scheduling Request on PUCCH — a control-channel signal
+that needs no existing grant — which is WP4's job, not WP3's. Until WP4
+lands, `sim/bsr.py::BsrModel.broadcast()` reports a flow's true backlog
+directly whenever its per-LCG estimate is exactly 0 (no evidence at all),
+which is a materially bigger stopgap than it sounds: it is load-bearing
+for every scenario's basic UL throughput today, not just an edge case.
+This does not defeat the crumb-collapse mechanism itself (a nonzero
+estimate capped to 0 by `B` still gates correctly) — only the "gNB has
+never heard from this flow" case.
 
 **The knobs, and why their defaults differ from the studies' settings.**
 These are `sim.driver.run` arguments, not scheduler parameters — each one
 models something a real gNB does *not* know. Zero means perfect
-information, which is why the library defaults are all `0`: a unit test
-should not have to reason about report latency to assert a scheduling
-decision. The studies deliberately run them non-zero, and the gap is worth
-stating plainly so the two sets of numbers are not read as inconsistent.
+information, which is why the library default is `0`: a unit test should
+not have to reason about report latency to assert a scheduling decision.
+The studies deliberately run it non-zero, and the gap is worth stating
+plainly so the two sets of numbers are not read as inconsistent.
 
 | Knob | Library default | Study setting | What it models |
 |---|---|---|---|
-| `ul_bsr_delay_slots` | `0` | `8` (≈ 4 ms at μ=1) | SR/BSR/grant round-trip before the gNB learns a UE has UL data. Configured Grants bypass it entirely — half of SPS's structural advantage (§7.5). |
-| `ul_bsr_loss_rate` | `0.0` | `0` | Per-slot Bernoulli BSR loss; on a loss the gNB keeps the last good report. Barely moves either scheduler on continuously-backlogged traffic (§7.5). |
 | `cqi_delay_slots` | `0` | `8` (≈ 4 ms) | Age of the CQI the scheduler picks an MCS from. Mismatch against the true SNR at transmission drives BLER (§7.6). |
 | `cqi_loss_rate` | `0.0` | `0` | Per-slot Bernoulli CQI-report loss; the gNB holds the last reported value. |
 
-Both loss rates are left at `0` in the studies because the sweeps found
-them near-inert on these workloads (§7.5, §7.6); they exist so a deployment
-with marginal PUCCH can be modelled rather than assumed away.
+The loss rate is left at `0` in the studies because the sweep found it
+near-inert on these workloads (§7.6); it exists so a deployment with
+marginal PUCCH can be modelled rather than assumed away.
+
+UL BSR realism (`sim/bsr.py`, WP3) is not a knob — it is always on, driven
+by each flow's `FlowConfig.lcg` rather than a `sim.driver.run` argument.
+There is no "perfect information" toggle for it: quantisation, per-LCG
+aggregation, and the `sched_ul_bytes` collapse-to-crumb gate are the
+gNB's *only* view of a UE's UL buffer, always.
 
 ### 5.2 The harness
 
@@ -970,6 +991,13 @@ machinery redistributes the pain; at 1.0× load it cannot remove it, and the
 default now chooses to spread it rather than concentrate it.
 
 ### 7.5 BSR sensitivity — delay and loss sweeps
+
+> **Superseded by WP3 (BSR realism).** The fixed-delay/Bernoulli-loss BSR
+> model this section swept (`ul_bsr_delay_slots`/`ul_bsr_loss_rate`) was
+> replaced by `sim/bsr.py`'s per-LCG, quantised, event-riding-on-a-grant
+> model; `scripts/bsr_study.py` was retired since its swept parameter no
+> longer exists. The findings below are a historical record of the old
+> model, not a live reproduction target.
 
 The 8-slot BSR delay used above is one point on a spectrum. To confirm
 the direction of the effect and check that the story is not tuned to that
