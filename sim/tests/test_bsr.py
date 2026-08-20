@@ -1,5 +1,10 @@
-"""Tests for sim/bsr.py (WP3, commit 1: quantisation + per-LCG structure,
-no event-triggering yet -- a BSR is assembled on every UL grant)."""
+"""Tests for sim/bsr.py (WP3).
+
+Commit 1: quantisation, per-LCG structure, the cold-start/re-arm probe.
+Commit 2: event-triggering (regular/periodic/retx) and the resulting
+sched_ul_bytes crumb-collapse gate -- a BSR is now assembled only when
+`pending`, not on every grant.
+"""
 
 import re
 from pathlib import Path
@@ -17,6 +22,10 @@ from sim.buffer import BufferModel
 from scheduler.flow import FlowConfig
 
 _OAI_SOURCE = Path(__file__).resolve().parents[2] / "oai-branches" / "two-tier" / "nr_mac_common.c"
+
+# A representative mu=1 slot duration (0.5 ms), used throughout so the
+# 5 ms/80 ms hardware timer values land on convenient slot counts (10/160).
+_SLOT_S = 0.0005
 
 
 def _parse_c_table(name: str) -> tuple[int, ...]:
@@ -90,8 +99,8 @@ def test_quantise_short_is_not_idempotent():
     assert twice > once
 
 
-def _flow(ue_id, qfi, lcg):
-    return FlowConfig(ue_id=ue_id, qfi=qfi, direction="UL", lcg=lcg)
+def _flow(ue_id, qfi, lcg, priority_level=100):
+    return FlowConfig(ue_id=ue_id, qfi=qfi, direction="UL", lcg=lcg, priority_level=priority_level)
 
 
 def test_flowconfig_defaults_lcg_from_5qi_and_rejects_out_of_range():
@@ -107,6 +116,13 @@ def test_flowconfig_defaults_lcg_from_5qi_and_rejects_out_of_range():
         FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=-2)
 
 
+def _force_pending(bsr, ue_id):
+    """Test helper: jump straight to "a BSR is due" without exercising the
+    trigger logic itself -- used by tests about quantisation/aggregation
+    mechanics, which are orthogonal to why a report was due."""
+    bsr._state[ue_id].pending = True
+
+
 def test_short_bsr_used_and_other_lcgs_zeroed_when_one_lcg_active():
     """When exactly one LCG has real backlog, the assembled BSR is short
     format: that LCG's estimate is set, every other LCG's slot reads 0 --
@@ -115,12 +131,13 @@ def test_short_bsr_used_and_other_lcgs_zeroed_when_one_lcg_active():
     buffers.register(1, 2, is_ul=True, lcg=0)
     buffers.register(1, 9, is_ul=True, lcg=1)
     flows = [_flow(1, 2, 0), _flow(1, 9, 1)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 0, 0.0)      # LCG 0: no data
     buffers.enqueue(1, 9, 2000, 0.0)   # LCG 1: only active LCG
 
-    bsr.on_ul_grant(ue_id=1, tb_size=0, delivered_bytes=0, buffers=buffers)
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=0, delivered_bytes=0, slot_index=0, buffers=buffers)
     bsr.broadcast(buffers)  # BsrModel's internal state -> BufferState
 
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == 0
@@ -132,12 +149,13 @@ def test_long_bsr_used_when_multiple_lcgs_active():
     buffers.register(1, 2, is_ul=True, lcg=0)
     buffers.register(1, 9, is_ul=True, lcg=1)
     flows = [_flow(1, 2, 0), _flow(1, 9, 1)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 500, 0.0)
     buffers.enqueue(1, 9, 2000, 0.0)
 
-    bsr.on_ul_grant(ue_id=1, tb_size=0, delivered_bytes=0, buffers=buffers)
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=0, delivered_bytes=0, slot_index=0, buffers=buffers)
     bsr.broadcast(buffers)
 
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == quantise_long(500)
@@ -151,10 +169,11 @@ def test_per_lcg_estimate_frozen_between_grants_not_drained():
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 1000, 0.0)
-    bsr.on_ul_grant(ue_id=1, tb_size=1000, delivered_bytes=1000, buffers=buffers)
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=1000, delivered_bytes=1000, slot_index=0, buffers=buffers)
     bsr.broadcast(buffers)
     reported_after_first_bsr = buffers.state(1, 2).estimated_ul_buffer_per_lcg
     assert reported_after_first_bsr == quantise_short(1000)
@@ -166,18 +185,55 @@ def test_per_lcg_estimate_frozen_between_grants_not_drained():
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == reported_after_first_bsr
 
 
-def test_sched_ul_bytes_resets_to_zero_on_every_bsr():
+def test_sched_ul_bytes_resets_to_zero_only_when_pending():
     """Both BSR formats reset sched_ul_bytes = 0 unconditionally on
-    reception (gNB_scheduler_ulsch.c:630, 651), regardless of how much was
-    granted since the last one."""
+    reception (gNB_scheduler_ulsch.c:630, 651) -- but only on an actual
+    BSR, not every grant (that's the whole point of event-triggering)."""
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 5000, 0.0)
-    bsr.on_ul_grant(ue_id=1, tb_size=200, delivered_bytes=200, buffers=buffers)
+    # Not pending: sched_ul_bytes accumulates, no reset.
+    bsr.on_ul_grant(ue_id=1, tb_size=200, delivered_bytes=200, slot_index=0, buffers=buffers)
+    assert bsr._state[1].sched_ul_bytes == 200
+
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=200, delivered_bytes=200, slot_index=1, buffers=buffers)
     assert bsr._state[1].sched_ul_bytes == 0
+
+
+def test_scalar_decrements_on_every_grant_independent_of_pending():
+    """README §7 finding (b): the scalar estimated_ul_buffer decrements on
+    actual data receipt regardless of whether this grant also carries a
+    BSR -- independent of the per-LCG array, which only a BSR touches.
+    This is what lets the two desync between BSRs."""
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    bsr = BsrModel(flows, _SLOT_S)
+
+    st = bsr._state[1]
+    st.estimated_ul_buffer = 1000
+    buffers.enqueue(1, 2, 9999, 0.0)  # true backlog present, but not pending
+    bsr.on_ul_grant(ue_id=1, tb_size=300, delivered_bytes=300, slot_index=0, buffers=buffers)
+    assert st.estimated_ul_buffer == 700  # decremented, NOT reassembled
+    assert st.estimated_ul_buffer_per_lcg == [0] * 8  # per-LCG array untouched
+
+
+def test_bsr_not_assembled_when_not_pending():
+    """on_ul_grant must not touch estimated_ul_buffer_per_lcg at all unless
+    pending -- the crux of event-triggering."""
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    bsr = BsrModel(flows, _SLOT_S)
+
+    buffers.enqueue(1, 2, 5000, 0.0)
+    bsr.on_ul_grant(ue_id=1, tb_size=500, delivered_bytes=500, slot_index=0, buffers=buffers)
+    assert bsr._state[1].estimated_ul_buffer_per_lcg == [0] * 8
+    assert bsr._state[1].pending is False
 
 
 def test_rides_on_a_grant_no_change_without_one():
@@ -189,9 +245,10 @@ def test_rides_on_a_grant_no_change_without_one():
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 1234, 0.0)
+    bsr.on_arrivals({(1, 2): 1234}, buffers)  # legitimate regular trigger
     for _ in range(10):
         bsr.broadcast(buffers)
     # Never granted -> still the true-backlog probe, not a quantised value.
@@ -207,16 +264,18 @@ def test_cold_start_probe_rearms_after_a_flow_drains_to_empty():
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 500, 0.0)
     buffers.drain(1, 2, 500)
-    bsr.on_ul_grant(ue_id=1, tb_size=500, delivered_bytes=500, buffers=buffers)
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=500, delivered_bytes=500, slot_index=0, buffers=buffers)
     bsr.broadcast(buffers)
     assert buffers.state(1, 2).bytes_reported == 0
 
     # New data arrives with no further grant -- must become visible again.
     buffers.enqueue(1, 2, 300, 0.001)
+    bsr.on_arrivals({(1, 2): 300}, buffers)  # regular trigger: previously-empty LCG
     bsr.broadcast(buffers)
     assert buffers.state(1, 2).bytes_reported == 300
 
@@ -229,11 +288,12 @@ def test_crumb_collapse_not_defeated_by_the_probe():
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
-    bsr = BsrModel(flows)
+    bsr = BsrModel(flows, _SLOT_S)
 
     buffers.enqueue(1, 2, 50_000, 0.0)
     buffers.drain(1, 2, 10_000)  # partial: 40_000 left, LCG still active
-    bsr.on_ul_grant(ue_id=1, tb_size=10_000, delivered_bytes=10_000, buffers=buffers)
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=10_000, delivered_bytes=10_000, slot_index=0, buffers=buffers)
     st = bsr._state[1]
     assert st.estimated_ul_buffer_per_lcg[0] > 0
 
@@ -244,3 +304,100 @@ def test_crumb_collapse_not_defeated_by_the_probe():
     assert buffers.state(1, 2).bytes_reported == 0
     # The frozen per-LCG estimate itself is untouched by the gate.
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == st.estimated_ul_buffer_per_lcg[0]
+
+
+# --- Event-triggering (commit 2) --------------------------------------------
+
+
+def test_regular_trigger_fires_on_previously_empty_lcg():
+    """An arrival on an LCG that had zero backlog sets `pending` -- the
+    regular-BSR trigger (TS 38.321 §5.4.5 condition (ii), condensed to LCG
+    granularity)."""
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    bsr = BsrModel(flows, _SLOT_S)
+
+    buffers.enqueue(1, 2, 100, 0.0)
+    assert bsr._state[1].pending is False  # on_arrivals not called yet
+    bsr.on_arrivals({(1, 2): 100}, buffers)
+    assert bsr._state[1].pending is True
+
+
+def test_no_regular_trigger_without_an_arrival():
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    bsr = BsrModel(flows, _SLOT_S)
+
+    bsr.on_arrivals({}, buffers)
+    assert bsr._state[1].pending is False
+
+
+def test_periodic_timer_fires_pending_after_deadline():
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    # periodicBSR = 5 ms = 10 slots at _SLOT_S; retxBSR set huge so it
+    # cannot be the one that fires here.
+    bsr = BsrModel(flows, _SLOT_S, periodic_bsr_ms=5.0, retx_bsr_ms=100_000.0)
+
+    for slot in range(9):
+        bsr.tick_timers(slot)
+        assert bsr._state[1].pending is False, slot
+    bsr.tick_timers(10)
+    assert bsr._state[1].pending is True
+
+
+def test_retx_timer_restarts_on_every_grant_suppressing_recovery():
+    """The ground truth's own note: retxBSR restarts on every received
+    grant, so a min_rb crumb trickle suppresses the one non-regular,
+    non-periodic recovery path. Simulate a trickle of grants (no arrivals,
+    so no regular trigger) shorter than the retx window and confirm
+    `pending` never flips from the retx timer while the trickle continues,
+    then confirm it DOES fire once grants stop for longer than the window."""
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    # retxBSR = 80 ms = 160 slots; periodic set huge so only retx is live.
+    bsr = BsrModel(flows, _SLOT_S, periodic_bsr_ms=100_000.0, retx_bsr_ms=80.0)
+    buffers.enqueue(1, 2, 1_000_000, 0.0)
+
+    for slot in range(0, 400, 50):  # grants every 50 slots, well under 160
+        bsr.tick_timers(slot)
+        assert bsr._state[1].pending is False, slot
+        bsr.on_ul_grant(ue_id=1, tb_size=10, delivered_bytes=10, slot_index=slot, buffers=buffers)
+
+    # Grants stop; the retx window (160 slots) elapses with no more grants.
+    last_grant_slot = 350
+    bsr.tick_timers(last_grant_slot + 160)
+    assert bsr._state[1].pending is True
+
+
+def test_crumb_fraction_emerges_from_fast_grants_slow_bsr():
+    """End-to-end sanity check of the mechanism the charter names: a UE
+    granted every slot but only BSR-triggered once collapses to
+    bytes_reported == 0 (a min_rb-crumb-forcing signal from B hitting 0)
+    well before the next report is due, purely from sched_ul_bytes
+    outracing the one stale estimate -- no new arrivals needed to produce
+    the collapse."""
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    bsr = BsrModel(flows, _SLOT_S, periodic_bsr_ms=100_000.0, retx_bsr_ms=100_000.0)
+
+    buffers.enqueue(1, 2, 100_000, 0.0)
+    bsr.on_arrivals({(1, 2): 100_000}, buffers)  # one regular trigger, then none
+    bsr.on_ul_grant(ue_id=1, tb_size=2000, delivered_bytes=2000, slot_index=0, buffers=buffers)
+    assert bsr._state[1].estimated_ul_buffer > 0
+
+    saw_collapse = False
+    for slot in range(1, 100):
+        bsr.broadcast(buffers)
+        if buffers.state(1, 2).bytes_reported == 0:
+            saw_collapse = True
+        # Not pending (no arrivals, timers far off): sched_ul_bytes just
+        # keeps accumulating grant after grant with no reset.
+        bsr.on_ul_grant(ue_id=1, tb_size=2000, delivered_bytes=0, slot_index=slot, buffers=buffers)
+    assert saw_collapse
+    assert bsr._state[1].pending is False  # collapsed without any new trigger

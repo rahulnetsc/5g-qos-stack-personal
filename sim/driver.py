@@ -48,7 +48,7 @@ def run(
         cqi_seed=scenario.seed ^ 0xC9C9C9C9,
     )
     buffers = BufferModel()
-    bsr = BsrModel(scenario.flows)
+    bsr = BsrModel(scenario.flows, grid.slot_duration_s)
     traffic = TrafficModel(scenario.flows, buffers, grid.slot_duration_s, rng)
     metrics = Metrics(record_timeseries=record_timeseries)
 
@@ -76,6 +76,12 @@ def run(
             per_flow_arrived[(ue_id, qfi)] += byts
 
         channel.update(slot_index)
+
+        # Regular-BSR trigger (arrivals) and periodic/retx timer expiry --
+        # both just set `pending`; order between them doesn't matter, only
+        # that both run before broadcast()/scheduler.allocate().
+        bsr.on_arrivals(per_flow_arrived, buffers)
+        bsr.tick_timers(slot_index)
 
         # Recompute every UL flow's gNB-visible bytes_reported from the
         # current BsrModel state (B = estimated_ul_buffer - sched_ul_bytes,
@@ -128,10 +134,13 @@ def run(
                     metrics.record_delivery(alloc.ue_id, qfi, byts)
                     per_flow_delivered[(alloc.ue_id, qfi)] += byts
                     ue_delivered_bytes += byts
-                # BSR: assemble/quantise a report from the true post-drain
-                # per-LCG backlog and credit sched_ul_bytes -- see
+                # BSR: if pending, assemble/quantise a report from the true
+                # post-drain per-LCG backlog; always credit sched_ul_bytes
+                # and restart the retx timer -- see
                 # sim/bsr.py::BsrModel.on_ul_grant.
-                bsr.on_ul_grant(alloc.ue_id, alloc.bytes_capacity, ue_delivered_bytes, buffers)
+                bsr.on_ul_grant(
+                    alloc.ue_id, alloc.bytes_capacity, ue_delivered_bytes, slot_index, buffers
+                )
             else:
                 buffers.drain(alloc.ue_id, alloc.qfi, delivered)
                 metrics.record_delivery(alloc.ue_id, alloc.qfi, delivered)

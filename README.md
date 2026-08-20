@@ -342,6 +342,21 @@ they survive it:
   scenario (two same-class UL flows forced onto one `lcg` via an explicit
   override) before H5 can be confirmed, refuted, or ruled inconclusive in
   Phase 3.
+- `[OPEN]` **WP3's crumb fraction falls well short of the charter's
+  acceptance bar.** Measured on `factory_robots_scenario` @ 1.0× with
+  TwoTier: grants ≤150 bytes ("crumb") are **0.09%** of UL grants, against
+  the hardware measurement's ~48-52% — roughly 500x off, not the "within a
+  factor of two" the charter (`p5g-sim-plan.md` §9 WP3) asks for. The
+  crumbs that do occur average 79 bytes, inside the hardware's measured
+  72-107 byte range — the mechanism looks structurally right, only its
+  *frequency* is off. Not chased further before landing: plausibly
+  scenario-dependent (TwoTier's grant sizing may already avoid granting
+  past `bytes_reported` on this workload, unlike the probe's hardware
+  traffic) or timer/workload-cadence-dependent (periodicBSR=5ms vs this
+  scenario's grant rate), not necessarily a modeling bug. Revisit once
+  WP9's characterization sweep runs a wider parameter range — if the
+  shortfall persists across scenarios, that's a real finding about this
+  port, not just this scenario.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

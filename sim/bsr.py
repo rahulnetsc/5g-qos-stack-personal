@@ -12,11 +12,16 @@ crumb between BSRs. `sim/buffer.py` stays the true-backlog store only --
 this module is the only writer of a UL flow's `bytes_reported` /
 `estimated_ul_buffer_per_lcg`.
 
-Commit-1 scope: quantisation + per-LCG structure only. A BSR is assembled
-on every slot a UE receives a UL grant (as if always pending).
-Event-triggering (regular/periodic/retx timers, real pending-gating, the
-"~48-52% of grants collapse to a crumb" hardware fraction) lands in a
-follow-up commit -- see README §4 WP3 for why the split.
+Event-triggering: a BSR is assembled only when `pending` -- set by a
+regular trigger (arrival on a previously-empty LCG, or of higher priority
+than every other currently-buffered LCG; TS 38.321 §5.4.5, condensed to
+LCG granularity) or by the periodic (5 ms) / retx (80 ms) timer expiring.
+The retx timer restarts on *every* received grant, not just ones that
+carry a BSR -- so a `min_rb` crumb trickle suppresses the one recovery
+path, which is exactly the "~48-52% of grants collapse to a crumb"
+mechanism the hardware measurement names. Commit 1 assembled a BSR on
+every grant (no gating); this is the follow-up that makes the
+`sched_ul_bytes` gate load-bearing -- see README §4 WP3.
 
 Cold-start / re-arm stopgap: a flow whose last-known per-LCG BSR estimate
 is exactly 0 has nothing to report and no way to get a grant to report on
@@ -122,42 +127,119 @@ class _UeBsrState:
     estimated_ul_buffer: int = 0
     estimated_ul_buffer_per_lcg: list[int] = field(default_factory=lambda: [0] * LCG_COUNT)
     sched_ul_bytes: int = 0
+    # Set by a regular trigger or a timer expiry; consumed (and cleared) the
+    # next time the UE gets a grant, which is when a BSR can actually ride
+    # on something. False at construction: a UE with no data yet has
+    # nothing to trigger a report.
+    pending: bool = False
+    # Slot index at/after which each timer is due. BsrModel.__init__ seeds
+    # these to one full interval from construction (a timer counts down
+    # from when it starts, it isn't already expired at t=0).
+    periodic_deadline_slot: int = 0
+    retx_deadline_slot: int = 0
 
 
 class BsrModel:
     """Per-UE BSR state: quantised per-LCG estimates plus the
     `sched_ul_bytes`/`estimated_ul_buffer` gate that collapses a UE's
-    grants toward a `min_rb` crumb between BSRs. See module docstring for
-    commit-1 scope.
+    grants toward a `min_rb` crumb between BSRs. See module docstring.
     """
 
-    def __init__(self, flows: list[FlowConfig]) -> None:
+    def __init__(
+        self,
+        flows: list[FlowConfig],
+        slot_duration_s: float,
+        periodic_bsr_ms: float = 5.0,
+        retx_bsr_ms: float = 80.0,
+    ) -> None:
         self._ue_flows: dict[int, list[FlowConfig]] = {}
         for f in flows:
             if f.direction != "UL":
                 continue
             self._ue_flows.setdefault(f.ue_id, []).append(f)
+        # Hardware timer values (README §4 WP3): periodicBSR = 5 ms,
+        # retxBSR = 80 ms.
+        self._periodic_bsr_slots = max(1, round((periodic_bsr_ms / 1000.0) / slot_duration_s))
+        self._retx_bsr_slots = max(1, round((retx_bsr_ms / 1000.0) / slot_duration_s))
         self._state: dict[int, _UeBsrState] = {
-            ue_id: _UeBsrState() for ue_id in self._ue_flows
+            ue_id: _UeBsrState(
+                periodic_deadline_slot=self._periodic_bsr_slots,
+                retx_deadline_slot=self._retx_bsr_slots,
+            )
+            for ue_id in self._ue_flows
         }
 
-    def on_ul_grant(self, ue_id: int, tb_size: int, delivered_bytes: int, buffers) -> None:
-        """Call once per UE per slot, for the UE's `ue_grant=True`
-        allocation, after `buffers.drain()` has applied it. Assembles and
-        quantises a BSR from the true post-drain per-LCG backlog and
-        resets `sched_ul_bytes`, matching `gNB_scheduler_ulsch.c:626-679`
-        (both BSR formats reset `sched_ul_bytes = 0` unconditionally).
+    def on_arrivals(self, per_flow_arrived: dict[tuple[int, int], int], buffers) -> None:
+        """Regular-BSR trigger (TS 38.321 §5.4.5, condensed to LCG
+        granularity): an arrival on a previously-empty LCG, or of higher
+        priority than every other currently-buffered LCG, sets `pending`.
 
-        Commit-1 scope reports on every grant (no event-triggering yet),
-        so a fresh BSR always overwrites `estimated_ul_buffer` below --
-        `delivered_bytes` (the SDU-receipt scalar decrement,
-        `gNB_scheduler_ulsch.c:544-547`, finding (b) in README §7) has no
-        observable effect yet. It becomes load-bearing once a follow-up
-        commit makes the reset conditional on a pending BSR rather than
-        automatic on every grant.
+        Call once per slot, after this slot's arrivals have already been
+        enqueued (`TrafficModel.generate()` does that itself) but before
+        `broadcast()`. `per_flow_arrived` is each flow's OWN arrival this
+        slot -- used to reconstruct each LCG's backlog as it was
+        immediately *before* this slot's arrivals, since `buffers` already
+        reflects them.
+        """
+        for ue_id, flows in self._ue_flows.items():
+            arrived = [per_flow_arrived.get((f.ue_id, f.qfi), 0) for f in flows]
+            if not any(b > 0 for b in arrived):
+                continue
+            pre_arrival_lcg: dict[int, int] = {}
+            for f, a in zip(flows, arrived):
+                true_now = buffers.state(f.ue_id, f.qfi).bytes_queued
+                pre_arrival_lcg[f.lcg] = pre_arrival_lcg.get(f.lcg, 0) + (true_now - a)
+            active_before = {lcg for lcg, backlog in pre_arrival_lcg.items() if backlog > 0}
+            best_active_priority = min(
+                (f.priority_level for f in flows if pre_arrival_lcg.get(f.lcg, 0) > 0),
+                default=None,
+            )
+            st = self._state[ue_id]
+            for f, a in zip(flows, arrived):
+                if a <= 0:
+                    continue
+                if f.lcg not in active_before:
+                    st.pending = True
+                elif best_active_priority is not None and f.priority_level < best_active_priority:
+                    st.pending = True
+
+    def tick_timers(self, slot_index: int) -> None:
+        """periodicBSR / retxBSR expiry -- call once per slot, before
+        `broadcast()`. Idempotent: re-arms `pending` every slot past the
+        deadline until a grant consumes it and resets the deadline."""
+        for st in self._state.values():
+            if slot_index >= st.periodic_deadline_slot or slot_index >= st.retx_deadline_slot:
+                st.pending = True
+
+    def on_ul_grant(
+        self, ue_id: int, tb_size: int, delivered_bytes: int, slot_index: int, buffers
+    ) -> None:
+        """Call once per UE per slot, for the UE's `ue_grant=True`
+        allocation, after `buffers.drain()` has applied it.
+
+        Always: credit `sched_ul_bytes` and restart the retx timer -- both
+        happen on *every* grant regardless of whether it carries a BSR
+        (`gNB_scheduler_ulsch.c:2730`; the retx-restart is the ground
+        truth's "a crumb trickle suppresses the one recovery path" note).
+        Also always decrements the scalar `estimated_ul_buffer` by
+        `delivered_bytes` (SDU-receipt effect, `gNB_scheduler_ulsch.c:
+        544-547`, finding (b)) -- independent of the per-LCG array, which
+        only a BSR touches; this is what lets the two desync.
+
+        Only if `pending`: assemble and quantise a BSR from the true
+        post-drain per-LCG backlog, reset `sched_ul_bytes` and the
+        periodic timer, and clear `pending` -- matching
+        `gNB_scheduler_ulsch.c:626-679` (both formats reset
+        `sched_ul_bytes = 0` unconditionally, but only on actual BSR
+        reception, not every grant).
         """
         st = self._state[ue_id]
         st.sched_ul_bytes += tb_size
+        st.retx_deadline_slot = slot_index + self._retx_bsr_slots
+        st.estimated_ul_buffer = max(0, st.estimated_ul_buffer - delivered_bytes)
+
+        if not st.pending:
+            return
 
         per_lcg_true: dict[int, int] = {}
         for f in self._ue_flows[ue_id]:
@@ -167,10 +249,7 @@ class BsrModel:
         st.estimated_ul_buffer_per_lcg = [0] * LCG_COUNT
         if not active_lcgs:
             st.estimated_ul_buffer = 0
-            st.sched_ul_bytes = 0
-            return
-
-        if len(active_lcgs) == 1:
+        elif len(active_lcgs) == 1:
             # Short BSR: reports one LCG's size; the aliasing is the memset
             # above -- every other LCG's slot is already zeroed and stays
             # that way until a future BSR repopulates it.
@@ -185,7 +264,10 @@ class BsrModel:
                 st.estimated_ul_buffer_per_lcg[lcg] = estim
                 total += estim
             st.estimated_ul_buffer = total
+
         st.sched_ul_bytes = 0
+        st.pending = False
+        st.periodic_deadline_slot = slot_index + self._periodic_bsr_slots
 
     def broadcast(self, buffers) -> None:
         """Every slot, every UE: recompute
@@ -196,12 +278,17 @@ class BsrModel:
         `bytes_reported` collapse toward zero with no scheduler-side
         change -- see README §4/§7.
 
-        Cold-start / re-arm probe (see module docstring): if a flow's
-        per-LCG estimate is 0 but it actually has data queued, the gNB has
-        no evidence of it at all (as opposed to evidence that's merely
-        collapsed under `B`) -- report the true backlog directly so the
-        flow can get a grant at all, standing in for the Scheduling
-        Request WP4 will model properly.
+        Cold-start / re-arm probe (see module docstring): if the gated
+        value would be 0 (either no per-LCG evidence at all, or `B` has
+        gated a stale-but-nonzero estimate to 0) while the flow actually
+        has data queued AND a BSR is currently `pending`, the UE has
+        something to report and no grant to report it on -- report the
+        true backlog directly, standing in for the Scheduling Request WP4
+        will model properly (TS 38.321 §5.4.5: exactly this situation
+        triggers SR). Gating `pending` on this is what keeps ordinary
+        crumb collapse (nonzero estimate, gated to 0 by `B`, nothing new
+        triggered) genuinely gated -- that's the mechanism WP3 exists to
+        demonstrate, not a bug to route around.
         """
         for ue_id, flows in self._ue_flows.items():
             st = self._state[ue_id]
@@ -209,9 +296,10 @@ class BsrModel:
             for f in flows:
                 state = buffers.state(f.ue_id, f.qfi)
                 per_lcg = st.estimated_ul_buffer_per_lcg[f.lcg]
-                if per_lcg <= 0 and state.bytes_queued > 0:
+                gated = min(per_lcg, b)
+                if gated <= 0 and state.bytes_queued > 0 and st.pending:
                     state.estimated_ul_buffer_per_lcg = state.bytes_queued
                     state.bytes_reported = state.bytes_queued
                 else:
                     state.estimated_ul_buffer_per_lcg = per_lcg
-                    state.bytes_reported = min(per_lcg, b)
+                    state.bytes_reported = gated
