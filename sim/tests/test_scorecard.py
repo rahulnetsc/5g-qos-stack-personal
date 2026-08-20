@@ -100,8 +100,10 @@ def test_m02_pdb_violation_rate_matches_hand_computation():
     results = sc.score(rec)
     total_arrived = sum(f.bytes_arrived for f in rec.flows.values())
     total_dropped = sum(f.bytes_dropped_pdb for f in rec.flows.values())
-    expected = total_dropped / total_arrived if total_arrived else 0.0
+    total_late = sum(f.bytes_delivered_late_pdb for f in rec.flows.values())
+    expected = (total_dropped + total_late) / total_arrived if total_arrived else 0.0
     assert abs(results["M02"].value - expected) < 1e-9
+    assert results["M02"].status == "ok"
 
 
 def test_correlate_flows_requires_timeseries():

@@ -54,14 +54,14 @@ metrics:
     guarantees: [G1, G5, G12]
     unit: fraction
     direction: lower_better
-    status: proxy
-    requires: WP3 (per-chunk completion timestamps in the buffer model)
+    status: ok
+    requires: null
     note: >
-      The expiry-discard component (bytes_dropped_pdb / bytes_arrived) is
-      exact today. The "delivered, but later than PDB" component is not
-      trackable until the buffer model reports per-chunk completion time
-      (WP3) -- currently a byte that is drained before expiry is counted as
-      fully fine regardless of how late the drain was.
+      Both components are exact: expiry-discard (bytes_dropped_pdb /
+      bytes_arrived) and "delivered, but later than PDB"
+      (bytes_delivered_late_pdb / bytes_arrived, WP3 -- sim/buffer.py's
+      drain() tags each removed chunk's age against the flow's PDB at
+      drain time).
 
   - id: M03
     name: liveness_gap_distribution

@@ -130,7 +130,8 @@ def run(
                 for qfi, byts in ue_lcp.fill(
                     ue_flows_by_ue.get(alloc.ue_id, []), delivered, buffers
                 ):
-                    buffers.drain(alloc.ue_id, qfi, byts)
+                    pdb_s = pdb_by_flow.get((alloc.ue_id, qfi), 1.0)
+                    buffers.drain(alloc.ue_id, qfi, byts, now_s, pdb_s)
                     metrics.record_delivery(alloc.ue_id, qfi, byts)
                     per_flow_delivered[(alloc.ue_id, qfi)] += byts
                     ue_delivered_bytes += byts
@@ -142,7 +143,8 @@ def run(
                     alloc.ue_id, alloc.bytes_capacity, ue_delivered_bytes, slot_index, buffers
                 )
             else:
-                buffers.drain(alloc.ue_id, alloc.qfi, delivered)
+                pdb_s = pdb_by_flow.get((alloc.ue_id, alloc.qfi), 1.0)
+                buffers.drain(alloc.ue_id, alloc.qfi, delivered, now_s, pdb_s)
                 metrics.record_delivery(alloc.ue_id, alloc.qfi, delivered)
                 per_flow_delivered[(alloc.ue_id, alloc.qfi)] += delivered
             metrics.record_prb_use(alloc.direction, alloc.prbs)
@@ -180,7 +182,7 @@ def run(
             cce_used=cce_used_this_slot,
         )
 
-    summary = metrics.summary(horizon_s)
+    summary = metrics.summary(horizon_s, buffers)
     # Diagnostic handle on the UE model, so a study can compare the gNB's
     # shadow token buckets against the UE's real ones. Not part of the
     # metrics contract -- see scripts/ul_shadow_study.py.

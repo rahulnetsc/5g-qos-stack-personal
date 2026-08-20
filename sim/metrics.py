@@ -142,7 +142,11 @@ class Metrics:
         k = min(len(s) - 1, int(len(s) * p))
         return s[k]
 
-    def summary(self, horizon_s: float) -> dict:
+    def summary(self, horizon_s: float, buffers=None) -> dict:
+        """``buffers`` is optional so callers that don't need M02's
+        "delivered, but later than PDB" component (e.g. tests exercising
+        Metrics in isolation) don't have to supply one -- bytes_delivered_
+        late_pdb is 0 without it."""
         out = {
             "horizon_s": horizon_s,
             "dl_prb_utilization": self._dl_prbs_used / max(1, self._dl_prbs_total),
@@ -153,10 +157,12 @@ class Metrics:
         for (ue_id, qfi), m in sorted(self._flow.items()):
             tput_bps = (m.bytes_delivered * 8) / horizon_s if horizon_s > 0 else 0.0
             arr_bps = (m.bytes_arrived * 8) / horizon_s if horizon_s > 0 else 0.0
+            late_pdb = buffers.state(ue_id, qfi).bytes_delivered_late_pdb if buffers else 0
             out["flows"][f"ue{ue_id}_qfi{qfi}"] = {
                 "bytes_arrived": m.bytes_arrived,
                 "bytes_delivered": m.bytes_delivered,
                 "bytes_dropped": m.bytes_dropped,
+                "bytes_delivered_late_pdb": late_pdb,
                 "throughput_bps": round(tput_bps, 1),
                 "offered_bps": round(arr_bps, 1),
                 "delivery_ratio": round(

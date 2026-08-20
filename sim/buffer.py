@@ -8,6 +8,11 @@ class BufferState:
     bytes_reported: int = 0          # BSR-visible view -- see sim/bsr.py
     hol_timestamp_s: float = 0.0
     bytes_dropped_pdb: int = 0
+    # Bytes drained after their PDB had already passed -- delivered, but too
+    # late to matter (config/metric_panel.yml M02's "delivered, but later
+    # than PDB" component). Distinct from bytes_dropped_pdb, which never
+    # reaches drain() at all -- expire() removes those first.
+    bytes_delivered_late_pdb: int = 0
     lcg: int = -1                    # this flow's logical channel group (-1 = DL / n/a)
     estimated_ul_buffer_per_lcg: int = 0  # gNB's raw per-LCG estimate, uncapped by
                                            # sched_ul_bytes (bytes_reported is capped)
@@ -84,8 +89,25 @@ class BufferModel:
         if key not in self._bsr_managed:
             state.bytes_reported = state.bytes_queued
 
-    def drain(self, ue_id: int, qfi: int, bytes_count: int) -> int:
-        """Remove up to bytes_count bytes from the head. Returns bytes actually removed."""
+    def drain(
+        self,
+        ue_id: int,
+        qfi: int,
+        bytes_count: int,
+        now_s: float = 0.0,
+        pdb_s: float = float("inf"),
+    ) -> int:
+        """Remove up to bytes_count bytes from the head. Returns bytes actually removed.
+
+        ``now_s``/``pdb_s`` are optional: a caller that doesn't care whether
+        delivery was late can omit them (nothing is ever "late" against an
+        infinite PDB). When given, each removed chunk's age at removal is
+        checked against the flow's PDB -- bytes from a chunk already older
+        than ``pdb_s`` count toward ``bytes_delivered_late_pdb`` (M02's
+        "delivered, but later than PDB" component). A drain spanning
+        several chunks can straddle the deadline: some of the removed
+        bytes late, some not.
+        """
         if bytes_count <= 0:
             return 0
         key = (ue_id, qfi)
@@ -93,15 +115,19 @@ class BufferModel:
         chunks = self._chunks[key]
         remaining = bytes_count
         removed = 0
+        late = 0
         while remaining > 0 and chunks:
             chunk = chunks[0]
             take = min(remaining, chunk[1])
+            if (now_s - chunk[0]) > pdb_s:
+                late += take
             chunk[1] -= take
             removed += take
             remaining -= take
             if chunk[1] == 0:
                 chunks.popleft()
         state.bytes_queued -= removed
+        state.bytes_delivered_late_pdb += late
         state.hol_timestamp_s = chunks[0][0] if chunks else 0.0
         self._delivered_cum[key] += removed
         if key not in self._bsr_managed:

@@ -8,6 +8,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 0,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 825000,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -32,6 +33,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 0,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 26457,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -56,6 +58,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -80,6 +83,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250269,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 1.0,
@@ -104,6 +108,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 927544,
+          "bytes_delivered_late_pdb": 12915,
           "bytes_dropped_pdb": 164314,
           "delay_p50_ms_proxy": 13.0,
           "delay_p95_ms_proxy": 27.75,
@@ -128,6 +133,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -152,6 +158,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 674060,
+          "bytes_delivered_late_pdb": 2245,
           "bytes_dropped_pdb": 417185,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -176,6 +183,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -200,6 +208,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 743720,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 347525,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -224,6 +233,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -248,6 +258,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 623071,
+          "bytes_delivered_late_pdb": 11226,
           "bytes_dropped_pdb": 467562,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -272,6 +283,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -296,6 +308,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1167902,
+          "bytes_delivered_late_pdb": 11839,
           "bytes_dropped_pdb": 690436,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -320,6 +333,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -344,6 +358,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 814632,
+          "bytes_delivered_late_pdb": 6494,
           "bytes_dropped_pdb": 1046044,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -368,6 +383,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -392,6 +408,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 484168,
+          "bytes_delivered_late_pdb": 3266,
           "bytes_dropped_pdb": 1371832,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -416,6 +433,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -440,6 +458,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 745773,
+          "bytes_delivered_late_pdb": 2858,
           "bytes_dropped_pdb": 82085,
           "delay_p50_ms_proxy": 12.5,
           "delay_p95_ms_proxy": 25.75,
@@ -464,6 +483,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -488,6 +508,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 314020,
+          "bytes_delivered_late_pdb": 13707,
           "bytes_dropped_pdb": 561332,
           "delay_p50_ms_proxy": 299.0,
           "delay_p95_ms_proxy": 300.0,
@@ -512,6 +533,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 652403,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 172597,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.5,
@@ -536,6 +558,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -560,6 +583,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 79125,
+          "bytes_delivered_late_pdb": 7495,
           "bytes_dropped_pdb": 794423,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -613,6 +637,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 458939,
+          "bytes_delivered_late_pdb": 2858,
           "bytes_dropped_pdb": 366061,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.5,
@@ -637,6 +662,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 31373,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 125.5,
           "delay_p95_ms_proxy": 256.0,
@@ -661,6 +687,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -685,6 +712,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250696,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -709,6 +737,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 588170,
+          "bytes_delivered_late_pdb": 3674,
           "bytes_dropped_pdb": 503688,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -733,6 +762,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -757,6 +787,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 539867,
+          "bytes_delivered_late_pdb": 2245,
           "bytes_dropped_pdb": 551378,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -781,6 +812,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -805,6 +837,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 551947,
+          "bytes_delivered_late_pdb": 8777,
           "bytes_dropped_pdb": 539298,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -829,6 +862,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -853,6 +887,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 537832,
+          "bytes_delivered_late_pdb": 2245,
           "bytes_dropped_pdb": 552801,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -877,6 +912,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -901,6 +937,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1079412,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 776588,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -925,6 +962,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -949,6 +987,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 999099,
+          "bytes_delivered_late_pdb": 14653,
           "bytes_dropped_pdb": 861577,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -973,6 +1012,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -997,6 +1037,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 951541,
+          "bytes_delivered_late_pdb": 3266,
           "bytes_dropped_pdb": 907131,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -1021,6 +1062,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1045,6 +1087,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 458853,
+          "bytes_delivered_late_pdb": 12024,
           "bytes_dropped_pdb": 366147,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 28.5,
@@ -1069,6 +1112,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1093,6 +1137,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 66259,
+          "bytes_delivered_late_pdb": 3048,
           "bytes_dropped_pdb": 809093,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -1117,6 +1162,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 422475,
+          "bytes_delivered_late_pdb": 5919,
           "bytes_dropped_pdb": 402525,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -1141,6 +1187,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1165,6 +1212,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 63266,
+          "bytes_delivered_late_pdb": 4842,
           "bytes_dropped_pdb": 810282,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -1218,6 +1266,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 323806,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 501194,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -1242,6 +1291,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 18703,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 7754,
           "delay_p50_ms_proxy": 102.0,
           "delay_p95_ms_proxy": 300.0,
@@ -1266,6 +1316,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1290,6 +1341,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250696,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -1314,6 +1366,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 450064,
+          "bytes_delivered_late_pdb": 3975,
           "bytes_dropped_pdb": 638936,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 28.5,
@@ -1338,6 +1391,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1362,6 +1416,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 727761,
+          "bytes_delivered_late_pdb": 4827,
           "bytes_dropped_pdb": 363484,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -1386,6 +1441,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1410,6 +1466,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 436461,
+          "bytes_delivered_late_pdb": 803,
           "bytes_dropped_pdb": 652539,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -1434,6 +1491,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1458,6 +1516,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 711785,
+          "bytes_delivered_late_pdb": 3251,
           "bytes_dropped_pdb": 377215,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -1482,6 +1541,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1506,6 +1566,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1660841,
+          "bytes_delivered_late_pdb": 9872,
           "bytes_dropped_pdb": 207183,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 28.0,
@@ -1530,6 +1591,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1554,6 +1616,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 794405,
+          "bytes_delivered_late_pdb": 5103,
           "bytes_dropped_pdb": 1061595,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -1578,6 +1641,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1602,6 +1666,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 789109,
+          "bytes_delivered_late_pdb": 8877,
           "bytes_dropped_pdb": 1071790,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -1626,6 +1691,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1650,6 +1716,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 332300,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 492700,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -1674,6 +1741,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1698,6 +1766,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 198732,
+          "bytes_delivered_late_pdb": 3747,
           "bytes_dropped_pdb": 676620,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -1722,6 +1791,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 538553,
+          "bytes_delivered_late_pdb": 7040,
           "bytes_dropped_pdb": 286447,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -1746,6 +1816,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1770,6 +1841,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 134567,
+          "bytes_delivered_late_pdb": 6013,
           "bytes_dropped_pdb": 742443,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -1823,6 +1895,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 692914,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 132086,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.75,
@@ -1847,6 +1920,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37510,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 35.0,
           "delay_p95_ms_proxy": 139.5,
@@ -1871,6 +1945,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1895,6 +1970,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250696,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -1919,6 +1995,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 932555,
+          "bytes_delivered_late_pdb": 4145,
           "bytes_dropped_pdb": 159303,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 28.25,
@@ -1943,6 +2020,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -1967,6 +2045,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 704228,
+          "bytes_delivered_late_pdb": 4501,
           "bytes_dropped_pdb": 384772,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -1991,6 +2070,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2015,6 +2095,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 904819,
+          "bytes_delivered_late_pdb": 6782,
           "bytes_dropped_pdb": 189692,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.0,
@@ -2039,6 +2120,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2063,6 +2145,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 226592,
+          "bytes_delivered_late_pdb": 2630,
           "bytes_dropped_pdb": 862408,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -2087,6 +2170,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2111,6 +2195,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1644294,
+          "bytes_delivered_late_pdb": 1829,
           "bytes_dropped_pdb": 217718,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.75,
@@ -2135,6 +2220,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2159,6 +2245,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1033859,
+          "bytes_delivered_late_pdb": 10455,
           "bytes_dropped_pdb": 822141,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -2183,6 +2270,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2207,6 +2295,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 3792,
+          "bytes_delivered_late_pdb": 178,
           "bytes_dropped_pdb": 1852208,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -2231,6 +2320,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2255,6 +2345,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 686785,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 140033,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 28.0,
@@ -2279,6 +2370,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2303,6 +2395,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 294160,
+          "bytes_delivered_late_pdb": 7421,
           "bytes_dropped_pdb": 581192,
           "delay_p50_ms_proxy": 298.75,
           "delay_p95_ms_proxy": 300.0,
@@ -2327,6 +2420,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 567487,
+          "bytes_delivered_late_pdb": 7245,
           "bytes_dropped_pdb": 259758,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -2351,6 +2445,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2375,6 +2470,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 110303,
+          "bytes_delivered_late_pdb": 7906,
           "bytes_dropped_pdb": 763245,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -2428,6 +2524,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 260177,
+          "bytes_delivered_late_pdb": 12939,
           "bytes_dropped_pdb": 564823,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -2452,6 +2549,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37567,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 17.25,
           "delay_p95_ms_proxy": 39.75,
@@ -2476,6 +2574,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2500,6 +2599,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250274,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 1.0,
@@ -2524,6 +2624,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1034929,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 76813,
           "delay_p50_ms_proxy": 4.25,
           "delay_p95_ms_proxy": 18.5,
@@ -2548,6 +2649,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2572,6 +2674,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 993969,
+          "bytes_delivered_late_pdb": 2156,
           "bytes_dropped_pdb": 98420,
           "delay_p50_ms_proxy": 10.25,
           "delay_p95_ms_proxy": 20.25,
@@ -2596,6 +2699,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2620,6 +2724,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1004696,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 87693,
           "delay_p50_ms_proxy": 8.25,
           "delay_p95_ms_proxy": 19.0,
@@ -2644,6 +2749,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2668,6 +2774,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 957357,
+          "bytes_delivered_late_pdb": 456,
           "bytes_dropped_pdb": 131643,
           "delay_p50_ms_proxy": 12.5,
           "delay_p95_ms_proxy": 26.0,
@@ -2692,6 +2799,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2716,6 +2824,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1734800,
+          "bytes_delivered_late_pdb": 1135,
           "bytes_dropped_pdb": 121200,
           "delay_p50_ms_proxy": 10.75,
           "delay_p95_ms_proxy": 24.0,
@@ -2740,6 +2849,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2764,6 +2874,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1265505,
+          "bytes_delivered_late_pdb": 6447,
           "bytes_dropped_pdb": 590495,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -2788,6 +2899,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2812,6 +2924,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 746413,
+          "bytes_delivered_late_pdb": 13893,
           "bytes_dropped_pdb": 1109587,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -2836,6 +2949,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2860,6 +2974,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 766562,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 58438,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 22.25,
@@ -2884,6 +2999,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2908,6 +3024,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 978478,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 52.0,
           "delay_p95_ms_proxy": 205.25,
@@ -2932,6 +3049,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 758580,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 66420,
           "delay_p50_ms_proxy": 13.0,
           "delay_p95_ms_proxy": 25.0,
@@ -2956,6 +3074,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -2980,6 +3099,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 448891,
+          "bytes_delivered_late_pdb": 9888,
           "bytes_dropped_pdb": 426063,
           "delay_p50_ms_proxy": 295.5,
           "delay_p95_ms_proxy": 300.0,
@@ -3033,6 +3153,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 656396,
+          "bytes_delivered_late_pdb": 2547,
           "bytes_dropped_pdb": 168604,
           "delay_p50_ms_proxy": 13.5,
           "delay_p95_ms_proxy": 27.75,
@@ -3057,6 +3178,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 36313,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 37.75,
           "delay_p95_ms_proxy": 125.25,
@@ -3081,6 +3203,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3105,6 +3228,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -3129,6 +3253,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 886240,
+          "bytes_delivered_late_pdb": 17250,
           "bytes_dropped_pdb": 207073,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -3153,6 +3278,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3177,6 +3303,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 824186,
+          "bytes_delivered_late_pdb": 10167,
           "bytes_dropped_pdb": 268203,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -3201,6 +3328,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3225,6 +3353,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 833837,
+          "bytes_delivered_late_pdb": 10167,
           "bytes_dropped_pdb": 261017,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -3249,6 +3378,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3273,6 +3403,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 821996,
+          "bytes_delivered_late_pdb": 6778,
           "bytes_dropped_pdb": 269469,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -3297,6 +3428,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3321,6 +3453,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1584500,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 271500,
           "delay_p50_ms_proxy": 13.25,
           "delay_p95_ms_proxy": 27.75,
@@ -3345,6 +3478,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3369,6 +3503,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1526209,
+          "bytes_delivered_late_pdb": 12077,
           "bytes_dropped_pdb": 336849,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -3393,6 +3528,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3417,6 +3553,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1418281,
+          "bytes_delivered_late_pdb": 8066,
           "bytes_dropped_pdb": 439287,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -3441,6 +3578,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3465,6 +3603,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 666593,
+          "bytes_delivered_late_pdb": 786,
           "bytes_dropped_pdb": 158407,
           "delay_p50_ms_proxy": 13.5,
           "delay_p95_ms_proxy": 27.75,
@@ -3489,6 +3628,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3513,6 +3653,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 297215,
+          "bytes_delivered_late_pdb": 4689,
           "bytes_dropped_pdb": 578315,
           "delay_p50_ms_proxy": 297.0,
           "delay_p95_ms_proxy": 300.0,
@@ -3537,6 +3678,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 617767,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 207233,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 28.5,
@@ -3561,6 +3703,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3585,6 +3728,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 173829,
+          "bytes_delivered_late_pdb": 7415,
           "bytes_dropped_pdb": 699719,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -3638,6 +3782,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 704141,
+          "bytes_delivered_late_pdb": 3190,
           "bytes_dropped_pdb": 129485,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -3662,6 +3807,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 36947,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 30.5,
           "delay_p95_ms_proxy": 119.25,
@@ -3686,6 +3832,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3710,6 +3857,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -3734,6 +3882,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 921544,
+          "bytes_delivered_late_pdb": 15448,
           "bytes_dropped_pdb": 170201,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -3758,6 +3907,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3782,6 +3932,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 903991,
+          "bytes_delivered_late_pdb": 10839,
           "bytes_dropped_pdb": 188398,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -3806,6 +3957,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3830,6 +3982,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 910886,
+          "bytes_delivered_late_pdb": 5336,
           "bytes_dropped_pdb": 181503,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 28.0,
@@ -3854,6 +4007,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3878,6 +4032,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 435963,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 653037,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -3902,6 +4057,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3926,6 +4082,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1628458,
+          "bytes_delivered_late_pdb": 2576,
           "bytes_dropped_pdb": 236615,
           "delay_p50_ms_proxy": 13.75,
           "delay_p95_ms_proxy": 28.0,
@@ -3950,6 +4107,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -3974,6 +4132,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1576523,
+          "bytes_delivered_late_pdb": 4931,
           "bytes_dropped_pdb": 279477,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 28.25,
@@ -3998,6 +4157,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4022,6 +4182,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1535090,
+          "bytes_delivered_late_pdb": 4838,
           "bytes_dropped_pdb": 323375,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.0,
@@ -4046,6 +4207,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4070,6 +4232,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 658487,
+          "bytes_delivered_late_pdb": 2531,
           "bytes_dropped_pdb": 166513,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 28.25,
@@ -4094,6 +4257,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4118,6 +4282,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 368391,
+          "bytes_delivered_late_pdb": 5543,
           "bytes_dropped_pdb": 515238,
           "delay_p50_ms_proxy": 295.25,
           "delay_p95_ms_proxy": 300.0,
@@ -4142,6 +4307,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 647902,
+          "bytes_delivered_late_pdb": 9604,
           "bytes_dropped_pdb": 177098,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -4166,6 +4332,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4190,6 +4357,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 151544,
+          "bytes_delivered_late_pdb": 5780,
           "bytes_dropped_pdb": 722004,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -4243,6 +4411,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 712826,
+          "bytes_delivered_late_pdb": 690,
           "bytes_dropped_pdb": 112174,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 27.5,
@@ -4267,6 +4436,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37519,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 29.5,
           "delay_p95_ms_proxy": 119.25,
@@ -4291,6 +4461,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4315,6 +4486,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -4339,6 +4511,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 937405,
+          "bytes_delivered_late_pdb": 10993,
           "bytes_dropped_pdb": 151595,
           "delay_p50_ms_proxy": 13.75,
           "delay_p95_ms_proxy": 27.5,
@@ -4363,6 +4536,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4387,6 +4561,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 937929,
+          "bytes_delivered_late_pdb": 7936,
           "bytes_dropped_pdb": 154460,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -4411,6 +4586,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4435,6 +4611,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 935551,
+          "bytes_delivered_late_pdb": 292,
           "bytes_dropped_pdb": 156838,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 27.0,
@@ -4459,6 +4636,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4483,6 +4661,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 855629,
+          "bytes_delivered_late_pdb": 7422,
           "bytes_dropped_pdb": 233371,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -4507,6 +4686,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4531,6 +4711,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1683643,
+          "bytes_delivered_late_pdb": 1436,
           "bytes_dropped_pdb": 177902,
           "delay_p50_ms_proxy": 13.5,
           "delay_p95_ms_proxy": 27.5,
@@ -4555,6 +4736,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4579,6 +4761,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1672471,
+          "bytes_delivered_late_pdb": 1648,
           "bytes_dropped_pdb": 192155,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.75,
@@ -4603,6 +4786,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4627,6 +4811,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 941683,
+          "bytes_delivered_late_pdb": 8909,
           "bytes_dropped_pdb": 914317,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -4651,6 +4836,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4675,6 +4861,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 714840,
+          "bytes_delivered_late_pdb": 1554,
           "bytes_dropped_pdb": 119963,
           "delay_p50_ms_proxy": 13.25,
           "delay_p95_ms_proxy": 27.5,
@@ -4699,6 +4886,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4723,6 +4911,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 343744,
+          "bytes_delivered_late_pdb": 5242,
           "bytes_dropped_pdb": 531608,
           "delay_p50_ms_proxy": 295.0,
           "delay_p95_ms_proxy": 300.0,
@@ -4747,6 +4936,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 673588,
+          "bytes_delivered_late_pdb": 12985,
           "bytes_dropped_pdb": 151412,
           "delay_p50_ms_proxy": 14.75,
           "delay_p95_ms_proxy": 28.25,
@@ -4771,6 +4961,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4795,6 +4986,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 212495,
+          "bytes_delivered_late_pdb": 5017,
           "bytes_dropped_pdb": 661053,
           "delay_p50_ms_proxy": 299.75,
           "delay_p95_ms_proxy": 300.0,
@@ -4848,6 +5040,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 742307,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 82693,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 22.75,
@@ -4872,6 +5065,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37562,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 9.5,
           "delay_p95_ms_proxy": 26.0,
@@ -4896,6 +5090,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4920,6 +5115,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -4944,6 +5140,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1050737,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 62912,
           "delay_p50_ms_proxy": 3.75,
           "delay_p95_ms_proxy": 19.25,
@@ -4968,6 +5165,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -4992,6 +5190,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1004792,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 88740,
           "delay_p50_ms_proxy": 7.0,
           "delay_p95_ms_proxy": 17.25,
@@ -5016,6 +5215,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5040,6 +5240,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1017124,
+          "bytes_delivered_late_pdb": 3671,
           "bytes_dropped_pdb": 76408,
           "delay_p50_ms_proxy": 6.0,
           "delay_p95_ms_proxy": 16.25,
@@ -5064,6 +5265,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5088,6 +5290,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1001482,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 87518,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 18.25,
@@ -5112,6 +5315,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5136,6 +5340,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1762901,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 100515,
           "delay_p50_ms_proxy": 7.0,
           "delay_p95_ms_proxy": 17.25,
@@ -5160,6 +5365,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5184,6 +5390,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1724679,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 131321,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 23.5,
@@ -5208,6 +5415,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5232,6 +5440,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1333579,
+          "bytes_delivered_late_pdb": 31435,
           "bytes_dropped_pdb": 522421,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -5256,6 +5465,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5280,6 +5490,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 782165,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 42835,
           "delay_p50_ms_proxy": 7.5,
           "delay_p95_ms_proxy": 15.75,
@@ -5304,6 +5515,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5328,6 +5540,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1245624,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 6.25,
           "delay_p95_ms_proxy": 23.0,
@@ -5352,6 +5565,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 767024,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 57976,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 22.0,
@@ -5376,6 +5590,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5400,6 +5615,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 1243563,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 32.75,
@@ -5453,6 +5669,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 754222,
+          "bytes_delivered_late_pdb": 204,
           "bytes_dropped_pdb": 72660,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -5477,6 +5694,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37325,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 18.5,
           "delay_p95_ms_proxy": 37.75,
@@ -5501,6 +5719,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5525,6 +5744,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -5549,6 +5769,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1016492,
+          "bytes_delivered_late_pdb": 254,
           "bytes_dropped_pdb": 75148,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -5573,6 +5794,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5597,6 +5819,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 991659,
+          "bytes_delivered_late_pdb": 601,
           "bytes_dropped_pdb": 100009,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.5,
@@ -5621,6 +5844,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5645,6 +5869,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 996137,
+          "bytes_delivered_late_pdb": 264,
           "bytes_dropped_pdb": 95531,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.5,
@@ -5669,6 +5894,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5693,6 +5919,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 991300,
+          "bytes_delivered_late_pdb": 715,
           "bytes_dropped_pdb": 100070,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.25,
@@ -5717,6 +5944,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5741,6 +5969,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1790555,
+          "bytes_delivered_late_pdb": 382,
           "bytes_dropped_pdb": 74670,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -5765,6 +5994,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5789,6 +6019,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1758444,
+          "bytes_delivered_late_pdb": 398,
           "bytes_dropped_pdb": 102006,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -5813,6 +6044,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5837,6 +6069,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1743669,
+          "bytes_delivered_late_pdb": 760,
           "bytes_dropped_pdb": 116651,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.25,
@@ -5861,6 +6094,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5885,6 +6119,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 761199,
+          "bytes_delivered_late_pdb": 759,
           "bytes_dropped_pdb": 65683,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 26.5,
@@ -5909,6 +6144,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -5933,6 +6169,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1239116,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 32.25,
@@ -5957,6 +6194,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 751819,
+          "bytes_delivered_late_pdb": 181,
           "bytes_dropped_pdb": 74955,
           "delay_p50_ms_proxy": 12.75,
           "delay_p95_ms_proxy": 26.25,
@@ -5981,6 +6219,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6005,6 +6244,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 975020,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 28.25,
           "delay_p95_ms_proxy": 199.75,
@@ -6058,6 +6298,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 754222,
+          "bytes_delivered_late_pdb": 204,
           "bytes_dropped_pdb": 72660,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -6082,6 +6323,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37325,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 18.5,
           "delay_p95_ms_proxy": 37.75,
@@ -6106,6 +6348,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6130,6 +6373,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -6154,6 +6398,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1016492,
+          "bytes_delivered_late_pdb": 254,
           "bytes_dropped_pdb": 75148,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -6178,6 +6423,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6202,6 +6448,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 991659,
+          "bytes_delivered_late_pdb": 601,
           "bytes_dropped_pdb": 100009,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.5,
@@ -6226,6 +6473,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6250,6 +6498,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 996137,
+          "bytes_delivered_late_pdb": 264,
           "bytes_dropped_pdb": 95531,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.5,
@@ -6274,6 +6523,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6298,6 +6548,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 991300,
+          "bytes_delivered_late_pdb": 715,
           "bytes_dropped_pdb": 100070,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.25,
@@ -6322,6 +6573,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6346,6 +6598,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1790555,
+          "bytes_delivered_late_pdb": 382,
           "bytes_dropped_pdb": 74670,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -6370,6 +6623,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6394,6 +6648,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1758444,
+          "bytes_delivered_late_pdb": 398,
           "bytes_dropped_pdb": 102006,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -6418,6 +6673,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6442,6 +6698,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1743669,
+          "bytes_delivered_late_pdb": 760,
           "bytes_dropped_pdb": 116651,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.25,
@@ -6466,6 +6723,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6490,6 +6748,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 761199,
+          "bytes_delivered_late_pdb": 759,
           "bytes_dropped_pdb": 65683,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 26.5,
@@ -6514,6 +6773,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6538,6 +6798,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1239116,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 32.25,
@@ -6562,6 +6823,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 751819,
+          "bytes_delivered_late_pdb": 181,
           "bytes_dropped_pdb": 74955,
           "delay_p50_ms_proxy": 12.75,
           "delay_p95_ms_proxy": 26.25,
@@ -6586,6 +6848,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6610,6 +6873,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 975020,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 28.25,
           "delay_p95_ms_proxy": 199.75,
@@ -6663,6 +6927,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 754222,
+          "bytes_delivered_late_pdb": 204,
           "bytes_dropped_pdb": 72660,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -6687,6 +6952,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37325,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 18.5,
           "delay_p95_ms_proxy": 37.75,
@@ -6711,6 +6977,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6735,6 +7002,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -6759,6 +7027,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1016492,
+          "bytes_delivered_late_pdb": 254,
           "bytes_dropped_pdb": 75148,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.75,
@@ -6783,6 +7052,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6807,6 +7077,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 991659,
+          "bytes_delivered_late_pdb": 601,
           "bytes_dropped_pdb": 100009,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.5,
@@ -6831,6 +7102,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6855,6 +7127,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 996137,
+          "bytes_delivered_late_pdb": 264,
           "bytes_dropped_pdb": 95531,
           "delay_p50_ms_proxy": 14.5,
           "delay_p95_ms_proxy": 27.5,
@@ -6879,6 +7152,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6903,6 +7177,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 991300,
+          "bytes_delivered_late_pdb": 715,
           "bytes_dropped_pdb": 100070,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.25,
@@ -6927,6 +7202,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6951,6 +7227,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1790555,
+          "bytes_delivered_late_pdb": 382,
           "bytes_dropped_pdb": 74670,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.25,
@@ -6975,6 +7252,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -6999,6 +7277,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1758444,
+          "bytes_delivered_late_pdb": 398,
           "bytes_dropped_pdb": 102006,
           "delay_p50_ms_proxy": 15.0,
           "delay_p95_ms_proxy": 28.5,
@@ -7023,6 +7302,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7047,6 +7327,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1743669,
+          "bytes_delivered_late_pdb": 760,
           "bytes_dropped_pdb": 116651,
           "delay_p50_ms_proxy": 14.25,
           "delay_p95_ms_proxy": 27.25,
@@ -7071,6 +7352,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7095,6 +7377,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 761199,
+          "bytes_delivered_late_pdb": 759,
           "bytes_dropped_pdb": 65683,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 26.5,
@@ -7119,6 +7402,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7143,6 +7427,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1239116,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 32.25,
@@ -7167,6 +7452,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 751819,
+          "bytes_delivered_late_pdb": 181,
           "bytes_dropped_pdb": 74955,
           "delay_p50_ms_proxy": 12.75,
           "delay_p95_ms_proxy": 26.25,
@@ -7191,6 +7477,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7215,6 +7502,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 975020,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 28.25,
           "delay_p95_ms_proxy": 199.75,
@@ -7268,6 +7556,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 768135,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 56865,
           "delay_p50_ms_proxy": 7.75,
           "delay_p95_ms_proxy": 15.0,
@@ -7292,6 +7581,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37464,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.25,
           "delay_p95_ms_proxy": 17.5,
@@ -7316,6 +7606,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7340,6 +7631,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -7364,6 +7656,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1082054,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 29690,
           "delay_p50_ms_proxy": 3.25,
           "delay_p95_ms_proxy": 21.5,
@@ -7388,6 +7681,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7412,6 +7706,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1035871,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 66685,
           "delay_p50_ms_proxy": 4.75,
           "delay_p95_ms_proxy": 16.0,
@@ -7436,6 +7731,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7460,6 +7756,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1043774,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 52004,
           "delay_p50_ms_proxy": 4.25,
           "delay_p95_ms_proxy": 17.5,
@@ -7484,6 +7781,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7508,6 +7806,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1021075,
+          "bytes_delivered_late_pdb": 4313,
           "bytes_dropped_pdb": 67925,
           "delay_p50_ms_proxy": 5.75,
           "delay_p95_ms_proxy": 14.5,
@@ -7532,6 +7831,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7556,6 +7856,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1807036,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 67114,
           "delay_p50_ms_proxy": 5.25,
           "delay_p95_ms_proxy": 15.25,
@@ -7580,6 +7881,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7604,6 +7906,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1745797,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 110203,
           "delay_p50_ms_proxy": 8.25,
           "delay_p95_ms_proxy": 16.75,
@@ -7628,6 +7931,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7652,6 +7956,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1725921,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 130079,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 22.25,
@@ -7676,6 +7981,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7700,6 +8006,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 801859,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 23141,
           "delay_p50_ms_proxy": 5.5,
           "delay_p95_ms_proxy": 14.0,
@@ -7724,6 +8031,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7748,6 +8056,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1241866,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 3.5,
           "delay_p95_ms_proxy": 14.5,
@@ -7772,6 +8081,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 790315,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 34685,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 16.0,
@@ -7796,6 +8106,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7820,6 +8131,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 1245072,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 5.25,
           "delay_p95_ms_proxy": 18.0,
@@ -7873,6 +8185,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 765050,
+          "bytes_delivered_late_pdb": 198,
           "bytes_dropped_pdb": 62212,
           "delay_p50_ms_proxy": 10.0,
           "delay_p95_ms_proxy": 19.0,
@@ -7897,6 +8210,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37386,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 21.75,
@@ -7921,6 +8235,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -7945,6 +8260,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -7969,6 +8285,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1042243,
+          "bytes_delivered_late_pdb": 254,
           "bytes_dropped_pdb": 49775,
           "delay_p50_ms_proxy": 12.25,
           "delay_p95_ms_proxy": 27.5,
@@ -7993,6 +8310,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8017,6 +8335,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1010154,
+          "bytes_delivered_late_pdb": 259,
           "bytes_dropped_pdb": 81806,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 26.5,
@@ -8041,6 +8360,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8065,6 +8385,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1027451,
+          "bytes_delivered_late_pdb": 264,
           "bytes_dropped_pdb": 64509,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 26.25,
@@ -8089,6 +8410,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8113,6 +8435,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1008201,
+          "bytes_delivered_late_pdb": 259,
           "bytes_dropped_pdb": 83605,
           "delay_p50_ms_proxy": 10.5,
           "delay_p95_ms_proxy": 23.75,
@@ -8137,6 +8460,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8161,6 +8485,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1843983,
+          "bytes_delivered_late_pdb": 424,
           "bytes_dropped_pdb": 41342,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 28.25,
@@ -8185,6 +8510,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8209,6 +8535,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1797926,
+          "bytes_delivered_late_pdb": 418,
           "bytes_dropped_pdb": 63114,
           "delay_p50_ms_proxy": 13.5,
           "delay_p95_ms_proxy": 28.25,
@@ -8233,6 +8560,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8257,6 +8585,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1746989,
+          "bytes_delivered_late_pdb": 434,
           "bytes_dropped_pdb": 113977,
           "delay_p50_ms_proxy": 10.5,
           "delay_p95_ms_proxy": 22.25,
@@ -8281,6 +8610,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8305,6 +8635,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 801766,
+          "bytes_delivered_late_pdb": 2413,
           "bytes_dropped_pdb": 25496,
           "delay_p50_ms_proxy": 6.5,
           "delay_p95_ms_proxy": 14.75,
@@ -8329,6 +8660,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8353,6 +8685,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1242772,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.75,
           "delay_p95_ms_proxy": 15.25,
@@ -8377,6 +8710,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 780965,
+          "bytes_delivered_late_pdb": 181,
           "bytes_dropped_pdb": 46107,
           "delay_p50_ms_proxy": 7.5,
           "delay_p95_ms_proxy": 16.25,
@@ -8401,6 +8735,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8425,6 +8760,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 1244442,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 5.75,
           "delay_p95_ms_proxy": 17.5,
@@ -8478,6 +8814,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 765050,
+          "bytes_delivered_late_pdb": 198,
           "bytes_dropped_pdb": 62212,
           "delay_p50_ms_proxy": 10.0,
           "delay_p95_ms_proxy": 19.0,
@@ -8502,6 +8839,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37386,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 21.75,
@@ -8526,6 +8864,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8550,6 +8889,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -8574,6 +8914,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1042243,
+          "bytes_delivered_late_pdb": 254,
           "bytes_dropped_pdb": 49775,
           "delay_p50_ms_proxy": 12.25,
           "delay_p95_ms_proxy": 27.5,
@@ -8598,6 +8939,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8622,6 +8964,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1010154,
+          "bytes_delivered_late_pdb": 259,
           "bytes_dropped_pdb": 81806,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 26.5,
@@ -8646,6 +8989,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8670,6 +9014,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1027451,
+          "bytes_delivered_late_pdb": 264,
           "bytes_dropped_pdb": 64509,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 26.25,
@@ -8694,6 +9039,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8718,6 +9064,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1008201,
+          "bytes_delivered_late_pdb": 259,
           "bytes_dropped_pdb": 83605,
           "delay_p50_ms_proxy": 10.5,
           "delay_p95_ms_proxy": 23.75,
@@ -8742,6 +9089,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8766,6 +9114,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1843983,
+          "bytes_delivered_late_pdb": 424,
           "bytes_dropped_pdb": 41342,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 28.25,
@@ -8790,6 +9139,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8814,6 +9164,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1797926,
+          "bytes_delivered_late_pdb": 418,
           "bytes_dropped_pdb": 63114,
           "delay_p50_ms_proxy": 13.5,
           "delay_p95_ms_proxy": 28.25,
@@ -8838,6 +9189,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8862,6 +9214,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1746989,
+          "bytes_delivered_late_pdb": 434,
           "bytes_dropped_pdb": 113977,
           "delay_p50_ms_proxy": 10.5,
           "delay_p95_ms_proxy": 22.25,
@@ -8886,6 +9239,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8910,6 +9264,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 801766,
+          "bytes_delivered_late_pdb": 2413,
           "bytes_dropped_pdb": 25496,
           "delay_p50_ms_proxy": 6.5,
           "delay_p95_ms_proxy": 14.75,
@@ -8934,6 +9289,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -8958,6 +9314,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1242772,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.75,
           "delay_p95_ms_proxy": 15.25,
@@ -8982,6 +9339,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 780965,
+          "bytes_delivered_late_pdb": 181,
           "bytes_dropped_pdb": 46107,
           "delay_p50_ms_proxy": 7.5,
           "delay_p95_ms_proxy": 16.25,
@@ -9006,6 +9364,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9030,6 +9389,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 1244442,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 5.75,
           "delay_p95_ms_proxy": 17.5,
@@ -9083,6 +9443,7 @@
         "ue10_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 765050,
+          "bytes_delivered_late_pdb": 198,
           "bytes_dropped_pdb": 62212,
           "delay_p50_ms_proxy": 10.0,
           "delay_p95_ms_proxy": 19.0,
@@ -9107,6 +9468,7 @@
         "ue10_qfi8": {
           "bytes_arrived": 37659,
           "bytes_delivered": 37386,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 21.75,
@@ -9131,6 +9493,7 @@
         "ue10_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9155,6 +9518,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 1251713,
           "bytes_delivered": 1250706,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 0.5,
           "delay_p95_ms_proxy": 0.75,
@@ -9179,6 +9543,7 @@
         "ue1_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1042243,
+          "bytes_delivered_late_pdb": 254,
           "bytes_dropped_pdb": 49775,
           "delay_p50_ms_proxy": 12.25,
           "delay_p95_ms_proxy": 27.5,
@@ -9203,6 +9568,7 @@
         "ue1_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9227,6 +9593,7 @@
         "ue2_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1010154,
+          "bytes_delivered_late_pdb": 259,
           "bytes_dropped_pdb": 81806,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 26.5,
@@ -9251,6 +9618,7 @@
         "ue2_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9275,6 +9643,7 @@
         "ue3_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1027451,
+          "bytes_delivered_late_pdb": 264,
           "bytes_dropped_pdb": 64509,
           "delay_p50_ms_proxy": 11.25,
           "delay_p95_ms_proxy": 26.25,
@@ -9299,6 +9668,7 @@
         "ue3_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9323,6 +9693,7 @@
         "ue4_qfi2": {
           "bytes_arrived": 1221000,
           "bytes_delivered": 1008201,
+          "bytes_delivered_late_pdb": 259,
           "bytes_dropped_pdb": 83605,
           "delay_p50_ms_proxy": 10.5,
           "delay_p95_ms_proxy": 23.75,
@@ -9347,6 +9718,7 @@
         "ue4_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9371,6 +9743,7 @@
         "ue5_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1843983,
+          "bytes_delivered_late_pdb": 424,
           "bytes_dropped_pdb": 41342,
           "delay_p50_ms_proxy": 14.0,
           "delay_p95_ms_proxy": 28.25,
@@ -9395,6 +9768,7 @@
         "ue5_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7997,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9419,6 +9793,7 @@
         "ue6_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1797926,
+          "bytes_delivered_late_pdb": 418,
           "bytes_dropped_pdb": 63114,
           "delay_p50_ms_proxy": 13.5,
           "delay_p95_ms_proxy": 28.25,
@@ -9443,6 +9818,7 @@
         "ue6_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9467,6 +9843,7 @@
         "ue7_qfi2": {
           "bytes_arrived": 2030000,
           "bytes_delivered": 1746989,
+          "bytes_delivered_late_pdb": 434,
           "bytes_dropped_pdb": 113977,
           "delay_p50_ms_proxy": 10.5,
           "delay_p95_ms_proxy": 22.25,
@@ -9491,6 +9868,7 @@
         "ue7_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9515,6 +9893,7 @@
         "ue8_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 801766,
+          "bytes_delivered_late_pdb": 2413,
           "bytes_dropped_pdb": 25496,
           "delay_p50_ms_proxy": 6.5,
           "delay_p95_ms_proxy": 14.75,
@@ -9539,6 +9918,7 @@
         "ue8_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9563,6 +9943,7 @@
         "ue8_qfi9": {
           "bytes_arrived": 1249382,
           "bytes_delivered": 1242772,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.75,
           "delay_p95_ms_proxy": 15.25,
@@ -9587,6 +9968,7 @@
         "ue9_qfi2": {
           "bytes_arrived": 925000,
           "bytes_delivered": 780965,
+          "bytes_delivered_late_pdb": 181,
           "bytes_dropped_pdb": 46107,
           "delay_p50_ms_proxy": 7.5,
           "delay_p95_ms_proxy": 16.25,
@@ -9611,6 +9993,7 @@
         "ue9_qfi82": {
           "bytes_arrived": 8000,
           "bytes_delivered": 7999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.75,
@@ -9635,6 +10018,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 1249327,
           "bytes_delivered": 1244442,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 5.75,
           "delay_p95_ms_proxy": 17.5,
@@ -9688,6 +10072,7 @@
         "ue10_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 1.5,
           "delay_p95_ms_proxy": 4.5,
@@ -9712,6 +10097,7 @@
         "ue11_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79980,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.0,
           "delay_p95_ms_proxy": 6.5,
@@ -9736,6 +10122,7 @@
         "ue12_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 7.0,
@@ -9760,6 +10147,7 @@
         "ue13_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79538,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 174,
           "delay_p50_ms_proxy": 3.0,
           "delay_p95_ms_proxy": 8.5,
@@ -9784,6 +10172,7 @@
         "ue14_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 6.0,
@@ -9808,6 +10197,7 @@
         "ue15_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79980,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.0,
           "delay_p95_ms_proxy": 6.0,
@@ -9832,6 +10222,7 @@
         "ue16_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79980,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.0,
           "delay_p95_ms_proxy": 6.0,
@@ -9856,6 +10247,7 @@
         "ue17_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 1.5,
           "delay_p95_ms_proxy": 4.5,
@@ -9880,6 +10272,7 @@
         "ue18_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 78917,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 974,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 9.5,
@@ -9904,6 +10297,7 @@
         "ue19_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79980,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.0,
           "delay_p95_ms_proxy": 6.5,
@@ -9928,6 +10322,7 @@
         "ue1_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79110,
+          "bytes_delivered_late_pdb": 99,
           "bytes_dropped_pdb": 480,
           "delay_p50_ms_proxy": 4.5,
           "delay_p95_ms_proxy": 10.0,
@@ -9952,6 +10347,7 @@
         "ue20_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79980,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 3.5,
           "delay_p95_ms_proxy": 6.5,
@@ -9976,6 +10372,7 @@
         "ue21_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79417,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 583,
           "delay_p50_ms_proxy": 3.5,
           "delay_p95_ms_proxy": 9.5,
@@ -10000,6 +10397,7 @@
         "ue22_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 5.0,
@@ -10024,6 +10422,7 @@
         "ue23_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 4.0,
@@ -10048,6 +10447,7 @@
         "ue24_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 1.5,
           "delay_p95_ms_proxy": 4.5,
@@ -10072,6 +10472,7 @@
         "ue25_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79778,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 222,
           "delay_p50_ms_proxy": 3.5,
           "delay_p95_ms_proxy": 6.5,
@@ -10096,6 +10497,7 @@
         "ue26_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 74420,
+          "bytes_delivered_late_pdb": 127,
           "bytes_dropped_pdb": 5580,
           "delay_p50_ms_proxy": 4.5,
           "delay_p95_ms_proxy": 13.0,
@@ -10120,6 +10522,7 @@
         "ue27_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 71400,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 8600,
           "delay_p50_ms_proxy": 7.0,
           "delay_p95_ms_proxy": 13.5,
@@ -10144,6 +10547,7 @@
         "ue28_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 4.0,
           "delay_p95_ms_proxy": 6.0,
@@ -10168,6 +10572,7 @@
         "ue29_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79675,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 325,
           "delay_p50_ms_proxy": 3.0,
           "delay_p95_ms_proxy": 11.5,
@@ -10192,6 +10597,7 @@
         "ue2_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 1.5,
           "delay_p95_ms_proxy": 5.5,
@@ -10216,6 +10622,7 @@
         "ue30_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79980,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 6.5,
@@ -10240,6 +10647,7 @@
         "ue3_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 4.0,
@@ -10264,6 +10672,7 @@
         "ue4_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 78940,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 1060,
           "delay_p50_ms_proxy": 3.5,
           "delay_p95_ms_proxy": 11.5,
@@ -10288,6 +10697,7 @@
         "ue5_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 1.5,
           "delay_p95_ms_proxy": 4.0,
@@ -10312,6 +10722,7 @@
         "ue6_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 3.5,
@@ -10336,6 +10747,7 @@
         "ue7_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 5.0,
@@ -10360,6 +10772,7 @@
         "ue8_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 5.0,
@@ -10384,6 +10797,7 @@
         "ue9_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 5.0,
@@ -10437,6 +10851,7 @@
         "ue10_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 39644,
+          "bytes_delivered_late_pdb": 691,
           "bytes_dropped_pdb": 39756,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10461,6 +10876,7 @@
         "ue11_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 43555,
+          "bytes_delivered_late_pdb": 884,
           "bytes_dropped_pdb": 36185,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10485,6 +10901,7 @@
         "ue12_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 41346,
+          "bytes_delivered_late_pdb": 509,
           "bytes_dropped_pdb": 38394,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10509,6 +10926,7 @@
         "ue13_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 42117,
+          "bytes_delivered_late_pdb": 375,
           "bytes_dropped_pdb": 37623,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10533,6 +10951,7 @@
         "ue14_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 44811,
+          "bytes_delivered_late_pdb": 859,
           "bytes_dropped_pdb": 35169,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10557,6 +10976,7 @@
         "ue15_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 45310,
+          "bytes_delivered_late_pdb": 982,
           "bytes_dropped_pdb": 34181,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10581,6 +11001,7 @@
         "ue16_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 41815,
+          "bytes_delivered_late_pdb": 600,
           "bytes_dropped_pdb": 38185,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10605,6 +11026,7 @@
         "ue17_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 39778,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 39622,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10629,6 +11051,7 @@
         "ue18_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 40076,
+          "bytes_delivered_late_pdb": 709,
           "bytes_dropped_pdb": 39415,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10653,6 +11076,7 @@
         "ue19_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 49312,
+          "bytes_delivered_late_pdb": 934,
           "bytes_dropped_pdb": 30628,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10677,6 +11101,7 @@
         "ue1_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 37763,
+          "bytes_delivered_late_pdb": 200,
           "bytes_dropped_pdb": 41637,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10701,6 +11126,7 @@
         "ue20_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 40714,
+          "bytes_delivered_late_pdb": 491,
           "bytes_dropped_pdb": 38777,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10725,6 +11151,7 @@
         "ue21_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 42091,
+          "bytes_delivered_late_pdb": 600,
           "bytes_dropped_pdb": 37909,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10749,6 +11176,7 @@
         "ue22_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 45000,
+          "bytes_delivered_late_pdb": 491,
           "bytes_dropped_pdb": 34400,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10773,6 +11201,7 @@
         "ue23_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 42663,
+          "bytes_delivered_late_pdb": 333,
           "bytes_dropped_pdb": 37337,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10797,6 +11226,7 @@
         "ue24_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 41828,
+          "bytes_delivered_late_pdb": 225,
           "bytes_dropped_pdb": 37572,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10821,6 +11251,7 @@
         "ue25_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 39383,
+          "bytes_delivered_late_pdb": 200,
           "bytes_dropped_pdb": 40017,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10845,6 +11276,7 @@
         "ue26_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 40613,
+          "bytes_delivered_late_pdb": 691,
           "bytes_dropped_pdb": 38787,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10869,6 +11301,7 @@
         "ue27_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 44629,
+          "bytes_delivered_late_pdb": 491,
           "bytes_dropped_pdb": 34951,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10893,6 +11326,7 @@
         "ue28_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 39385,
+          "bytes_delivered_late_pdb": 109,
           "bytes_dropped_pdb": 40215,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10917,6 +11351,7 @@
         "ue29_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 41536,
+          "bytes_delivered_late_pdb": 309,
           "bytes_dropped_pdb": 37864,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -10941,6 +11376,7 @@
         "ue2_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 35694,
+          "bytes_delivered_late_pdb": 1182,
           "bytes_dropped_pdb": 43846,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10965,6 +11401,7 @@
         "ue30_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 37906,
+          "bytes_delivered_late_pdb": 109,
           "bytes_dropped_pdb": 41634,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -10989,6 +11426,7 @@
         "ue3_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 38002,
+          "bytes_delivered_late_pdb": 1200,
           "bytes_dropped_pdb": 41398,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -11013,6 +11451,7 @@
         "ue4_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 37382,
+          "bytes_delivered_late_pdb": 534,
           "bytes_dropped_pdb": 42218,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -11037,6 +11476,7 @@
         "ue5_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 37119,
+          "bytes_delivered_late_pdb": 364,
           "bytes_dropped_pdb": 42281,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -11061,6 +11501,7 @@
         "ue6_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 41740,
+          "bytes_delivered_late_pdb": 509,
           "bytes_dropped_pdb": 38021,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -11085,6 +11526,7 @@
         "ue7_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 38339,
+          "bytes_delivered_late_pdb": 673,
           "bytes_dropped_pdb": 41061,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -11109,6 +11551,7 @@
         "ue8_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 40539,
+          "bytes_delivered_late_pdb": 709,
           "bytes_dropped_pdb": 39201,
           "delay_p50_ms_proxy": 11.0,
           "delay_p95_ms_proxy": 14.5,
@@ -11133,6 +11576,7 @@
         "ue9_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 38279,
+          "bytes_delivered_late_pdb": 218,
           "bytes_dropped_pdb": 41521,
           "delay_p50_ms_proxy": 11.5,
           "delay_p95_ms_proxy": 14.5,
@@ -11186,6 +11630,7 @@
         "ue10_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11210,6 +11655,7 @@
         "ue11_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11234,6 +11680,7 @@
         "ue12_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11258,6 +11705,7 @@
         "ue13_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11282,6 +11730,7 @@
         "ue14_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11306,6 +11755,7 @@
         "ue15_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11330,6 +11780,7 @@
         "ue16_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11354,6 +11805,7 @@
         "ue17_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11378,6 +11830,7 @@
         "ue18_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11402,6 +11855,7 @@
         "ue19_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11426,6 +11880,7 @@
         "ue1_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11450,6 +11905,7 @@
         "ue20_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11474,6 +11930,7 @@
         "ue21_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11498,6 +11955,7 @@
         "ue22_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11522,6 +11980,7 @@
         "ue23_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11546,6 +12005,7 @@
         "ue24_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11570,6 +12030,7 @@
         "ue25_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11594,6 +12055,7 @@
         "ue26_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 4.5,
@@ -11618,6 +12080,7 @@
         "ue27_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 1.5,
           "delay_p95_ms_proxy": 3.0,
@@ -11642,6 +12105,7 @@
         "ue28_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11666,6 +12130,7 @@
         "ue29_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 5.0,
@@ -11690,6 +12155,7 @@
         "ue2_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11714,6 +12180,7 @@
         "ue30_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.0,
           "delay_p95_ms_proxy": 4.5,
@@ -11738,6 +12205,7 @@
         "ue3_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11762,6 +12230,7 @@
         "ue4_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11786,6 +12255,7 @@
         "ue5_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11810,6 +12280,7 @@
         "ue6_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11834,6 +12305,7 @@
         "ue7_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 80000,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11858,6 +12330,7 @@
         "ue8_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11882,6 +12355,7 @@
         "ue9_qfi1": {
           "bytes_arrived": 80000,
           "bytes_delivered": 79999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 5.0,
@@ -11935,6 +12409,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 5004267,
           "bytes_delivered": 1517617,
+          "bytes_delivered_late_pdb": 315976,
           "bytes_dropped_pdb": 2736517,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -11959,6 +12434,7 @@
         "ue11_qfi9": {
           "bytes_arrived": 4998299,
           "bytes_delivered": 1486389,
+          "bytes_delivered_late_pdb": 345676,
           "bytes_dropped_pdb": 2762576,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -11983,6 +12459,7 @@
         "ue12_qfi9": {
           "bytes_arrived": 5000519,
           "bytes_delivered": 1623770,
+          "bytes_delivered_late_pdb": 300686,
           "bytes_dropped_pdb": 2627662,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12007,6 +12484,7 @@
         "ue1_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12031,6 +12509,7 @@
         "ue2_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1245934,
+          "bytes_delivered_late_pdb": 346,
           "bytes_dropped_pdb": 3954,
           "delay_p50_ms_proxy": 4.0,
           "delay_p95_ms_proxy": 8.5,
@@ -12055,6 +12534,7 @@
         "ue3_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1239377,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 10273,
           "delay_p50_ms_proxy": 5.0,
           "delay_p95_ms_proxy": 9.5,
@@ -12079,6 +12559,7 @@
         "ue4_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 872056,
+          "bytes_delivered_late_pdb": 24935,
           "bytes_dropped_pdb": 371694,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 11.5,
@@ -12103,6 +12584,7 @@
         "ue5_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 723528,
+          "bytes_delivered_late_pdb": 5456,
           "bytes_dropped_pdb": 522627,
           "delay_p50_ms_proxy": 9.0,
           "delay_p95_ms_proxy": 11.5,
@@ -12127,6 +12609,7 @@
         "ue6_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 781379,
+          "bytes_delivered_late_pdb": 7252,
           "bytes_dropped_pdb": 464776,
           "delay_p50_ms_proxy": 8.5,
           "delay_p95_ms_proxy": 11.5,
@@ -12151,6 +12634,7 @@
         "ue7_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12175,6 +12659,7 @@
         "ue8_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12199,6 +12684,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 4999606,
           "bytes_delivered": 1527520,
+          "bytes_delivered_late_pdb": 333917,
           "bytes_dropped_pdb": 2722322,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12252,6 +12738,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 5004267,
           "bytes_delivered": 1476936,
+          "bytes_delivered_late_pdb": 262323,
           "bytes_dropped_pdb": 2777198,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12276,6 +12763,7 @@
         "ue11_qfi9": {
           "bytes_arrived": 4998299,
           "bytes_delivered": 1437883,
+          "bytes_delivered_late_pdb": 268551,
           "bytes_dropped_pdb": 2810462,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12300,6 +12788,7 @@
         "ue12_qfi9": {
           "bytes_arrived": 5000519,
           "bytes_delivered": 1569006,
+          "bytes_delivered_late_pdb": 259818,
           "bytes_dropped_pdb": 2682426,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12324,6 +12813,7 @@
         "ue1_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1246357,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 6.0,
           "delay_p95_ms_proxy": 10.5,
@@ -12348,6 +12838,7 @@
         "ue2_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1232016,
+          "bytes_delivered_late_pdb": 2415,
           "bytes_dropped_pdb": 15865,
           "delay_p50_ms_proxy": 6.0,
           "delay_p95_ms_proxy": 10.0,
@@ -12372,6 +12863,7 @@
         "ue3_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1216341,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 30223,
           "delay_p50_ms_proxy": 7.0,
           "delay_p95_ms_proxy": 11.0,
@@ -12396,6 +12888,7 @@
         "ue4_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 850361,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 393389,
           "delay_p50_ms_proxy": 8.0,
           "delay_p95_ms_proxy": 11.0,
@@ -12420,6 +12913,7 @@
         "ue5_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 575564,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 668186,
           "delay_p50_ms_proxy": 9.5,
           "delay_p95_ms_proxy": 11.5,
@@ -12444,6 +12938,7 @@
         "ue6_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 756380,
+          "bytes_delivered_late_pdb": 55286,
           "bytes_dropped_pdb": 489842,
           "delay_p50_ms_proxy": 8.5,
           "delay_p95_ms_proxy": 11.5,
@@ -12468,6 +12963,7 @@
         "ue7_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249621,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 5.0,
           "delay_p95_ms_proxy": 9.5,
@@ -12492,6 +12988,7 @@
         "ue8_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249599,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 5.5,
           "delay_p95_ms_proxy": 10.0,
@@ -12516,6 +13013,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 4999606,
           "bytes_delivered": 1225599,
+          "bytes_delivered_late_pdb": 267197,
           "bytes_dropped_pdb": 3024243,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12569,6 +13067,7 @@
         "ue10_qfi9": {
           "bytes_arrived": 5004267,
           "bytes_delivered": 432940,
+          "bytes_delivered_late_pdb": 71932,
           "bytes_dropped_pdb": 3821363,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12593,6 +13092,7 @@
         "ue11_qfi9": {
           "bytes_arrived": 4998299,
           "bytes_delivered": 427003,
+          "bytes_delivered_late_pdb": 98408,
           "bytes_dropped_pdb": 3821342,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12617,6 +13117,7 @@
         "ue12_qfi9": {
           "bytes_arrived": 5000519,
           "bytes_delivered": 633284,
+          "bytes_delivered_late_pdb": 166520,
           "bytes_dropped_pdb": 3618148,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,
@@ -12641,6 +13142,7 @@
         "ue1_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249930,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12665,6 +13167,7 @@
         "ue2_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12689,6 +13192,7 @@
         "ue3_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249910,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12713,6 +13217,7 @@
         "ue4_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249995,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12737,6 +13242,7 @@
         "ue5_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12761,6 +13267,7 @@
         "ue6_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249993,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12785,6 +13292,7 @@
         "ue7_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12809,6 +13317,7 @@
         "ue8_qfi1": {
           "bytes_arrived": 1250000,
           "bytes_delivered": 1249999,
+          "bytes_delivered_late_pdb": 0,
           "bytes_dropped_pdb": 0,
           "delay_p50_ms_proxy": 2.5,
           "delay_p95_ms_proxy": 4.5,
@@ -12833,6 +13342,7 @@
         "ue9_qfi9": {
           "bytes_arrived": 4999606,
           "bytes_delivered": 1795669,
+          "bytes_delivered_late_pdb": 331555,
           "bytes_dropped_pdb": 2454173,
           "delay_p50_ms_proxy": 299.5,
           "delay_p95_ms_proxy": 300.0,

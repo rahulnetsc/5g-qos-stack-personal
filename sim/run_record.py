@@ -48,6 +48,11 @@ class FlowRecord:
     bytes_arrived: int
     bytes_delivered: int
     bytes_dropped_pdb: int
+    # Delivered, but after the flow's own PDB had already passed -- the
+    # "delivered, but later than PDB" component of M02 (config/metric_
+    # panel.yml). 0 on records predating this field. Distinct from
+    # bytes_dropped_pdb (bytes that never reached delivery at all).
+    bytes_delivered_late_pdb: int
     throughput_bps: float
     offered_bps: float
     delivery_ratio: float
@@ -200,6 +205,7 @@ class RunRecord:
                 bytes_arrived=m["bytes_arrived"],
                 bytes_delivered=m["bytes_delivered"],
                 bytes_dropped_pdb=m["bytes_dropped"],
+                bytes_delivered_late_pdb=m.get("bytes_delivered_late_pdb", 0),
                 throughput_bps=m["throughput_bps"],
                 offered_bps=m["offered_bps"],
                 delivery_ratio=m["delivery_ratio"],

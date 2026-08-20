@@ -157,11 +157,13 @@ class Scorecard:
     def _m02_pdb_violation_rate(self, record: RunRecord) -> MetricResult:
         total_arrived = sum(fr.bytes_arrived for fr in record.flows.values())
         total_dropped = sum(fr.bytes_dropped_pdb for fr in record.flows.values())
-        rate = (total_dropped / total_arrived) if total_arrived > 0 else 0.0
+        total_late = sum(fr.bytes_delivered_late_pdb for fr in record.flows.values())
+        rate = ((total_dropped + total_late) / total_arrived) if total_arrived > 0 else 0.0
         return MetricResult(
-            "M02", "pdb_violation_rate", rate, "proxy", "fraction",
-            "expiry-discard component only (exact); 'delivered-but-late' "
-            "component needs WP3 per-chunk completion timestamps",
+            "M02", "pdb_violation_rate", rate, "ok", "fraction",
+            "expiry-discard + delivered-but-late components, both exact "
+            "(WP3: bytes_delivered_late_pdb tags each drained chunk's age "
+            "against its flow's PDB at drain time)",
         )
 
     def _m04_survival_time_failures(self, record: RunRecord, survival_n: int) -> MetricResult:

@@ -161,6 +161,41 @@ def test_buffer_pdb_expiry():
     assert b.state(1, 9).bytes_queued == 0
 
 
+def test_buffer_drain_without_pdb_args_never_marks_late():
+    """now_s/pdb_s are optional -- a caller that doesn't care about
+    lateness (the default: now_s=0.0, pdb_s=inf) gets none tagged."""
+    b = BufferModel()
+    b.register(1, 9)
+    b.enqueue(1, 9, 500, 0.0)
+    b.drain(1, 9, 500)
+    assert b.state(1, 9).bytes_delivered_late_pdb == 0
+
+
+def test_buffer_drain_tags_bytes_delivered_after_pdb_as_late():
+    """M02 (config/metric_panel.yml): a chunk drained after its own PDB
+    has already passed counts as delivered-but-late, not fully fine --
+    distinct from bytes_dropped_pdb, which never reaches drain() at all."""
+    b = BufferModel()
+    b.register(1, 9)
+    b.enqueue(1, 9, 500, 0.0)
+    # PDB is 0.5s; draining at t=1.0 means this chunk is already late.
+    drained = b.drain(1, 9, 500, now_s=1.0, pdb_s=0.5)
+    assert drained == 500
+    assert b.state(1, 9).bytes_delivered_late_pdb == 500
+
+
+def test_buffer_drain_spanning_chunks_tags_only_the_late_one():
+    """A single drain() call can straddle the PDB deadline: an old chunk
+    counts as late, a fresh one in the same drain does not."""
+    b = BufferModel()
+    b.register(1, 9)
+    b.enqueue(1, 9, 300, 0.0)   # arrives at t=0 -- late by t=1.0 (pdb=0.5)
+    b.enqueue(1, 9, 300, 0.9)  # arrives at t=0.9 -- not late by t=1.0
+    drained = b.drain(1, 9, 600, now_s=1.0, pdb_s=0.5)
+    assert drained == 600
+    assert b.state(1, 9).bytes_delivered_late_pdb == 300
+
+
 def test_buffer_bsr_managed_flow_ignores_enqueue_drain_expire():
     """A BSR-managed UL flow's bytes_reported is NOT touched by
     BufferModel's enqueue/drain/expire -- only sim/bsr.py::BsrModel writes
