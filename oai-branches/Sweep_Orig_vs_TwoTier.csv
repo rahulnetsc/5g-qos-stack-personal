@@ -1,0 +1,7 @@
+Point,Load %,Orig p99 med (ms),Orig result,TT p99 med (ms),TT result,Note
+P1,45.0,67.25,PASS,63.13,PASS,both PASS
+P2,70.0,31.88,PASS,24.36,PASS,both PASS
+P3,90.0,15.59,PASS,16.7,PASS,both PASS
+P4,105.0,14.73,PASS,15.26,PASS,both PASS
+P5,125.0,12.98,PASS,12.99,PASS,both PASS (tt ovlp 87%)
+P6,145.0,33.09,PASS,15.9,FAIL*,orig PASS; tt FAIL=overlap 40% artifact; real p99 12-16ms

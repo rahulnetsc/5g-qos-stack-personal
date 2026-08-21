@@ -299,6 +299,27 @@ they survive it:
   combined with the previous point it means the per-LCG breakdown can
   drift arbitrarily from the scalar until the next BSR resets both.
   Preserved deliberately in the port, not fixed.
+- **At N=2 UEs, the two schedulers do not differentiate on admissible
+  load — settled by the original measurement's own author, not just
+  argued from absence of evidence.** `oai-branches/Sweep_Orig_vs_TwoTier.
+  xlsx` (a 6-point offered-load sweep, 45-145%, 3 runs/point, "worse-of-
+  two-UE p99", found untracked in the repo and vendored for WP4) carries
+  its own conclusion: "at N=2 UEs over this load range, the two schedulers
+  are equivalent on admissible load; neither breaks... if admissible load
+  ties, go to N=3, or report the fairness (Jain) metric as the
+  differentiator." This independently confirms `p5g-sim-plan.md` §3.2's
+  argument that reservation/two-tier's difference was never actually
+  exercised at N=2 — from the person who ran the original hardware sweep,
+  not just inferred from the numbers after the fact.
+- **Neither scheduler is uniformly better across the sweep — there's a
+  crossover, and it's the more interesting result than either endpoint.**
+  Two-tier reads lower (better) p99 than Original at 45%, 70%, and 145%
+  load, but higher (worse) at 90% and 105% (125% is a near-tie: 12.98 vs
+  12.99 ms). See §8 for the full curve and the caveats on the 145% point.
+  `p5g-sim-plan.md` §11's two-number summary (45%→67.25ms, 125%→12.98ms)
+  is an accurate transcription of two of these six points but on its own
+  hides this crossover entirely — exactly the kind of detail "reproduce
+  the two headline numbers" would miss.
 
 ---
 
@@ -331,6 +352,26 @@ they survive it:
   `design-docs/scheduler-study.md` §5.1 for detail. **WP4 should treat
   properly retiring this stopgap as part of its acceptance criteria, not
   an optional cleanup.**
+- `[OPEN]` **The load-inversion calibration target's full source data, and
+  what it does and doesn't support.** `p5g-sim-plan.md` §11's 67.25ms/
+  12.98ms headline traces to `oai-branches/Sweep_Orig_vs_TwoTier.xlsx` (see
+  §7 for the no-differentiation finding) — found sitting untracked in the
+  repo while scoping WP4, now vendored there along with a plain-text
+  `Sweep_Orig_vs_TwoTier.csv` extraction. Full 6-point curve (Load% → Orig
+  / TT p99 med, ms): 45→67.25/63.13, 70→31.88/24.36, 90→15.59/16.7,
+  105→14.73/15.26, 125→12.98/12.99, 145→33.09/15.9. Both curves fall
+  45%→125%, then Original genuinely upticks at 145% (33.09ms, a real
+  measurement). The 145% Two-tier value (15.9ms) is flagged by the sheet's
+  own author as a capture-overlap artifact ("real p99 12-16ms" for valid
+  runs) — treat it as unusable for characterizing scheduler behavior at
+  that point, not as a real "stays flat" measurement. Only medians across
+  3 runs/point are available — no raw per-run values or confidence
+  intervals. Open question: whether a fuller/raw-runs version of this
+  sweep exists elsewhere (being tracked down separately). Practical
+  consequence for WP4: the target to reproduce is the *shape* — fall then
+  uptick, with a scheduler crossover in the middle (§7) — not a specific
+  millisecond value at either endpoint, and not a scheduler-differentiation
+  signal, since the source itself says there isn't one at this N.
 - `[OPEN]` H5 (`p5g-sim-plan.md` line 338, "two-tier degrades as
   flows-per-LCG grows") is not demonstrable on any current scenario. WP3's
   default 5QI→LCG mapping (`scheduler/flow.py::FIVE_QI_LCG`) deliberately
