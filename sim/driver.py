@@ -10,6 +10,7 @@ from .config import ScenarioConfig
 from .metrics import Metrics
 from .resource import ResourceGrid
 from .ue_lcp import UeLcp
+from .ul_access import UlAccessModel
 from scheduler import Scheduler, bler_for_mcs, mcs_threshold_for_snr
 from .traffic import TrafficModel
 
@@ -20,12 +21,19 @@ def run(
     record_timeseries: bool = False,
     cqi_delay_slots: int = 0,
     cqi_loss_rate: float = 0.0,
+    sr_period_slots: int = 10,
+    sr_offset_slots: int = 0,
 ) -> dict:
     """Run one scenario through one scheduler.
 
     Uplink Buffer Status Reports are modelled by ``sim/bsr.py::BsrModel``:
     per-LCG, quantised, riding on a UL grant. Configured Grants (SPS)
-    bypass BSR entirely (they read ``bytes_queued`` directly).
+    bypass BSR entirely (they read ``bytes_queued`` directly). The uplink
+    access chain (SR -> grant -> BSR -> grant, ``sim/ul_access.py``) is
+    what makes a flow with no BSR evidence and real backlog reportable at
+    all -- see that module's docstring. ``sr_period_slots`` /
+    ``sr_offset_slots`` have no ground truth (README §8); exposed here so
+    a study can sweep them rather than fixing a silent default.
 
     ``cqi_delay_slots`` / ``cqi_loss_rate`` model the UE-to-gNB Channel
     Quality Indicator report on the *downlink* -- ChannelModel exposes a
@@ -49,6 +57,12 @@ def run(
     )
     buffers = BufferModel()
     bsr = BsrModel(scenario.flows, grid.slot_duration_s)
+    ul_access = UlAccessModel(
+        scenario.flows,
+        grid.slot_duration_s,
+        sr_period_slots=sr_period_slots,
+        sr_offset_slots=sr_offset_slots,
+    )
     traffic = TrafficModel(scenario.flows, buffers, grid.slot_duration_s, rng)
     metrics = Metrics(record_timeseries=record_timeseries)
 
@@ -79,14 +93,18 @@ def run(
 
         # Regular-BSR trigger (arrivals) and periodic/retx timer expiry --
         # both just set `pending`; order between them doesn't matter, only
-        # that both run before broadcast()/scheduler.allocate().
+        # that both run before broadcast()/scheduler.allocate(). SR shares
+        # the same arrivals event (on_arrivals) and needs its own per-slot
+        # occasion/timer tick before broadcast() asks it for a report.
         bsr.on_arrivals(per_flow_arrived, buffers)
         bsr.tick_timers(slot_index)
+        ul_access.on_arrivals(per_flow_arrived, buffers)
+        ul_access.tick(slot_index)
 
         # Recompute every UL flow's gNB-visible bytes_reported from the
         # current BsrModel state (B = estimated_ul_buffer - sched_ul_bytes,
         # capped per-LCG) -- must run before the scheduler reads state.
-        bsr.broadcast(buffers)
+        bsr.broadcast(buffers, ul_access)
 
         slot_grid = grid.slot_grid(slot_index)
         metrics.record_grid_capacity(
@@ -142,6 +160,7 @@ def run(
                 bsr.on_ul_grant(
                     alloc.ue_id, alloc.bytes_capacity, ue_delivered_bytes, slot_index, buffers
                 )
+                ul_access.on_ul_grant(alloc.ue_id)
             else:
                 pdb_s = pdb_by_flow.get((alloc.ue_id, alloc.qfi), 1.0)
                 buffers.drain(alloc.ue_id, alloc.qfi, delivered, now_s, pdb_s)

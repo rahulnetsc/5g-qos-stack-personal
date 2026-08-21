@@ -4,6 +4,14 @@ Commit 1: quantisation, per-LCG structure, the cold-start/re-arm probe.
 Commit 2: event-triggering (regular/periodic/retx) and the resulting
 sched_ul_bytes crumb-collapse gate -- a BSR is now assembled only when
 `pending`, not on every grant.
+
+WP4 note: the cold-start/re-arm probe from commit 1 was replaced by the
+real SR mechanism in `sim/ul_access.py` -- `broadcast()` now takes a
+`ul_access` argument instead of bypassing to the true backlog itself. Most
+tests below just need a `UlAccessModel` that never fires (constructed but
+never ticked) to keep testing quantisation/aggregation mechanics in
+isolation from SR; see `_no_sr()`. SR-specific behaviour has its own tests
+in `sim/tests/test_ul_access.py`.
 """
 
 import re
@@ -19,6 +27,7 @@ from sim.bsr import (
     quantise_short,
 )
 from sim.buffer import BufferModel
+from sim.ul_access import UlAccessModel
 from scheduler.flow import FlowConfig
 
 _OAI_SOURCE = Path(__file__).resolve().parents[2] / "oai-branches" / "two-tier" / "nr_mac_common.c"
@@ -116,6 +125,13 @@ def test_flowconfig_defaults_lcg_from_5qi_and_rejects_out_of_range():
         FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=-2)
 
 
+def _no_sr(flows):
+    """A UlAccessModel that never fires -- never had on_arrivals/tick
+    called, so sr_report_floor() always returns 0. Used by tests about
+    quantisation/aggregation mechanics, which are orthogonal to SR."""
+    return UlAccessModel(flows, _SLOT_S)
+
+
 def _force_pending(bsr, ue_id):
     """Test helper: jump straight to "a BSR is due" without exercising the
     trigger logic itself -- used by tests about quantisation/aggregation
@@ -138,7 +154,7 @@ def test_short_bsr_used_and_other_lcgs_zeroed_when_one_lcg_active():
 
     _force_pending(bsr, 1)
     bsr.on_ul_grant(ue_id=1, tb_size=0, delivered_bytes=0, slot_index=0, buffers=buffers)
-    bsr.broadcast(buffers)  # BsrModel's internal state -> BufferState
+    bsr.broadcast(buffers, _no_sr(flows))  # BsrModel's internal state -> BufferState
 
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == 0
     assert buffers.state(1, 9).estimated_ul_buffer_per_lcg == quantise_short(2000)
@@ -156,7 +172,7 @@ def test_long_bsr_used_when_multiple_lcgs_active():
 
     _force_pending(bsr, 1)
     bsr.on_ul_grant(ue_id=1, tb_size=0, delivered_bytes=0, slot_index=0, buffers=buffers)
-    bsr.broadcast(buffers)
+    bsr.broadcast(buffers, _no_sr(flows))
 
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == quantise_long(500)
     assert buffers.state(1, 9).estimated_ul_buffer_per_lcg == quantise_long(2000)
@@ -174,14 +190,15 @@ def test_per_lcg_estimate_frozen_between_grants_not_drained():
     buffers.enqueue(1, 2, 1000, 0.0)
     _force_pending(bsr, 1)
     bsr.on_ul_grant(ue_id=1, tb_size=1000, delivered_bytes=1000, slot_index=0, buffers=buffers)
-    bsr.broadcast(buffers)
+    ul_access = _no_sr(flows)
+    bsr.broadcast(buffers, ul_access)
     reported_after_first_bsr = buffers.state(1, 2).estimated_ul_buffer_per_lcg
     assert reported_after_first_bsr == quantise_short(1000)
 
     # No new grant: broadcast() alone must not change the frozen estimate,
     # even though the true backlog is now 0 (fully drained).
     for _ in range(5):
-        bsr.broadcast(buffers)
+        bsr.broadcast(buffers, ul_access)
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == reported_after_first_bsr
 
 
@@ -236,55 +253,33 @@ def test_bsr_not_assembled_when_not_pending():
     assert bsr._state[1].pending is False
 
 
-def test_rides_on_a_grant_no_change_without_one():
-    """A flow with real data but no UL grant this run never gets a BSR
-    assembled -- on_ul_grant is only called for actual grants. broadcast()
-    alone (the cold-start/re-arm probe) is the only thing keeping it from
-    a permanent 0, and it reports the true backlog directly, not a
-    quantised estimate, until a real grant lands."""
+def test_broadcast_alone_cannot_report_without_a_grant_or_sr():
+    """A flow with real data but no UL grant and no SR engagement never
+    becomes visible -- broadcast() alone does nothing. WP3's cold-start
+    probe used to bypass straight to the true backlog here; WP4 replaced
+    it with the real SR path (sim/ul_access.py), which this test
+    deliberately never engages (ul_access is constructed but never ticked)
+    to isolate bsr.py's own contract. SR's re-arm behaviour has its own
+    integration test in sim/tests/test_ul_access.py."""
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
     bsr = BsrModel(flows, _SLOT_S)
+    ul_access = _no_sr(flows)
 
     buffers.enqueue(1, 2, 1234, 0.0)
     bsr.on_arrivals({(1, 2): 1234}, buffers)  # legitimate regular trigger
     for _ in range(10):
-        bsr.broadcast(buffers)
-    # Never granted -> still the true-backlog probe, not a quantised value.
-    assert buffers.state(1, 2).bytes_reported == 1234
-
-
-def test_cold_start_probe_rearms_after_a_flow_drains_to_empty():
-    """The probe is not one-shot: once a flow's per-LCG estimate reads 0
-    (whether from a genuine empty-backlog BSR or because it was never
-    reported), a fresh arrival must be visible again via the probe, not
-    stuck at the frozen 0 -- otherwise any bursty UL flow deadlocks after
-    its first empty buffer (see README §8's WP3 finding)."""
-    buffers = BufferModel()
-    buffers.register(1, 2, is_ul=True, lcg=0)
-    flows = [_flow(1, 2, 0)]
-    bsr = BsrModel(flows, _SLOT_S)
-
-    buffers.enqueue(1, 2, 500, 0.0)
-    buffers.drain(1, 2, 500)
-    _force_pending(bsr, 1)
-    bsr.on_ul_grant(ue_id=1, tb_size=500, delivered_bytes=500, slot_index=0, buffers=buffers)
-    bsr.broadcast(buffers)
+        bsr.broadcast(buffers, ul_access)
+    # Never granted, SR never engaged -> stays at 0.
     assert buffers.state(1, 2).bytes_reported == 0
 
-    # New data arrives with no further grant -- must become visible again.
-    buffers.enqueue(1, 2, 300, 0.001)
-    bsr.on_arrivals({(1, 2): 300}, buffers)  # regular trigger: previously-empty LCG
-    bsr.broadcast(buffers)
-    assert buffers.state(1, 2).bytes_reported == 300
 
-
-def test_crumb_collapse_not_defeated_by_the_probe():
-    """The probe only fires when the per-LCG estimate is exactly 0 (no
-    evidence at all). A nonzero-but-B-capped estimate (genuine crumb
-    collapse) must still gate to a small/zero bytes_reported, not bypass
-    to the true backlog."""
+def test_crumb_collapse_not_defeated_by_sr():
+    """SR only ever reports once its own state machine has fired
+    (sim/ul_access.py) -- a nonzero-but-B-capped estimate (genuine crumb
+    collapse) must still gate to a small/zero bytes_reported when SR was
+    never engaged, not bypass to the true backlog."""
     buffers = BufferModel()
     buffers.register(1, 2, is_ul=True, lcg=0)
     flows = [_flow(1, 2, 0)]
@@ -300,7 +295,7 @@ def test_crumb_collapse_not_defeated_by_the_probe():
     # Simulate the gNB having already granted more than the BSR reported,
     # without a new BSR arriving (sched_ul_bytes >= estimated_ul_buffer).
     st.sched_ul_bytes = st.estimated_ul_buffer
-    bsr.broadcast(buffers)
+    bsr.broadcast(buffers, _no_sr(flows))
     assert buffers.state(1, 2).bytes_reported == 0
     # The frozen per-LCG estimate itself is untouched by the gate.
     assert buffers.state(1, 2).estimated_ul_buffer_per_lcg == st.estimated_ul_buffer_per_lcg[0]
@@ -391,9 +386,10 @@ def test_crumb_fraction_emerges_from_fast_grants_slow_bsr():
     bsr.on_ul_grant(ue_id=1, tb_size=2000, delivered_bytes=2000, slot_index=0, buffers=buffers)
     assert bsr._state[1].estimated_ul_buffer > 0
 
+    ul_access = _no_sr(flows)
     saw_collapse = False
     for slot in range(1, 100):
-        bsr.broadcast(buffers)
+        bsr.broadcast(buffers, ul_access)
         if buffers.state(1, 2).bytes_reported == 0:
             saw_collapse = True
         # Not pending (no arrivals, timers far off): sched_ul_bytes just

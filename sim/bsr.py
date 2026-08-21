@@ -23,21 +23,24 @@ mechanism the hardware measurement names. Commit 1 assembled a BSR on
 every grant (no gating); this is the follow-up that makes the
 `sched_ul_bytes` gate load-bearing -- see README §4 WP3.
 
-Cold-start / re-arm stopgap: a flow whose last-known per-LCG BSR estimate
-is exactly 0 has nothing to report and no way to get a grant to report on
--- every scheduler's eligibility gate reads bytes_reported, and only a
-grant can update it. This isn't just a one-time startup case: it recurs
-every time a flow's real backlog goes from empty back to non-empty, which
-is most UL traffic in this repo (bursty/periodic sources). Real 5G breaks
-it with a Scheduling Request on PUCCH -- a grant-free control-channel
-signal (WP4, not modeled here) -- plus, for GBR flows specifically, a
-separate BSR-independent floor (`ul_has_unfulfilled_gbr` in the ground
-truth) neither modeled here. Until then, `broadcast()` reports a flow's
-true backlog directly whenever its per-LCG estimate is 0 and real data is
-waiting (see the probe branch below); this does NOT touch the crumb-
-collapse case (a nonzero per-LCG estimate capped to 0 by `B` -- that stays
-gated, which is the mechanism WP3 exists to demonstrate), only the "gNB
-has zero evidence at all" case.
+Cold-start / re-arm, WP3 -> WP4: a flow whose last-known per-LCG BSR
+estimate is exactly 0 has nothing to report and no way to get a grant to
+report on -- every scheduler's eligibility gate reads bytes_reported, and
+only a grant can update it. This isn't just a one-time startup case: it
+recurs every time a flow's real backlog goes from empty back to
+non-empty, which is most UL traffic in this repo (bursty/periodic
+sources). Real 5G breaks it with a Scheduling Request on PUCCH -- a
+grant-free control-channel signal. WP3 stood this in with a stopgap
+(`broadcast()` reporting a flow's true backlog directly); WP4
+(`sim/ul_access.py`) replaces it with the real mechanism -- `broadcast()`
+now asks `UlAccessModel.sr_report_floor()` for a small honest report
+(the gNB genuinely doesn't know more than "something exists" at this
+point) instead of bypassing to the true backlog. This does NOT touch the
+crumb-collapse case (a nonzero per-LCG estimate capped to 0 by `B` --
+that stays gated, which is the mechanism WP3 exists to demonstrate), only
+the "gNB has zero evidence at all" case. A separate BSR-independent floor
+for GBR flows specifically (`ul_has_unfulfilled_gbr` in the ground truth)
+is still not modeled here.
 """
 
 import bisect
@@ -261,10 +264,10 @@ class BsrModel:
         effect WP3 exists to demonstrate. An equally defensible alternative
         (mirror the decrement anyway, using `delivered_bytes` as the
         confirmed amount) was considered and rejected on that basis, not
-        because it's wrong on its face. If WP4's Scheduling-Request/k2
-        modelling doesn't fully explain the measured crumb-fraction
-        shortfall (README §8), this omission is a plausible contributor to
-        check first.
+        because it's wrong on its face. WP4 added a real SR path
+        (`sim/ul_access.py`) without adding k2/HARQ-round separation; if
+        the measured crumb-fraction shortfall (README §8) persists after
+        WP4, this omission is still a plausible contributor to check next.
         """
         st = self._state[ue_id]
         st.sched_ul_bytes += tb_size
@@ -302,7 +305,7 @@ class BsrModel:
         st.pending = False
         st.periodic_deadline_slot = slot_index + self._periodic_bsr_slots
 
-    def broadcast(self, buffers) -> None:
+    def broadcast(self, buffers, ul_access) -> None:
         """Every slot, every UE: recompute
         ``B = max(0, estimated_ul_buffer - sched_ul_bytes)`` and write
         `bytes_reported` / `estimated_ul_buffer_per_lcg` for every UL flow.
@@ -311,17 +314,19 @@ class BsrModel:
         `bytes_reported` collapse toward zero with no scheduler-side
         change -- see README §4/§7.
 
-        Cold-start / re-arm probe (see module docstring): if the gated
-        value would be 0 (either no per-LCG evidence at all, or `B` has
-        gated a stale-but-nonzero estimate to 0) while the flow actually
-        has data queued AND a BSR is currently `pending`, the UE has
-        something to report and no grant to report it on -- report the
-        true backlog directly, standing in for the Scheduling Request WP4
-        will model properly (TS 38.321 §5.4.5: exactly this situation
-        triggers SR). Gating `pending` on this is what keeps ordinary
-        crumb collapse (nonzero estimate, gated to 0 by `B`, nothing new
-        triggered) genuinely gated -- that's the mechanism WP3 exists to
-        demonstrate, not a bug to route around.
+        WP4's uplink access chain (`sim/ul_access.py`): if the gated value
+        would be 0 (either no per-LCG evidence at all, or `B` has gated a
+        stale-but-nonzero estimate to 0) while the flow actually has data
+        queued, ask `ul_access.sr_report_floor()` what the SR state
+        machine has to report -- 0 if still waiting on an SR occasion, a
+        small honest floor once the gNB's SR flag is set. This replaces
+        WP3's cold-start/re-arm probe, which bypassed straight to the true
+        backlog (a lie the gNB couldn't actually know); `ul_access` reports
+        only what a real gNB would know at this point. Ordinary crumb
+        collapse (nonzero estimate, gated to 0 by `B`, no SR involved
+        because `bytes_queued` was never 0) is unaffected -- `ul_access`
+        only ever returns nonzero once its own state machine has fired,
+        never merely because the gate happens to read 0.
         """
         for ue_id, flows in self._ue_flows.items():
             st = self._state[ue_id]
@@ -330,9 +335,10 @@ class BsrModel:
                 state = buffers.state(f.ue_id, f.qfi)
                 per_lcg = st.estimated_ul_buffer_per_lcg[f.lcg]
                 gated = min(per_lcg, b)
-                if gated <= 0 and state.bytes_queued > 0 and st.pending:
-                    state.estimated_ul_buffer_per_lcg = state.bytes_queued
-                    state.bytes_reported = state.bytes_queued
+                if gated <= 0 and state.bytes_queued > 0:
+                    floor = ul_access.sr_report_floor(ue_id)
+                    state.estimated_ul_buffer_per_lcg = per_lcg
+                    state.bytes_reported = floor
                 else:
                     state.estimated_ul_buffer_per_lcg = per_lcg
                     state.bytes_reported = gated

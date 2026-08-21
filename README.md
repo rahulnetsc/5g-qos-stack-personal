@@ -111,7 +111,7 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 | 1 | WP0 | Harness, pre-registered metric panel, regression corpus | `p5g-sim-plan.md` §9, extended per §5/§6 below | Done |
 | 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) | Done |
 | 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) | Done — 3 commits (quantisation/LCG structure, event-triggering/crumb gate, M02 per-chunk tracking); crumb-fraction and H5-scenario gaps open (§8) |
-| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; this WP owns the SR-chain inversion calibration target (§11 of that doc) | Pending |
+| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; ground truth vendored from the live OAI checkout, not `oai-branches/` (§7); mechanics verified against `gNB_scheduler_uci.c`/`nr_ue_procedures.c` | Done — cold-start probe retired (§8); SR-chain inversion calibration target (§11) **not reproduced** — negative result, reported not tuned (§8) |
 | 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Pending |
 | 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Pending |
 | 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Pending |
@@ -413,6 +413,55 @@ they survive it:
   WP9's characterization sweep runs a wider parameter range — if the
   shortfall persists across scenarios, that's a real finding about this
   port, not just this scenario.
+  **Update, WP4:** measured again on the same scenario/scheduler after
+  landing the real SR path — crumb fraction moved to **4.47%** (152/3404
+  UL grants), a ~50x increase in the predicted direction but still well
+  short of hardware's 48-52%. The crumbs' own size profile got *less*
+  accurate in the process: average crumb size is now 146 bytes (vs
+  WP3's 79 bytes, inside hardware's 72-107 byte range) because most
+  crumbs are now the SR-triggered grant's fixed 150-byte report floor
+  (`sim/ul_access.py::DEFAULT_SR_REPORT_FLOOR_BYTES`) rather than the
+  organic `sched_ul_bytes`-outracing-`estimated_ul_buffer` collapse WP3
+  identified — a partial, directionally-correct but not closing
+  confirmation, not a resolution.
+- `[OPEN]` **The load-inversion calibration target (§7/§11) does not
+  appear in this simulator, at any calibration tried.** `scripts/
+  scheduler_study.py::study_ul_access_chain` (WP4) sweeps offered load
+  (45-145%, matching the real sweep) against `sr_period_slots` on two
+  different scenario constructions (`sensor_dense_scenario`'s 30-UE/15ms-
+  PDB setup, and a dedicated N=2-UE/100ms-PDB scenario mirroring the real
+  sweep's own methodology more closely). Neither shows the hypothesised
+  high-to-low curve. Instead: PF/RoundRobin (non-SPS) show p99
+  *increasing* with load — the opposite direction — up to a sharp
+  collapse to the PDB ceiling, not a gradual queueing curve; TwoTier
+  (SPS-bypassed for these flows) stays flat and small throughout, which
+  is the mechanism being absent, not confirmed. `sr_period_slots` changes
+  how early the collapse hits, not its shape. Diagnosis: the hypothesis
+  needs a regime where a UE's buffer stays busy enough to never return to
+  empty between messages (so SR is skipped after the first one) without
+  yet missing PDBs outright — in this simulator that middle regime did
+  not appear at any tested load/scenario/periodicity combination; the
+  transition from fully-served to collapsed is a cliff. Per the WP4
+  charter's own instruction, this is reported as a negative finding about
+  the mechanism hypothesis rather than tuned until a curve appears —
+  whether the cliff itself is realistic (a genuine capacity-ceiling
+  effect) or an artefact of these scenarios' traffic/capacity shape is
+  open, and is the natural next question for WP9's wider sweep.
+- `[OPEN]` **WP4 exposed a pre-existing PF fairness weakness: identical
+  scores tie-break by flow iteration order, not randomly or by any
+  fairness-relevant tiebreaker.** `sim/baselines/pf.py`'s ranking sorts by
+  `bits_per_rb / max(1.0, r_avg)`; many simultaneously-cold UEs with
+  similar SNR can score identically, and Python's stable sort always
+  resolves ties toward the same UEs (lower `ue_id`, since `_flows`
+  iterates in scenario-declaration order). Under WP3's probe this rarely
+  mattered (most UEs were eligible with substantial reported backlog most
+  of the time, diluting the effect); under WP4's SR-gated eligibility
+  (narrower windows, many simultaneously-cold UEs after a synchronised
+  burst) it produces persistent starvation for a specific subset of UEs
+  on `sensor_dense_scenario` (see `sim/tests/test_ul_access.py`). Not
+  fixed — Phase 1 (§4) forbids scheduler logic changes in this WP, and
+  the weakness is `pf.py`'s, not `ul_access.py`'s. Flagged for whoever
+  next touches `pf.py`, not for WP4 to resolve.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

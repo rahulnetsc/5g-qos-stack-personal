@@ -681,10 +681,18 @@ def test_pdcch_budget_caps_dynamic_allocations():
 
     sc = sensor_dense_scenario()
     summary = run(sc, ProportionalFair(ewma_window_slots=200))
-    # PDCCH utilization should be high (we're hitting the budget) but not
-    # over 100% (the cap actually applies).
+    # PDCCH utilization should be substantial (we're hitting the budget) but
+    # not over 100% (the cap actually applies). Threshold lowered from 0.4
+    # by WP4 (sim/ul_access.py): on this scenario, every message now needs
+    # two grant events (SR-driven crumb, then a real BSR-sized grant)
+    # instead of one, and the real grant is sized from a *quantised*
+    # (overestimating) BSR rather than the WP3 probe's exact true-backlog
+    # report -- roughly doubling PRB cost per message on a scenario with
+    # near-zero PRB margin to begin with (README §8). Fewer UEs end up
+    # PDCCH-eligible per slot as a result; the cap itself is still what's
+    # being tested here, not the specific utilization level.
     util = summary["cce_utilization"]
-    assert 0.4 < util <= 1.0, f"PDCCH utilization {util:.1%} unexpected"
+    assert 0.3 < util <= 1.0, f"PDCCH utilization {util:.1%} unexpected"
 
 
 def test_cce_aggregation_level_monotonic():

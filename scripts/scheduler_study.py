@@ -1,6 +1,6 @@
 """Scheduler study: which scheduler to build, and under what conditions.
 
-Three studies, each framed as an engineering decision rather than a metric
+Four studies, each framed as an engineering decision rather than a metric
 dump:
 
   1. Overload sweep -- how the PF-vs-TwoTier gap depends on how overloaded
@@ -10,6 +10,13 @@ dump:
      control channel, not the data channel, is the bottleneck.
   3. Latency-bound -- tight-PDB control loops sharing a congested downlink
      with bulk traffic. Tests deadline awareness.
+  4. Uplink access chain (WP4) -- offered load x SR periodicity grid,
+     testing whether this simulator reproduces the branch's one real
+     calibration target: hardware's load-inverted UL p99
+     (docs/p5g-sim-plan.md sec 3.3, README sec 7/8). No existing study
+     sweeps offered load (study 1 sweeps carrier capacity instead), and
+     sr_period_slots has no ground truth (README sec 8) -- swept
+     explicitly here rather than defaulted silently, per the WP4 plan.
 
 Metrics are contract-oriented: for a GBR flow the contract is its GFBR;
 for a Delay flow it is on-time delivery within the PDB. Mean delivery
@@ -87,6 +94,23 @@ def _scale_capacity(scenario: ScenarioConfig, mult: float) -> ScenarioConfig:
         bandwidth_hz=int(scenario.carrier.bandwidth_hz * mult),
     )
     return dataclasses.replace(scenario, carrier=carrier)
+
+
+def _scale_ul_load(scenario: ScenarioConfig, mult: float) -> ScenarioConfig:
+    """Return the scenario with every UL flow's deterministic traffic
+    volume scaled by mult, capacity held fixed -- the load-axis analogue of
+    _scale_capacity's capacity-axis scaling, "around the as-configured
+    point (1.0x)" the same way. Only `deterministic` traffic_kind flows are
+    scaled (bytes_per_period); this study's base scenario uses only that
+    kind for its UL flows."""
+    new_flows = []
+    for f in scenario.flows:
+        if f.direction == "UL" and f.traffic_kind == "deterministic":
+            params = dict(f.traffic_params)
+            params["bytes_per_period"] = params["bytes_per_period"] * mult
+            f = dataclasses.replace(f, traffic_params=params)
+        new_flows.append(f)
+    return dataclasses.replace(scenario, flows=new_flows)
 
 
 def _profile(scenario: ScenarioConfig, summary: dict) -> dict:
@@ -222,6 +246,118 @@ def study_latency_bound() -> None:
         )
 
 
+def _ul_access_study_scenario() -> ScenarioConfig:
+    """A dedicated N=2-UE scenario for study 4, deliberately mirroring the
+    real hardware sweep's own methodology (oai-branches/
+    Sweep_Orig_vs_TwoTier.xlsx: "Two-UE Admissible-Load Sweep", PASS bound
+    p99<100ms) rather than reusing sensor_dense_scenario's 30-UE/15ms-PDB
+    setup. That setup was tried first and found unsuitable for this study:
+    its tight PDB pegs p99 at the PDB ceiling itself once packets start
+    getting dropped, saturating almost the entire grid rather than showing
+    the smoothly-varying access-chain-latency signal the real sweep
+    reveals. Two UEs at a generous 100 ms PDB avoids that saturation
+    artifact and is a closer methodological match besides."""
+    from sim.config import CarrierConfig, FlowConfig, ScenarioConfig as SC, UEConfig
+
+    # bytes_per_period=1400 (200 x 7) is itself a calibration finding, not
+    # an arbitrary choice: at 200 bytes/5ms, UL PRB utilization never
+    # exceeds ~13% across the whole 45-145% sweep (checked empirically) --
+    # far too lightly loaded for a "load %" axis to mean anything, since
+    # the buffer fully drains between every message at every tested point
+    # regardless of load, so every message independently pays the same
+    # SR round trip and the sweep is flat by construction. 7x is the
+    # point where the access chain's own throughput ceiling (not raw PRB
+    # capacity, which stays under ~15% utilized even at 145% here) starts
+    # to bind -- see study_ul_access_chain's printed finding for what this
+    # revealed about the load-inversion hypothesis.
+    ues = [UEConfig(ue_id=i, mean_snr_db=20.0, coherence_slots=2000) for i in (1, 2)]
+    flows = [
+        FlowConfig(
+            ue_id=i, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0,
+            traffic_kind="deterministic",
+            traffic_params={"period_ms": 5.0, "bytes_per_period": 200 * 7},
+        )
+        for i in (1, 2)
+    ]
+    return SC(
+        name="ul_access_study", horizon_slots=8000,
+        carrier=CarrierConfig(), ues=ues, flows=flows, seed=42,
+    )
+
+
+def study_ul_access_chain() -> None:
+    _hr("STUDY 4 -- Uplink access chain (SR -> grant -> BSR -> grant)")
+    print(
+        "Offered-load x SR-periodicity grid on a dedicated N=2-UE scenario\n"
+        "(mirrors the real sweep's own methodology, see\n"
+        "_ul_access_study_scenario's docstring for why sensor_dense_\n"
+        "scenario didn't work for this). Load points match the real\n"
+        "hardware sweep (oai-branches/Sweep_Orig_vs_TwoTier.xlsx, README\n"
+        "sec 7/8) -- 100% is this scenario's as-configured traffic, scaled\n"
+        "the same way study 1 scales capacity around its as-configured\n"
+        "point. Reported: worst-of-two-UE UL HoL p99 (ms), the proxy for\n"
+        "M01/flow_latency_percentiles (config/metric_panel.yml).\n"
+        "sr_period_slots has no ground truth (README sec 8) -- swept\n"
+        "explicitly, not defaulted.\n"
+        "Real sweep's own p99 (Orig / Two-tier, ms), for comparison:\n"
+    )
+    real_sweep = {
+        45: (67.25, 63.13), 70: (31.88, 24.36), 90: (15.59, 16.7),
+        105: (14.73, 15.26), 125: (12.98, 12.99), 145: (33.09, 15.9),
+    }
+    for pct, (orig, tt) in real_sweep.items():
+        print(f"  {pct:>3}% load: Orig {orig:>6.2f}ms  TT {tt:>6.2f}ms")
+
+    base = _ul_access_study_scenario()
+    load_points = (45, 70, 90, 105, 125, 145)
+    periods = (1, 10, 20, 40)
+    scheds = [("RoundRobin", RoundRobin), ("PF", _pf), ("TwoTier", _tt)]
+
+    for name, factory in scheds:
+        print(f"\n{name} -- worst UL HoL p99 (ms), rows=load%, cols=sr_period_slots")
+        header = "  load%  " + "".join(f"{p:>9}" for p in periods)
+        print(header)
+        for pct in load_points:
+            sc = _scale_ul_load(base, pct / 100.0)
+            meta = _flow_meta(sc)
+            row = [f"{pct:>5}%  "]
+            for period in periods:
+                summary = run(
+                    sc, factory(), cqi_delay_slots=CQI_DELAY_SLOTS,
+                    sr_period_slots=period,
+                )
+                ul_p99 = max(
+                    (m["hol_p99_ms"] for fk, m in summary["flows"].items()
+                     if meta[fk][3] == "UL"),
+                    default=0.0,
+                )
+                row.append(f"{ul_p99:>9.2f}")
+            print("".join(row))
+    print(
+        "\nFINDING (negative result, reported as instructed rather than\n"
+        "tuned away): the load-inversion does NOT appear. PF/RoundRobin\n"
+        "(non-SPS) show p99 INCREASING with load -- the opposite direction\n"
+        "-- up to a sharp collapse to the PDB ceiling (100ms), not a smooth\n"
+        "high-to-low curve. TwoTier (SPS-bypassed for these flows) stays\n"
+        "flat and small throughout, as expected, but that's the mechanism\n"
+        "being absent, not confirmed. Two scenario constructions were\n"
+        "tried (sensor_dense_scenario's 30-UE/15ms-PDB setup, and this\n"
+        "dedicated N=2-UE/100ms-PDB one) and neither showed the hypothesised\n"
+        "shape at any tested load or sr_period_slots value -- this isn't a\n"
+        "single miscalibrated point. Diagnosis: the hypothesis requires a\n"
+        "regime where the UE is busy enough that its buffer never returns\n"
+        "to empty between messages (so SR is skipped after the first one),\n"
+        "but not so overloaded that messages miss their PDB outright. In\n"
+        "this simulator that middle regime is vanishingly narrow -- the\n"
+        "transition from fully-served to PDB-collapsed is a cliff, not a\n"
+        "gradual queueing curve, at every calibration tried. Whether that\n"
+        "cliff is itself realistic or an artefact of this scenario's\n"
+        "capacity/traffic shape is open (README sec 8); it is NOT explained\n"
+        "by sr_period_slots, which does not change the qualitative shape,\n"
+        "only how early the cliff hits."
+    )
+
+
 def main() -> None:
     print(
         "UL BSR: per-LCG, quantised, event-driven (sim/bsr.py); "
@@ -232,6 +368,7 @@ def main() -> None:
     study_overload_sweep()
     study_pdcch_limited()
     study_latency_bound()
+    study_ul_access_chain()
 
 
 if __name__ == "__main__":
