@@ -397,10 +397,12 @@ they survive it:
 │   └── IA_P5G_Guarantee_Validation_Suite.md     earlier draft; mined for mechanism detail only
 ├── oai-branches/                 verified OAI source, ground truth for Phase 2 (§7)
 │   ├── README.md                 why these are kept separate per-branch
-│   ├── two-tier/                 gNB_scheduler{,_dlsch,_ulsch}.c, ia_p5g_scheduler.{c,h}
-│   └── reservation/               gNB_scheduler{,_dlsch,_ulsch}.c (no ia_p5g equivalent)
-├── calibration-logs/
-│   └── contention_twotier_run1.log   one traffic condition, two-tier only — guideline, not a fit target
+│   ├── two-tier/                 gNB_scheduler{,_dlsch,_ulsch,_uci}.c, nr_ue_procedures.c, ia_p5g_scheduler.{c,h}
+│   ├── reservation/               gNB_scheduler{,_dlsch,_ulsch}.c (no ia_p5g equivalent)
+│   ├── Sweep_Orig_vs_TwoTier.xlsx N=2 UE admissible-load sweep, 6 points, 3 runs/pt medians (§7, §8)
+│   └── Sweep_Orig_vs_TwoTier.csv  plain-text extraction of the above
+├── calibration-logs/              real deployment captures (README.md there for provenance)
+│   └── twotier_startup_gnb.log    one gNB startup log, two-tier config — RRC/MAC timer constants only, no traffic data
 ├── scheduler/                    [Phase 2] two_tier.py, reservation.py — rewritten from §7, not ported from main
 ├── sim/                          [Phase 1] channel.py, buffer.py, traffic.py, driver.py, metrics.py, harq.py (new), join.py (new) — rebuilt per §4
 └── scripts/                      [Phase 3] regime_sweep.py, regression_corpus.py, scorecard.py
