@@ -81,7 +81,7 @@ NR_LONG_BSR_TABLE: tuple[int, ...] = (
 
 def _locate_bsr_index(table: tuple[int, ...], true_bytes: int) -> int:
     """UE-side BSR index encoder -- mirrors `nr_locate_BsrIndexByBufferSize`
-    (`oai-branches/two-tier/nr_ue_scheduler.c:1506-1540`). Smallest index i
+    (`oai-branches/two-tier/nr_ue_scheduler.c:1506-1542`). Smallest index i
     such that ``table[i] >= true_bytes`` (0 bytes -> index 0 falls out of
     this naturally); clamped to the last index if `true_bytes` exceeds
     every table entry.

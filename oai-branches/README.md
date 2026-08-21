@@ -24,7 +24,7 @@ not from two separate repos.
 | `ia_p5g_scheduler.h` | `twotier` | `7358e99` | ditto |
 | `gNB_scheduler_primitives.c` | `twotier` | `f5486434f9139d869cd742065139a1af17a627b4` (2026-03-12, "Working GBR") | byte-identical to `reservation/gNB_scheduler_primitives.c`; predates `7358e99` |
 | `nr_mac_common.c` | `twotier` | `98618a7dc8c2c9bdf7fc3d2c789f57658cbd46d1` (2025-10-28) | originally `openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.c`, not `NR_MAC_gNB/`; pulled for WP3 (BSR realism) — carries `NR_SHORT_BSR_TABLE`/`NR_LONG_BSR_TABLE` (38.321 Tables 6.1.3.1-1/-2) and `get_short_bsr_value`/`get_long_bsr_value`, the source `sim/bsr.py`'s quantisation tables are transcribed from |
-| `nr_ue_scheduler.c` | `twotier` | `63f3fb55aeab49e6709561828e0555b7eea87a32` (2025-12-09) | originally `openair2/LAYER2/NR_MAC_UE/nr_ue_scheduler.c` — the *UE*-side MAC, not the gNB; pulled for WP3 alongside `nr_mac_common.c` — carries `nr_locate_BsrIndexByBufferSize` (~L1506-1540), the UE-side BSR-index encoder (`sim/bsr.py`'s quantisation is a two-step port: this file's encoder, then `gNB_scheduler_ulsch.c`'s `overestim_bsr_index` decoder) |
+| `nr_ue_scheduler.c` | `twotier` | `63f3fb55aeab49e6709561828e0555b7eea87a32` (2025-12-09) | originally `openair2/LAYER2/NR_MAC_UE/nr_ue_scheduler.c` — the *UE*-side MAC, not the gNB; pulled for WP3 alongside `nr_mac_common.c` — carries `nr_locate_BsrIndexByBufferSize` (L1506-1542), the UE-side BSR-index encoder (`sim/bsr.py`'s quantisation is a two-step port: this file's encoder, then `gNB_scheduler_ulsch.c`'s `overestim_bsr_index` decoder) |
 
 ## reservation/
 
