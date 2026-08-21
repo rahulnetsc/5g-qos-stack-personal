@@ -156,15 +156,34 @@ class Scorecard:
 
     def _m02_pdb_violation_rate(self, record: RunRecord) -> MetricResult:
         total_arrived = sum(fr.bytes_arrived for fr in record.flows.values())
+        total_delivered = sum(fr.bytes_delivered for fr in record.flows.values())
         total_dropped = sum(fr.bytes_dropped_pdb for fr in record.flows.values())
         total_late = sum(fr.bytes_delivered_late_pdb for fr in record.flows.values())
-        rate = ((total_dropped + total_late) / total_arrived) if total_arrived > 0 else 0.0
-        return MetricResult(
-            "M02", "pdb_violation_rate", rate, "ok", "fraction",
+        # Denominator is RESOLVED bytes (delivered + dropped), not
+        # bytes_arrived. A byte still queued at horizon end is neither
+        # delivered, dropped, nor late -- if it counted toward bytes_arrived
+        # without ever being able to land in the numerator, the rate would
+        # be systematically optimistic on any run that doesn't fully drain
+        # (short horizons, bursty tails). Excluding it is honest about what
+        # wasn't resolved rather than silently treating it as fine.
+        total_resolved = total_delivered + total_dropped
+        rate = ((total_dropped + total_late) / total_resolved) if total_resolved > 0 else 0.0
+        note = (
             "expiry-discard + delivered-but-late components, both exact "
             "(WP3: bytes_delivered_late_pdb tags each drained chunk's age "
-            "against its flow's PDB at drain time)",
+            "against its flow's PDB at drain time); denominator is resolved "
+            "bytes (delivered + dropped), not bytes_arrived -- bytes still "
+            "queued and unresolved at horizon end are excluded rather than "
+            "counted as fine"
         )
+        still_queued = total_arrived - total_resolved
+        if total_arrived > 0 and still_queued > 0:
+            note += (
+                f"; {still_queued}/{total_arrived} bytes "
+                f"({still_queued / total_arrived:.1%}) still queued, "
+                "unresolved at horizon end, excluded from this run"
+            )
+        return MetricResult("M02", "pdb_violation_rate", rate, "ok", "fraction", note)
 
     def _m04_survival_time_failures(self, record: RunRecord, survival_n: int) -> MetricResult:
         if not record.has_timeseries():

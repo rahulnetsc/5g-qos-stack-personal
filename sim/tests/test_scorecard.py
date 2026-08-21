@@ -95,15 +95,55 @@ def test_m11_and_m12_match_system_record_exactly():
 
 
 def test_m02_pdb_violation_rate_matches_hand_computation():
+    """Denominator is RESOLVED bytes (delivered + dropped), not
+    bytes_arrived -- see test_m02_excludes_bytes_still_queued_at_horizon_end
+    for why bytes_arrived would be wrong."""
     rec, _ = _record()
     sc = Scorecard()
     results = sc.score(rec)
-    total_arrived = sum(f.bytes_arrived for f in rec.flows.values())
+    total_delivered = sum(f.bytes_delivered for f in rec.flows.values())
     total_dropped = sum(f.bytes_dropped_pdb for f in rec.flows.values())
     total_late = sum(f.bytes_delivered_late_pdb for f in rec.flows.values())
-    expected = (total_dropped + total_late) / total_arrived if total_arrived else 0.0
+    total_resolved = total_delivered + total_dropped
+    expected = (total_dropped + total_late) / total_resolved if total_resolved else 0.0
     assert abs(results["M02"].value - expected) < 1e-9
     assert results["M02"].status == "ok"
+
+
+def test_m02_excludes_bytes_still_queued_at_horizon_end():
+    """A short horizon relative to offered load leaves most arrived bytes
+    still queued (neither delivered, dropped, nor late) when the run ends.
+    Those bytes must NOT inflate M02's denominator -- smoke_scenario()
+    (used above) drains close to fully and can't catch this; a short
+    horizon on a heavily-loaded scenario can. Confirmed empirically: at
+    horizon_slots=200 on factory_robots_scenario/PF, ~19% of arrived bytes
+    are unresolved, and the bytes_arrived-denominator rate (0.58) differs
+    materially from the resolved-bytes rate (0.72)."""
+    sc = dataclasses.replace(factory_robots_scenario(), horizon_slots=200)
+    summary = run(sc, ProportionalFair())
+    rec = RunRecord.from_summary(
+        scenario_name=sc.name, scheduler_name="PF", seed=sc.seed,
+        flow_configs=sc.flows, summary=summary,
+    )
+    total_arrived = sum(f.bytes_arrived for f in rec.flows.values())
+    total_delivered = sum(f.bytes_delivered for f in rec.flows.values())
+    total_dropped = sum(f.bytes_dropped_pdb for f in rec.flows.values())
+    total_late = sum(f.bytes_delivered_late_pdb for f in rec.flows.values())
+    still_queued = total_arrived - total_delivered - total_dropped
+
+    # Test-setup invariant: this scenario/horizon must actually leave a
+    # meaningful chunk unresolved, or this test isn't exercising the bug.
+    assert still_queued / total_arrived > 0.1, (
+        "test setup invariant broken: expected a substantial unresolved "
+        f"fraction, got {still_queued}/{total_arrived}"
+    )
+
+    results = Scorecard().score(rec)
+    resolved_rate = (total_dropped + total_late) / (total_delivered + total_dropped)
+    wrong_rate_against_arrived = (total_dropped + total_late) / total_arrived
+    assert abs(results["M02"].value - resolved_rate) < 1e-9
+    assert results["M02"].value != pytest.approx(wrong_rate_against_arrived)
+    assert "still queued" in results["M02"].note
 
 
 def test_correlate_flows_requires_timeseries():
