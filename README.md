@@ -342,6 +342,21 @@ they survive it:
   scenario (two same-class UL flows forced onto one `lcg` via an explicit
   override) before H5 can be confirmed, refuted, or ruled inconclusive in
   Phase 3.
+- `[OPEN]` **`FIVE_QI_LCG` (`scheduler/flow.py`) is an invented mapping with
+  nothing to validate it against.** LCG assignment isn't 3GPP-standardised
+  as a function of 5QI — a real deployment configures it per-logical-channel
+  via RRC, an operator/gNB policy choice — and no OAI source or spec table
+  exists for it either. The specific groupings (voice/gaming→LCG0,
+  conversational video→LCG1, buffered video→LCG2, ...) are a judgment call
+  made during WP3 with no standard, vendored config, or measurement to check
+  it against. This isn't just an academic gap: it directly determines which
+  flows alias/collapse together under short-BSR reporting, and it's the
+  mapping the H5 follow-up scenario above would have to use — so H5's
+  result would depend entirely on this unvalidated choice. Resolution needs
+  either a real deployment's RRC logical-channel config (if one becomes
+  available) or an explicit decision to sweep the mapping itself as a WP9
+  axis rather than treating it as fixed ground truth. Recorded nowhere
+  before this.
 - `[OPEN]` **WP3's crumb fraction falls well short of the charter's
   acceptance bar.** Measured on `factory_robots_scenario` @ 1.0× with
   TwoTier: grants ≤150 bytes ("crumb") are **0.09%** of UL grants, against

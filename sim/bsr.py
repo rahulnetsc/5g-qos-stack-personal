@@ -180,6 +180,18 @@ class BsrModel:
         slot -- used to reconstruct each LCG's backlog as it was
         immediately *before* this slot's arrivals, since `buffers` already
         reflects them.
+
+        The second condition (line ~204 below) is unreachable for the
+        single-flow-per-LCG case that describes every scenario in this
+        repo today: `best_active_priority` is computed over every
+        previously-active LCG, including the arriving flow's own if it was
+        already active, so a flow can never be strictly higher-priority
+        than a set that already includes itself. It only has a chance to
+        fire when multiple flows with different priorities share one LCG
+        (not currently exercised -- see the FIVE_QI_LCG open item, README
+        §8). `test_regular_trigger_fires_on_previously_empty_lcg` covers
+        only the first condition for exactly this reason; nothing tests the
+        second one independently.
         """
         for ue_id, flows in self._ue_flows.items():
             arrived = [per_flow_arrived.get((f.ue_id, f.qfi), 0) for f in flows]
@@ -232,6 +244,27 @@ class BsrModel:
         `gNB_scheduler_ulsch.c:626-679` (both formats reset
         `sched_ul_bytes = 0` unconditionally, but only on actual BSR
         reception, not every grant).
+
+        Judgment call, recorded because it's easy to get wrong the other
+        way: the ground truth ALSO decrements `sched_ul_bytes` itself at
+        confirmed-SDU-reception time (`gNB_scheduler_ulsch.c:1096-1098`,
+        `-= sdu_lenP`, in `_nr_rx_sdu`, before `nr_process_mac_pdu` even
+        runs) -- separate from, and in addition to, the `+= tb_size` credit
+        at grant time (line 2730 above). On real hardware those two events
+        are genuinely separated by the k2 grant-to-transmission delay, so
+        `sched_ul_bytes` spends that window elevated, tracking "granted but
+        not yet confirmed" bytes; if several grants pipeline within one k2
+        window it can outrace confirmation and force a real collapse. This
+        sim has no k2/HARQ-round separation -- grant and delivery are the
+        same call -- so decrementing what was just incremented in the same
+        step would mostly cancel out and mute the exact crumb-collapse
+        effect WP3 exists to demonstrate. An equally defensible alternative
+        (mirror the decrement anyway, using `delivered_bytes` as the
+        confirmed amount) was considered and rejected on that basis, not
+        because it's wrong on its face. If WP4's Scheduling-Request/k2
+        modelling doesn't fully explain the measured crumb-fraction
+        shortfall (README §8), this omission is a plausible contributor to
+        check first.
         """
         st = self._state[ue_id]
         st.sched_ul_bytes += tb_size

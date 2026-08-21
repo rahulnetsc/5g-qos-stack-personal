@@ -168,7 +168,14 @@ third commit), M04 unchanged.
   hardware's 72-107 byte range), only the *frequency* is off. Landed as-is
   per user decision (README §8) rather than chased; plausibly scenario- or
   timer-cadence-dependent, not necessarily a modeling bug. Revisit with
-  WP9's wider parameter sweep before deciding it's a real gap.
+  WP9's wider parameter sweep before deciding it's a real gap. One
+  candidate contributor if WP4's SR/k2 modelling doesn't fully close it:
+  `sim/bsr.py::BsrModel.on_ul_grant` doesn't mirror the ground truth's
+  SDU-receipt decrement of `sched_ul_bytes` itself (`gNB_scheduler_ulsch.c:
+  1096-1098`) — omitted because this sim has no k2/HARQ-round separation
+  between grant and delivery, so decrementing what was just incremented in
+  the same call would mute the effect rather than reproduce it. See the
+  docstring at `on_ul_grant` for the full reasoning.
 - H5 (`p5g-sim-plan.md` line 338, two-tier degrades as flows-per-LCG
   grows) is not demonstrable on any current scenario — WP3's default 5QI→
   LCG mapping deliberately separates QoS classes into different LCGs, so
