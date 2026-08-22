@@ -414,12 +414,19 @@ they survive it:
   shortfall persists across scenarios, that's a real finding about this
   port, not just this scenario.
   **Update, WP4:** measured again on the same scenario/scheduler after
-  landing the real SR path — crumb fraction moved to **4.47%** (152/3404
-  UL grants), a ~50x increase in the predicted direction but still well
-  short of hardware's 48-52%. The crumbs' own size profile got *less*
-  accurate in the process: average crumb size is now 146 bytes (vs
-  WP3's 79 bytes, inside hardware's 72-107 byte range) because most
-  crumbs are now the SR-triggered grant's fixed 150-byte report floor
+  landing the real SR path, under the same `cqi_delay_slots=8` every other
+  study/regression case in this branch actually runs with
+  (`scripts/scheduler_study.py::CQI_DELAY_SLOTS`) — crumb fraction moved
+  to **4.4503%** (151/3393 UL grants), a ~50x increase in the predicted
+  direction but still well short of hardware's 48-52%. (At
+  `cqi_delay_slots=0`, the driver's bare default and not what this
+  branch's studies run, the same measurement gives 4.4653%/152/3404 — the
+  two are close enough not to change the finding, but 4.4503%/151/3393 is
+  the figure consistent with how every other number in this document was
+  produced, so it's the one recorded here.) The crumbs' own size profile
+  got *less* accurate in the process: average crumb size is now 146.03
+  bytes (vs WP3's 79 bytes, inside hardware's 72-107 byte range) because
+  most crumbs are now the SR-triggered grant's fixed 150-byte report floor
   (`sim/ul_access.py::DEFAULT_SR_REPORT_FLOOR_BYTES`) rather than the
   organic `sched_ul_bytes`-outracing-`estimated_ul_buffer` collapse WP3
   identified — a partial, directionally-correct but not closing
@@ -447,6 +454,23 @@ they survive it:
   whether the cliff itself is realistic (a genuine capacity-ceiling
   effect) or an artefact of these scenarios' traffic/capacity shape is
   open, and is the natural next question for WP9's wider sweep.
+- `[OPEN]` **`study_ul_access_chain`'s TwoTier arm never exercises SPS, so
+  its flat curve above isn't evidence of an active anti-inversion
+  mechanism.** The study's flows are `flow_class="PF"`
+  (`scripts/scheduler_study.py`), which fails `_is_sps_eligible`'s
+  `flow_class == "GBR"` gate (`scheduler/two_tier.py:466`) — so
+  `_allocate_sps`/`_SPSReservation` (`two_tier.py:21-37`, `915`) never
+  fire for these flows at all. "TwoTier (SPS-bypassed for these flows)"
+  above (and in the study's own printed finding) describes a
+  structurally-unexercised code path, not a confirmed suppressive
+  mechanism. Separately: that SPS machinery is itself inherited-from-
+  `main` scope CLAUDE.md says the Python two-tier shouldn't carry at all
+  — real hardware defers SPS to a Phase 2 that was never built — so the
+  TwoTier column of this study carries that fidelity mismatch on top,
+  whether or not it happened to fire here. PF/RoundRobin are confirmed
+  free of any SPS reference (`grep -rn "SPS" sim/baselines/*.py` — no
+  hits), so the negative result's overall conclusion (no load-inversion
+  found) is unaffected.
 - `[OPEN]` **WP4 exposed a pre-existing PF fairness weakness: identical
   scores tie-break by flow iteration order, not randomly or by any
   fairness-relevant tiebreaker.** `sim/baselines/pf.py`'s ranking sorts by
@@ -462,6 +486,26 @@ they survive it:
   fixed — Phase 1 (§4) forbids scheduler logic changes in this WP, and
   the weakness is `pf.py`'s, not `ul_access.py`'s. Flagged for whoever
   next touches `pf.py`, not for WP4 to resolve.
+- `[OPEN]` **The single largest-magnitude movement in WP4's regression
+  diff is on non-GBR UL flows (`qfi8`/`qfi9`, PF-class), not the GBR
+  flows WP4 targeted.** 135 of the 1706 mismatches, with deltas up to
+  **+264ms** and several flows pegged at a ~300ms ceiling. This is the
+  same phenomenon as the PF fairness weakness immediately above —
+  SR-gated eligibility synchronizes cold-start bursts that PF's
+  iteration-order tiebreak then starves — but the magnitude here is
+  considerably larger than that item's framing implies on its own;
+  re-read the two together, with this number in mind, before WP9
+  characterizes either finding further.
+- `[OPEN]` **Delay-class UL flows moved the opposite direction from GBR
+  UL flows under the same WP4 change, and this isn't understood yet.**
+  In `sensor_dense_scenario`'s PDCCH-limited case, Delay-class UL flows'
+  (`qfi1`) p95/p98/p99 latency proxies moved *down* in ~80% of
+  mismatches (SR improved their tail latency), while
+  `factory_robots_scenario`'s GBR UL flows' same percentiles moved up in
+  79-88% of mismatches under the same SR mechanism. Not chased before
+  landing — worth understanding why the same UL access-chain change
+  helps one flow class and hurts another before WP9 treats either result
+  as representative of what SR does in general.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either
