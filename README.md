@@ -111,7 +111,7 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 | 1 | WP0 | Harness, pre-registered metric panel, regression corpus | `p5g-sim-plan.md` §9, extended per §5/§6 below | Done |
 | 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) | Done |
 | 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) | Done — 3 commits (quantisation/LCG structure, event-triggering/crumb gate, M02 per-chunk tracking); crumb-fraction and H5-scenario gaps open (§8) |
-| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; ground truth vendored from the live OAI checkout, not `oai-branches/` (§7); mechanics verified against `gNB_scheduler_uci.c`/`nr_ue_procedures.c` | Done — cold-start probe retired (§8); SR-chain inversion calibration target (§11) **not reproduced** — negative result, reported not tuned (§8) |
+| 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; ground truth vendored from the live OAI checkout, not `oai-branches/` (§7); mechanics verified against `gNB_scheduler_uci.c`/`nr_ue_procedures.c` | Done — cold-start probe retired (§8); SR-chain inversion calibration target (§11) **not reproduced** — negative result, reported not tuned (§8); regression-check predictions verified against `--check`'s actual output and mostly falsified (§8) |
 | 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Pending |
 | 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Pending |
 | 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Pending |
@@ -473,6 +473,46 @@ they survive it:
   unmodified as the historical planning document; this README is
   authoritative wherever the two conflict (§0 above states this per
   section).
+- `[RESOLVED]` **`fa8232b` ("WIP WP4") bundled three logical changes in one
+  commit, and its regression-check predictions were checked against
+  `scripts/regression_corpus.py --check`'s actual output (1706 mismatches)
+  — left unrewritten (already pushed; not worth a force-push on this
+  branch) but recorded here for legibility.** The three units: (1) core
+  mechanism — `sim/ul_access.py` (new SR state machine), `sim/bsr.py`,
+  `sim/driver.py`, `sim/tests/test_ul_access.py` (new),
+  `sim/tests/test_bsr.py`, `sim/tests/test_smoke.py` — replacing WP3's
+  cold-start probe; (2) `scripts/scheduler_study.py`'s Study 4
+  (`study_ul_access_chain`), the SR-chain load-inversion sweep; (3) the
+  `README.md`/`docs/oai-port-map.md` updates described elsewhere in this
+  section.
+
+  Prediction scorecard, checked against the actual mismatches rather than
+  assumed: **M11** (UL PRB utilization) predicted up; actual 15/15
+  mismatches moved *down*, and only at overload_mult ≥1.5× / study2's
+  PDCCH-limited case, never at 1.0× — SR's wait-for-PUCCH-occasion delay
+  removes utilization headroom under saturation rather than adding it via
+  crumb grants. **M12** (CCE/PDCCH utilization) predicted up; actual mostly
+  down (12/19 mismatches) — matches `test_smoke.py`'s own rationale for
+  lowering its PDCCH-utilization assertion (0.4→0.3): SR reduces
+  PDCCH-eligible UEs per slot as load rises; only the lowest-load case
+  moved up, and only slightly. **GBR UL p95/p98/p99** predicted worse —
+  the one prediction that held (79-88% of mismatches moved as predicted).
+  **GBR UL p50** predicted flat; actual moved in *more* cases (110) than
+  any higher percentile, with a mean absolute delta (1.86ms) comparable to
+  p98/p99's — not flat.
+
+  Also surfaced, unpredicted: **DL PRB utilization** moved for **PF only**
+  (4 mismatches, all up) even though WP4 touches no DL code — traced to
+  `sim/baselines/pf.py`'s per-UE (not per-direction) `_r_avg` EWMA, shared
+  between a UE's UL and DL flows, so WP4's change to UL grant timing
+  perturbs that UE's DL competitive ranking in later slots. Verified
+  causally: sweeping only `sr_period_slots` (10→1, a UL-only knob) shifts
+  PF's per-UE DL PRB counts by a few PRBs each, while TwoTier's and
+  RoundRobin's `dl_prb_utilization` stay bit-for-bit identical across the
+  same sweep — confirming this is PF's shared-rate design, not a TwoTier
+  Tier-1 boundary leak. The other unpredicted, larger-magnitude movements
+  (non-GBR UL flows, Delay-class UL flows) are their own `[OPEN]` items
+  above.
 
 ---
 
