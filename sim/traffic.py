@@ -4,6 +4,7 @@ import numpy as np
 
 from .buffer import BufferModel
 from .config import FlowConfig
+from .messages import Message, MessageLedger
 
 
 @dataclass
@@ -25,12 +26,18 @@ class TrafficModel:
         buffers: BufferModel,
         slot_duration_s: float,
         rng: np.random.Generator,
+        ledger: MessageLedger | None = None,
     ) -> None:
         self.flows = [_FlowState(cfg=f) for f in flows]
         self._state_of = {(s.cfg.ue_id, s.cfg.qfi): s for s in self.flows}
         self.buffers = buffers
         self.slot_duration_s = slot_duration_s
         self.rng = rng
+        # Optional (WP7): tags each enqueued chunk with message identity so
+        # sim/messages.py can track true per-message completion. None keeps
+        # pre-WP7 behaviour exactly -- every existing caller that doesn't
+        # pass a ledger is unaffected.
+        self.ledger = ledger
         for f in flows:
             buffers.register(f.ue_id, f.qfi, is_ul=(f.direction == "UL"), lcg=f.lcg)
 
@@ -85,7 +92,16 @@ class TrafficModel:
             cfg = state.cfg
             for ts, byts in self._gen(cfg, slot_index, now_s):
                 if byts > 0:
-                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, byts, ts)
+                    message = None
+                    if self.ledger is not None:
+                        message = Message(
+                            id=self.ledger.new_id(),
+                            ue_id=cfg.ue_id,
+                            qfi=cfg.qfi,
+                            size_bytes=byts,
+                            generation_ts_s=ts,
+                        )
+                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, byts, ts, message=message)
                     arrivals.append((cfg.ue_id, cfg.qfi, byts))
         return arrivals
 

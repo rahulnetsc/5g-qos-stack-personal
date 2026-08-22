@@ -7,6 +7,7 @@ from .bsr import BsrModel
 from .buffer import BufferModel
 from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
+from .messages import MessageLedger
 from .metrics import Metrics
 from .resource import ResourceGrid
 from .ue_lcp import UeLcp
@@ -63,7 +64,14 @@ def run(
         sr_period_slots=sr_period_slots,
         sr_offset_slots=sr_offset_slots,
     )
-    traffic = TrafficModel(scenario.flows, buffers, grid.slot_duration_s, rng)
+    # WP7: message identity is purely a scoring-side overlay -- BSR/
+    # scheduler code above never reads it. Collected below at the existing
+    # drain()/expire() call sites; not yet consumed by Metrics/RunRecord/
+    # scorecard (that lands in a later WP7 commit).
+    message_ledger = MessageLedger()
+    traffic = TrafficModel(
+        scenario.flows, buffers, grid.slot_duration_s, rng, ledger=message_ledger
+    )
     metrics = Metrics(record_timeseries=record_timeseries)
 
     scheduler.configure(scenario.flows, grid.slot_duration_s, grid)
@@ -187,6 +195,8 @@ def run(
             metrics.record_hol_delay(
                 ue_id, qfi, buffers.hol_delay_s(ue_id, qfi, now_s)
             )
+            for completion in buffers.pop_completions(ue_id, qfi):
+                message_ledger.record(completion)
 
         metrics.snapshot_slot(
             slot_index=slot_index,
@@ -206,6 +216,10 @@ def run(
     # shadow token buckets against the UE's real ones. Not part of the
     # metrics contract -- see scripts/ul_shadow_study.py.
     summary["_ue_lcp"] = ue_lcp
+    # WP7: diagnostic handle, same idiom as _ue_lcp -- not part of the
+    # metrics contract yet. A later WP7 commit reads this to compute true
+    # per-message latency/completeness metrics.
+    summary["_message_ledger"] = message_ledger
     if record_timeseries:
         summary["timeseries"] = metrics.timeseries()
     return summary

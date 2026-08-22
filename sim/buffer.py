@@ -1,6 +1,8 @@
 from collections import deque
 from dataclasses import dataclass
 
+from .messages import Message, MessageCompletion
+
 
 @dataclass
 class BufferState:
@@ -31,11 +33,21 @@ class BufferModel:
     class does not touch it. For DL flows and any flow not BSR-managed,
     ``bytes_reported`` stays in lock-step with ``bytes_queued`` here, same
     as before (no BSR needed: the gNB IS the DL buffer).
+
+    WP7 message identity (optional, additive): a chunk may carry a
+    ``Message`` reference (``enqueue(..., message=...)``). When it does,
+    ``drain()``/``expire()`` track that message's completion -- fully
+    delivered, or dropped on PDB expiry -- as a side effect and queue a
+    ``MessageCompletion`` for ``pop_completions()`` to collect. A chunk
+    enqueued without a message (every call site before WP7, and any test
+    that doesn't care) behaves exactly as before -- this tracking is purely
+    additive and never changes what ``drain()``/``expire()`` return.
     """
 
     def __init__(self) -> None:
         self._buffers: dict[tuple[int, int], BufferState] = {}
-        # Each chunk is [timestamp_s, bytes_remaining]; FIFO via deque.
+        # Each chunk is [timestamp_s, bytes_remaining, message_or_None];
+        # FIFO via deque.
         self._chunks: dict[tuple[int, int], deque] = {}
         # Monotone lifetime counters (bytes). Used by schedulers that need a
         # windowed view of offered/served load.
@@ -43,6 +55,8 @@ class BufferModel:
         self._delivered_cum: dict[tuple[int, int], int] = {}
         # Flows whose bytes_reported is externally driven by BsrModel.
         self._bsr_managed: set[tuple[int, int]] = set()
+        # Completed messages not yet collected via pop_completions().
+        self._completed: dict[tuple[int, int], list[MessageCompletion]] = {}
 
     def register(self, ue_id: int, qfi: int, is_ul: bool = False, lcg: int = -1) -> None:
         key = (ue_id, qfi)
@@ -50,6 +64,7 @@ class BufferModel:
         self._chunks[key] = deque()
         self._arrived_cum[key] = 0
         self._delivered_cum[key] = 0
+        self._completed[key] = []
         if is_ul:
             self._bsr_managed.add(key)
 
@@ -74,7 +89,14 @@ class BufferModel:
     def state(self, ue_id: int, qfi: int) -> BufferState:
         return self._buffers[(ue_id, qfi)]
 
-    def enqueue(self, ue_id: int, qfi: int, bytes_count: int, timestamp_s: float) -> None:
+    def enqueue(
+        self,
+        ue_id: int,
+        qfi: int,
+        bytes_count: int,
+        timestamp_s: float,
+        message: Message | None = None,
+    ) -> None:
         if bytes_count <= 0:
             return
         key = (ue_id, qfi)
@@ -82,7 +104,7 @@ class BufferModel:
         chunks = self._chunks[key]
         if state.bytes_queued == 0:
             state.hol_timestamp_s = timestamp_s
-        chunks.append([timestamp_s, bytes_count])
+        chunks.append([timestamp_s, bytes_count, message])
         state.bytes_queued += bytes_count
         self._arrived_cum[key] += bytes_count
         # DL / non-BSR-managed flows: report is exact and instant.
@@ -119,12 +141,24 @@ class BufferModel:
         while remaining > 0 and chunks:
             chunk = chunks[0]
             take = min(remaining, chunk[1])
-            if (now_s - chunk[0]) > pdb_s:
+            chunk_late = (now_s - chunk[0]) > pdb_s
+            if chunk_late:
                 late += take
             chunk[1] -= take
             removed += take
             remaining -= take
+            if chunk[2] is not None:
+                chunk[2].delivered_bytes += take
             if chunk[1] == 0:
+                if chunk[2] is not None:
+                    self._completed[key].append(MessageCompletion(
+                        message=chunk[2],
+                        complete=True,
+                        late=chunk_late,
+                        completion_ts_s=now_s,
+                        delivered_bytes=chunk[2].delivered_bytes,
+                        dropped_bytes=0,
+                    ))
                 chunks.popleft()
         state.bytes_queued -= removed
         state.bytes_delivered_late_pdb += late
@@ -141,7 +175,17 @@ class BufferModel:
         chunks = self._chunks[key]
         dropped = 0
         while chunks and (now_s - chunks[0][0]) > pdb_s:
-            dropped += chunks[0][1]
+            chunk = chunks[0]
+            dropped += chunk[1]
+            if chunk[2] is not None:
+                self._completed[key].append(MessageCompletion(
+                    message=chunk[2],
+                    complete=False,
+                    late=True,
+                    completion_ts_s=now_s,
+                    delivered_bytes=chunk[2].delivered_bytes,
+                    dropped_bytes=chunk[1],
+                ))
             chunks.popleft()
         state.bytes_dropped_pdb += dropped
         state.bytes_queued -= dropped
@@ -149,6 +193,15 @@ class BufferModel:
         if key not in self._bsr_managed:
             state.bytes_reported = state.bytes_queued
         return dropped
+
+    def pop_completions(self, ue_id: int, qfi: int) -> list[MessageCompletion]:
+        """Return and clear this flow's ``MessageCompletion``s recorded by
+        ``drain()``/``expire()`` since the last call. Empty for any chunk
+        enqueued without a ``message=`` -- see the class docstring."""
+        key = (ue_id, qfi)
+        out = self._completed[key]
+        self._completed[key] = []
+        return out
 
     def hol_delay_s(self, ue_id: int, qfi: int, now_s: float) -> float:
         state = self._buffers[(ue_id, qfi)]
