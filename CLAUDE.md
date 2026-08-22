@@ -96,19 +96,32 @@ instead of Python's `round()` (half-to-even) — they disagree at exact
 Bundling two changes makes the deltas uninterpretable, which is the whole
 point of the corpus.
 
-**A UL flow's `bytes_reported` deadlocks without a cold-start/re-arm probe
-— this is load-bearing, not a hack to remove.** Every scheduler's UL
-eligibility gate reads `bytes_reported > 0`, but only a grant updates it
-(`sim/bsr.py::BsrModel.on_ul_grant`), and a grant requires the gate to
-already be open. This isn't just a t=0 case: it recurs every time a flow's
-real backlog goes from empty back to non-empty, which is most UL traffic
-in this repo. `BsrModel.broadcast()`'s probe (fires when the gated value
-is 0 **and** a BSR is `pending`) stands in for the Scheduling Request real
-5G uses here — WP4's job, not WP3's. See README §8 for the full writeup;
-WP4 should treat properly retiring this stopgap as an acceptance
-criterion, not optional cleanup. Don't "simplify" it away — doing so
-silently breaks UL throughput on every scenario in the repo (verified:
-removing it drops a 30-UE sensor scenario from ~99% to ~0.2% delivery).
+**A UL flow's `bytes_reported` deadlocks without something to break the
+cold-start silence — WP4 landed the real fix; don't revert to a probe.**
+Every scheduler's UL eligibility gate reads `bytes_reported > 0`, but only
+a grant updates it (`sim/bsr.py::BsrModel.on_ul_grant`), and a grant
+requires the gate to already be open. This recurs every time a flow's real
+backlog goes from empty back to non-empty, which is most UL traffic in
+this repo. WP3's stopgap (a probe that bypassed straight to true backlog)
+is retired; `sim/ul_access.py::UlAccessModel` now models the real
+mechanism — SR on PUCCH → `sr-ProhibitTimer` → grant → BSR — and
+`BsrModel.broadcast()` asks it for `sr_report_floor()` instead of probing.
+Don't reintroduce the old probe or bypass `UlAccessModel`'s wait as a
+"simplification" — doing so silently breaks UL throughput the same way
+removing the old probe did, and desyncs the crumb-fraction/latency numbers
+this document tracks (README §8).
+
+**`sim/baselines/pf.py`'s `_r_avg` is one EWMA per UE, shared across that
+UE's UL and DL flows — a UL-only change can still move DL numbers on the
+PF arm.** `allocate()` schedules DL then UL each slot, updating the same
+`_r_avg[ue_id]` either way, so a UE's DL competitive ranking in a later
+slot depends on its UL grant history too. Confirmed via WP4: sweeping only
+`sr_period_slots` (UL-only) shifted PF's per-UE DL PRB counts while
+TwoTier's and RoundRobin's `dl_prb_utilization` stayed bit-for-bit
+identical. Not a bug, and not a Tier-1 boundary leak — don't "fix" it by
+splitting into per-direction rates — but expect PF-arm DL drift whenever a
+UL-only change lands, and check `pf.py` before assuming a DL mismatch
+means something crossed a scheduler boundary it shouldn't have.
 
 **`sim/bsr.py`'s per-LCG array is frozen between BSRs — do not drain it on
 a grant, and do not resync it with the scalar `estimated_ul_buffer`.**
@@ -152,6 +165,23 @@ assumption that WP3 gates it (it's BSR-adjacent) is wrong. As of WP3
 landing: M01 stays `proxy` (still needs WP7), M02 flipped to `ok` (WP3's
 third commit), M04 unchanged.
 
+**If a WP predicts which regression metrics will move and how, check the
+prediction against the actual `--check` output and record the misses, not
+just the hits.** WP4 predicted M11/M12 up and GBR p50 flat; the actual
+output showed M11 100% opposite, M12 mostly opposite, and p50 moved in
+*more* cases than the higher percentiles it was supposed to stay flat
+against (README §8). A prediction exercise that only gets cited when it's
+right isn't a prediction exercise.
+
+## End-of-WP checklist
+
+Before calling a WP done: run the full suite + `--check`; if predictions
+were made, score them (see above). Then do a judgment-calls review of the
+WP's own diff — reread it looking for undocumented decisions or silent
+bugs, the same pass that caught WP3's real M02 denominator bug (`c7baba9`)
+and an unrecorded open decision (`86c54b9`). Treat this as a standing step
+for every WP, not an opportunistic one.
+
 ## Known issues (flagged deliberately, do not fix as a drive-by)
 
 - `sim/metrics.py::record_hol_delay` drops zero-delay samples, biasing every
@@ -161,21 +191,15 @@ third commit), M04 unchanged.
 - `average_agg_level` is hardcoded to 4 in the OAI DL scheduler
   (`// TODO find a better estimation`). Decide deliberately whether the sim
   models it fixed or SNR-dependent.
-- WP3's measured crumb fraction (grants ≤150 bytes) on
-  `factory_robots_scenario` @ 1.0× with TwoTier is **0.09%**, against the
-  hardware measurement's ~48-52% the charter asks to reproduce within a
-  factor of two — the crumbs that do occur average 79 bytes (matches
-  hardware's 72-107 byte range), only the *frequency* is off. Landed as-is
-  per user decision (README §8) rather than chased; plausibly scenario- or
-  timer-cadence-dependent, not necessarily a modeling bug. Revisit with
-  WP9's wider parameter sweep before deciding it's a real gap. One
-  candidate contributor if WP4's SR/k2 modelling doesn't fully close it:
-  `sim/bsr.py::BsrModel.on_ul_grant` doesn't mirror the ground truth's
-  SDU-receipt decrement of `sched_ul_bytes` itself (`gNB_scheduler_ulsch.c:
-  1096-1098`) — omitted because this sim has no k2/HARQ-round separation
-  between grant and delivery, so decrementing what was just incremented in
-  the same call would mute the effect rather than reproduce it. See the
-  docstring at `on_ul_grant` for the full reasoning.
+- Crumb fraction (grants ≤150 bytes) on `factory_robots_scenario` @ 1.0×
+  with TwoTier moved from WP3's 0.09% to WP4's **4.4503%** (151/3393 UL
+  grants) after landing the real SR path — still ~11x short of hardware's
+  48-52%, and the crumbs' own size profile got *less* accurate in the
+  process (79 bytes, inside hardware's 72-107 range → 146 bytes, outside
+  it, now dominated by the SR path's fixed report floor rather than an
+  organic collapse). Not chased further; see README §8 for the full
+  writeup, including the `sched_ul_bytes`/k2-HARQ omission still flagged
+  as a candidate contributor. Revisit with WP9's wider sweep.
 - H5 (`p5g-sim-plan.md` line 338, two-tier degrades as flows-per-LCG
   grows) is not demonstrable on any current scenario — WP3's default 5QI→
   LCG mapping deliberately separates QoS classes into different LCGs, so
