@@ -38,13 +38,14 @@ metrics:
     guarantees: [G1, G2]
     unit: ms
     direction: lower_better
-    status: proxy
-    requires: WP3 (BSR realism), WP7 (discrete per-message traffic)
+    status: ok
+    requires: null
     note: >
-      Currently sampled as head-of-line age once per slot (sim/metrics.py
-      record_hol_delay), not true per-message completion latency. This
-      under-samples fast-served messages -- see the known-issue note in
-      sim/metrics.py.
+      WP7: true per-message completion latency (sim/messages.py::
+      message_latency_percentiles_ms), over fully-delivered messages only.
+      A RunRecord produced before WP7's message ledger was wired up (no
+      message_count on any FlowRecord) falls back to the old head-of-line
+      proxy in scorecard.py -- see that module's _has_true_latency.
 
   - id: M02
     name: pdb_violation_rate
@@ -208,8 +209,9 @@ metrics:
     guarantees: [G1, G2]
     unit: ms
     direction: lower_better
-    status: proxy
-    requires: same caveat as M01 (delay proxy)
+    status: ok
+    requires: null
+    note: WP7 -- same true-latency fields as M01; same pre-WP7 fallback.
 
   - id: M16
     name: ul_dl_shared_bearer_correlation

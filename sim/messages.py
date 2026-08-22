@@ -85,3 +85,31 @@ class MessageLedger:
             c for c in self._completions
             if c.message.ue_id == ue_id and c.message.qfi == qfi
         ]
+
+
+def message_latency_percentiles_ms(completions: list[MessageCompletion]) -> dict:
+    """True per-message completion-latency percentiles (ms), over only the
+    *fully delivered* messages in ``completions``. A dropped message has no
+    delivery latency to contribute -- it's scored by M02
+    (config/metric_panel.yml), not blended into this percentile.
+
+    Same percentile-index convention as ``sim.metrics.Metrics._percentile``
+    (``k = min(len-1, int(len*p))``), so a diff between this and the old
+    head-of-line proxy is attributable to the sample set, not a formula
+    change.
+    """
+    delays_ms = sorted(
+        (c.completion_ts_s - c.message.generation_ts_s) * 1000.0
+        for c in completions if c.complete
+    )
+    if not delays_ms:
+        return {"p50": 0.0, "p95": 0.0, "p98": 0.0, "p99": 0.0, "count": 0}
+
+    def pct(p: float) -> float:
+        k = min(len(delays_ms) - 1, int(len(delays_ms) * p))
+        return delays_ms[k]
+
+    return {
+        "p50": pct(0.50), "p95": pct(0.95), "p98": pct(0.98), "p99": pct(0.99),
+        "count": len(delays_ms),
+    }

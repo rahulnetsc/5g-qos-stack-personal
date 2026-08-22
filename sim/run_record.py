@@ -64,6 +64,19 @@ class FlowRecord:
     delay_p99_ms_proxy: float
     delay_p98_ms_proxy: Optional[float] = None  # None on records from before p98 was added
 
+    # True per-message completion-latency percentiles (WP7), over fully-
+    # delivered messages only -- sim/messages.py::message_latency_
+    # percentiles_ms. None on records from before WP7's message ledger was
+    # wired up; scorecard.py falls back to the _proxy fields in that case.
+    delay_p50_ms: Optional[float] = None
+    delay_p95_ms: Optional[float] = None
+    delay_p98_ms: Optional[float] = None
+    delay_p99_ms: Optional[float] = None
+    # Count of fully-delivered messages the percentiles above were computed
+    # over. 0 is a real "no message completed," distinct from None ("this
+    # record predates WP7 and was never given true-latency fields at all").
+    message_count: Optional[int] = None
+
     # Populated only when driver.run(..., record_timeseries=True) was used.
     # Per-slot series, aligned to RunRecord.timeseries_time_s.
     ts_backlog_bytes: Optional[list[int]] = None
@@ -213,6 +226,11 @@ class RunRecord:
                 delay_p95_ms_proxy=m["hol_p95_ms"],
                 delay_p99_ms_proxy=m["hol_p99_ms"],
                 delay_p98_ms_proxy=m.get("hol_p98_ms"),
+                delay_p50_ms=m.get("delay_p50_ms"),
+                delay_p95_ms=m.get("delay_p95_ms"),
+                delay_p98_ms=m.get("delay_p98_ms"),
+                delay_p99_ms=m.get("delay_p99_ms"),
+                message_count=m.get("message_count"),
                 ts_backlog_bytes=fts["backlog_bytes"] if fts else None,
                 ts_hol_delay_s=fts["hol_delay_s"] if fts else None,
                 ts_delivered_bytes=fts["delivered_bytes"] if fts else None,

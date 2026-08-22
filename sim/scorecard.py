@@ -135,7 +135,46 @@ class Scorecard:
         )
         return out
 
+    def _has_true_latency(self, record: RunRecord) -> bool:
+        """WP7: True per-message latency is available iff every flow in the
+        record was produced by a WP7-aware driver.run() (message_count is
+        never None for a flow that exists at all, post-WP7 -- see
+        RunRecord.FlowRecord). False for any pre-WP7 record, which keeps
+        the head-of-line proxy as the fallback rather than mixing the two
+        within one record."""
+        flows = list(record.flows.values())
+        return bool(flows) and all(fr.message_count is not None for fr in flows)
+
     def _m01_latency_percentiles(self, record: RunRecord) -> MetricResult:
+        if self._has_true_latency(record):
+            all_flows = list(record.flows.values())
+            # A flow that never fully delivered a single message (chronic
+            # stall / total congestion) has message_count == 0 and would
+            # otherwise report 0ms -- the LOWEST possible value, silently
+            # masking the worst-behaved flow as the best one. Exclude it
+            # from the "worst" contest here; M02/bytes_dropped_pdb and M05
+            # are what actually score that flow's failure, not this metric.
+            delivering = [fr for fr in all_flows if fr.message_count]
+            excluded = len(all_flows) - len(delivering)
+            worst = {"p50": 0.0, "p95": 0.0, "p98": 0.0, "p99": 0.0, "flow": None}
+            for fr in delivering:
+                if fr.delay_p99_ms >= worst["p99"]:
+                    worst = {
+                        "p50": fr.delay_p50_ms, "p95": fr.delay_p95_ms,
+                        "p98": fr.delay_p98_ms, "p99": fr.delay_p99_ms, "flow": fr.key,
+                    }
+            note = (
+                "true per-message completion latency (WP7) over fully-delivered "
+                "messages only; dropped messages are scored by M02, not blended in here"
+            )
+            if excluded:
+                note += (
+                    f"; {excluded}/{len(all_flows)} flow(s) delivered zero complete "
+                    "messages this run and are excluded here -- see M02/M05 for their "
+                    "violation/completeness rate, not a 0ms latency"
+                )
+            return MetricResult("M01", "flow_latency_percentiles", worst, "ok", "ms", note)
+
         worst = {"p50": 0.0, "p95": 0.0, "p98": 0.0, "p99": 0.0, "flow": None}
         have_p98 = True
         for fr in record.flows.values():
@@ -284,18 +323,31 @@ class Scorecard:
                              "ok", "fraction")
 
     def _m15_command_jitter(self, record: RunRecord) -> MetricResult:
+        have_true = self._has_true_latency(record)
         worst = None
         worst_jitter = -1.0
         for fr in record.flows.values():
-            jitter = fr.delay_p99_ms_proxy - fr.delay_p50_ms_proxy
+            # Same zero-completions exclusion as M01 -- a stalled flow's
+            # jitter is undefined, not 0ms.
+            if have_true and not fr.message_count:
+                continue
+            jitter = (
+                fr.delay_p99_ms - fr.delay_p50_ms if have_true
+                else fr.delay_p99_ms_proxy - fr.delay_p50_ms_proxy
+            )
             if jitter > worst_jitter:
                 worst_jitter = jitter
                 worst = fr.key
         if worst is None:
             return MetricResult("M15", "command_jitter_p99_p50", None, "proxy", "ms", "no flows")
+        status = "ok" if have_true else "proxy"
+        note = (
+            "true per-message p99-p50 (WP7); flows with zero delivered messages excluded"
+            if have_true
+            else "inherits M01's head-of-line-age proxy caveat"
+        )
         return MetricResult("M15", "command_jitter_p99_p50",
-                             {"flow": worst, "jitter_ms": worst_jitter}, "proxy", "ms",
-                             "inherits M01's head-of-line-age proxy caveat")
+                             {"flow": worst, "jitter_ms": worst_jitter}, status, "ms", note)
 
     # -- metrics that need extra arguments, called explicitly ----------
 

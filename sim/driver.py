@@ -7,7 +7,7 @@ from .bsr import BsrModel
 from .buffer import BufferModel
 from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
-from .messages import MessageLedger
+from .messages import MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
 from .ue_lcp import UeLcp
@@ -212,13 +212,29 @@ def run(
         )
 
     summary = metrics.summary(horizon_s, buffers)
+    # WP7: true per-message completion latency, replacing the head-of-line
+    # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
+    # the message ledger and merged into the same per-flow summary dict the
+    # proxy fields already live in -- RunRecord.from_summary picks both up.
+    for f in scenario.flows:
+        key = f"ue{f.ue_id}_qfi{f.qfi}"
+        if key not in summary["flows"]:
+            continue  # flow generated no traffic at all this run
+        stats = message_latency_percentiles_ms(
+            message_ledger.completions_for(f.ue_id, f.qfi)
+        )
+        summary["flows"][key]["delay_p50_ms"] = round(stats["p50"], 3)
+        summary["flows"][key]["delay_p95_ms"] = round(stats["p95"], 3)
+        summary["flows"][key]["delay_p98_ms"] = round(stats["p98"], 3)
+        summary["flows"][key]["delay_p99_ms"] = round(stats["p99"], 3)
+        summary["flows"][key]["message_count"] = stats["count"]
     # Diagnostic handle on the UE model, so a study can compare the gNB's
     # shadow token buckets against the UE's real ones. Not part of the
     # metrics contract -- see scripts/ul_shadow_study.py.
     summary["_ue_lcp"] = ue_lcp
     # WP7: diagnostic handle, same idiom as _ue_lcp -- not part of the
-    # metrics contract yet. A later WP7 commit reads this to compute true
-    # per-message latency/completeness metrics.
+    # metrics contract. Lets a study inspect raw per-message completions
+    # beyond the percentiles already merged into summary["flows"] above.
     summary["_message_ledger"] = message_ledger
     if record_timeseries:
         summary["timeseries"] = metrics.timeseries()

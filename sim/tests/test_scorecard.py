@@ -3,13 +3,44 @@ import dataclasses
 import pytest
 
 from sim.driver import run
-from sim.run_record import RunRecord
+from sim.run_record import FlowRecord, RunRecord, SystemRecord
 from sim.scorecard import Scorecard, load_panel
 from sim.scenarios import smoke_scenario, factory_robots_scenario
 from sim.baselines.pf import ProportionalFair
 
 
 PANEL_IDS = [m["id"] for m in load_panel()["metrics"]]
+
+
+def _flow_record(key_suffix: str, *, message_count, delay_p50=0.0, delay_p99=0.0,
+                  proxy_p50=0.0, proxy_p99=0.0, **overrides) -> FlowRecord:
+    """Minimal FlowRecord for scorecard-logic tests that don't need a real
+    driver.run() -- WP7's M01/M15 true-latency edge cases are about
+    scorecard.py's own selection logic, not traffic generation."""
+    ue_id, qfi = 1, int(key_suffix)
+    defaults = dict(
+        ue_id=ue_id, qfi=qfi, direction="UL", flow_class="PF",
+        gfbr_bps=0.0, pdb_ms=100.0, priority_level=100,
+        bytes_arrived=0, bytes_delivered=0, bytes_dropped_pdb=0,
+        bytes_delivered_late_pdb=0, throughput_bps=0.0, offered_bps=0.0,
+        delivery_ratio=0.0,
+        delay_p50_ms_proxy=proxy_p50, delay_p95_ms_proxy=proxy_p50,
+        delay_p99_ms_proxy=proxy_p99, delay_p98_ms_proxy=proxy_p99,
+        delay_p50_ms=delay_p50, delay_p95_ms=delay_p50,
+        delay_p98_ms=delay_p99, delay_p99_ms=delay_p99,
+        message_count=message_count,
+    )
+    defaults.update(overrides)
+    return FlowRecord(**defaults)
+
+
+def _run_record(flows: list[FlowRecord]) -> RunRecord:
+    return RunRecord(
+        schema_version=1, scenario_name="synthetic", scheduler_name="X", seed=0,
+        arm={}, flows={f.key: f for f in flows},
+        system=SystemRecord(horizon_s=1.0, dl_prb_utilization=0.0,
+                             ul_prb_utilization=0.0, cce_utilization=0.0),
+    )
 
 
 def _record(scenario_fn=smoke_scenario, record_timeseries=False, **run_kwargs):
@@ -144,6 +175,54 @@ def test_m02_excludes_bytes_still_queued_at_horizon_end():
     assert abs(results["M02"].value - resolved_rate) < 1e-9
     assert results["M02"].value != pytest.approx(wrong_rate_against_arrived)
     assert "still queued" in results["M02"].note
+
+
+def test_m01_flips_to_ok_and_uses_true_latency_when_every_flow_has_it():
+    rec = _run_record([_flow_record("1", message_count=50, delay_p50=2.0, delay_p99=9.0)])
+    res = Scorecard().score(rec)["M01"]
+    assert res.status == "ok"
+    assert res.value["p99"] == 9.0
+
+
+def test_m01_falls_back_to_proxy_for_a_pre_wp7_record():
+    rec = _run_record([_flow_record("1", message_count=None, proxy_p50=2.0, proxy_p99=9.0)])
+    res = Scorecard().score(rec)["M01"]
+    assert res.status == "proxy"
+    assert res.value["p99"] == 9.0
+
+
+def test_m01_excludes_a_chronically_stalled_flow_from_worst():
+    """A flow that never fully delivered a message (message_count=0) must
+    not win the 'worst' contest by reporting a 0ms latency -- that would
+    silently rank the most-broken flow as the best one. See scorecard.py's
+    _m01_latency_percentiles."""
+    stalled = _flow_record("1", message_count=0, delay_p50=0.0, delay_p99=0.0)
+    healthy = _flow_record("2", message_count=10, delay_p50=3.0, delay_p99=7.0)
+    rec = _run_record([stalled, healthy])
+    res = Scorecard().score(rec)["M01"]
+    assert res.status == "ok"
+    assert res.value["flow"] == healthy.key
+    assert res.value["p99"] == 7.0
+    assert "excluded" in res.note
+
+
+def test_m01_notes_when_every_flow_is_stalled():
+    stalled = _flow_record("1", message_count=0)
+    rec = _run_record([stalled])
+    res = Scorecard().score(rec)["M01"]
+    assert res.status == "ok"
+    assert res.value["flow"] is None
+    assert "excluded" in res.note
+
+
+def test_m15_excludes_a_chronically_stalled_flow_from_worst():
+    stalled = _flow_record("1", message_count=0, delay_p50=0.0, delay_p99=0.0)
+    healthy = _flow_record("2", message_count=10, delay_p50=1.0, delay_p99=6.0)
+    rec = _run_record([stalled, healthy])
+    res = Scorecard().score(rec)["M15"]
+    assert res.status == "ok"
+    assert res.value["flow"] == healthy.key
+    assert res.value["jitter_ms"] == pytest.approx(5.0)
 
 
 def test_correlate_flows_requires_timeseries():
