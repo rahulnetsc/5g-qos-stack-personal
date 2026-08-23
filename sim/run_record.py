@@ -94,6 +94,18 @@ class FlowRecord:
     # both be computed at score time against the flow's own pdb_ms, without
     # this field baking in a threshold.
     frame_completions: Optional[dict[str, Any]] = None
+    # WP7 M17 (frame_freeze_and_effective_fps): the flow's configured
+    # nominal frame period, copied from FlowConfig.traffic_params
+    # ["period_ms"] when traffic_kind=="xr_video", else None -- not
+    # derivable from frame_completions alone (total/horizon_s would give
+    # this simulator's own slot-quantised firing interval, not the source's
+    # actual claimed frame rate; a freeze must be judged against the
+    # latter, docs/wp7-plan.md's commit-7 note). None for every non-xr_video
+    # flow -- not a "predates this field" marker like the Optional fields
+    # above, since a fresh dataclass default can't distinguish those two
+    # cases; scorecard.py gates on frame_completions["complete_ts_s"]'s
+    # presence instead.
+    xr_frame_period_ms: Optional[float] = None
 
     # Populated only when driver.run(..., record_timeseries=True) was used.
     # Per-slot series, aligned to RunRecord.timeseries_time_s.
@@ -251,6 +263,9 @@ class RunRecord:
                 message_count=m.get("message_count"),
                 completion_ts_by_role_s=m.get("completion_ts_by_role_s"),
                 frame_completions=m.get("frame_completions"),
+                xr_frame_period_ms=(
+                    fc.traffic_params.get("period_ms") if fc.traffic_kind == "xr_video" else None
+                ),
                 ts_backlog_bytes=fts["backlog_bytes"] if fts else None,
                 ts_hol_delay_s=fts["hol_delay_s"] if fts else None,
                 ts_delivered_bytes=fts["delivered_bytes"] if fts else None,

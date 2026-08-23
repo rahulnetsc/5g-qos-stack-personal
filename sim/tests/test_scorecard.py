@@ -359,6 +359,87 @@ def test_m06_reports_p95_of_the_worst_flow():
     assert res.value["p95_ms"] == pytest.approx(10)  # k = min(9, int(10*0.95)) = 9 -> s[9] = 10
 
 
+def test_m17_is_pending_for_a_pre_wp7_commit7_record():
+    """frame_completions in the commit-6 shape (no complete_ts_s key) must
+    still report pending, not silently treat the missing key as an empty
+    gap array -- see _has_frame_gap_data vs _has_frame_data."""
+    fr = _flow_record("1", message_count=10,
+                       frame_completions={"total": 3, "complete_ages_ms": [1.0, 2.0, 3.0]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M17"]
+    assert res.status == "pending"
+    assert res.value is None
+
+
+def test_m17_excludes_flows_that_never_used_xr_video():
+    non_xr = _flow_record("1", message_count=10,
+                           frame_completions={"total": 0, "complete_ages_ms": [], "complete_ts_s": []})
+    rec = _run_record([non_xr])
+    res = Scorecard().score(rec)["M17"]
+    assert res.status == "ok"
+    assert res.value is None
+
+
+def test_m17_detects_a_freeze_when_a_gap_exceeds_2x_the_nominal_interval():
+    # period_ms=20 -> nominal interval 0.02s, freeze threshold 0.04s.
+    fr = _flow_record("1", message_count=10, xr_frame_period_ms=20.0,
+                       frame_completions={"total": 4, "complete_ages_ms": [1, 1, 1, 1],
+                                          "complete_ts_s": [0.0, 0.02, 0.04, 0.09]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M17"]
+    assert res.status == "ok"
+    assert res.value["freeze_count"] == 1  # only the 0.04->0.09 gap (0.05s) exceeds 0.04s
+    assert res.value["freeze_total_duration_ms"] == pytest.approx(50.0)
+    assert res.value["freeze_max_duration_ms"] == pytest.approx(50.0)
+
+
+def test_m17_no_freeze_when_all_gaps_are_within_2x_the_nominal_interval():
+    fr = _flow_record("1", message_count=10, xr_frame_period_ms=20.0,
+                       frame_completions={"total": 3, "complete_ages_ms": [1, 1, 1],
+                                          "complete_ts_s": [0.0, 0.02, 0.04]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M17"]
+    assert res.value["freeze_count"] == 0
+    assert res.value["freeze_total_duration_ms"] == pytest.approx(0.0)
+
+
+def test_m17_reports_effective_and_source_fps():
+    fr = _flow_record("1", message_count=10, xr_frame_period_ms=20.0,  # source fps = 50
+                       frame_completions={"total": 4, "complete_ages_ms": [1, 1, 1, 1],
+                                          "complete_ts_s": [0.0, 0.02, 0.04, 0.09]})
+    rec = _run_record([fr])  # _run_record's SystemRecord uses horizon_s=1.0
+    res = Scorecard().score(rec)["M17"]
+    assert res.value["source_fps"] == pytest.approx(50.0)
+    assert res.value["effective_fps"] == pytest.approx(4.0)  # 4 complete frames / 1.0s horizon
+
+
+def test_m17_excludes_a_flow_with_fewer_than_two_complete_frames():
+    silent = _flow_record("1", message_count=1, xr_frame_period_ms=20.0,
+                           frame_completions={"total": 3, "complete_ages_ms": [1],
+                                              "complete_ts_s": [0.0]})
+    healthy = _flow_record("2", message_count=10, xr_frame_period_ms=20.0,
+                            frame_completions={"total": 3, "complete_ages_ms": [1, 1, 1],
+                                               "complete_ts_s": [0.0, 0.02, 0.04]})
+    rec = _run_record([silent, healthy])
+    res = Scorecard().score(rec)["M17"]
+    assert res.status == "ok"
+    assert res.value["flow"] == healthy.key
+    assert silent.key in res.note
+
+
+def test_m17_worst_flow_has_the_most_freeze_events():
+    calm = _flow_record("1", message_count=10, xr_frame_period_ms=20.0,
+                         frame_completions={"total": 3, "complete_ages_ms": [1, 1, 1],
+                                            "complete_ts_s": [0.0, 0.02, 0.04]})
+    freezy = _flow_record("2", message_count=10, xr_frame_period_ms=20.0,
+                           frame_completions={"total": 4, "complete_ages_ms": [1, 1, 1, 1],
+                                              "complete_ts_s": [0.0, 0.1, 0.2, 0.3]})
+    rec = _run_record([calm, freezy])
+    res = Scorecard().score(rec)["M17"]
+    assert res.value["flow"] == freezy.key
+    assert res.value["freeze_count"] == 3
+
+
 def test_correlate_flows_requires_timeseries():
     rec, sc_cfg = _record(record_timeseries=False)
     sc = Scorecard()

@@ -255,8 +255,18 @@ metrics:
     guarantees: [G5]
     unit: mixed (count, ms, fps)
     direction: lower_better
-    status: pending
-    requires: WP7 (XR frame model, same as M05/M06)
+    status: ok
+    requires: null
+    note: >
+      WP7 commit 7: worst (most freeze events, ties by total duration)
+      per-flow freeze count/duration plus effective (MEC) vs source fps
+      (sim/scorecard.py::Scorecard._m17_frame_freeze_and_effective_fps). A
+      freeze is a gap between consecutive fully-delivered frames exceeding
+      2x the flow's CONFIGURED nominal frame interval (FlowRecord.
+      xr_frame_period_ms) -- deliberately not this simulator's own
+      slot-quantised actual firing interval, so a freeze reflects the
+      source's real claimed frame rate, not a time-discretisation artifact.
+      Pre-WP7-commit-7 records report status=pending.
 
 # Statistical policy (docs/p5g-sim-plan.md sec 7 / sec 5.3): the rule of
 # three. Demonstrating a miss rate <= eps at 95% confidence with zero

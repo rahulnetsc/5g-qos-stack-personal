@@ -124,17 +124,21 @@ def _compact_for_regression(records: dict[str, dict]) -> dict[str, dict]:
     this same record). Summarising the gaps, not the timestamps, is the
     more direct fingerprint of what M03 actually reports.
 
-    frame_completions (WP7 M05/M06) carries the same shape of risk:
-    complete_ages_ms is one entry per fully-delivered XR frame. Today it is
-    always empty (no scenario in this corpus exercises xr_video, so every
-    flow's value is the trivial {"total": 0, "complete_ages_ms": []}) --
+    frame_completions (WP7 M05/M06/M17) carries the same shape of risk --
+    complete_ages_ms and complete_ts_s are each one entry per fully-
+    delivered XR frame. Today both are always empty (no scenario in this
+    corpus exercises xr_video, so every flow's value is trivial) --
     compacted here anyway, now, so a future scenario that actually uses
     xr_video doesn't silently reintroduce the exact problem this function
-    exists to prevent. total (a count, not an array) is left as-is.
+    exists to prevent. complete_ts_s is summarised via its GAPS (consecutive
+    differences), not the raw timestamps, same reasoning as
+    completion_ts_by_role_s -- M17 scores the gap structure, not when in
+    the run frames happened to land. total and xr_frame_period_ms (a count
+    and a scalar, not arrays) are left as-is.
 
-    Extend this function, not RunRecord itself, when a future WP (commit
-    7's freeze/fps data, or any other large array) lands here -- see
-    docs/wp7-plan.md's regression-corpus-size note.
+    Extend this function, not RunRecord itself, when a future WP lands
+    another large array here -- see docs/wp7-plan.md's regression-corpus-
+    size note.
     """
     for rec in records.values():
         for fr in rec["flows"].values():
@@ -148,6 +152,11 @@ def _compact_for_regression(records: dict[str, dict]) -> dict[str, dict]:
             if frame_completions and frame_completions.get("complete_ages_ms"):
                 frame_completions["complete_ages_ms"] = _array_stats(
                     frame_completions["complete_ages_ms"]
+                )
+            if frame_completions and frame_completions.get("complete_ts_s"):
+                ts = frame_completions["complete_ts_s"]
+                frame_completions["complete_ts_s"] = _array_stats(
+                    [b - a for a, b in zip(ts, ts[1:])]
                 )
     return records
 

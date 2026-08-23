@@ -252,8 +252,14 @@ def run(
             round((fc.completion_ts_s - fc.generation_ts_s) * 1000.0, 3)
             for fc in frames if fc.complete
         ]
+        # WP7 commit 7 (M17 frame_freeze_and_effective_fps): the absolute
+        # completion timestamps of the same complete frames, sorted -- ages
+        # alone can't reconstruct inter-arrival gaps between frames (two
+        # frames' ages don't encode the time between their arrivals).
+        complete_ts_s = sorted(fc.completion_ts_s for fc in frames if fc.complete)
         summary["flows"][key]["frame_completions"] = {
             "total": len(frames), "complete_ages_ms": complete_ages_ms,
+            "complete_ts_s": complete_ts_s,
         }
     # Diagnostic handle on the UE model, so a study can compare the gNB's
     # shadow token buckets against the UE's real ones. Not part of the

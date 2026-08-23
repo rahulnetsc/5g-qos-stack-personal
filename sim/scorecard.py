@@ -120,10 +120,7 @@ class Scorecard:
         out["M15"] = self._m15_command_jitter(record)
         # M16 (ul_dl_shared_bearer_correlation) needs a named flow pair --
         # see correlate_flows() below, not part of the automatic per-run scan.
-        out["M17"] = MetricResult(
-            "M17", "frame_freeze_and_effective_fps", None, "pending", "mixed",
-            "requires WP7 XR frame model (same as M05/M06)",
-        )
+        out["M17"] = self._m17_frame_freeze_and_effective_fps(record)
         return out
 
     def _has_true_latency(self, record: RunRecord) -> bool:
@@ -330,6 +327,82 @@ class Scorecard:
         worst_key, worst_p95 = max(candidates, key=lambda kv: kv[1])
         return MetricResult("M06", "frame_age_at_mec",
                              {"flow": worst_key, "p95_ms": worst_p95}, "ok", "ms", note)
+
+    def _has_frame_gap_data(self, record: RunRecord) -> bool:
+        """WP7 commit 7: frame_completions["complete_ts_s"] is present iff
+        every flow was produced by a commit-7-aware driver.run(). Checks
+        key PRESENCE, not truthiness -- an empty list is a real "no
+        complete frames this run," while a MISSING key means the record
+        predates commit 7 (frame_completions itself already existed from
+        commit 6, so frame_completions is not None alone can't tell the two
+        apart -- see _has_frame_data)."""
+        flows = list(record.flows.values())
+        return bool(flows) and all(
+            fr.frame_completions is not None and "complete_ts_s" in fr.frame_completions
+            for fr in flows
+        )
+
+    def _m17_frame_freeze_and_effective_fps(self, record: RunRecord) -> MetricResult:
+        if not self._has_frame_gap_data(record):
+            return MetricResult(
+                "M17", "frame_freeze_and_effective_fps", None, "pending", "mixed",
+                "requires WP7 commit 7 (frame_completions[\"complete_ts_s\"] / "
+                "xr_frame_period_ms); record predates it",
+            )
+        horizon_s = record.system.horizon_s
+        candidates = []
+        excluded: list[str] = []
+        for fr in record.flows.values():
+            total = fr.frame_completions["total"]
+            if total == 0:
+                continue  # this flow never used xr_video -- not applicable
+            ts = fr.frame_completions["complete_ts_s"]
+            period_ms = fr.xr_frame_period_ms
+            if len(ts) < 2 or period_ms is None:
+                # Generated frames but too few completed to see a gap at
+                # all -- M05 already scores this as a completeness failure;
+                # this metric just excludes it, same shape as M06's own
+                # zero-completion exclusion.
+                excluded.append(fr.key)
+                continue
+            frame_interval_s = period_ms / 1000.0
+            gaps_s = [b - a for a, b in zip(ts, ts[1:])]
+            freeze_gaps_s = [g for g in gaps_s if g > 2 * frame_interval_s]
+            candidates.append((fr.key, {
+                "freeze_count": len(freeze_gaps_s),
+                "freeze_total_duration_ms": round(sum(freeze_gaps_s) * 1000.0, 3),
+                "freeze_max_duration_ms": round(max(freeze_gaps_s) * 1000.0, 3) if freeze_gaps_s else 0.0,
+                "effective_fps": round(len(ts) / horizon_s, 3) if horizon_s > 0 else 0.0,
+                "source_fps": round(1000.0 / period_ms, 3),
+            }))
+        note = (
+            "a freeze is a gap between consecutive fully-delivered frames "
+            "exceeding 2x the flow's CONFIGURED (nominal) frame interval -- "
+            "xr_frame_period_ms, not this simulator's own slot-quantised "
+            "actual firing interval, so a freeze reflects the source's real "
+            "claimed frame rate rather than an artifact of this simulator's "
+            "time discretisation (docs/wp7-plan.md commit 7); worst = most "
+            "freeze events, ties broken by total freeze duration"
+        )
+        if excluded:
+            note += (
+                f"; {len(excluded)} flow(s) generated frames but had fewer "
+                f"than 2 complete ones (no gap definable) and are excluded "
+                f"here -- see M05 for their completeness failure: "
+                f"{', '.join(excluded)}"
+            )
+        if not candidates:
+            return MetricResult(
+                "M17", "frame_freeze_and_effective_fps", None, "ok", "mixed",
+                "no flow had enough complete frames to evaluate; " + note,
+            )
+        worst_key, worst_value = max(
+            candidates, key=lambda kv: (kv[1]["freeze_count"], kv[1]["freeze_total_duration_ms"])
+        )
+        return MetricResult(
+            "M17", "frame_freeze_and_effective_fps",
+            {"flow": worst_key, **worst_value}, "ok", "mixed", note,
+        )
 
     def _m02_pdb_violation_rate(self, record: RunRecord) -> MetricResult:
         total_arrived = sum(fr.bytes_arrived for fr in record.flows.values())

@@ -165,13 +165,55 @@ Update it as commits land; don't let it drift back out of sync with reality.
   waiting for a future WP to rediscover the same size problem. File size:
   665,781 → 719,331 bytes (+53,550 bytes, matching one small trivial field
   × 510 flows, not an array-driven blowup).
+- **Commit 7** — M17, the last of the three XR metrics. `frame_completions`
+  couldn't answer this one on its own: freeze detection needs actual
+  inter-arrival gaps between delivered frames, which ages alone can't
+  reconstruct (two frames' ages don't encode the time between their
+  arrivals). Two additions: `frame_completions["complete_ts_s"]` (sorted
+  absolute completion timestamps of complete frames, new key in the
+  existing dict) and a new top-level `FlowRecord.xr_frame_period_ms` (the
+  flow's *configured* nominal frame period, copied from `FlowConfig.
+  traffic_params["period_ms"]`).
 
-**Last verified** (2026-08-23, after commit 6): full suite green (196
+  **Decided, flagged before picking (same tier as the PSDB call):** "2
+  frame intervals" for freeze detection is measured against the
+  **configured** period, not this simulator's own slot-quantised actual
+  firing interval (which was available for free via `horizon_s/total`, no
+  new field needed). A freeze is a viewer-perceptible stutter relative to
+  what the source claims its frame rate is — using the quantised interval
+  instead would make it impossible to tell a real network stall apart from
+  this simulator's own time-discretisation artifact (already flagged in
+  commit 5's docstring), exactly the confound M17 exists to catch. Same
+  reasoning gives an *exact* source fps (`1000/period_ms`) instead of the
+  `total/horizon_s` approximation.
+
+  `Scorecard._m17_frame_freeze_and_effective_fps()` reports the worst flow
+  (most freeze events, ties by total duration): freeze count, total/max
+  duration, and effective (MEC) vs source fps. Excludes flows with
+  `total==0` (never used `xr_video`) and flows with <2 complete frames (no
+  gap definable — M05 already scores that failure). `config/metric_panel.
+  yml`: M17 flipped `pending` → `ok` — confirmed the last of the three XR
+  metrics, nothing else moves. 7 new tests in `sim/tests/test_scorecard.py`.
+
+  **Drift prediction, made before writing any code, confirmed exactly:**
+  two new pieces of data (one new key in the existing `frame_completions`
+  dict, one new top-level scalar field), both trivial (`[]`, `None`) since
+  no scenario uses `xr_video` — predicted 1020 mismatches (510 + 510).
+  Actual: exactly 1020, split exactly 510/510 by field. Re-baselined.
+
+  **Compaction extended in the same commit, not after:** `complete_ts_s` is
+  array-shaped, same risk class as `completion_ts_by_role_s`/
+  `complete_ages_ms` — `_compact_for_regression` now also summarises its
+  *gaps* (not raw timestamps, same reasoning as the other two: M17 scores
+  gap structure, not when in the run frames happened to land). File size:
+  719,331 → 755,541 bytes (+36,210 bytes for 1020 trivial entries, not an
+  array-driven blowup).
+
+**Last verified** (2026-08-23, after commit 7): full suite green (203
 passed, `sim/tests -q`), `scripts/regression_corpus.py --check` clean, all
-commits through 6 pushed to `origin/feat/high-fidelity-sim`. Update this
+commits through 7 pushed to `origin/feat/high-fidelity-sim`. Update this
 line as commits land rather than letting it go stale again — it already did
-once (this note replaces one written after commit 2 that still claimed 160
-passed and "both commits" five commits later).
+once before (see commit 6's note above).
 
 ## The five pending metrics WP7 owns
 
@@ -225,9 +267,12 @@ description).
   reusing `pdb_ms` as the frame's set delay budget — no separate PSDB
   concept on disk) + M06 (frame age, worst-flow p95) + panel flips for
   both.
-- Commit 7 (next): M17 (freeze events, gaps > 2 frame intervals; effective
-  fps vs source fps) — reuses commit 6's `FrameLedger`, no new decomposition
-  question. Panel flip for M17 only.
+- Commit 7 (landed): M17 (freeze events, gaps > 2x the flow's *configured*
+  frame interval, decided over the simulator's own quantised actual
+  interval; effective fps vs source fps) — reused commit 6's `FrameLedger`,
+  needed two new pieces of raw data (`complete_ts_s`, `xr_frame_period_ms`)
+  since ages alone can't reconstruct inter-arrival gaps. Panel flip for M17
+  only — all three XR metrics (M05, M06, M17) are now `ok`.
 
 ### M14 — `communication_service_availability`
 `requires: WP7 (discrete message model, same as M03/M04)` — WP7 alone.
@@ -456,8 +501,9 @@ back below commit 3's trajectory).
 
 ## Next step
 
-Commits 3-6 are landed (see "Landed" above); M03/M05/M06 are `ok`; the
-regression corpus is stored compactly, including `frame_completions`'
-array field. Next action is commit 7: M17 (`frame_freeze_and_effective_fps`)
-reusing commit 6's `FrameLedger` — freeze events (gaps > 2 frame intervals)
-and effective fps vs source fps — and the panel flip for M17 only.
+Commits 3-7 are landed (see "Landed" above); M03/M05/M06/M17 are all `ok` —
+every XR/message-model metric this plan targeted except M14 is done. Next
+action is commit 8: M14 (`communication_service_availability`), reporting
+the `survival_time_ms` used alongside the availability figure (Decision #3's
+condition), then commit 9 (`cycle_clock`/`sync_group` + the aggressor/
+fault-injection knobs).
