@@ -76,6 +76,14 @@ class FlowRecord:
     # over. 0 is a real "no message completed," distinct from None ("this
     # record predates WP7 and was never given true-latency fields at all").
     message_count: Optional[int] = None
+    # WP7 M03 (liveness_gap_distribution): completion timestamps of fully-
+    # delivered messages, grouped by Message.role. None on records that
+    # predate this field; {} is a real "flow generated no completions",
+    # distinct from None -- same never-None-post-WP7 convention as
+    # message_count. scorecard.py derives gaps and applies its own T_live
+    # threshold from these rather than a driver-computed count, since the
+    # threshold is a scoring-time choice, not a simulation output.
+    completion_ts_by_role_s: Optional[dict[str, list[float]]] = None
 
     # Populated only when driver.run(..., record_timeseries=True) was used.
     # Per-slot series, aligned to RunRecord.timeseries_time_s.
@@ -231,6 +239,7 @@ class RunRecord:
                 delay_p98_ms=m.get("delay_p98_ms"),
                 delay_p99_ms=m.get("delay_p99_ms"),
                 message_count=m.get("message_count"),
+                completion_ts_by_role_s=m.get("completion_ts_by_role_s"),
                 ts_backlog_bytes=fts["backlog_bytes"] if fts else None,
                 ts_hol_delay_s=fts["hol_delay_s"] if fts else None,
                 ts_delivered_bytes=fts["delivered_bytes"] if fts else None,

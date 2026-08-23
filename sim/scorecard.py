@@ -101,10 +101,7 @@ class Scorecard:
         out: dict[str, MetricResult] = {}
         out["M01"] = self._m01_latency_percentiles(record)
         out["M02"] = self._m02_pdb_violation_rate(record)
-        out["M03"] = MetricResult(
-            "M03", "liveness_gap_distribution", None, "pending", "ms",
-            "requires WP7 discrete message model + WP4 uplink access chain",
-        )
+        out["M03"] = self._m03_liveness_gap_distribution(record, cfg["t_live_s"])
         out["M04"] = self._m04_survival_time_failures(record, cfg["survival_miss_n"])
         out["M05"] = MetricResult(
             "M05", "pdu_set_completeness", None, "pending", "fraction",
@@ -192,6 +189,75 @@ class Scorecard:
         if not have_p98:
             note += "; record predates p98 (some flows show p98=None)"
         return MetricResult("M01", "flow_latency_percentiles", worst, "proxy", "ms", note)
+
+    def _has_role_completions(self, record: RunRecord) -> bool:
+        """WP7 commit 4: completion_ts_by_role_s is available iff every flow
+        in the record was produced by a commit-4-aware driver.run() (never
+        None for a flow that exists at all, post-commit-4 -- an empty dict
+        is a real 'no completions', same convention as message_count)."""
+        flows = list(record.flows.values())
+        return bool(flows) and all(fr.completion_ts_by_role_s is not None for fr in flows)
+
+    def _m03_liveness_gap_distribution(self, record: RunRecord, t_live_s: float) -> MetricResult:
+        if not self._has_role_completions(record):
+            return MetricResult(
+                "M03", "liveness_gap_distribution", None, "pending", "ms",
+                "requires WP7 commit 4 (completion_ts_by_role_s); record predates it",
+            )
+        t_live_quarter, t_live_half = t_live_s / 4.0, t_live_s / 2.0
+        worst = None
+        worst_gap_ms = -1.0
+        excluded: list[str] = []
+        for fr in record.flows.values():
+            for role, ts_list in fr.completion_ts_by_role_s.items():
+                # A role with <2 completions has no inter-arrival gap to
+                # measure. Excluding it (not scoring gap=0) matters for the
+                # same reason M01 excludes zero-message flows: 0ms/0-gap is
+                # the BEST possible value, and a flow in total silence must
+                # not win the "worst" contest by looking like the quietest,
+                # best-behaved one.
+                if len(ts_list) < 2:
+                    excluded.append(f"{fr.key}:{role}")
+                    continue
+                gaps_s = [b - a for a, b in zip(ts_list, ts_list[1:])]
+                max_gap_ms = max(gaps_s) * 1000.0
+                if max_gap_ms > worst_gap_ms:
+                    worst_gap_ms = max_gap_ms
+                    worst = {
+                        "flow": fr.key,
+                        "role": role,
+                        "max_gap_ms": max_gap_ms,
+                        "gap_count_over_t_live_over_4": sum(1 for g in gaps_s if g > t_live_quarter),
+                        "gap_count_over_t_live_over_2": sum(1 for g in gaps_s if g > t_live_half),
+                        "gap_count_over_t_live": sum(1 for g in gaps_s if g > t_live_s),
+                        # Never quotable without the assumption it was
+                        # computed against -- same condition attached to
+                        # M14's survival_time_ms (docs/wp7-plan.md Decision
+                        # #3). t_live_s itself is README sec8's [OPEN] item,
+                        # assumed 2s.
+                        "t_live_s": t_live_s,
+                    }
+        note = (
+            "max/count of receiver-side inter-arrival gaps among fully-"
+            "delivered messages, grouped by Message.role; computed "
+            "generically over any flow's completions -- most diagnostic for "
+            "periodic_control/MAVLink-style flows, which no current scenario "
+            "uses yet, so today's records exercise the mechanism without yet "
+            "testing its intended use case"
+        )
+        if excluded:
+            note += (
+                f"; {len(excluded)} flow/role pair(s) had fewer than 2 "
+                "completions (no gap definable) and are excluded from the "
+                "worst-gap contest rather than scored as gap=0 -- see M01/M02 "
+                f"for their delivery failure: {', '.join(excluded)}"
+            )
+        if worst is None:
+            return MetricResult(
+                "M03", "liveness_gap_distribution", None, "ok", "ms",
+                "no flow/role pair had >=2 completions this run; " + note,
+            )
+        return MetricResult("M03", "liveness_gap_distribution", worst, "ok", "ms", note)
 
     def _m02_pdb_violation_rate(self, record: RunRecord) -> MetricResult:
         total_arrived = sum(fr.bytes_arrived for fr in record.flows.values())

@@ -73,12 +73,18 @@ metrics:
     guarantees: [G3]
     unit: ms
     direction: lower_better
-    status: pending
-    requires: WP7 (discrete periodic message model), WP4 (uplink access chain)
+    status: ok
+    requires: null
     note: >
-      Requires a per-message receive-timestamp sequence for a periodic
-      flow. The current fluid byte buffer has no notion of a discrete
-      "message" arriving and being fully received; only a delay proxy.
+      WP7 commit 4: max/count of receiver-side inter-arrival gaps among
+      fully-delivered messages, grouped by Message.role (sim/scorecard.py::
+      Scorecard._m03_liveness_gap_distribution), compared against
+      {T_live/4, T_live/2, T_live} (defaults.t_live_s below, itself an
+      [OPEN] assumption -- README.md sec8). The T_live value used is always
+      reported alongside the gap figure, never a bare number. A record
+      produced before WP7 commit 4 (no completion_ts_by_role_s on any
+      FlowRecord) reports status=pending, not a fallback proxy -- this
+      metric has none.
 
   - id: M04
     name: survival_time_failures

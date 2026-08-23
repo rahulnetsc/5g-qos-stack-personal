@@ -220,14 +220,26 @@ def run(
         key = f"ue{f.ue_id}_qfi{f.qfi}"
         if key not in summary["flows"]:
             continue  # flow generated no traffic at all this run
-        stats = message_latency_percentiles_ms(
-            message_ledger.completions_for(f.ue_id, f.qfi)
-        )
+        completions = message_ledger.completions_for(f.ue_id, f.qfi)
+        stats = message_latency_percentiles_ms(completions)
         summary["flows"][key]["delay_p50_ms"] = round(stats["p50"], 3)
         summary["flows"][key]["delay_p95_ms"] = round(stats["p95"], 3)
         summary["flows"][key]["delay_p98_ms"] = round(stats["p98"], 3)
         summary["flows"][key]["delay_p99_ms"] = round(stats["p99"], 3)
         summary["flows"][key]["message_count"] = stats["count"]
+        # WP7 commit 4 (M03 liveness_gap_distribution): completion
+        # timestamps of fully-delivered messages, grouped by Message.role --
+        # a gap distribution needs the actual timestamps, not an aggregate
+        # percentile. Dropped messages never arrived at the receiver at all;
+        # M02 scores those, not this. T_live thresholding happens in
+        # scorecard.py, not here -- this is raw material only.
+        by_role: dict[str, list[float]] = {}
+        for c in completions:
+            if c.complete:
+                by_role.setdefault(c.message.role, []).append(c.completion_ts_s)
+        for ts_list in by_role.values():
+            ts_list.sort()
+        summary["flows"][key]["completion_ts_by_role_s"] = by_role
     # Diagnostic handle on the UE model, so a study can compare the gNB's
     # shadow token buckets against the UE's real ones. Not part of the
     # metrics contract -- see scripts/ul_shadow_study.py.

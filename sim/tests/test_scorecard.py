@@ -225,6 +225,70 @@ def test_m15_excludes_a_chronically_stalled_flow_from_worst():
     assert res.value["jitter_ms"] == pytest.approx(5.0)
 
 
+def test_m03_is_pending_for_a_pre_wp7_commit4_record():
+    """completion_ts_by_role_s defaults to None (via _flow_record's
+    defaults, which don't set it) -- the same never-None-post-commit-4
+    convention message_count uses for M01."""
+    rec = _run_record([_flow_record("1", message_count=10)])
+    res = Scorecard().score(rec)["M03"]
+    assert res.status == "pending"
+    assert res.value is None
+
+
+def test_m03_computes_max_gap_and_reports_the_t_live_it_used():
+    fr = _flow_record("1", message_count=3,
+                       completion_ts_by_role_s={"data": [0.0, 1.0, 3.0]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M03"]  # default t_live_s = 2.0 (panel)
+    assert res.status == "ok"
+    assert res.value["flow"] == fr.key
+    assert res.value["role"] == "data"
+    assert res.value["max_gap_ms"] == pytest.approx(2000.0)
+    assert res.value["t_live_s"] == pytest.approx(2.0)
+    assert res.value["gap_count_over_t_live_over_4"] == 2  # gaps 1.0,2.0 > 0.5
+    assert res.value["gap_count_over_t_live_over_2"] == 1  # only 2.0 > 1.0
+    assert res.value["gap_count_over_t_live"] == 0         # neither > 2.0
+
+
+def test_m03_respects_a_t_live_s_override():
+    fr = _flow_record("1", message_count=3,
+                       completion_ts_by_role_s={"data": [0.0, 1.0, 3.0]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec, t_live_s=0.5)["M03"]
+    assert res.value["t_live_s"] == pytest.approx(0.5)
+    assert res.value["gap_count_over_t_live"] == 2  # both gaps (1.0, 2.0) > 0.5
+
+
+def test_m03_excludes_a_role_with_fewer_than_two_completions_from_worst():
+    """A role that only ever completed once has no inter-arrival gap --
+    excluding it (not scoring gap=0) matters for the same reason M01
+    excludes zero-message flows: silence must not look like the best case.
+    """
+    silent = _flow_record("1", message_count=1,
+                           completion_ts_by_role_s={"heartbeat": [0.0]})
+    noisy = _flow_record("2", message_count=5,
+                          completion_ts_by_role_s={"telemetry": [0.0, 0.05, 5.0]})
+    rec = _run_record([silent, noisy])
+    res = Scorecard().score(rec)["M03"]
+    assert res.status == "ok"
+    assert res.value["flow"] == noisy.key
+    assert res.value["role"] == "telemetry"
+    assert "1:heartbeat" in res.note
+
+
+def test_m03_selects_the_worst_role_within_one_multi_role_flow():
+    """MAVLink-style: one flow, several roles -- the worst (largest) gap
+    across roles wins, not just the first role seen."""
+    fr = _flow_record("1", message_count=6, completion_ts_by_role_s={
+        "heartbeat": [0.0, 1.0, 2.0],   # max gap 1.0s
+        "telemetry": [0.0, 0.1, 4.0],   # max gap 3.9s
+    })
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M03"]
+    assert res.value["role"] == "telemetry"
+    assert res.value["max_gap_ms"] == pytest.approx(3900.0)
+
+
 def test_correlate_flows_requires_timeseries():
     rec, sc_cfg = _record(record_timeseries=False)
     sc = Scorecard()

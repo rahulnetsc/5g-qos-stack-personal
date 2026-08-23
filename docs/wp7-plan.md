@@ -63,6 +63,40 @@ Update it as commits land; don't let it drift back out of sync with reality.
   `--check` clean, no re-baseline. `config/metric_panel.yml` untouched —
   M03 stays `pending`; only the generator half of its `requires:` landed
   here, the scorecard function is commit 4.
+- **Commit 4** — M03's scorecard function. `sim/driver.py` groups each
+  flow's `MessageLedger` completions by `role` (fully-delivered only) and
+  stores sorted completion timestamps in a new `RunRecord.FlowRecord.
+  completion_ts_by_role_s` field (`scorecard.py` can't own the raw ledger,
+  and can't bake in a `T_live` threshold at driver-time, so it needs the raw
+  timestamps, not a precomputed count). `Scorecard._m03_liveness_gap_
+  distribution()` computes consecutive-completion gaps per role, picks the
+  worst (largest max-gap) role per flow and across flows, and reports
+  `t_live_s` alongside every value it returns — never a bare number, same
+  condition as M14's `survival_time_ms`. A role with <2 completions is
+  excluded from the "worst" contest (not scored as gap=0) for the same
+  reason M01 excludes zero-message flows. `config/metric_panel.yml`: M03
+  flipped `pending` → `ok` — checked against every other metric's
+  `requires:`, nothing else flips (M04 stays `proxy` by prior decision;
+  M05/M06/M14/M17 still need the XR frame model). 5 new tests in
+  `sim/tests/test_scorecard.py`.
+
+  **Drift prediction, made before writing code, confirmed exactly:**
+  `regression_corpus.py` never calls `Scorecard.score()` — it snapshots
+  `RunRecord.to_dict()` directly, so M03's *scoring logic* can't move
+  `--check` regardless of correctness (that path is `test_scorecard.py`'s
+  job). What can move it is the new `FlowRecord` field. Predicted 510
+  mismatches (24×16 + 30×3 + 12×3 flows across the 22 records), all and
+  only `completion_ts_by_role_s`, zero movement elsewhere — confirmed
+  exactly: 510 mismatches, all that one key. Re-baselined, matching commit
+  2's precedent for a purely-additive change.
+
+  **New finding, not chased further here:** the baseline file grew 512KB →
+  5.7MB (11x) from this one field — raw per-message timestamp lists are not
+  free, unlike the scalar percentiles commit 2 added. Commits 5-8 (frame
+  ledgers, XR completions) will add more data of the same shape. Not
+  blocking, but worth watching — if the corpus grows unwieldy, precomputing
+  gaps instead of raw timestamps would help at the cost of baking a fixed
+  `T_live` in at capture time.
 
 **Verified independently before writing this plan** (2026-08-23): full
 suite green (160 passed, `sim/tests -q`), `scripts/regression_corpus.py
@@ -298,7 +332,7 @@ block on it.
 
 ## Next step
 
-Commit 3 is landed (see "Landed" above). Next action is commit 4: the M03
-scorecard function — group `MessageLedger.completions_for(ue_id, qfi)` by
-`role`, compute receiver inter-arrival gaps, compare against `{T_live/4,
-T_live/2, T_live}` — and the `config/metric_panel.yml` flip to `ok`.
+Commits 3 and 4 are landed (see "Landed" above); M03 is `ok`. Next action is
+commit 5: the `xr_video` generator, implementing Decision #1's size-derived
+fragmentation (fragment size as a config parameter, docstring disclosing the
+MTU-style stand-in explicitly).
