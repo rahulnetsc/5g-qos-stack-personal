@@ -313,6 +313,10 @@ def test_m05_excludes_flows_that_never_used_xr_video():
     assert res.value["flow"] == xr.key
     assert res.value["frame_count"] == 4
     assert res.value["fraction"] == pytest.approx(0.5)  # 2 of 4 ages <= 50ms pdb
+    # pdb_ms must travel with the fraction -- it varies per flow, so the
+    # number alone doesn't say what it was measured against (found in
+    # WP7's end-of-WP review).
+    assert res.value["pdb_ms"] == pytest.approx(50.0)
 
 
 def test_m05_scores_a_dropped_frame_as_failed_even_though_it_is_fast():
@@ -411,6 +415,10 @@ def test_m17_reports_effective_and_source_fps():
     res = Scorecard().score(rec)["M17"]
     assert res.value["source_fps"] == pytest.approx(50.0)
     assert res.value["effective_fps"] == pytest.approx(4.0)  # 4 complete frames / 1.0s horizon
+    # Labelled explicitly rather than left as an inversion of source_fps
+    # (found in WP7's end-of-WP review) -- this is what freeze_count was
+    # actually measured against.
+    assert res.value["xr_frame_period_ms"] == pytest.approx(20.0)
 
 
 def test_m17_excludes_a_flow_with_fewer_than_two_complete_frames():
@@ -457,6 +465,10 @@ def test_m14_collapses_to_within_pdb_ms_when_survival_time_is_zero():
     # first gap is within budget.
     assert res.value["fraction"] == pytest.approx(0.5)
     assert res.value["survival_time_ms"] == pytest.approx(0.0)
+    # pdb_ms is the other half of the threshold (pdb_ms + survival_time_ms)
+    # -- must travel alongside survival_time_ms, not just the latter (found
+    # in WP7's end-of-WP review).
+    assert res.value["pdb_ms"] == pytest.approx(50.0)
 
 
 def test_m14_survival_time_extends_the_budget():

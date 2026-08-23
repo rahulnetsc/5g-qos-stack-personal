@@ -228,8 +228,10 @@ class RunRecord:
         """Build a RunRecord from sim.driver.run()'s output dict.
 
         ``flow_configs`` is ``scenario.flows`` -- the QoS metadata driver.run()
-        doesn't carry in its summary. ``summary["_ue_lcp"]`` (a live object,
-        not JSON-serialisable) is intentionally dropped here.
+        doesn't carry in its summary. ``summary["_ue_lcp"]`` and
+        ``summary["_message_ledger"]`` (WP7) -- both live objects, not
+        JSON-serialisable -- are intentionally dropped here; neither is read
+        by this method at all.
         """
         meta_by_key = {flow_key(f.ue_id, f.qfi): f for f in flow_configs}
         ts = summary.get("timeseries") or {}

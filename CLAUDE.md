@@ -31,9 +31,22 @@ bare `python` invocation that works.
   `sim/buffer.py` is purely the true-backlog store now — it does not model
   BSR delay/loss/quantisation at all; `BsrModel` is the only writer of a
   UL flow's `bytes_reported`/`estimated_ul_buffer_per_lcg`.
-- `sim/run_record.py`, `sim/scorecard.py` — WP0 (+ WP3 for M02). The scoring
-  layer. `scorecard.py` must not import `sim/driver.py` or `sim/config.py`; it
-  consumes `RunRecord` only, so it can score records from any producer.
+- `sim/run_record.py`, `sim/scorecard.py` — WP0 (+ WP3 for M02, WP7 for
+  M01/M03/M05/M06/M14/M15/M17). The scoring layer. `scorecard.py` must not
+  import `sim/driver.py` or `sim/config.py`; it consumes `RunRecord` only,
+  so it can score records from any producer.
+- `sim/messages.py` — WP7. `Message`/`MessageCompletion`/`MessageLedger`
+  (per-message identity and completion bookkeeping) and
+  `FrameCompletion`/`FrameLedger` (grouping sibling PDU-set fragments by
+  `frame_id`). Pure simulator-side scoring construct — no OAI ground truth,
+  no real network element learns per-message identity (`sim/bsr.py`,
+  `sim/ul_access.py` stay untouched).
+- `sim/cycle_clock.py` — WP7. Stateless phase-offset math for
+  `FlowConfig.sync_group`'s correlated-burst mechanism — every member
+  anchors to slot 0 independently, so no shared mutable clock state is
+  actually needed. Only `sim/traffic.py`'s `periodic_control`/
+  `condition_monitor` kind reads it; every other kind ignores `sync_group`
+  silently.
 - `config/metric_panel.yml` — the pre-registered metric panel. See rules below.
 - `scheduler/` — `two_tier.py`, `tier1.py`, `link.py`, `flow.py`.
   `flow.py::FlowConfig.lcg` self-resolves from 5QI via `__post_init__` — see
@@ -163,7 +176,14 @@ gates a metric.** M04's `requires` has always named WP7 (discrete message
 model) + `record_timeseries=True`, never WP3 — a plausible-sounding
 assumption that WP3 gates it (it's BSR-adjacent) is wrong. As of WP3
 landing: M01 stays `proxy` (still needs WP7), M02 flipped to `ok` (WP3's
-third commit), M04 unchanged.
+third commit), M04 unchanged. WP7 then flipped M01/M03/M05/M06/M14/M15/M17
+to `ok` — but **deliberately left M04 as `proxy`**, even though WP7's
+message ledger gives it everything an exact per-message-miss count would
+need. Not an oversight: fixing M04 exactly is "close to free" but was kept
+out of every WP7 commit on purpose, since bundling a refinement of an
+already-shipped metric into an unrelated commit's diff defeats the
+attribution the one-fidelity-change-per-commit rule exists for
+(`docs/wp7-plan.md`, "On M04"). Still open, own commit, whenever taken up.
 
 **If a WP predicts which regression metrics will move and how, check the
 prediction against the actual `--check` output and record the misses, not
@@ -205,6 +225,17 @@ for every WP, not an opportunistic one.
   LCG mapping deliberately separates QoS classes into different LCGs, so
   no scenario's multi-UL-flow UEs share one. Needs a small follow-up
   scenario (README §8) before H5 can be tested in Phase 3.
+- `FlowConfig.aggressor_multiplier` scales an `xr_video` flow's fragments
+  *after* `sim/traffic.py::_gen_xr_video` has already fragmented the frame
+  to fit `fragment_bytes` — a scaled fragment can end up larger than the
+  configured `fragment_bytes`, silently breaking that generator's own
+  "grounded in a real physical constant" MTU-cap claim. Found in WP7's
+  end-of-WP review; untested (no scenario combines the two). Not fixed —
+  a real fix means scaling `avg_bytes` before fragmentation, which breaks
+  the multiplier's "uniform regardless of kind" design and needs its own
+  decision. Workaround until then: scale `traffic_params["avg_bytes"]`
+  directly for an `xr_video` aggressor instead of using
+  `aggressor_multiplier`.
 
 ## Style
 

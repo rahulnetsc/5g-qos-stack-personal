@@ -123,6 +123,16 @@ class FlowConfig:
     # _clipped_gaussian_jitter_ms, not a second jitter mechanism).
     # phase_jitter_ms defaults to 0.0 -- no ground truth for a nonzero
     # value, README sec8 [OPEN].
+    #
+    # SCOPE (found in WP7's end-of-WP review, undocumented until now): only
+    # sim/traffic.py's periodic_control/condition_monitor kind actually
+    # reads sync_group/phase_offset_ms/phase_jitter_ms
+    # (TrafficModel._gen_periodic_control). Setting these on any other kind
+    # (xr_video, deterministic, poisson, adaptive, video_frame,
+    # aperiodic_event, machine_vision) is a silent no-op -- no error, just
+    # unsynchronised as if sync_group were never set. Extending this to
+    # xr_video (e.g. a synchronised camera fleet) is plausible future work,
+    # not yet built.
     sync_group: int | None = None
     phase_offset_ms: float = 0.0
     phase_jitter_ms: float = 0.0
@@ -137,6 +147,19 @@ class FlowConfig:
     # or T6e (an RF-outage recovery, a channel-side event, not a traffic-
     # generation one); those need different tooling, not this knob.
     # 1.0 = inert, every existing flow's default.
+    #
+    # KNOWN GAP with xr_video (found in WP7's end-of-WP review, untested --
+    # no scenario combines the two): the multiplier scales EACH fragment's
+    # bytes independently, after sim/traffic.py's _gen_xr_video has already
+    # fragmented the frame to fit fragment_bytes. A scaled fragment can end
+    # up LARGER than the configured fragment_bytes, silently breaking the
+    # "grounded in a real physical constant" MTU-cap invariant that
+    # generator's own docstring claims. Not fixed here (fixing it properly
+    # means scaling avg_bytes before fragmentation, which breaks this
+    # field's "uniform post-processing regardless of kind" design and needs
+    # its own decision). If building GT-4.3's camera-at-2x-MFBR test on an
+    # xr_video flow, scale traffic_params["avg_bytes"] directly instead of
+    # using aggressor_multiplier until this is resolved.
     aggressor_multiplier: float = 1.0
     aggressor_trigger_ms: float = 0.0
 

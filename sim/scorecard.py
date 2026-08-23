@@ -288,6 +288,14 @@ class Scorecard:
                         "role": role,
                         "fraction": fraction,
                         "interval_count": len(gaps_s),
+                        # Both halves of the threshold, not just the newly-
+                        # added one -- pdb_ms varies per flow, so "fraction"
+                        # alone is meaningless without it too. Found in
+                        # WP7's end-of-WP review: Decision #3 asked only for
+                        # survival_time_ms, but a fraction is just as
+                        # unquotable without knowing which pdb_ms it was
+                        # measured against.
+                        "pdb_ms": fr.pdb_ms,
                         "survival_time_ms": fr.survival_time_ms,
                     }
         note = (
@@ -333,7 +341,7 @@ class Scorecard:
             on_time = sum(
                 1 for age in fr.frame_completions["complete_ages_ms"] if age <= fr.pdb_ms
             )
-            candidates.append((fr.key, on_time / total, total))
+            candidates.append((fr.key, on_time / total, total, fr.pdb_ms))
         note = (
             "worst (min) per-flow fraction of frames fully delivered within "
             "pdb_ms -- this branch has no separate PDU-Set Delay Budget "
@@ -346,10 +354,15 @@ class Scorecard:
                 "M05", "pdu_set_completeness", None, "ok", "fraction",
                 "no flow in this run generated any XR frames; " + note,
             )
-        worst_key, worst_fraction, worst_total = min(candidates, key=lambda kv: kv[1])
+        worst_key, worst_fraction, worst_total, worst_pdb_ms = min(candidates, key=lambda kv: kv[1])
         return MetricResult(
             "M05", "pdu_set_completeness",
-            {"flow": worst_key, "fraction": worst_fraction, "frame_count": worst_total},
+            # pdb_ms travels with the value -- found in WP7's end-of-WP
+            # review: pdb_ms varies per flow, so "fraction" alone doesn't
+            # say what it was measured against, the same class of gap
+            # Decision #3 exists to prevent for M14's survival_time_ms.
+            {"flow": worst_key, "fraction": worst_fraction, "frame_count": worst_total,
+             "pdb_ms": worst_pdb_ms},
             "ok", "fraction", note,
         )
 
@@ -435,6 +448,12 @@ class Scorecard:
                 "freeze_max_duration_ms": round(max(freeze_gaps_s) * 1000.0, 3) if freeze_gaps_s else 0.0,
                 "effective_fps": round(len(ts) / horizon_s, 3) if horizon_s > 0 else 0.0,
                 "source_fps": round(1000.0 / period_ms, 3),
+                # Technically recoverable from source_fps (1000/source_fps),
+                # but labelled explicitly rather than left as an inversion
+                # the reader has to do -- found in WP7's end-of-WP review,
+                # same class of gap as M05/M14's missing pdb_ms: this is the
+                # threshold freeze_count was actually measured against.
+                "xr_frame_period_ms": period_ms,
             }))
         note = (
             "a freeze is a gap between consecutive fully-delivered frames "

@@ -602,6 +602,66 @@ both sides) — not 510. Actual: 458. Re-baselined; resulting file:
 665,781 bytes (8.6x smaller than the 5,701,824-byte raw-array baseline,
 back below commit 3's trajectory).
 
+## End-of-WP judgment-calls review (2026-08-24)
+
+Per CLAUDE.md's standing step, reread the whole diff (`ef121b3~1..976f09d`,
+all nine commits plus the decisions commit and 19b8e26's corpus compaction)
+looking for undocumented decisions and silent bugs, not relying on memory
+of what was intended. Findings, all fixed in the review commit itself
+(none deferred silently):
+
+- **M05 and M14 didn't report `pdb_ms`, even though both use it as (half
+  of) their threshold.** Decision #3 asked M14 to report `survival_time_ms`
+  alongside every value; it does, but `pdb_ms` — the *other* half of
+  `pdb_ms + survival_time_ms`, and varies per flow — was missing, so the
+  reported fraction still wasn't fully interpretable. M05 had the same gap
+  with just `pdb_ms` alone. Fixed: both now include `pdb_ms` in their value
+  dict. The letter of a "report the assumption" rule doesn't guarantee the
+  spirit — worth rechecking every threshold input, not just the newest one
+  added, when a decision like #3 gets made.
+- **M17 didn't label `xr_frame_period_ms` directly** — recoverable via
+  `1000/source_fps`, but that's an inversion the reader has to do, not a
+  travelling assumption. Fixed: added directly, same class of gap as M05/
+  M14's, just one degree less severe (recoverable vs. not).
+- **`sync_group`/`phase_offset_ms`/`phase_jitter_ms` are silently inert for
+  every traffic kind except `periodic_control`/`condition_monitor`** — a
+  scenario author setting `sync_group` on an `xr_video` or `deterministic`
+  flow gets no error and no synchronisation, and nothing in the code said
+  so (only in conversation, which isn't discoverable later). Fixed:
+  `FlowConfig`'s comment now states the scope explicitly.
+- **`aggressor_multiplier` scales each `xr_video` fragment's bytes *after*
+  fragmentation, so a scaled fragment can exceed the configured
+  `fragment_bytes`** — silently breaking the "grounded in a real physical
+  constant" MTU-cap claim `_gen_xr_video`'s own docstring makes. Untested:
+  no test combines an aggressor multiplier with `xr_video`, so nothing
+  caught it. **Not fixed** — a real fix means scaling `avg_bytes` before
+  fragmentation, which breaks the multiplier's "uniform regardless of kind"
+  design and needs its own decision, and nothing uses this combination yet.
+  Documented prominently in `FlowConfig`'s comment and CLAUDE.md's Known
+  issues instead, with the workaround (scale `avg_bytes` directly for an
+  `xr_video` aggressor) stated so whoever builds GT-4.3 on an `xr_video`
+  flow doesn't rediscover it the hard way.
+- **`RunRecord.from_summary`'s docstring only named `summary["_ue_lcp"]`**
+  as the intentionally-dropped live object, not `summary["_message_ledger"]`
+  (WP7's own addition, same situation). Fixed: docstring now names both.
+- **Minor:** `Message.frame_id`'s comment said "video frame / lidar sweep,"
+  implying both exist; only `xr_video` (frame) is built. Reworded to say
+  so plainly.
+
+**Checked and NOT a WP7 finding:** `scripts/run_smoke.py` crashes trying to
+`json.dumps()` `driver.run()`'s summary dict, because `UeLcp` isn't
+serialisable — confirmed by actually running it. This is pre-existing
+(fails on `_ue_lcp`, unrelated to WP7's `_message_ledger` addition, which
+has the same problem but never gets reached) — not something this WP broke.
+
+**Noted, not a bug, worth flagging for WP9's larger sweeps:**
+`MessageLedger.completions_for()` does a linear scan of every completion in
+the ledger, filtered by `(ue_id, qfi)`; `driver.py` calls it once per flow.
+For N flows and the run's total message count scaling with N, this is
+O(N × total-messages) — fine at today's scale (tens of flows, hundreds to
+low thousands of messages), but worth knowing about before a much larger
+`N`-sweep scenario makes it a real cost.
+
 ## Next step
 
 **All 9 commits of this plan are landed.** All five of WP7's target metrics

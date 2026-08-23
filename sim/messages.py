@@ -38,7 +38,9 @@ class Message:
     qfi: int
     size_bytes: int
     generation_ts_s: float
-    # Groups sibling PDUs of one video frame / lidar sweep into a PDU set.
+    # Groups sibling PDUs of one PDU set into a frame -- currently only
+    # sim/traffic.py's xr_video generator assigns this (video frames); a
+    # lidar sweep or similar would fit the same mechanism but isn't built.
     # None for flows with no PDU-set structure (most traffic).
     frame_id: int | None = None
     # Tags a sub-stream within a multi-rate flow (WP7 MAVLink cadence,
