@@ -1,10 +1,25 @@
 from dataclasses import dataclass
+from math import ceil
+from typing import NamedTuple
 
 import numpy as np
 
 from .buffer import BufferModel
 from .config import FlowConfig
 from .messages import Message, MessageLedger
+
+
+class _Arrival(NamedTuple):
+    """One generated arrival. ``role``/``frame_id`` default to Message's own
+    defaults, so a kind that doesn't need them can omit them entirely rather
+    than every _gen() branch having to state "data"/None explicitly -- this
+    replaced a bare (ts, bytes, role) tuple (WP7 commit 3) specifically so a
+    second per-arrival attribute (frame_id, commit 5) wouldn't require
+    touching every existing kind's return statement a second time."""
+    ts_s: float
+    bytes: int
+    role: str = "data"
+    frame_id: int | None = None
 
 
 def _clipped_gaussian_jitter_ms(
@@ -24,6 +39,22 @@ def _clipped_gaussian_jitter_ms(
     if sigma_ms <= 0.0:
         return 0.0
     return float(np.clip(rng.normal(0.0, sigma_ms), -clip_ms, clip_ms))
+
+
+def _clipped_gaussian_around_mean(
+    rng: np.random.Generator, mean: float, sigma_frac: float,
+    lo_frac: float, hi_frac: float,
+) -> float:
+    """Gaussian centred on ``mean`` with std ``sigma_frac*mean``, clamped to
+    ``[lo_frac*mean, hi_frac*mean]``. This is docs/p5g-sim-plan.md sec9's XR
+    frame-size shape (sigma~10.5% of mean, clipped to [50%,150%]) -- a
+    distinct shape from _clipped_gaussian_jitter_ms's zero-mean absolute-ms
+    jitter, not a generalisation of it, so kept as its own function rather
+    than one parameterised to cover both.
+    """
+    if sigma_frac <= 0.0:
+        return mean
+    return float(np.clip(rng.normal(mean, sigma_frac * mean), lo_frac * mean, hi_frac * mean))
 
 
 @dataclass
@@ -109,38 +140,39 @@ class TrafficModel:
         arrivals: list[tuple[int, int, int]] = []
         for state in self.flows:
             cfg = state.cfg
-            for ts, byts, role in self._gen(cfg, slot_index, now_s):
-                if byts > 0:
+            for a in self._gen(cfg, slot_index, now_s):
+                if a.bytes > 0:
                     message = None
                     if self.ledger is not None:
                         message = Message(
                             id=self.ledger.new_id(),
                             ue_id=cfg.ue_id,
                             qfi=cfg.qfi,
-                            size_bytes=byts,
-                            generation_ts_s=ts,
-                            role=role,
+                            size_bytes=a.bytes,
+                            generation_ts_s=a.ts_s,
+                            role=a.role,
+                            frame_id=a.frame_id,
                         )
-                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, byts, ts, message=message)
-                    arrivals.append((cfg.ue_id, cfg.qfi, byts))
+                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, a.bytes, a.ts_s, message=message)
+                    arrivals.append((cfg.ue_id, cfg.qfi, a.bytes))
         return arrivals
 
     def _gen(
         self, cfg: FlowConfig, slot_index: int, now_s: float
-    ) -> list[tuple[float, int, str]]:
+    ) -> list[_Arrival]:
         kind = cfg.traffic_kind
         p = cfg.traffic_params
 
         if kind == "deterministic":
             period_slots = max(1, int(p["period_ms"] / 1000.0 / self.slot_duration_s))
             if slot_index % period_slots == 0:
-                return [(now_s, int(p["bytes_per_period"]), "data")]
+                return [_Arrival(now_s, int(p["bytes_per_period"]))]
             return []
 
         if kind == "poisson":
             mean_bytes = (p["rate_bps"] / 8.0) * self.slot_duration_s
             byts = int(self.rng.poisson(mean_bytes))
-            return [(now_s, byts, "data")] if byts > 0 else []
+            return [_Arrival(now_s, byts)] if byts > 0 else []
 
         if kind == "adaptive":
             state = self._state_of[(cfg.ue_id, cfg.qfi)]
@@ -156,7 +188,7 @@ class TrafficModel:
             mean_bytes = (state.rate_bps / 8.0) * self.slot_duration_s
             byts = int(self.rng.poisson(mean_bytes))
             state.offered_since_adapt += byts
-            return [(now_s, byts, "data")] if byts > 0 else []
+            return [_Arrival(now_s, byts)] if byts > 0 else []
 
         if kind == "video_frame":
             period_slots = max(1, int(p.get("period_ms", 16.67) / 1000.0 / self.slot_duration_s))
@@ -169,7 +201,10 @@ class TrafficModel:
             i_mult = float(p.get("i_frame_multiplier", 5.0))
             mult = i_mult if ((frame_idx + i_phase) % i_period == 0) else 1.0
             size = int(p["avg_bytes"] * mult)
-            return [(now_s, size, "data")]
+            return [_Arrival(now_s, size)]
+
+        if kind == "xr_video":
+            return self._gen_xr_video(cfg, slot_index, now_s)
 
         if kind in ("periodic_control", "condition_monitor"):
             # Mechanically identical for both kind names -- the plan doc's
@@ -192,7 +227,7 @@ class TrafficModel:
 
     def _gen_periodic_control(
         self, cfg: FlowConfig, slot_index: int, now_s: float
-    ) -> list[tuple[float, int, str]]:
+    ) -> list[_Arrival]:
         """Deterministic period +/- clipped-Gaussian jitter, per (sub-)stream.
 
         ``traffic_params["streams"]`` (optional): a list of independently-
@@ -218,7 +253,7 @@ class TrafficModel:
                 "jitter_clip_ms": p.get("jitter_clip_ms"),
             }]
 
-        arrivals: list[tuple[float, int, str]] = []
+        arrivals: list[_Arrival] = []
         for stream in streams:
             period_ms = float(stream["period_ms"])
             period_slots = max(1, int(period_ms / 1000.0 / self.slot_duration_s))
@@ -230,12 +265,12 @@ class TrafficModel:
             jitter_s = _clipped_gaussian_jitter_ms(self.rng, sigma_ms, clip_ms) / 1000.0
             ts = max(0.0, now_s + jitter_s)
             role = str(stream.get("role", "data"))
-            arrivals.append((ts, int(stream["bytes"]), role))
+            arrivals.append(_Arrival(ts, int(stream["bytes"]), role))
         return arrivals
 
     def _gen_poisson_triggered_burst(
         self, cfg: FlowConfig, slot_index: int, now_s: float
-    ) -> list[tuple[float, int, str]]:
+    ) -> list[_Arrival]:
         """A single burst, triggered by a per-slot Bernoulli-thinned Poisson
         process -- the same per-slot-probability approximation the existing
         ``poisson`` kind already uses for its continuous arrivals, applied
@@ -247,4 +282,70 @@ class TrafficModel:
         trigger_prob = float(p["rate_hz"]) * self.slot_duration_s
         if self.rng.random() >= trigger_prob:
             return []
-        return [(now_s, int(p["burst_bytes"]), "data")]
+        return [_Arrival(now_s, int(p["burst_bytes"]))]
+
+    def _gen_xr_video(
+        self, cfg: FlowConfig, slot_index: int, now_s: float
+    ) -> list[_Arrival]:
+        """3GPP XR video frame model (docs/p5g-sim-plan.md sec9): frame size
+        truncated Gaussian (sigma~10.5% of mean, clipped to [50%,150%]);
+        arrival jitter truncated Gaussian (sigma~2ms, clipped to +/-4ms, the
+        same _clipped_gaussian_jitter_ms commit 3 built for periodic_control
+        -- one jitter mechanism, not two); one frame = one PDU set, modelled
+        as several sibling Messages sharing one frame_id (sim/messages.py).
+
+        PDU-set decomposition (docs/wp7-plan.md Decision #1, decided): the
+        frame is split into ceil(frame_bytes / fragment_bytes) equal-ish
+        chunks, mimicking IP/MTU fragmentation. This is an explicit stand-in
+        for RTP packetization, NOT a verified one -- oai-branches/ is
+        MAC-layer scheduler source only and has no RTP/PDCP fragmentation
+        ground truth at all. Only the *generating rule* (a fragment size) is
+        grounded in a real physical constant; the specific value is not, so
+        traffic_params["fragment_bytes"] has no default and must be set by
+        the caller -- so a scenario can't silently inherit an unexamined
+        constant, and WP9 can sweep it as an axis (M05 is a G5 metric, and
+        fragment size plausibly moves PDU-set completeness). Same honesty
+        bar as sim/power.py's shrink_to_power_budget/snr_to_prb_floor.
+
+        Periodicity: like every other kind here, frames fire on a slot-
+        quantised cadence (period_slots = period_ms rounded down to the
+        nearest slot) -- e.g. 16.67ms at a 0.5ms slot quantises to 33 slots
+        (16.5ms), a fixed rational approximation, not a continuously
+        accumulating fractional period. This is a structural property of
+        the whole slot-stepped simulator (every kind here has it), not
+        something new this generator introduces or resolves; it's still
+        where the intended aliasing against the 100ms Tier-1 period shows
+        up, just at the coarser precision the simulator's own slot grid
+        allows.
+        """
+        p = cfg.traffic_params
+        period_slots = max(1, int(p["period_ms"] / 1000.0 / self.slot_duration_s))
+        slot_offset = int(p.get("slot_offset", 0))
+        if (slot_index - slot_offset) % period_slots != 0 or slot_index < slot_offset:
+            return []
+        frame_idx = (slot_index - slot_offset) // period_slots
+
+        avg_bytes = float(p["avg_bytes"])
+        sigma_frac = float(p.get("frame_size_sigma_frac", 0.105))
+        lo_frac = float(p.get("frame_size_clip_lo_frac", 0.5))
+        hi_frac = float(p.get("frame_size_clip_hi_frac", 1.5))
+        frame_bytes = max(0, int(_clipped_gaussian_around_mean(
+            self.rng, avg_bytes, sigma_frac, lo_frac, hi_frac
+        )))
+
+        jitter_sigma_ms = float(p.get("jitter_sigma_ms", 2.0))
+        jitter_clip_ms = float(p.get("jitter_clip_ms", 4.0))
+        jitter_s = _clipped_gaussian_jitter_ms(self.rng, jitter_sigma_ms, jitter_clip_ms) / 1000.0
+        ts = max(0.0, now_s + jitter_s)
+
+        fragment_bytes = int(p["fragment_bytes"])
+        if frame_bytes == 0:
+            return []
+        n_fragments = ceil(frame_bytes / fragment_bytes)
+        arrivals: list[_Arrival] = []
+        remaining = frame_bytes
+        for _ in range(n_fragments):
+            chunk = min(fragment_bytes, remaining)
+            arrivals.append(_Arrival(ts, chunk, frame_id=frame_idx))
+            remaining -= chunk
+        return arrivals

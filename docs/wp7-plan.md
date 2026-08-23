@@ -96,7 +96,34 @@ Update it as commits land; don't let it drift back out of sync with reality.
   ledgers, XR completions) will add more data of the same shape. Not
   blocking, but worth watching — if the corpus grows unwieldy, precomputing
   gaps instead of raw timestamps would help at the cost of baking a fixed
-  `T_live` in at capture time.
+  `T_live` in at capture time. (Addressed below, before commit 5.)
+- **Regression-corpus compaction** (not a numbered commit) — see its own
+  section below. Landed between commits 4 and 5.
+- **Commit 5** — `sim/traffic.py`'s `xr_video` generator: frame size
+  `_clipped_gaussian_around_mean` (σ≈10.5% of mean, clipped [50%,150%],
+  `docs/p5g-sim-plan.md` §9); arrival jitter reuses commit 3's
+  `_clipped_gaussian_jitter_ms` (σ≈2ms, clipped ±4ms — one jitter
+  mechanism, not two, same reasoning as `periodic_control`'s); PDU-set
+  decomposition per Decision #1 (`ceil(frame_bytes/fragment_bytes)` sibling
+  messages sharing one `frame_id`, `fragment_bytes` required with **no
+  default** so no scenario can silently inherit an unexamined constant).
+  `_gen()`'s return shape changed a second time — `(ts, bytes, role)` →
+  a `_Arrival` `NamedTuple` with keyword-defaulted `role`/`frame_id` — so a
+  third per-arrival attribute won't require touching every existing kind's
+  return statement again; bundled into this commit since it's mechanical
+  and provably inert (unlike the corpus compaction, no information
+  tradeoff to isolate). 8 new tests in `sim/tests/test_traffic.py` (20
+  total in that file).
+
+  **Drift prediction, made before writing any code, confirmed exactly:** no
+  scenario or test anywhere references `xr_video` (checked directly, not
+  assumed) — predicted a clean `--check`, falsifiable. Actual: clean, full
+  suite 185 passed (177 + 8 new).
+
+  **Panel check:** `config/metric_panel.yml` untouched — confirmed by its
+  absence from the diff. M05/M06/M17 all need commit 6/7's `FrameLedger` and
+  scorecard functions; the generator alone satisfies none of their
+  `requires:`.
 
 **Verified independently before writing this plan** (2026-08-23): full
 suite green (160 passed, `sim/tests -q`), `scripts/regression_corpus.py
@@ -390,8 +417,8 @@ back below commit 3's trajectory).
 
 ## Next step
 
-Commits 3 and 4 are landed (see "Landed" above); M03 is `ok`; the regression
-corpus is now stored compactly. Next action is commit 5: the `xr_video`
-generator, implementing Decision #1's size-derived fragmentation (fragment
-size as a config parameter, docstring disclosing the MTU-style stand-in
-explicitly).
+Commits 3-5 are landed (see "Landed" above); M03 is `ok`; the regression
+corpus is stored compactly; `xr_video` exists but no scenario uses it yet.
+Next action is commit 6: `FrameLedger` + M05 (`pdu_set_completeness`) + M06
+(`frame_age_at_mec`), grouping `xr_video`'s frame-tagged completions by
+`frame_id`, and the panel flip for both.

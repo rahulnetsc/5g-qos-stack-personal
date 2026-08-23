@@ -5,11 +5,12 @@ directly, same style as test_messages.py.
 """
 
 import numpy as np
+import pytest
 
 from sim.buffer import BufferModel
 from sim.config import FlowConfig
 from sim.messages import MessageLedger
-from sim.traffic import TrafficModel, _clipped_gaussian_jitter_ms
+from sim.traffic import TrafficModel, _clipped_gaussian_jitter_ms, _clipped_gaussian_around_mean
 
 
 def _model(flow: FlowConfig, slot_duration_s: float = 0.0005, seed: int = 0,
@@ -27,17 +28,17 @@ def test_periodic_control_fires_on_period_boundaries_with_role_data():
     period_slots = int(1.0 / 1000.0 / 0.0005)  # 2
     fired = [model._gen(flow, i, i * 0.0005) for i in range(6)]
     assert [bool(f) for f in fired] == [True, False, True, False, True, False]
-    ts, byts, role = fired[0][0]
-    assert byts == 30
-    assert role == "data"
+    a = fired[0][0]
+    assert a.bytes == 30
+    assert a.role == "data"
 
 
 def test_periodic_control_without_jitter_params_is_deterministic():
     flow = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="periodic_control",
                        traffic_params={"period_ms": 1.0, "bytes_per_period": 30})
     model = _model(flow)
-    ts, byts, role = model._gen(flow, 0, 0.0)[0]
-    assert ts == 0.0  # no jitter configured -> sigma defaults to 0.0
+    a = model._gen(flow, 0, 0.0)[0]
+    assert a.ts_s == 0.0  # no jitter configured -> sigma defaults to 0.0
 
 
 def test_condition_monitor_is_mechanically_identical_to_periodic_control():
@@ -75,11 +76,11 @@ def test_multi_role_streams_tag_each_sub_streams_role_independently():
         ]},
     )
     model = _model(flow, slot_duration_s=0.0005)
-    roles_at_slot0 = {r for _, _, r in model._gen(flow, 0, 0.0)}
+    roles_at_slot0 = {a.role for a in model._gen(flow, 0, 0.0)}
     assert roles_at_slot0 == {"heartbeat", "telemetry"}
     # telemetry period = 2 slots, heartbeat period = 8 slots -- at slot 2,
     # only telemetry should fire.
-    roles_at_slot2 = {r for _, _, r in model._gen(flow, 2, 2 * 0.0005)}
+    roles_at_slot2 = {a.role for a in model._gen(flow, 2, 2 * 0.0005)}
     assert roles_at_slot2 == {"telemetry"}
 
 
@@ -107,7 +108,7 @@ def test_aperiodic_event_always_fires_when_trigger_prob_is_one():
     model = _model(flow, slot_duration_s=0.0005)
     for i in range(20):
         arrivals = model._gen(flow, i, i * 0.0005)
-        assert arrivals == [(i * 0.0005, 1000, "data")]
+        assert arrivals == [(i * 0.0005, 1000, "data", None)]
 
 
 def test_clipped_gaussian_jitter_never_exceeds_clip_bound():
@@ -138,12 +139,106 @@ def test_periodic_control_jitter_default_clip_is_twice_sigma():
     assert all(0.0 <= ts <= 0.2 for ts in ts_values)
 
 
-def test_existing_kinds_tag_role_data_and_are_otherwise_unaffected():
-    """The _gen() tuple-shape change (ts, bytes) -> (ts, bytes, role) touches
-    every existing kind's return statement mechanically; this pins that the
-    values themselves (not just role) are unchanged from pre-WP7 shape."""
+def test_xr_video_fires_on_period_boundaries_and_tags_frame_id():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="DL", traffic_kind="xr_video",
+                       traffic_params={"period_ms": 1.0, "avg_bytes": 3000,
+                                       "frame_size_sigma_frac": 0.0,
+                                       "fragment_bytes": 1500})
+    model = _model(flow, slot_duration_s=0.0005)
+    period_slots = int(1.0 / 1000.0 / 0.0005)  # 2
+    fired = [model._gen(flow, i, i * 0.0005) for i in range(6)]
+    assert [bool(f) for f in fired] == [True, False, True, False, True, False]
+    frame_ids = [f[0].frame_id for f in fired if f]
+    assert frame_ids == [0, 1, 2]  # frame_idx increments once per firing
+
+
+def test_xr_video_fragments_a_frame_into_ceil_fragment_count_sharing_one_frame_id():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="DL", traffic_kind="xr_video",
+                       traffic_params={"period_ms": 1.0, "avg_bytes": 3200,
+                                       "frame_size_sigma_frac": 0.0,  # deterministic size
+                                       "fragment_bytes": 1500})
+    model = _model(flow, slot_duration_s=0.0005)
+    arrivals = model._gen(flow, 0, 0.0)
+    assert len(arrivals) == 3  # ceil(3200/1500) = 3
+    assert [a.bytes for a in arrivals] == [1500, 1500, 200]
+    assert sum(a.bytes for a in arrivals) == 3200
+    assert all(a.frame_id == 0 for a in arrivals)
+    assert all(a.ts_s == arrivals[0].ts_s for a in arrivals)  # siblings share one ts
+
+
+def test_xr_video_requires_fragment_bytes_with_no_default():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="DL", traffic_kind="xr_video",
+                       traffic_params={"period_ms": 1.0, "avg_bytes": 3000})
+    model = _model(flow, slot_duration_s=0.0005)
+    with pytest.raises(KeyError):
+        model._gen(flow, 0, 0.0)
+
+
+def test_xr_video_frame_size_is_clipped_to_the_spec_range():
+    """sigma_frac huge -> the raw Gaussian draw is almost certainly outside
+    [50%,150%] of the mean, so clipping must have actually engaged."""
+    flow = FlowConfig(ue_id=1, qfi=9, direction="DL", traffic_kind="xr_video",
+                       traffic_params={"period_ms": 1.0, "avg_bytes": 1000,
+                                       "frame_size_sigma_frac": 5.0,
+                                       "fragment_bytes": 100000})
+    model = _model(flow, slot_duration_s=0.0005, seed=2)
+    sizes = []
+    for i in range(0, 40, 2):
+        arrivals = model._gen(flow, i, i * 0.0005)
+        if arrivals:
+            sizes.append(sum(a.bytes for a in arrivals))
+    assert sizes  # got at least one frame
+    assert all(500 <= s <= 1500 for s in sizes)  # [50%,150%] of 1000
+
+
+def test_xr_video_zero_avg_bytes_produces_no_arrivals():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="DL", traffic_kind="xr_video",
+                       traffic_params={"period_ms": 1.0, "avg_bytes": 0,
+                                       "frame_size_sigma_frac": 0.0,
+                                       "fragment_bytes": 1500})
+    model = _model(flow, slot_duration_s=0.0005)
+    assert model._gen(flow, 0, 0.0) == []
+
+
+def test_xr_video_jitter_defaults_match_the_3gpp_spec_values():
+    """docs/p5g-sim-plan.md sec9: sigma~2ms, clipped to +/-4ms, when the
+    scenario doesn't override jitter_sigma_ms/jitter_clip_ms."""
+    flow = FlowConfig(ue_id=1, qfi=9, direction="DL", traffic_kind="xr_video",
+                       traffic_params={"period_ms": 1.0, "avg_bytes": 1000,
+                                       "frame_size_sigma_frac": 0.0,
+                                       "fragment_bytes": 100000})
+    model = _model(flow, slot_duration_s=0.0005, seed=5)
+    ts_values = []
+    for i in range(0, 400, 2):
+        arrivals = model._gen(flow, i, i * 0.0005)
+        if arrivals:
+            ts_values.append(arrivals[0].ts_s - i * 0.0005)
+    assert all(-0.004 - 1e-9 <= dt <= 0.004 + 1e-9 for dt in ts_values)  # +/-4ms
+    assert any(dt != 0.0 for dt in ts_values)  # sigma=2ms actually perturbs
+
+
+def test_clipped_gaussian_around_mean_never_exceeds_clip_fractions():
+    rng = np.random.default_rng(0)
+    samples = [_clipped_gaussian_around_mean(rng, mean=1000.0, sigma_frac=1.0,
+                                              lo_frac=0.5, hi_frac=1.5)
+               for _ in range(2000)]
+    assert all(500.0 <= s <= 1500.0 for s in samples)
+    assert any(s != 1000.0 for s in samples)
+
+
+def test_clipped_gaussian_around_mean_is_exactly_mean_when_sigma_is_zero():
+    rng = np.random.default_rng(0)
+    assert all(_clipped_gaussian_around_mean(rng, 1000.0, 0.0, 0.5, 1.5) == 1000.0
+               for _ in range(10))
+
+
+def test_existing_kinds_tag_role_data_and_frame_id_none_and_are_otherwise_unaffected():
+    """The _gen() return shape has been extended twice now (bare tuple ->
+    (ts,bytes,role) in commit 3 -> _Arrival(ts,bytes,role,frame_id) in
+    commit 5); this pins that every existing kind's values (not just the
+    new defaulted fields) are unchanged."""
     det = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="deterministic",
                       traffic_params={"period_ms": 1.0, "bytes_per_period": 100})
     model = _model(det, slot_duration_s=0.0005)
-    ts, byts, role = model._gen(det, 0, 0.0)[0]
-    assert (ts, byts, role) == (0.0, 100, "data")
+    a = model._gen(det, 0, 0.0)[0]
+    assert (a.ts_s, a.bytes, a.role, a.frame_id) == (0.0, 100, "data", None)
