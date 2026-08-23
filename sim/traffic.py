@@ -6,6 +6,7 @@ import numpy as np
 
 from .buffer import BufferModel
 from .config import FlowConfig
+from .cycle_clock import phase_offset_slots
 from .messages import Message, MessageLedger
 
 
@@ -141,20 +142,30 @@ class TrafficModel:
         for state in self.flows:
             cfg = state.cfg
             for a in self._gen(cfg, slot_index, now_s):
-                if a.bytes > 0:
+                byts = a.bytes
+                # WP7 commit 9: aggressor/fault-injection rate multiplier
+                # (README sec6, GT-4.3/T6a/b/d) -- a uniform post-processing
+                # scale applied here, not inside _gen(), so it works
+                # identically regardless of which kind generated the
+                # arrival. 1.0 (every existing flow's default) is a no-op.
+                if cfg.aggressor_multiplier != 1.0:
+                    trigger_slot = int(cfg.aggressor_trigger_ms / 1000.0 / self.slot_duration_s)
+                    if slot_index >= trigger_slot:
+                        byts = int(byts * cfg.aggressor_multiplier)
+                if byts > 0:
                     message = None
                     if self.ledger is not None:
                         message = Message(
                             id=self.ledger.new_id(),
                             ue_id=cfg.ue_id,
                             qfi=cfg.qfi,
-                            size_bytes=a.bytes,
+                            size_bytes=byts,
                             generation_ts_s=a.ts_s,
                             role=a.role,
                             frame_id=a.frame_id,
                         )
-                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, a.bytes, a.ts_s, message=message)
-                    arrivals.append((cfg.ue_id, cfg.qfi, a.bytes))
+                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, byts, a.ts_s, message=message)
+                    arrivals.append((cfg.ue_id, cfg.qfi, byts))
         return arrivals
 
     def _gen(
@@ -241,6 +252,16 @@ class TrafficModel:
         ``role="data"`` -- every pre-WP7 use of this kind (there are none
         yet) and every scenario not opting into multi-role behaves exactly
         the same either way.
+
+        ``cfg.sync_group`` (WP7 commit 9, ``sim/cycle_clock.py``): when set,
+        every stream's firing slot shifts by ``cfg.phase_offset_ms``
+        (relative to the shared slot-0 anchor every sync_group member uses)
+        and gets an extra, independent jitter draw from
+        ``cfg.phase_jitter_ms`` on top of the stream's own jitter -- two
+        distinct sources of variance (per-stream arrival jitter vs.
+        per-robot response-to-the-shared-tick jitter) composed by simple
+        addition, not merged into one. ``sync_group is None`` (every
+        existing flow) skips this entirely.
         """
         p = cfg.traffic_params
         streams = p.get("streams")
@@ -253,16 +274,25 @@ class TrafficModel:
                 "jitter_clip_ms": p.get("jitter_clip_ms"),
             }]
 
+        offset_slots = (
+            phase_offset_slots(cfg.phase_offset_ms, self.slot_duration_s)
+            if cfg.sync_group is not None else 0
+        )
+
         arrivals: list[_Arrival] = []
         for stream in streams:
             period_ms = float(stream["period_ms"])
             period_slots = max(1, int(period_ms / 1000.0 / self.slot_duration_s))
-            if slot_index % period_slots != 0:
+            if slot_index < offset_slots or (slot_index - offset_slots) % period_slots != 0:
                 continue
             sigma_ms = float(stream.get("jitter_sigma_ms", 0.0))
             clip_ms = stream.get("jitter_clip_ms")
             clip_ms = float(clip_ms) if clip_ms is not None else 2.0 * sigma_ms
             jitter_s = _clipped_gaussian_jitter_ms(self.rng, sigma_ms, clip_ms) / 1000.0
+            if cfg.sync_group is not None and cfg.phase_jitter_ms > 0.0:
+                jitter_s += _clipped_gaussian_jitter_ms(
+                    self.rng, cfg.phase_jitter_ms, 2.0 * cfg.phase_jitter_ms
+                ) / 1000.0
             ts = max(0.0, now_s + jitter_s)
             role = str(stream.get("role", "data"))
             arrivals.append(_Arrival(ts, int(stream["bytes"]), role))

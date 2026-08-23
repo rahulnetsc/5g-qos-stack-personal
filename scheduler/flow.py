@@ -107,10 +107,38 @@ class FlowConfig:
     # itself and from config/metric_panel.yml's t_live_s/survival_miss_n,
     # which are different concepts despite sounding adjacent. Default 0
     # collapses M14 to "delivered within max latency"; no factory-relevant
-    # value exists on disk to pick instead. Only consumer is M14's WP7
-    # commit 8, not yet built -- when it lands it must report this value
-    # alongside the availability figure, never a bare number.
+    # value exists on disk to pick instead. M14 (WP7 commit 8) reports this
+    # value alongside the availability figure on every result, never a bare
+    # number, so a 0.0 default is never misread as a full CSA measurement.
     survival_time_ms: float = 0.0
+
+    # WP7 commit 9: shared production-line clock (sim/cycle_clock.py) for
+    # correlated bursts -- the "thundering herd" mechanism, docs/p5g-sim-
+    # plan.md sec9. None = doesn't participate (every existing flow,
+    # unaffected). Flows sharing the same sync_group value all anchor to
+    # slot 0 (like every other periodic kind here already does -- a
+    # sync_group is about synchrony BETWEEN its members, not the absolute
+    # phase of the whole run), then each fires phase_offset_ms after that
+    # shared tick, jittered by phase_jitter_ms (reusing sim/traffic.py's
+    # _clipped_gaussian_jitter_ms, not a second jitter mechanism).
+    # phase_jitter_ms defaults to 0.0 -- no ground truth for a nonzero
+    # value, README sec8 [OPEN].
+    sync_group: int | None = None
+    phase_offset_ms: float = 0.0
+    phase_jitter_ms: float = 0.0
+
+    # WP7 commit 9: fault-injection rate multiplier (README sec6, GT-4.3/
+    # T6a/b/d: 2x/3x/5x/10x on a named flow, mid-run -- checked against
+    # docs/IA_P5G_Guarantee_Validation_Suite.md's actual T6 table). Scales
+    # every generated arrival's byte count from aggressor_trigger_ms
+    # onward, a sustained step, not a bounded burst. Covers a misbehaving/
+    # misconfigured asset's SUSTAINED rate increase (T6a/b/d, GT-4.3) --
+    # does NOT cover T6c (a "line rate" burst, not a multiple of nominal)
+    # or T6e (an RF-outage recovery, a channel-side event, not a traffic-
+    # generation one); those need different tooling, not this knob.
+    # 1.0 = inert, every existing flow's default.
+    aggressor_multiplier: float = 1.0
+    aggressor_trigger_ms: float = 0.0
 
     traffic_kind: str = "poisson"
     traffic_params: dict = field(default_factory=dict)

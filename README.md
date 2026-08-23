@@ -149,7 +149,7 @@ that the number is certifiable — certifiable numbers still require real RF.
 |---|---|---|---|---|
 | G1 | Drive command p98 ≤ PDB | T1/T2 shared-bearer modeling, DL LCP | WP7, Phase 2 | Yes |
 | G2 | STOP always lands fast | Rule-of-three sample sizing (already in panel), DL priority | WP0, Phase 2 | Yes |
-| G3 | No false-failsafe | Real BSR/grant chain, liveness gap distribution | WP3, WP4 | Yes |
+| G3 | No false-failsafe | Real BSR/grant chain, liveness gap distribution | WP3, WP4, WP7 | Yes |
 | G4 | Prompt resume after silence | SR-path fidelity, floor arming window | WP4 | Yes |
 | G5 | Fresh, complete video | XR frame model, PDU-set completeness, frame age | WP7 | Yes |
 | G6 | BG traffic never impairs fleet | Non-GBR containment, per-class accounting | WP0 metric panel | Yes |
@@ -157,7 +157,7 @@ that the number is certifiable — certifiable numbers still require real RF.
 | G8 | Equal entitlement, continuously | Per-1s Jain (already flagged as new in `p5g-sim-plan.md` §7) | WP0 | Yes |
 | G9 | Fast join / re-join | **Join/RLF state machine — does not exist yet** | **WP-Join** | **No, until WP-Join lands** |
 | G10 | Admissible fleet size | N-sweep (this is what simulation buys that hardware can't — `p5g-sim-plan.md` §2) | Phase 3 | Yes |
-| G11 | Holds for a shift, reproducibly | Long-run soak, communication service availability metric (new, §6) | WP0 metric panel | Yes |
+| G11 | Holds for a shift, reproducibly | Long-run soak, communication service availability metric (new, §6) | WP0 metric panel, WP7 | Yes |
 | G12 | Ordered degradation under overload | First-violation-order metric (already in panel) | Phase 3 | Yes |
 
 **G9 is the one guarantee this simulator currently cannot address at all**,
@@ -520,6 +520,18 @@ they survive it:
   T9 are unanswerable until this is built.** See `docs/wp7-plan.md`'s
   Decision #2 for the full three-option writeup — a future revisit should
   start from that analysis, not redo it.
+- `[OPEN]` **`FlowConfig.phase_jitter_ms` (WP7 commit 9, `sim/cycle_
+  clock.py`'s sync_group mechanism) defaults to 0.0 — no ground truth for a
+  nonzero value.** A `sync_group`'s members are meant to model per-robot
+  processing-time variance around a shared production-cycle tick, but
+  nothing on disk (no spec, no `oai-branches/` source) gives a real number
+  for how much that varies. Defaulting to 0.0 (no jitter, deterministic
+  phase) is deliberate and consistent with every other jitter parameter
+  this WP added (`periodic_control`'s `jitter_sigma_ms`, `xr_video`'s
+  jitter both also default to off) — a scenario author who wants realistic
+  variance must set a nonzero value explicitly, rather than inheriting an
+  invented constant silently. Revisit if/when a scenario actually needs
+  correlated-burst jitter to be non-degenerate.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

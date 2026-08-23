@@ -242,3 +242,57 @@ def test_existing_kinds_tag_role_data_and_frame_id_none_and_are_otherwise_unaffe
     model = _model(det, slot_duration_s=0.0005)
     a = model._gen(det, 0, 0.0)[0]
     assert (a.ts_s, a.bytes, a.role, a.frame_id) == (0.0, 100, "data", None)
+
+
+def test_sync_group_shifts_the_firing_slot_by_phase_offset():
+    # period_ms=2.0 -> period_slots=4 at 0.0005s slots. phase_offset_ms=1.0
+    # -> offset_slots=2, so firing moves from {0,4,8,...} to {2,6,10,...}.
+    flow = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="periodic_control",
+                       traffic_params={"period_ms": 2.0, "bytes_per_period": 30},
+                       sync_group=1, phase_offset_ms=1.0)
+    model = _model(flow, slot_duration_s=0.0005)
+    fired = [bool(model._gen(flow, i, i * 0.0005)) for i in range(10)]
+    assert fired == [False, False, True, False, False, False, True, False, False, False]
+
+
+def test_sync_group_none_ignores_phase_offset_even_if_set():
+    """Defensive: phase_offset_ms should never matter unless sync_group is
+    actually set -- every existing flow (sync_group=None) must be
+    unaffected even if some default somehow set phase_offset_ms."""
+    flow = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="periodic_control",
+                       traffic_params={"period_ms": 2.0, "bytes_per_period": 30},
+                       sync_group=None, phase_offset_ms=1.0)
+    model = _model(flow, slot_duration_s=0.0005)
+    fired = [bool(model._gen(flow, i, i * 0.0005)) for i in range(8)]
+    assert fired == [True, False, False, False, True, False, False, False]
+
+
+def test_sync_group_phase_jitter_adds_to_the_streams_own_jitter():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="periodic_control",
+                       traffic_params={"period_ms": 2.0, "bytes_per_period": 30},
+                       sync_group=1, phase_offset_ms=0.0, phase_jitter_ms=100.0)
+    model = _model(flow, slot_duration_s=0.0005, seed=3)
+    ts_values = [model._gen(flow, 0, 0.0)[0].ts_s for _ in range(200)]
+    assert any(dt != 0.0 for dt in ts_values)  # phase_jitter_ms actually perturbs
+    # clip defaults to 2x sigma = 200ms -> ts = max(0, 0 + jitter) in [0, 0.2]s
+    assert all(0.0 <= dt <= 0.2 + 1e-9 for dt in ts_values)
+
+
+def test_aggressor_multiplier_scales_bytes_from_trigger_onward():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="deterministic",
+                       traffic_params={"period_ms": 1.0, "bytes_per_period": 100},
+                       aggressor_multiplier=3.0, aggressor_trigger_ms=1.0)
+    model = _model(flow, slot_duration_s=0.0005)
+    # period_slots=2 -> fires at slot 0 (before trigger) and slot 2 (at/after).
+    arrivals_before = model.generate(0)
+    arrivals_after = model.generate(2)
+    assert arrivals_before == [(1, 9, 100)]   # slot 0 < trigger_slot (2) -> unscaled
+    assert arrivals_after == [(1, 9, 300)]    # slot 2 >= trigger_slot -> 100*3
+
+
+def test_aggressor_multiplier_default_is_a_no_op():
+    flow = FlowConfig(ue_id=1, qfi=9, direction="UL", traffic_kind="deterministic",
+                       traffic_params={"period_ms": 1.0, "bytes_per_period": 100})
+    model = _model(flow, slot_duration_s=0.0005)
+    assert model.generate(0) == [(1, 9, 100)]
+    assert model.generate(2) == [(1, 9, 100)]

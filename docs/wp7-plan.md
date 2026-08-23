@@ -253,10 +253,61 @@ Update it as commits land; don't let it drift back out of sync with reality.
   Actual: exactly 510, that one field. Re-baselined; no `_compact_for_
   regression` change needed (no array introduced). File size: 755,541 →
   773,391 bytes (+17,850 bytes for 510 trivial scalars).
+- **Commit 9** — `sim/cycle_clock.py` (new, stateless — every sync_group
+  member computes its own phase offset against a fixed slot-0 anchor, so no
+  shared mutable state is actually needed despite the "clock" name
+  inherited from the plan doc's file naming). `FlowConfig` gains
+  `sync_group`/`phase_offset_ms`/`phase_jitter_ms` (correlated-burst /
+  "thundering herd" mechanism) and `aggressor_multiplier`/
+  `aggressor_trigger_ms` (fault-injection rate multiplier, README §6).
+  `_gen_periodic_control` shifts its firing slot by `phase_offset_ms` when
+  `sync_group` is set, and composes an independent `phase_jitter_ms` draw
+  on top of a stream's own jitter (two distinct variance sources, added,
+  not merged) reusing `_clipped_gaussian_jitter_ms` — no second jitter
+  mechanism. The aggressor multiplier is a uniform post-processing scale in
+  `generate()` (not inside `_gen()`), so it works identically regardless of
+  which kind generated the arrival — from `aggressor_trigger_ms` onward, a
+  sustained step, not a bounded burst.
 
-**Last verified** (2026-08-23, after commit 8): full suite green (208
+  **Aggressor-knob shape checked against the actual test specs before
+  building, not assumed:** read `docs/IA_P5G_Guarantee_Validation_Suite.md`'s
+  T6 table and `docs/IA_P5G_Factory_Guarantee_Test_Plan.md`'s GT-4.3
+  directly. The multiplier-from-trigger-time shape covers T6a (3× video),
+  T6b (5× lidar), T6d (10× telemetry), and GT-4.3 (2× MFBR) exactly — all
+  sustained rate increases on a named flow. It does **not** cover T6c (a
+  "line rate" burst, not a multiple of nominal — needs a different
+  generator variant) or T6e (an RF-outage recovery — a channel-side event,
+  not a traffic-generation one). Recorded so "aggressor knobs" doesn't
+  quietly imply full T6a-e coverage.
+
+  **Decision #4 resolved:** `phase_jitter_ms` defaults to 0.0 (no jitter
+  unless a scenario opts in) — consistent with every other jitter parameter
+  this WP added, all of which default to off rather than inventing a
+  nonzero number. New README §8 `[OPEN]` entry recording this.
+
+  **Drift prediction, made before writing any code, confirmed exactly:**
+  every new field is on `FlowConfig` (scenario input), not `RunRecord.
+  FlowRecord` — none of them feed a scorecard function (unlike
+  `survival_time_ms`/`xr_frame_period_ms`, which M14/M17 actually consume),
+  so there was nothing to copy onto `FlowRecord` at all. Combined with no
+  existing scenario referencing any of the five new fields (grepped
+  directly), predicted a **fully clean** `--check` — not "small and
+  trivial" like commits 6-8, genuinely zero mismatches, same as commits 3
+  and 5. Actual: clean. `config/metric_panel.yml` untouched (confirmed by
+  its absence from the diff) — commit 9 touches no scorecard logic; all
+  five WP7 metrics stay `ok`.
+
+  Also fixed in this commit, per review: README §5's guarantee
+  traceability table cited "WP3, WP4" for G3 and "WP0 metric panel" for G11
+  without naming WP7, even though M03/M14 needed WP7 to exist at all
+  (flagged as a finding in commit 8, fixed here rather than carried
+  further) — both rows now cite WP7. G5's row already correctly named WP7;
+  checked, no change needed. 9 new tests (2 in `sim/tests/test_cycle_
+  clock.py`, 7 in `test_traffic.py`).
+
+**Last verified** (2026-08-23, after commit 9): full suite green (215
 passed, `sim/tests -q`), `scripts/regression_corpus.py --check` clean, all
-commits through 8 pushed to `origin/feat/high-fidelity-sim`. Update this
+commits through 9 pushed to `origin/feat/high-fidelity-sim`. Update this
 line as commits land rather than letting it go stale again — it already did
 once before (see commit 6's note above).
 
@@ -353,7 +404,8 @@ are different concepts already flagged `[OPEN]` elsewhere.
   factory feature," load-bearing for H2 (two-tier's cross-idle credit
   accumulation) and H5. Doesn't flip a panel metric by itself — it's a
   scenario-realism feature that a later characterisation run (WP9) would
-  exercise. **Commit 9.**
+  exercise. **Landed in commit 9** — no scenario uses it yet, so it's
+  inert until WP9 actually builds a sync_group scenario to test H2/H5.
 - **RTSP/TCP UL/DL coupling** (README §6, needed for G10's mixed-fleet
   column and T9) — **decided: build none of it** (Decision #2 below).
   Dropped from this plan entirely; recorded instead as a new `[OPEN]` entry
@@ -361,10 +413,13 @@ are different concepts already flagged `[OPEN]` elsewhere.
   commit.
 - **Aggressor/fault-injection rate multipliers** (README §6, GT-4.3/T6a-e:
   2x/3x/5x/10x on a named flow, mid-run) — "should be first-class scenario
-  parameters, not one-off scripts." **Assigned to commit 9**, alongside
-  `cycle_clock`/`sync_group` — both touch scenario-config machinery, and
-  nothing else forces when the knobs would otherwise land, which is exactly
-  why they'd get dropped without an explicit assignment.
+  parameters, not one-off scripts." **Landed in commit 9**, alongside
+  `cycle_clock`/`sync_group`. Covers T6a/b/d and GT-4.3 (sustained rate
+  increase) exactly; does **not** cover T6c (line-rate burst, not a
+  multiple) or T6e (RF-outage recovery, a channel-side event) — those need
+  different tooling, not this knob. Checked against `docs/IA_P5G_
+  Guarantee_Validation_Suite.md`'s actual T6 table before building, not
+  assumed.
 
 **On M04:** already `status: proxy` (the per-slot-timeseries
 consecutive-miss approximation), not `pending`. Its `requires:` line notes
@@ -549,10 +604,22 @@ back below commit 3's trajectory).
 
 ## Next step
 
-Commits 3-8 are landed (see "Landed" above). All five of WP7's target
-metrics (M03, M05, M06, M17, M14) are `ok`; G3/G5/G11 are fully
-sim-answerable. Next action is commit 9: `cycle_clock`/`sync_group` (the
-production-line correlated-burst mechanism) plus the aggressor/fault-
-injection rate-multiplier knobs, assigned here per the decisions commit.
-After that, M04's exactness upgrade is an explicit, separate, optional
-follow-up — not bundled into 9 either.
+**All 9 commits of this plan are landed.** All five of WP7's target metrics
+(M03, M05, M06, M17, M14) are `ok`; G3/G5/G11 are fully sim-answerable;
+`cycle_clock`/`sync_group` and the aggressor knobs exist, inert until a
+scenario opts in. WP7 itself is done.
+
+What's left, explicitly not silently dropped:
+
+- **M04's exactness upgrade** — "close to free" once the ledger carries
+  late/complete per completion (it does, since commit 1), but deliberately
+  not bundled into any of the 9 commits above (would have mixed a
+  refinement of an already-shipped metric into an unrelated commit's diff).
+  A genuine optional follow-up, own commit, whenever taken up.
+- **A `sync_group` scenario to actually exercise H2/H5** — commit 9's
+  mechanism is inert until WP9 (or an earlier ad hoc study) builds a
+  scenario that uses it.
+- **The RTSP/TCP coupling gap** (Decision #2) and other README §8 `[OPEN]`
+  items this plan touched but didn't resolve (WP-Join's RACH depth,
+  `phase_jitter_ms`'s default) remain recorded there, not this document's
+  job to close.
