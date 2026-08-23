@@ -111,9 +111,16 @@ metrics:
     guarantees: [G5]
     unit: fraction
     direction: higher_better
-    status: pending
-    requires: WP7 (XR frame / PDU-set model)
-    note: No flow in the current traffic model is tagged by frame/PDU-set id.
+    status: ok
+    requires: null
+    note: >
+      WP7 commit 6: worst (min) per-flow fraction of frames fully delivered
+      within pdb_ms, grouping sim/messages.py::FrameLedger over Message.
+      frame_id (sim/scorecard.py::Scorecard._m05_pdu_set_completeness). This
+      branch has no separate PDU-Set Delay Budget concept, so a frame's own
+      packet PDB doubles as its set delay budget -- see that function's own
+      note. A record produced before WP7 commit 6 (no frame_completions on
+      any FlowRecord) reports status=pending, not a fallback proxy.
 
   - id: M06
     name: frame_age_at_mec
@@ -121,8 +128,15 @@ metrics:
     guarantees: [G5]
     unit: ms
     direction: lower_better
-    status: pending
-    requires: WP7 (XR frame model)
+    status: ok
+    requires: null
+    note: >
+      WP7 commit 6: p95 age over fully-delivered frames only (worst flow),
+      same FrameLedger grouping as M05 (sim/scorecard.py::Scorecard.
+      _m06_frame_age_at_mec). A flow that generated frames but completed
+      none has an undefined age and is excluded here, not scored as 0ms --
+      see M05 for that flow's completeness failure. Pre-WP7-commit-6
+      records report status=pending.
 
   - id: M07
     name: gbr_contract_count

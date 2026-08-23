@@ -289,6 +289,76 @@ def test_m03_selects_the_worst_role_within_one_multi_role_flow():
     assert res.value["max_gap_ms"] == pytest.approx(3900.0)
 
 
+def test_m05_is_pending_for_a_pre_wp7_commit6_record():
+    rec = _run_record([_flow_record("1", message_count=10)])  # frame_completions defaults None
+    res = Scorecard().score(rec)["M05"]
+    assert res.status == "pending"
+    assert res.value is None
+
+
+def test_m06_is_pending_for_a_pre_wp7_commit6_record():
+    rec = _run_record([_flow_record("1", message_count=10)])
+    res = Scorecard().score(rec)["M06"]
+    assert res.status == "pending"
+    assert res.value is None
+
+
+def test_m05_excludes_flows_that_never_used_xr_video():
+    non_xr = _flow_record("1", message_count=10, frame_completions={"total": 0, "complete_ages_ms": []})
+    xr = _flow_record("2", message_count=10, pdb_ms=50.0,
+                       frame_completions={"total": 4, "complete_ages_ms": [10.0, 20.0, 60.0, 70.0]})
+    rec = _run_record([non_xr, xr])
+    res = Scorecard().score(rec)["M05"]
+    assert res.status == "ok"
+    assert res.value["flow"] == xr.key
+    assert res.value["frame_count"] == 4
+    assert res.value["fraction"] == pytest.approx(0.5)  # 2 of 4 ages <= 50ms pdb
+
+
+def test_m05_scores_a_dropped_frame_as_failed_even_though_it_is_fast():
+    """A partial frame isn't in complete_ages_ms at all -- it must still
+    count against the denominator (total), per M05's own 'partial delivery
+    counts as failed' definition."""
+    fr = _flow_record("1", message_count=10, pdb_ms=1000.0,
+                       frame_completions={"total": 3, "complete_ages_ms": [1.0, 2.0]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M05"]
+    assert res.value["fraction"] == pytest.approx(2 / 3)  # 1 of 3 frames never completed
+
+
+def test_m05_worst_flow_is_the_lowest_completeness_fraction():
+    better = _flow_record("1", message_count=10, pdb_ms=100.0,
+                           frame_completions={"total": 2, "complete_ages_ms": [10.0, 20.0]})
+    worse = _flow_record("2", message_count=10, pdb_ms=100.0,
+                          frame_completions={"total": 2, "complete_ages_ms": [10.0]})
+    rec = _run_record([better, worse])
+    res = Scorecard().score(rec)["M05"]
+    assert res.value["flow"] == worse.key
+    assert res.value["fraction"] == pytest.approx(0.5)
+
+
+def test_m06_excludes_a_flow_that_generated_frames_but_completed_none():
+    silent = _flow_record("1", message_count=1,
+                           frame_completions={"total": 2, "complete_ages_ms": []})
+    healthy = _flow_record("2", message_count=10,
+                            frame_completions={"total": 3, "complete_ages_ms": [5.0, 6.0, 100.0]})
+    rec = _run_record([silent, healthy])
+    res = Scorecard().score(rec)["M06"]
+    assert res.status == "ok"
+    assert res.value["flow"] == healthy.key
+    assert silent.key in res.note  # excluded flow is named, not silently dropped
+
+
+def test_m06_reports_p95_of_the_worst_flow():
+    fr = _flow_record("1", message_count=10,
+                       frame_completions={"total": 10, "complete_ages_ms": list(range(1, 11))})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M06"]
+    assert res.status == "ok"
+    assert res.value["flow"] == fr.key
+    assert res.value["p95_ms"] == pytest.approx(10)  # k = min(9, int(10*0.95)) = 9 -> s[9] = 10
+
+
 def test_correlate_flows_requires_timeseries():
     rec, sc_cfg = _record(record_timeseries=False)
     sc = Scorecard()

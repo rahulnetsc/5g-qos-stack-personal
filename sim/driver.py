@@ -7,7 +7,7 @@ from .bsr import BsrModel
 from .buffer import BufferModel
 from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
-from .messages import MessageLedger, message_latency_percentiles_ms
+from .messages import FrameLedger, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
 from .ue_lcp import UeLcp
@@ -240,6 +240,21 @@ def run(
         for ts_list in by_role.values():
             ts_list.sort()
         summary["flows"][key]["completion_ts_by_role_s"] = by_role
+        # WP7 commit 6 (M05 pdu_set_completeness, M06 frame_age_at_mec):
+        # group the same completions by frame_id (FrameLedger) rather than
+        # refetching from the ledger. total counts every frame this flow
+        # generated (xr_video only; 0 for every other kind); complete_ages_ms
+        # is the completion age of only the fully-delivered ones -- an
+        # incomplete frame has no single arrival instant to report, and
+        # M05 (not this) is what scores its failure.
+        frames = FrameLedger.group(completions)
+        complete_ages_ms = [
+            round((fc.completion_ts_s - fc.generation_ts_s) * 1000.0, 3)
+            for fc in frames if fc.complete
+        ]
+        summary["flows"][key]["frame_completions"] = {
+            "total": len(frames), "complete_ages_ms": complete_ages_ms,
+        }
     # Diagnostic handle on the UE model, so a study can compare the gNB's
     # shadow token buckets against the UE's real ones. Not part of the
     # metrics contract -- see scripts/ul_shadow_study.py.

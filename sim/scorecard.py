@@ -103,14 +103,8 @@ class Scorecard:
         out["M02"] = self._m02_pdb_violation_rate(record)
         out["M03"] = self._m03_liveness_gap_distribution(record, cfg["t_live_s"])
         out["M04"] = self._m04_survival_time_failures(record, cfg["survival_miss_n"])
-        out["M05"] = MetricResult(
-            "M05", "pdu_set_completeness", None, "pending", "fraction",
-            "requires WP7 XR frame / PDU-set model",
-        )
-        out["M06"] = MetricResult(
-            "M06", "frame_age_at_mec", None, "pending", "ms",
-            "requires WP7 XR frame model",
-        )
+        out["M05"] = self._m05_pdu_set_completeness(record)
+        out["M06"] = self._m06_frame_age_at_mec(record)
         out["M07"] = self._m07_gbr_contract_count(record, cfg["gbr_contract_fraction"])
         out["M08"] = self._m08_worst_flow_gfbr_fraction(record)
         out["M09"] = self._m09_per_second_jain(record)
@@ -258,6 +252,84 @@ class Scorecard:
                 "no flow/role pair had >=2 completions this run; " + note,
             )
         return MetricResult("M03", "liveness_gap_distribution", worst, "ok", "ms", note)
+
+    def _has_frame_data(self, record: RunRecord) -> bool:
+        """WP7 commit 6: frame_completions is available iff every flow in
+        the record was produced by a commit-6-aware driver.run() (never
+        None for a flow that exists at all, post-commit-6 -- total=0 is a
+        real "generated no XR frames," same convention as message_count)."""
+        flows = list(record.flows.values())
+        return bool(flows) and all(fr.frame_completions is not None for fr in flows)
+
+    def _m05_pdu_set_completeness(self, record: RunRecord) -> MetricResult:
+        if not self._has_frame_data(record):
+            return MetricResult(
+                "M05", "pdu_set_completeness", None, "pending", "fraction",
+                "requires WP7 commit 6 (FrameLedger / frame_completions); record predates it",
+            )
+        candidates = []
+        for fr in record.flows.values():
+            total = fr.frame_completions["total"]
+            if total == 0:
+                continue  # this flow never used xr_video -- not applicable
+            on_time = sum(
+                1 for age in fr.frame_completions["complete_ages_ms"] if age <= fr.pdb_ms
+            )
+            candidates.append((fr.key, on_time / total, total))
+        note = (
+            "worst (min) per-flow fraction of frames fully delivered within "
+            "pdb_ms -- this branch has no separate PDU-Set Delay Budget "
+            "concept, so the frame's own PDB doubles as its set delay "
+            "budget; a dropped or partial frame counts as failed regardless "
+            "of speed, per this metric's own definition"
+        )
+        if not candidates:
+            return MetricResult(
+                "M05", "pdu_set_completeness", None, "ok", "fraction",
+                "no flow in this run generated any XR frames; " + note,
+            )
+        worst_key, worst_fraction, worst_total = min(candidates, key=lambda kv: kv[1])
+        return MetricResult(
+            "M05", "pdu_set_completeness",
+            {"flow": worst_key, "fraction": worst_fraction, "frame_count": worst_total},
+            "ok", "fraction", note,
+        )
+
+    def _m06_frame_age_at_mec(self, record: RunRecord) -> MetricResult:
+        if not self._has_frame_data(record):
+            return MetricResult(
+                "M06", "frame_age_at_mec", None, "pending", "ms",
+                "requires WP7 commit 6 (FrameLedger / frame_completions); record predates it",
+            )
+        candidates = []
+        excluded: list[str] = []
+        for fr in record.flows.values():
+            total = fr.frame_completions["total"]
+            if total == 0:
+                continue  # this flow never used xr_video -- not applicable
+            ages = fr.frame_completions["complete_ages_ms"]
+            if not ages:
+                # Generated frames but completed none -- age is undefined,
+                # not 0ms (0 would look like the BEST-behaved flow). M05
+                # scores this failure as 0% completeness; this metric just
+                # excludes it, the same shape as M01's zero-message-count
+                # exclusion.
+                excluded.append(fr.key)
+                continue
+            candidates.append((fr.key, _percentile(ages, 0.95)))
+        note = "p95 age (completion_ts - frame_generation_ts) over fully-delivered frames only, worst flow"
+        if excluded:
+            note += (
+                f"; {len(excluded)} flow(s) generated frames but completed none "
+                f"(age undefined) and are excluded here -- see M05 for their "
+                f"failure: {', '.join(excluded)}"
+            )
+        if not candidates:
+            return MetricResult("M06", "frame_age_at_mec", None, "ok", "ms",
+                                 "no flow completed a single XR frame this run; " + note)
+        worst_key, worst_p95 = max(candidates, key=lambda kv: kv[1])
+        return MetricResult("M06", "frame_age_at_mec",
+                             {"flow": worst_key, "p95_ms": worst_p95}, "ok", "ms", note)
 
     def _m02_pdb_violation_rate(self, record: RunRecord) -> MetricResult:
         total_arrived = sum(fr.bytes_arrived for fr in record.flows.values())

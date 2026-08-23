@@ -13,13 +13,24 @@ import pytest
 
 from sim.buffer import BufferModel
 from sim.config import FlowConfig
-from sim.messages import Message, MessageLedger
+from sim.messages import FrameLedger, Message, MessageCompletion, MessageLedger
 from sim.traffic import TrafficModel
 
 
-def _msg(ledger: MessageLedger, ue_id: int, qfi: int, size_bytes: int, ts: float) -> Message:
+def _msg(ledger: MessageLedger, ue_id: int, qfi: int, size_bytes: int, ts: float,
+         frame_id: int | None = None) -> Message:
     return Message(
-        id=ledger.new_id(), ue_id=ue_id, qfi=qfi, size_bytes=size_bytes, generation_ts_s=ts
+        id=ledger.new_id(), ue_id=ue_id, qfi=qfi, size_bytes=size_bytes,
+        generation_ts_s=ts, frame_id=frame_id,
+    )
+
+
+def _completion(msg: Message, *, complete: bool, completion_ts_s: float,
+                 delivered_bytes: int | None = None) -> MessageCompletion:
+    delivered = msg.size_bytes if delivered_bytes is None else delivered_bytes
+    return MessageCompletion(
+        message=msg, complete=complete, late=False, completion_ts_s=completion_ts_s,
+        delivered_bytes=delivered, dropped_bytes=msg.size_bytes - delivered,
     )
 
 
@@ -152,3 +163,58 @@ def test_traffic_model_with_ledger_tags_each_arrival_with_a_message():
     assert len(completions) == 1
     assert completions[0].message.size_bytes == 100
     assert completions[0].message.generation_ts_s == 0.0
+
+
+def test_frame_ledger_groups_a_fully_delivered_frame_as_complete():
+    ledger = MessageLedger()
+    frags = [_msg(ledger, 1, 9, 1500, ts=0.1, frame_id=0),
+              _msg(ledger, 1, 9, 500, ts=0.1, frame_id=0)]
+    completions = [_completion(m, complete=True, completion_ts_s=0.105) for m in frags]
+    frames = FrameLedger.group(completions)
+    assert len(frames) == 1
+    fc = frames[0]
+    assert fc.frame_id == 0
+    assert fc.complete is True
+    assert fc.completion_ts_s == 0.105
+    assert fc.fragment_count == 2
+    assert fc.delivered_fragment_count == 2
+    assert fc.generation_ts_s == 0.1
+
+
+def test_frame_ledger_marks_a_frame_incomplete_if_any_fragment_dropped():
+    """One frame = one PDU set: any dropped fragment fails the whole frame."""
+    ledger = MessageLedger()
+    frags = [_msg(ledger, 1, 9, 1500, ts=0.1, frame_id=0),
+              _msg(ledger, 1, 9, 500, ts=0.1, frame_id=0)]
+    completions = [
+        _completion(frags[0], complete=True, completion_ts_s=0.105),
+        _completion(frags[1], complete=False, completion_ts_s=0.2, delivered_bytes=0),
+    ]
+    frames = FrameLedger.group(completions)
+    assert len(frames) == 1
+    fc = frames[0]
+    assert fc.complete is False
+    assert fc.completion_ts_s is None  # no single arrival instant for a partial frame
+    assert fc.fragment_count == 2
+    assert fc.delivered_fragment_count == 1
+
+
+def test_frame_ledger_groups_multiple_frames_independently():
+    ledger = MessageLedger()
+    f0 = [_msg(ledger, 1, 9, 1000, ts=0.0, frame_id=0)]
+    f1 = [_msg(ledger, 1, 9, 1000, ts=0.05, frame_id=1)]
+    completions = (
+        [_completion(m, complete=True, completion_ts_s=0.01) for m in f0]
+        + [_completion(m, complete=True, completion_ts_s=0.06) for m in f1]
+    )
+    frames = {fc.frame_id: fc for fc in FrameLedger.group(completions)}
+    assert set(frames) == {0, 1}
+    assert frames[0].generation_ts_s == 0.0
+    assert frames[1].generation_ts_s == 0.05
+
+
+def test_frame_ledger_ignores_completions_with_no_frame_id():
+    ledger = MessageLedger()
+    m = _msg(ledger, 1, 9, 100, ts=0.0)  # frame_id=None -- ordinary traffic
+    completions = [_completion(m, complete=True, completion_ts_s=0.01)]
+    assert FrameLedger.group(completions) == []

@@ -124,12 +124,54 @@ Update it as commits land; don't let it drift back out of sync with reality.
   absence from the diff. M05/M06/M17 all need commit 6/7's `FrameLedger` and
   scorecard functions; the generator alone satisfies none of their
   `requires:`.
+- **Commit 6** — `sim/messages.py` gains `FrameCompletion`/`FrameLedger`
+  (the class commit 1's own module docstring forward-referenced as "below"
+  since it was written — now real, and matching that description exactly:
+  a post-hoc, stateless grouping of `MessageCompletion`s sharing one
+  `frame_id`, not a second id-issuing ledger like `MessageLedger`).
+  `sim/driver.py` groups the same per-flow completions already fetched for
+  M03 (no re-fetch) into frames, storing `{"total": int,
+  "complete_ages_ms": list[float]}` in a new `RunRecord.FlowRecord.
+  frame_completions` field. `Scorecard._m05_pdu_set_completeness()` reports
+  the worst (min) per-flow on-time-and-complete fraction; `_m06_frame_age_
+  at_mec()` reports the worst (max) per-flow p95 age over complete frames
+  only. Both exclude flows with `total==0` (never used `xr_video` — not
+  applicable) and M06 additionally excludes flows with frames but zero
+  completions (age undefined, not 0ms — M05 scores that failure instead).
+  **Decision made in-flight, recorded here rather than silently:** this
+  branch has no separate PDU-Set Delay Budget field, so M05 reuses the
+  flow's packet `pdb_ms` as the frame's set delay budget — a real 3GPP
+  deployment would configure PSDB separately from PDB, but nothing on disk
+  motivates a distinct value, so reusing the already-meaningful `pdb_ms`
+  beats inventing an unconstrained new one. `config/metric_panel.yml`: M05,
+  M06 flipped `pending` → `ok`; M17 untouched (needs commit 7's freeze/fps
+  logic even though its `requires:` names the same XR frame model — the
+  same "data exists but the scorer doesn't yet" gap M03 had after commit 3).
+  4 new tests in `sim/tests/test_messages.py`, 7 in `test_scorecard.py`.
 
-**Verified independently before writing this plan** (2026-08-23): full
-suite green (160 passed, `sim/tests -q`), `scripts/regression_corpus.py
---check` clean, both commits now pushed to `origin/feat/high-fidelity-sim`.
-The summary above matches `git show --stat` and the actual diffs, not just
-the commit messages.
+  **Drift prediction, made before writing any code, confirmed exactly:**
+  one new `FlowRecord` field (`frame_completions`), added to every flow in
+  all 22 records (510), all with the trivial value `{"total": 0,
+  "complete_ages_ms": []}` since no scenario uses `xr_video` yet — the
+  scorer logic itself can't move `--check` (same reason as commit 4:
+  `regression_corpus.py` never calls `Scorecard.score()`). Actual: exactly
+  510 mismatches, all that one field, all trivial. Re-baselined.
+
+  **Baseline-size check, per the compaction commit's own stated extension
+  point:** `_compact_for_regression` only knew about `completion_ts_by_
+  role_s` — `frame_completions.complete_ages_ms` would have slipped past
+  it silently once real `xr_video` data exists. Extended it now, while the
+  cost of being wrong is zero (today's arrays are all empty), rather than
+  waiting for a future WP to rediscover the same size problem. File size:
+  665,781 → 719,331 bytes (+53,550 bytes, matching one small trivial field
+  × 510 flows, not an array-driven blowup).
+
+**Last verified** (2026-08-23, after commit 6): full suite green (196
+passed, `sim/tests -q`), `scripts/regression_corpus.py --check` clean, all
+commits through 6 pushed to `origin/feat/high-fidelity-sim`. Update this
+line as commits land rather than letting it go stale again — it already did
+once (this note replaces one written after commit 2 that still claimed 160
+passed and "both commits" five commits later).
 
 ## The five pending metrics WP7 owns
 
@@ -170,25 +212,22 @@ Gaussian σ≈2ms clipped to ±4ms; non-integer-ms periods — 16.67/11.11/8.33 
 that alias against the 100ms Tier-1 period, README §7); the frame→PDU-set
 decomposition into sibling `Message`s sharing one `frame_id` (decided —
 size-derived MTU-style fragmentation, Decision #1 below); and a
-`FrameLedger` construct. Note: `sim/messages.py`'s own
-docstring already says completeness is "computed by grouping completions by
-`frame_id` after the fact (`FrameLedger` below)" — **no `FrameLedger` class
-exists in the file**. That's a stale forward-reference commit 1 left for
-this work, not a bug to fix now, but flagging it so it isn't mistaken for
-one later.
+`FrameLedger` construct — **landed in commit 6**, resolving the stale
+forward-reference `sim/messages.py`'s docstring carried since commit 1
+("computed by grouping completions by `frame_id` after the fact
+(`FrameLedger` below)" now points at a real class matching that exact
+description).
 
-- Commit 5: `xr_video` generator, implementing Decision #1's size-derived
-  fragmentation. The fragment size must be a config parameter (not a
-  hardcoded 1500), so WP9 can sweep it — M05 is a G5 metric, and fragment
-  size plausibly moves completeness. The generator's docstring must state
-  plainly that this is an MTU-style stand-in for RTP packetization with no
-  ground truth behind it, the same honesty `sim/power.py`'s
-  `shrink_to_power_budget`/`snr_to_prb_floor` hold themselves to.
-- Commit 6: `FrameLedger` + M05 (completeness) + M06 (frame age) + panel
-  flips.
-- Commit 7: M17 (freeze events, gaps > 2 frame intervals; effective fps vs
-  source fps) — reuses commit 6's `FrameLedger`, no new decomposition
-  question. Panel flip.
+- Commit 5 (landed): `xr_video` generator, implementing Decision #1's
+  size-derived fragmentation, `fragment_bytes` required with no default so
+  WP9 can sweep it.
+- Commit 6 (landed): `FrameLedger` + M05 (completeness, worst-flow fraction
+  reusing `pdb_ms` as the frame's set delay budget — no separate PSDB
+  concept on disk) + M06 (frame age, worst-flow p95) + panel flips for
+  both.
+- Commit 7 (next): M17 (freeze events, gaps > 2 frame intervals; effective
+  fps vs source fps) — reuses commit 6's `FrameLedger`, no new decomposition
+  question. Panel flip for M17 only.
 
 ### M14 — `communication_service_availability`
 `requires: WP7 (discrete message model, same as M03/M04)` — WP7 alone.
@@ -417,8 +456,8 @@ back below commit 3's trajectory).
 
 ## Next step
 
-Commits 3-5 are landed (see "Landed" above); M03 is `ok`; the regression
-corpus is stored compactly; `xr_video` exists but no scenario uses it yet.
-Next action is commit 6: `FrameLedger` + M05 (`pdu_set_completeness`) + M06
-(`frame_age_at_mec`), grouping `xr_video`'s frame-tagged completions by
-`frame_id`, and the panel flip for both.
+Commits 3-6 are landed (see "Landed" above); M03/M05/M06 are `ok`; the
+regression corpus is stored compactly, including `frame_completions`'
+array field. Next action is commit 7: M17 (`frame_freeze_and_effective_fps`)
+reusing commit 6's `FrameLedger` — freeze events (gaps > 2 frame intervals)
+and effective fps vs source fps — and the panel flip for M17 only.

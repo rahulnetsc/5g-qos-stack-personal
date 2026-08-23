@@ -84,6 +84,16 @@ class FlowRecord:
     # threshold from these rather than a driver-computed count, since the
     # threshold is a scoring-time choice, not a simulation output.
     completion_ts_by_role_s: Optional[dict[str, list[float]]] = None
+    # WP7 M05/M06 (pdu_set_completeness, frame_age_at_mec): {"total": int,
+    # "complete_ages_ms": list[float]}, from grouping the same ledger
+    # completions by Message.frame_id (sim/messages.py::FrameLedger). total
+    # counts every frame this flow generated (xr_video only; 0 for every
+    # other kind, real "no frames" -- distinct from None, "predates this
+    # field"); complete_ages_ms holds only fully-delivered frames' ages, so
+    # M05's denominator (total) and numerator (on-time completions) can
+    # both be computed at score time against the flow's own pdb_ms, without
+    # this field baking in a threshold.
+    frame_completions: Optional[dict[str, Any]] = None
 
     # Populated only when driver.run(..., record_timeseries=True) was used.
     # Per-slot series, aligned to RunRecord.timeseries_time_s.
@@ -240,6 +250,7 @@ class RunRecord:
                 delay_p99_ms=m.get("delay_p99_ms"),
                 message_count=m.get("message_count"),
                 completion_ts_by_role_s=m.get("completion_ts_by_role_s"),
+                frame_completions=m.get("frame_completions"),
                 ts_backlog_bytes=fts["backlog_bytes"] if fts else None,
                 ts_hol_delay_s=fts["hol_delay_s"] if fts else None,
                 ts_delivered_bytes=fts["delivered_bytes"] if fts else None,

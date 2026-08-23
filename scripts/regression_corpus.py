@@ -124,10 +124,17 @@ def _compact_for_regression(records: dict[str, dict]) -> dict[str, dict]:
     this same record). Summarising the gaps, not the timestamps, is the
     more direct fingerprint of what M03 actually reports.
 
-    Extend this function, not RunRecord itself, when a future WP (commits
-    5-8's frame ledgers, or a future scenario that actually exercises
-    xr_video) adds another large array here -- see docs/wp7-plan.md's
-    regression-corpus-size note.
+    frame_completions (WP7 M05/M06) carries the same shape of risk:
+    complete_ages_ms is one entry per fully-delivered XR frame. Today it is
+    always empty (no scenario in this corpus exercises xr_video, so every
+    flow's value is the trivial {"total": 0, "complete_ages_ms": []}) --
+    compacted here anyway, now, so a future scenario that actually uses
+    xr_video doesn't silently reintroduce the exact problem this function
+    exists to prevent. total (a count, not an array) is left as-is.
+
+    Extend this function, not RunRecord itself, when a future WP (commit
+    7's freeze/fps data, or any other large array) lands here -- see
+    docs/wp7-plan.md's regression-corpus-size note.
     """
     for rec in records.values():
         for fr in rec["flows"].values():
@@ -137,6 +144,11 @@ def _compact_for_regression(records: dict[str, dict]) -> dict[str, dict]:
                     role: _array_stats([b - a for a, b in zip(ts, ts[1:])])
                     for role, ts in by_role.items()
                 }
+            frame_completions = fr.get("frame_completions")
+            if frame_completions and frame_completions.get("complete_ages_ms"):
+                frame_completions["complete_ages_ms"] = _array_stats(
+                    frame_completions["complete_ages_ms"]
+                )
     return records
 
 

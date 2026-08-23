@@ -113,3 +113,55 @@ def message_latency_percentiles_ms(completions: list[MessageCompletion]) -> dict
         "p50": pct(0.50), "p95": pct(0.95), "p98": pct(0.98), "p99": pct(0.99),
         "count": len(delays_ms),
     }
+
+
+@dataclass(frozen=True)
+class FrameCompletion:
+    """One frame's (PDU set's) resolved outcome, derived from its sibling
+    fragment ``MessageCompletion``s sharing one ``frame_id`` -- WP7 commit 6,
+    what this module's docstring above forward-referenced from commit 1.
+    ``complete`` is True iff every fragment was fully delivered (one frame
+    = one PDU set, so any dropped/partial fragment fails the whole frame,
+    per config/metric_panel.yml M05's own definition)."""
+
+    frame_id: int
+    generation_ts_s: float
+    complete: bool
+    # Latest fragment's completion timestamp -- only meaningful, and only
+    # set, when complete. An incomplete frame has no single "arrival" instant.
+    completion_ts_s: float | None
+    fragment_count: int
+    delivered_fragment_count: int
+
+
+class FrameLedger:
+    """Groups ``MessageCompletion``s sharing one ``frame_id`` into one
+    ``FrameCompletion`` per frame -- computed post-hoc from completions
+    already collected by ``MessageLedger``, not a separate id-issuing
+    ledger like it (``frame_id`` already exists on ``Message``, assigned at
+    generation time by ``sim/traffic.py``'s ``xr_video`` generator).
+
+    Call with one flow's completions (e.g.
+    ``MessageLedger.completions_for(ue_id, qfi)``), not the whole ledger's:
+    ``frame_id`` is only unique within one flow, since each flow's
+    ``xr_video`` generator counts its own frames from 0 independently.
+    """
+
+    @staticmethod
+    def group(completions: list[MessageCompletion]) -> list[FrameCompletion]:
+        by_frame: dict[int, list[MessageCompletion]] = {}
+        for c in completions:
+            if c.message.frame_id is not None:
+                by_frame.setdefault(c.message.frame_id, []).append(c)
+        out: list[FrameCompletion] = []
+        for frame_id, frags in by_frame.items():
+            complete = all(f.complete for f in frags)
+            out.append(FrameCompletion(
+                frame_id=frame_id,
+                generation_ts_s=frags[0].message.generation_ts_s,
+                complete=complete,
+                completion_ts_s=max(f.completion_ts_s for f in frags) if complete else None,
+                fragment_count=len(frags),
+                delivered_fragment_count=sum(1 for f in frags if f.complete),
+            ))
+        return out
