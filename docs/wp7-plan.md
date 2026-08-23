@@ -330,9 +330,68 @@ simulator mechanism — but `phase_jitter_ms` has no natural default either.
 Fine to pick something for commit 9 and record it as `[OPEN]` rather than
 block on it.
 
+## Regression-corpus storage: compacted before it compounded further
+
+Not one of the numbered commits — a fix to `scripts/regression_corpus.py`'s
+own storage format, landed between commits 4 and 5 because the problem it
+fixes gets strictly worse if deferred (commits 5-8 add more of the same
+shape of data) and because bundling a storage-format change into commit 5's
+own fidelity work would make commit 5's drift prediction uninterpretable —
+the same reason CLAUDE.md insists on one fidelity change per commit,
+extended here to one *corpus* change per commit.
+
+**Problem, with numbers, not a feeling:** commit 4's `completion_ts_by_role_s`
+took the baseline from 512KB to 5.7MB (11x) by storing raw per-message
+timestamps. Checked whether this was actually a live risk before touching
+anything: M14 needs no new array (reuses this same field plus one new
+scalar, `survival_time_ms`); M05/M06/M17 only populate non-empty data for
+flows using `xr_video`, which none of the 22 baseline records do (studies
+1-3's scenarios aren't part of WP7's scope to change) — so the *immediate*
+scaling risk from commits 5-8 is smaller than it first looked, but the
+underlying problem (any universally-populated array field re-triggers this)
+doesn't go away, and would recur exactly this way whenever a future WP (most
+likely WP9) adds an XR-using scenario to the corpus.
+
+**Verified before implementing, not assumed: summary stats would have
+missed nothing.** Diffed the JSON key-sets across every historical
+baseline-affecting commit (`git show <c>:regression/baseline_studies_1_3.json`).
+WP4's 1706 mismatches (`02a0fe9`) and WP3's own re-baselines involved **zero
+new/removed keys** — pure value drift on already-existing scalars
+(`delay_p50_ms_proxy`, `dl_prb_utilization`, etc.). No array was ever
+involved in any drift class seen so far; array-vs-summary-stat storage is
+orthogonal to all of it. The only real residual risk is a hypothetical
+future change that reshuffles values inside an array without moving
+count/min/max/any of 6 percentiles — possible in principle, never the
+actual failure mode here, and covered independently by `sim/tests/
+test_traffic.py`/`test_scorecard.py`'s exact hand-computed assertions (this
+corpus's own docstring already calls it a coarse "what moved and by how
+much" instrument, not a correctness oracle).
+
+**Implementation:** `scripts/regression_corpus.py::_compact_for_regression()`
+replaces `completion_ts_by_role_s`'s raw per-role timestamp lists with
+`_array_stats()` (count/min/max/p10/p25/p50/p75/p90/p99) of the **gap
+array** (consecutive differences), not the raw timestamps — a more direct
+fingerprint of what M03 actually reports (a gap distribution), since
+timestamp percentiles mostly just re-encode traffic volume/pacing already
+tracked by `message_count`/`throughput_bps` elsewhere in the same record.
+This is a change to the corpus's own storage/comparison representation
+only — `sim/run_record.py::RunRecord`/`sim/scorecard.py` are untouched, and
+still get the full raw data for live scoring (an adjustable `T_live` can't
+be baked in ahead of time). Extend `_compact_for_regression`, not
+`RunRecord` itself, if commits 5-8 (or a future WP9 scenario) ever add
+another large array here.
+
+**Predicted, then confirmed exactly:** the format change itself (list ->
+stats dict) surfaces as a mismatch on every *non-empty* role entry — 458 of
+them (510 flows, 52 with zero completions matching trivially as `{}` on
+both sides) — not 510. Actual: 458. Re-baselined; resulting file:
+665,781 bytes (8.6x smaller than the 5,701,824-byte raw-array baseline,
+back below commit 3's trajectory).
+
 ## Next step
 
-Commits 3 and 4 are landed (see "Landed" above); M03 is `ok`. Next action is
-commit 5: the `xr_video` generator, implementing Decision #1's size-derived
-fragmentation (fragment size as a config parameter, docstring disclosing the
-MTU-style stand-in explicitly).
+Commits 3 and 4 are landed (see "Landed" above); M03 is `ok`; the regression
+corpus is now stored compactly. Next action is commit 5: the `xr_video`
+generator, implementing Decision #1's size-derived fragmentation (fragment
+size as a config parameter, docstring disclosing the MTU-style stand-in
+explicitly).

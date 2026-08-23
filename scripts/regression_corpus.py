@@ -85,8 +85,64 @@ def _record_id(case: dict[str, Any]) -> str:
     return f"study{case['study']}/{case['case']}/{case['scheduler_name']}"
 
 
+def _array_stats(values: list[float]) -> dict[str, Any]:
+    """Compact fingerprint of a numeric array: count, min, max, and a
+    spread of percentiles. Enough to catch a real behavioural change (a
+    shifted rate, a widened/narrowed spread, a moved tail) at a fraction of
+    the raw array's size. Not a substitute for the exact hand-computed
+    assertions in sim/tests/ -- this corpus is a coarse drift detector over
+    real scenario runs (its own docstring: "what moved and by how much"),
+    not a correctness oracle for any single algorithm.
+    """
+    if not values:
+        return {"count": 0}
+    s = sorted(values)
+    n = len(s)
+
+    def pct(p: float) -> float:
+        return round(s[min(n - 1, int(n * p))], 6)
+
+    return {
+        "count": n, "min": round(s[0], 6), "max": round(s[-1], 6),
+        "p10": pct(0.10), "p25": pct(0.25), "p50": pct(0.50),
+        "p75": pct(0.75), "p90": pct(0.90), "p99": pct(0.99),
+    }
+
+
+def _compact_for_regression(records: dict[str, dict]) -> dict[str, dict]:
+    """Shrink known large-array fields in place before they're snapshotted
+    or diffed -- this changes ONLY this corpus's own storage/comparison
+    representation, never sim/run_record.py's actual RunRecord (scorecard.py
+    still gets the full raw completion_ts_by_role_s it needs to score an
+    adjustable T_live; only regression_corpus.py's copy is compacted).
+
+    completion_ts_by_role_s (WP7 M03) stores every completion timestamp per
+    role -- exactly what live scoring needs, far more than a regression
+    check needs: drift in a GAP distribution shows up in gap statistics, not
+    in the raw timestamps (which mostly just re-encode traffic volume/
+    pacing, already tracked by message_count/throughput_bps elsewhere in
+    this same record). Summarising the gaps, not the timestamps, is the
+    more direct fingerprint of what M03 actually reports.
+
+    Extend this function, not RunRecord itself, when a future WP (commits
+    5-8's frame ledgers, or a future scenario that actually exercises
+    xr_video) adds another large array here -- see docs/wp7-plan.md's
+    regression-corpus-size note.
+    """
+    for rec in records.values():
+        for fr in rec["flows"].values():
+            by_role = fr.get("completion_ts_by_role_s")
+            if by_role:
+                fr["completion_ts_by_role_s"] = {
+                    role: _array_stats([b - a for a, b in zip(ts, ts[1:])])
+                    for role, ts in by_role.items()
+                }
+    return records
+
+
 def collect_records() -> dict[str, dict]:
-    """Run every case, return {record_id: RunRecord.to_dict()}."""
+    """Run every case, return {record_id: RunRecord.to_dict()}, with known
+    large-array fields compacted for storage (see _compact_for_regression)."""
     out: dict[str, dict] = {}
     for case in _cases():
         sc: ScenarioConfig = case["scenario"]
@@ -106,7 +162,7 @@ def collect_records() -> dict[str, dict]:
             meta={"study": case["study"], "case": case["case"]},
         )
         out[_record_id(case)] = rec.to_dict()
-    return out
+    return _compact_for_regression(out)
 
 
 def capture(path: Path = DEFAULT_BASELINE_PATH) -> None:
