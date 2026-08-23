@@ -46,6 +46,23 @@ Update it as commits land; don't let it drift back out of sync with reality.
   dormant field ahead of its commit-8 consumer — same "plumbing before
   need" pattern commit 1 used for `Message.frame_id`/`role` — and a new
   README §8 `[OPEN]` entry recording the RTSP/TCP gap.
+- **Commit 3** — `sim/traffic.py`: `periodic_control`/`condition_monitor`
+  (deterministic period + shared `_clipped_gaussian_jitter_ms` jitter,
+  optional `traffic_params["streams"]` for MAVLink-style multi-role tagging
+  of `Message.role`, falling back to single-rate `role="data"` when absent)
+  and `aperiodic_event`/`machine_vision` (Poisson-triggered single burst,
+  reusing the existing `poisson` kind's per-slot-probability trigger
+  style). `TrafficModel._gen()`'s return type grew from `(ts, bytes)` to
+  `(ts, bytes, role)` — every existing kind's return statement now states
+  `role="data"` explicitly, mechanically, matching `Message.role`'s
+  existing default exactly. New `sim/tests/test_traffic.py` (12 tests).
+  Predicted **zero regression drift** before writing any code (no existing
+  scenario references any of the four new kind strings — checked directly
+  against `scripts/scheduler_study.py`/`demand_study.py`/
+  `diagnose_finding3.py`/`test_smoke.py`, not assumed) — confirmed exactly:
+  `--check` clean, no re-baseline. `config/metric_panel.yml` untouched —
+  M03 stays `pending`; only the generator half of its `requires:` landed
+  here, the scorecard function is commit 4.
 
 **Verified independently before writing this plan** (2026-08-23): full
 suite green (160 passed, `sim/tests -q`), `scripts/regression_corpus.py
@@ -281,9 +298,7 @@ block on it.
 
 ## Next step
 
-All three decisions are made and recorded above; commit 10 (RTSP/TCP
-coupling) is dropped from this plan, base generators are confirmed folding
-into commit 3, and the aggressor/fault-injection knobs are assigned to
-commit 9. Nothing here is still pending review. Next action is commit 3
-itself: the base traffic generators plus the MAVLink multi-role
-`periodic_control` variant (§ M03 above).
+Commit 3 is landed (see "Landed" above). Next action is commit 4: the M03
+scorecard function — group `MessageLedger.completions_for(ue_id, qfi)` by
+`role`, compute receiver inter-arrival gaps, compare against `{T_live/4,
+T_live/2, T_live}` — and the `config/metric_panel.yml` flip to `ok`.
