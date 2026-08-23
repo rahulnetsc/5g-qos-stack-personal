@@ -102,6 +102,15 @@ class FlowConfig:
     # round leaves behind.
     pbr_bps: float = 0.0
     bsd_ms: float = 100.0
+    # [OPEN] TS 22.104 communication-service-availability grace period beyond
+    # pdb_ms (WP7 M14, docs/wp7-plan.md Decision #3) -- distinct from pdb_ms
+    # itself and from config/metric_panel.yml's t_live_s/survival_miss_n,
+    # which are different concepts despite sounding adjacent. Default 0
+    # collapses M14 to "delivered within max latency"; no factory-relevant
+    # value exists on disk to pick instead. Only consumer is M14's WP7
+    # commit 8, not yet built -- when it lands it must report this value
+    # alongside the availability figure, never a bare number.
+    survival_time_ms: float = 0.0
 
     traffic_kind: str = "poisson"
     traffic_params: dict = field(default_factory=dict)

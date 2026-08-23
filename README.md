@@ -506,6 +506,20 @@ they survive it:
   landing — worth understanding why the same UL access-chain change
   helps one flow class and hurts another before WP9 treats either result
   as representative of what SR does in general.
+- `[OPEN]` **RTSP/TCP UL/DL coupling (§6) is deliberately unbuilt in WP7.**
+  Three candidate abstractions were analysed — cross-wiring the existing
+  `adaptive` AIMD source's backoff signal from a paired video flow's DL
+  delivery, a minimal windowed-RTT model, and a fixed offered-rate
+  multiplier scoped to the specific guarantee test — and none was built.
+  All three require uncalibrated constants with no ground truth anywhere in
+  `oai-branches/` (which has no TCP or RTSP source at all), and the only
+  consumers — G10's mixed-fleet (UGV+UAV) column and T9 — are both Phase 3,
+  not now. Building any of them ahead of that consumer existing would carry
+  invented parameters through WP5/WP6/WP-Join and contaminate their
+  regression diffs for nothing. Consequence: **G10's mixed-fleet column and
+  T9 are unanswerable until this is built.** See `docs/wp7-plan.md`'s
+  Decision #2 for the full three-option writeup — a future revisit should
+  start from that analysis, not redo it.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

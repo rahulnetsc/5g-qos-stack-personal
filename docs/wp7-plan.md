@@ -8,7 +8,8 @@ fields, `docs/p5g-sim-plan.md` §9's WP7 spec, and README.md §4/§6/§7. Treat
 the commit boundaries and count below as this reconstruction's judgment
 call, not a recovered fact — the five target metrics and their `requires:`
 values are the part actually pinned down by files on disk; the grouping into
-commits 3-10 is a proposal to review, not a memory.
+commits 3-9 is a proposal to review, not a memory. (Originally sketched as
+commits 3-10; commit 10 was dropped — see the RTSP/TCP decision below.)
 
 This file is the artifact that should survive the *next* session restart.
 Update it as commits land; don't let it drift back out of sync with reality.
@@ -37,6 +38,14 @@ Update it as commits land; don't let it drift back out of sync with reality.
   (chronic stall, never fully delivered a message) is now excluded from
   M01/M15's "worst flow" contest instead of winning it by reporting a false
   0ms. `config/metric_panel.yml`: M01, M15 flipped `proxy` → `ok`.
+- **Decisions commit** — records decisions #1-3 below (all reviewed and
+  resolved), drops the RTSP/TCP coupling from this plan entirely (was
+  commit 10; see Decision #2), confirms base generators fold into commit 3,
+  and assigns the aggressor/fault-injection knobs to commit 9. Also lands
+  `FlowConfig.survival_time_ms: float = 0.0` (`scheduler/flow.py`) as a
+  dormant field ahead of its commit-8 consumer — same "plumbing before
+  need" pattern commit 1 used for `Message.frame_id`/`role` — and a new
+  README §8 `[OPEN]` entry recording the RTSP/TCP gap.
 
 **Verified independently before writing this plan** (2026-08-23): full
 suite green (160 passed, `sim/tests -q`), `scripts/regression_corpus.py
@@ -80,18 +89,23 @@ WP7 alone suffices for all three once it lands.
 Missing: the `xr_video` generator itself (plan doc §9: frame size truncated
 Gaussian σ≈10.5% of mean clipped to [50%,150%]; arrival jitter truncated
 Gaussian σ≈2ms clipped to ±4ms; non-integer-ms periods — 16.67/11.11/8.33 —
-that alias against the 100ms Tier-1 period, README §7); the actual
-frame→PDU-set decomposition into sibling `Message`s sharing one `frame_id`
-(see Open decisions below — this is genuinely unresolved, not just
-unwritten); and a `FrameLedger` construct. Note: `sim/messages.py`'s own
+that alias against the 100ms Tier-1 period, README §7); the frame→PDU-set
+decomposition into sibling `Message`s sharing one `frame_id` (decided —
+size-derived MTU-style fragmentation, Decision #1 below); and a
+`FrameLedger` construct. Note: `sim/messages.py`'s own
 docstring already says completeness is "computed by grouping completions by
 `frame_id` after the fact (`FrameLedger` below)" — **no `FrameLedger` class
 exists in the file**. That's a stale forward-reference commit 1 left for
 this work, not a bug to fix now, but flagging it so it isn't mistaken for
 one later.
 
-- Commit 5: `xr_video` generator + the decomposition decision (Open
-  decisions #1) resolved and recorded.
+- Commit 5: `xr_video` generator, implementing Decision #1's size-derived
+  fragmentation. The fragment size must be a config parameter (not a
+  hardcoded 1500), so WP9 can sweep it — M05 is a G5 metric, and fragment
+  size plausibly moves completeness. The generator's docstring must state
+  plainly that this is an MTU-style stand-in for RTP packetization with no
+  ground truth behind it, the same honesty `sim/power.py`'s
+  `shrink_to_power_budget`/`snr_to_prb_floor` hold themselves to.
 - Commit 6: `FrameLedger` + M05 (completeness) + M06 (frame age) + panel
   flips.
 - Commit 7: M17 (freeze events, gaps > 2 frame intervals; effective fps vs
@@ -102,14 +116,15 @@ one later.
 `requires: WP7 (discrete message model, same as M03/M04)` — WP7 alone.
 
 Missing: the metric itself (TS 22.104: fraction of transfer intervals where
-the message arrived within `max_latency + survival_time`) plus a
-`survival_time_ms` concept that doesn't exist anywhere in the config today
-(see Open decisions #3 — this is *not* the same thing as `t_live_s` or
-`defaults.survival_miss_n`, both of which are different concepts already
-flagged `[OPEN]` elsewhere).
+the message arrived within `max_latency + survival_time`).
+`FlowConfig.survival_time_ms` (decided — Decision #3 below) already exists
+as a dormant default-0 field as of the decisions commit above; this is not
+the same concept as `t_live_s` or `defaults.survival_miss_n`, both of which
+are different concepts already flagged `[OPEN]` elsewhere.
 
-- Commit 8: `survival_time_ms` decision recorded + M14 scorecard function +
-  panel flip.
+- Commit 8: M14 scorecard function + panel flip. Per Decision #3's
+  condition, M14 must report the `survival_time_ms` value it used alongside
+  the availability figure itself — never a bare number.
 
 ## Supporting work named in the WP7 spec, not tied to a single metric
 
@@ -130,19 +145,16 @@ flagged `[OPEN]` elsewhere).
   scenario-realism feature that a later characterisation run (WP9) would
   exercise. **Commit 9.**
 - **RTSP/TCP UL/DL coupling** (README §6, needed for G10's mixed-fleet
-  column and T9) — see Open decisions #2. Flagged as needing your sign-off
-  before building, same as WP-Join's RACH depth question was. **Commit 10,
-  pending that decision** — do not build a specific mechanism ahead of it.
+  column and T9) — **decided: build none of it** (Decision #2 below).
+  Dropped from this plan entirely; recorded instead as a new `[OPEN]` entry
+  in README §8 pointing back to Decision #2's three-option analysis. No
+  commit.
 - **Aggressor/fault-injection rate multipliers** (README §6, GT-4.3/T6a-e:
   2x/3x/5x/10x on a named flow, mid-run) — "should be first-class scenario
-  parameters, not one-off scripts." This is a scenario-config mechanism
-  (a runtime rate override keyed by flow + trigger time), orthogonal to
-  which generator is running underneath. No metric names it directly, so
-  there's no forcing function for *when* it lands — candidate for folding
-  into whichever of commits 3/9 turns out cheapest to extend once that code
-  exists, or its own commit if not. Flagging now rather than dropping it
-  silently, since it's explicit scope in §6 and easy to lose track of
-  amid the five-metric checklist above.
+  parameters, not one-off scripts." **Assigned to commit 9**, alongside
+  `cycle_clock`/`sync_group` — both touch scenario-config machinery, and
+  nothing else forces when the knobs would otherwise land, which is exactly
+  why they'd get dropped without an explicit assignment.
 
 **On M04:** already `status: proxy` (the per-slot-timeseries
 consecutive-miss approximation), not `pending`. Its `requires:` line notes
@@ -153,15 +165,17 @@ adding as a bonus once the ledger is fully wired (after commit 8, say), but
 it isn't one of the five status flips this plan is organized around, and
 nothing above depends on it.
 
-## Open decisions — no ground truth, flagging before implementation
+## Decisions — no ground truth to check against, made explicitly
 
 Two of these were named directly; a third turned up while tracing M14. All
 three share the same shape as the WP-Join RACH-depth question in README §6:
-nothing on disk can settle them, so picking one silently now just becomes a
+nothing on disk can settle them, so picking one silently would just become a
 README §8 `[OPEN]` discovered after the fact — the same pattern as
-`FIVE_QI_LCG` and `sr_period_slots`. Surfacing them here instead.
+`FIVE_QI_LCG` and `sr_period_slots`. Surfaced before implementation instead;
+all three are now decided, with the options kept below so a future revisit
+starts from this analysis rather than redoing it.
 
-### 1. XR frame → PDU-set decomposition
+### 1. XR frame → PDU-set decomposition — decided: (c)
 `sim/messages.py` already models a frame as several sibling `Message`s
 sharing one `frame_id`, each its own buffer chunk — but not how many
 siblings, or on what basis.
@@ -183,15 +197,24 @@ siblings, or on what basis.
 **What would distinguish them:** nothing currently in the repo.
 `oai-branches/` is MAC-layer scheduler source only — there is no RTP/PDCP
 fragmentation ground truth anywhere in this branch's vendored material.
-Recommend (c) as the least-arbitrary of the three, but this needs your call
-before commit 5, not a silent pick.
+
+**Decided: (c).** (a) is rejected outright — a PDU set of size 1 can never
+partially fail, which makes M05 vacuous by construction. (c) over (b)
+because tying the fragment count to a real physical constant beats picking
+N by hand. Two conditions bind on commit 5: the fragment size must be a
+config parameter, not a hardcoded 1500 — M05 is a G5 metric, and if
+fragment size moves completeness it needs to be sweepable in WP9 — and the
+generator's docstring must state plainly that this is an MTU-style stand-in
+for RTP packetization with no ground truth behind it, the same honesty
+`sim/power.py`'s `shrink_to_power_budget`/`snr_to_prb_floor` hold
+themselves to.
 
 (Side effect, resolves itself once the above is fixed: as long as all
 siblings of one frame are enqueued within the same `generate()` call, they
 naturally share one `now_s` — no separate decision needed for what
 "frame_generation_ts" means for M06.)
 
-### 2. RTSP/TCP UL/DL coupling abstraction
+### 2. RTSP/TCP UL/DL coupling abstraction — decided: build none
 README §6 already flags this as needing sign-off, not just an
 implementation detail. Three shapes considered:
 
@@ -209,12 +232,18 @@ implementation detail. Three shapes considered:
   needs rather than a reusable TCP model.
 
 **What would distinguish them:** nothing on disk — `oai-branches/` has no
-TCP or RTSP source at all. This is the one item in this document I'd
-actually block on rather than default: pick (a) only if you want something
-in a hurry and are willing to carry two stacked uncalibrated knobs; (c) if
-G10/T9 is the only consumer and a general model isn't worth building yet.
+TCP or RTSP source at all.
 
-### 3. M14's `survival_time_ms`
+**Decided: build none of the three.** All three add uncalibrated constants;
+(a) stacks a groundless coupling on top of `adaptive`'s already-uncalibrated
+`decrease_factor=0.7`, compounding rather than avoiding the problem. The
+only consumers — G10's mixed-fleet column and T9 — are both Phase 3, not
+now. Building any of the three ahead of that would carry invented
+parameters through WP5/WP6/WP-Join and contaminate their regression diffs
+to serve a consumer that doesn't exist yet. Recorded instead as a
+deliberate, documented gap in README §8, pointing back to this analysis.
+
+### 3. M14's `survival_time_ms` — decided: default 0.0, `[OPEN]`
 TS 22.104's communication service availability needs a per-flow "survival
 time" — the *additional* grace period beyond max latency before an
 interval counts as failed. No config field for this exists. It is
@@ -233,8 +262,16 @@ adjacent.
 
 **What would distinguish them:** nothing on disk names a factory-relevant
 survival time value (TS 22.104's worked examples are for other use cases
-entirely). Needs an explicit default before commit 8, flagged as `[OPEN]`
-in that commit rather than picked quietly.
+entirely).
+
+**Decided:** `FlowConfig.survival_time_ms: float = 0.0`, flagged `[OPEN]`.
+Default-0 — collapsing CSA to "delivered within max latency" — is
+acceptable only on one binding condition: it must not be silent. Commit 8's
+M14 implementation must report the `survival_time_ms` value it used
+alongside the availability figure itself, so the number is never quotable
+without its assumption attached — the `Sweep_Orig_vs_TwoTier.xlsx` lesson
+(README §7/§8: a number quoted without the caveat that travels with it
+gets misused later).
 
 ### 4. (minor) `cycle_clock`'s `phase_jitter_ms` default
 Lower stakes than the three above — scenario-authoring rather than a
@@ -244,7 +281,9 @@ block on it.
 
 ## Next step
 
-This is a plan, not a commit. Per your instructions: no code changes until
-you've reviewed the above — the metric/requires mapping, the commit
-grouping, and especially decisions #1-3, which block commits 5, 8, and 10
-respectively.
+All three decisions are made and recorded above; commit 10 (RTSP/TCP
+coupling) is dropped from this plan, base generators are confirmed folding
+into commit 3, and the aggressor/fault-injection knobs are assigned to
+commit 9. Nothing here is still pending review. Next action is commit 3
+itself: the base traffic generators plus the MAVLink multi-role
+`periodic_control` variant (§ M03 above).
