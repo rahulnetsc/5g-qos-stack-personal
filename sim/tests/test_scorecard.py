@@ -440,6 +440,58 @@ def test_m17_worst_flow_has_the_most_freeze_events():
     assert res.value["freeze_count"] == 3
 
 
+def test_m14_is_pending_for_a_pre_wp7_commit4_record():
+    rec = _run_record([_flow_record("1", message_count=10)])  # completion_ts_by_role_s defaults None
+    res = Scorecard().score(rec)["M14"]
+    assert res.status == "pending"
+    assert res.value is None
+
+
+def test_m14_collapses_to_within_pdb_ms_when_survival_time_is_zero():
+    fr = _flow_record("1", message_count=3, pdb_ms=50.0,
+                       completion_ts_by_role_s={"data": [0.0, 0.03, 0.1]})
+    rec = _run_record([fr])  # survival_time_ms defaults to 0.0
+    res = Scorecard().score(rec)["M14"]
+    assert res.status == "ok"
+    # gaps = [0.03, 0.07]s = [30, 70]ms; budget = 50+0 = 50ms -> only the
+    # first gap is within budget.
+    assert res.value["fraction"] == pytest.approx(0.5)
+    assert res.value["survival_time_ms"] == pytest.approx(0.0)
+
+
+def test_m14_survival_time_extends_the_budget():
+    fr = _flow_record("1", message_count=3, pdb_ms=50.0, survival_time_ms=30.0,
+                       completion_ts_by_role_s={"data": [0.0, 0.03, 0.1]})
+    rec = _run_record([fr])
+    res = Scorecard().score(rec)["M14"]
+    # same gaps as above, but budget = 50+30 = 80ms -> both gaps qualify now.
+    assert res.value["fraction"] == pytest.approx(1.0)
+    assert res.value["survival_time_ms"] == pytest.approx(30.0)
+
+
+def test_m14_excludes_a_role_with_fewer_than_two_completions():
+    silent = _flow_record("1", message_count=1, pdb_ms=50.0,
+                           completion_ts_by_role_s={"heartbeat": [0.0]})
+    healthy = _flow_record("2", message_count=5, pdb_ms=50.0,
+                            completion_ts_by_role_s={"telemetry": [0.0, 0.01, 0.02]})
+    rec = _run_record([silent, healthy])
+    res = Scorecard().score(rec)["M14"]
+    assert res.status == "ok"
+    assert res.value["flow"] == healthy.key
+    assert "1:heartbeat" in res.note
+
+
+def test_m14_worst_is_the_lowest_fraction_across_flows():
+    better = _flow_record("1", message_count=3, pdb_ms=100.0,
+                           completion_ts_by_role_s={"data": [0.0, 0.05, 0.1]})
+    worse = _flow_record("2", message_count=3, pdb_ms=100.0,
+                          completion_ts_by_role_s={"data": [0.0, 0.2, 0.4]})
+    rec = _run_record([better, worse])
+    res = Scorecard().score(rec)["M14"]
+    assert res.value["flow"] == worse.key
+    assert res.value["fraction"] == pytest.approx(0.0)  # both gaps (0.2s, 0.2s) exceed 100ms budget
+
+
 def test_correlate_flows_requires_timeseries():
     rec, sc_cfg = _record(record_timeseries=False)
     sc = Scorecard()

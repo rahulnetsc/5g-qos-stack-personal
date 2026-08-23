@@ -219,9 +219,21 @@ metrics:
     guarantees: [G11]
     unit: fraction
     direction: higher_better
-    status: pending
-    requires: WP7 (discrete message model, same as M03/M04)
-    note: This is the number that fills in G11's row on the Guarantee Sheet.
+    status: ok
+    requires: null
+    note: >
+      WP7 commit 8: reuses M03's exact gap mechanism (completion_ts_by_
+      role_s's receiver-side inter-arrival gaps) against a different
+      threshold -- pdb_ms + survival_time_ms per flow, not T_live-derived
+      ones (sim/scorecard.py::Scorecard._m14_communication_service_
+      availability). survival_time_ms (FlowConfig, dormant at 0.0 -- this
+      branch's own [OPEN], docs/wp7-plan.md Decision #3) is reported
+      alongside every value: at its universal current default, CSA
+      collapses exactly to "fraction of gaps within pdb_ms," not a full
+      CSA measurement including the TS 22.104 grace period -- the value is
+      never quotable without that context. This is the number that fills
+      in G11's row on the Guarantee Sheet. Pre-WP7-commit-4 records report
+      status=pending (same gate as M03).
 
   - id: M15
     name: command_jitter_p99_p50

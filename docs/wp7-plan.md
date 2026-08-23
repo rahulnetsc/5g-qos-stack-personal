@@ -208,10 +208,55 @@ Update it as commits land; don't let it drift back out of sync with reality.
   gap structure, not when in the run frames happened to land). File size:
   719,331 → 755,541 bytes (+36,210 bytes for 1020 trivial entries, not an
   array-driven blowup).
+- **Commit 8** — M14, the last of WP7's five target metrics.
+  `FlowConfig.survival_time_ms` (dormant since the decisions commit) copied
+  onto a new `FlowRecord.survival_time_ms` (plain `float = 0.0`, matching
+  `pdb_ms`'s style — not `Optional`, since it's a static config passthrough,
+  not a "predates WP7" sentinel; M14's pending/`ok` gate reuses M03's
+  `_has_role_completions` directly). `Scorecard._m14_communication_service_
+  availability()` reuses M03's exact gap mechanism (`completion_ts_by_
+  role_s`'s receiver-side inter-arrival gaps) against a different
+  threshold — `pdb_ms + survival_time_ms` per flow, not `T_live`-derived
+  ones — rather than needing new raw data: an "on time" gap and a
+  "within-CSA-budget" gap are the same measurement at a different
+  threshold. Reports the worst (min) fraction across flow/role pairs, with
+  `survival_time_ms` on every value. **With every current flow at its
+  dormant `survival_time_ms=0.0` default, CSA collapses exactly to "fraction
+  of gaps within `pdb_ms`"** — stated plainly in both the docstring and the
+  panel note, so a 0.0 result is never read as a full CSA measurement
+  including the TS 22.104 grace period. `config/metric_panel.yml`: M14
+  flipped `pending` → `ok` — confirmed by diff, the only status change.
+  5 new tests in `sim/tests/test_scorecard.py`.
 
-**Last verified** (2026-08-23, after commit 7): full suite green (203
+  **All five of WP7's target metrics (M03, M05, M06, M17, M14) are now
+  `ok`.** Guarantees G3, G5, and G11 — the three WP7's own metrics
+  targeted — are all fully sim-answerable. Found while checking this,
+  not chased as a fix: README §5's guarantee table cites "WP3, WP4" for
+  G3 and "WP0 metric panel" for G11, neither naming WP7, even though the
+  specific metrics that make them fully answerable (M03, M14) needed WP7
+  to exist at all — the "Yes" verdicts are correct, the WP attribution is
+  stale/incomplete. G9 remains the only guarantee marked unanswerable
+  ("No, until WP-Join lands"), unaffected by WP7.
+
+  **M04's exactness upgrade — deliberately not bundled here.** The plan
+  noted it's "close to free" once the ledger carries late/complete per
+  completion; still true, but bundling it into this commit would mix a
+  genuinely new metric (M14) with a refinement of an already-shipped one
+  (M04's proxy→exact upgrade) in one diff, defeating the attribution the
+  one-fidelity-change-per-commit discipline exists for. Not commit 9
+  either (unrelated scenario-authoring infrastructure). Left as its own,
+  separate, optional follow-up after commit 9.
+
+  **Drift prediction, made before writing any code, confirmed exactly:** no
+  new array (M14 reuses `completion_ts_by_role_s` as-is) — one new scalar
+  field, `survival_time_ms`, predicted 510 mismatches, all trivial (`0.0`).
+  Actual: exactly 510, that one field. Re-baselined; no `_compact_for_
+  regression` change needed (no array introduced). File size: 755,541 →
+  773,391 bytes (+17,850 bytes for 510 trivial scalars).
+
+**Last verified** (2026-08-23, after commit 8): full suite green (208
 passed, `sim/tests -q`), `scripts/regression_corpus.py --check` clean, all
-commits through 7 pushed to `origin/feat/high-fidelity-sim`. Update this
+commits through 8 pushed to `origin/feat/high-fidelity-sim`. Update this
 line as commits land rather than letting it go stale again — it already did
 once before (see commit 6's note above).
 
@@ -284,9 +329,12 @@ as a dormant default-0 field as of the decisions commit above; this is not
 the same concept as `t_live_s` or `defaults.survival_miss_n`, both of which
 are different concepts already flagged `[OPEN]` elsewhere.
 
-- Commit 8: M14 scorecard function + panel flip. Per Decision #3's
-  condition, M14 must report the `survival_time_ms` value it used alongside
-  the availability figure itself — never a bare number.
+- Commit 8 (landed): M14 scorecard function + panel flip, reusing M03's
+  gap mechanism against a `pdb_ms + survival_time_ms` threshold rather than
+  new raw data. Reports `survival_time_ms` alongside every value, per
+  Decision #3's condition — never a bare number. With every flow at the
+  0.0 default, CSA collapses exactly to "within pdb_ms," stated plainly
+  rather than left implicit.
 
 ## Supporting work named in the WP7 spec, not tied to a single metric
 
@@ -501,9 +549,10 @@ back below commit 3's trajectory).
 
 ## Next step
 
-Commits 3-7 are landed (see "Landed" above); M03/M05/M06/M17 are all `ok` —
-every XR/message-model metric this plan targeted except M14 is done. Next
-action is commit 8: M14 (`communication_service_availability`), reporting
-the `survival_time_ms` used alongside the availability figure (Decision #3's
-condition), then commit 9 (`cycle_clock`/`sync_group` + the aggressor/
-fault-injection knobs).
+Commits 3-8 are landed (see "Landed" above). All five of WP7's target
+metrics (M03, M05, M06, M17, M14) are `ok`; G3/G5/G11 are fully
+sim-answerable. Next action is commit 9: `cycle_clock`/`sync_group` (the
+production-line correlated-burst mechanism) plus the aggressor/fault-
+injection rate-multiplier knobs, assigned here per the decisions commit.
+After that, M04's exactness upgrade is an explicit, separate, optional
+follow-up — not bundled into 9 either.

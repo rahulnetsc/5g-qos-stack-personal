@@ -113,10 +113,7 @@ class Scorecard:
         out["M12"] = self._m12_cce_utilization(record)
         # M13 (first_violation_order) is a cross-run metric -- see
         # first_violation_order() below, called by the study/sweep layer.
-        out["M14"] = MetricResult(
-            "M14", "communication_service_availability", None, "pending", "fraction",
-            "requires WP7 discrete message model (same as M03/M04)",
-        )
+        out["M14"] = self._m14_communication_service_availability(record)
         out["M15"] = self._m15_command_jitter(record)
         # M16 (ul_dl_shared_bearer_correlation) needs a named flow pair --
         # see correlate_flows() below, not part of the automatic per-run scan.
@@ -249,6 +246,70 @@ class Scorecard:
                 "no flow/role pair had >=2 completions this run; " + note,
             )
         return MetricResult("M03", "liveness_gap_distribution", worst, "ok", "ms", note)
+
+    def _m14_communication_service_availability(self, record: RunRecord) -> MetricResult:
+        """TS 22.104 CSA: fraction of transfer intervals where the message
+        arrived within (max latency + survival time). Reuses M03's exact
+        gap mechanism (completion_ts_by_role_s's receiver-side inter-arrival
+        gaps) against a different threshold -- pdb_ms + survival_time_ms
+        per flow, instead of T_live-derived ones -- rather than needing a
+        second raw-data field: an "on time" gap and a "within CSA budget"
+        gap are the same underlying measurement at a different threshold.
+
+        With survival_time_ms == 0.0 (every flow's dormant default as of
+        this commit -- no scenario overrides it), the threshold collapses
+        to exactly pdb_ms, so CSA == "fraction of gaps within the flow's own
+        PDB" -- NOT a full CSA measurement including the TS 22.104 grace
+        period. survival_time_ms is reported alongside every value for
+        exactly this reason (docs/wp7-plan.md Decision #3): so a 0.0 result
+        is never quoted as if it were a real survival-time-aware figure.
+        """
+        if not self._has_role_completions(record):
+            return MetricResult(
+                "M14", "communication_service_availability", None, "pending", "fraction",
+                "requires WP7 commit 4 (completion_ts_by_role_s); record predates it",
+            )
+        worst = None
+        worst_fraction = 2.0  # above the valid [0,1] range, so the first candidate always wins
+        excluded: list[str] = []
+        for fr in record.flows.values():
+            budget_s = (fr.pdb_ms + fr.survival_time_ms) / 1000.0
+            for role, ts_list in fr.completion_ts_by_role_s.items():
+                if len(ts_list) < 2:
+                    excluded.append(f"{fr.key}:{role}")
+                    continue
+                gaps_s = [b - a for a, b in zip(ts_list, ts_list[1:])]
+                within = sum(1 for g in gaps_s if g <= budget_s)
+                fraction = within / len(gaps_s)
+                if fraction < worst_fraction:
+                    worst_fraction = fraction
+                    worst = {
+                        "flow": fr.key,
+                        "role": role,
+                        "fraction": fraction,
+                        "interval_count": len(gaps_s),
+                        "survival_time_ms": fr.survival_time_ms,
+                    }
+        note = (
+            "fraction of receiver-side inter-arrival gaps within pdb_ms + "
+            "survival_time_ms, grouped by Message.role, worst (min) flow/role "
+            "pair; survival_time_ms defaults to 0.0 (docs/wp7-plan.md Decision "
+            "#3) -- with every current flow at that default, this collapses "
+            "exactly to the fraction of gaps within the flow's own pdb_ms, "
+            "not a full CSA measurement including the TS 22.104 grace period"
+        )
+        if excluded:
+            note += (
+                f"; {len(excluded)} flow/role pair(s) had fewer than 2 "
+                "completions (no interval definable) and are excluded here -- "
+                f"see M01/M02 for their delivery failure: {', '.join(excluded)}"
+            )
+        if worst is None:
+            return MetricResult(
+                "M14", "communication_service_availability", None, "ok", "fraction",
+                "no flow/role pair had >=2 completions this run; " + note,
+            )
+        return MetricResult("M14", "communication_service_availability", worst, "ok", "fraction", note)
 
     def _has_frame_data(self, record: RunRecord) -> bool:
         """WP7 commit 6: frame_completions is available iff every flow in

@@ -106,6 +106,13 @@ class FlowRecord:
     # cases; scorecard.py gates on frame_completions["complete_ts_s"]'s
     # presence instead.
     xr_frame_period_ms: Optional[float] = None
+    # WP7 M14 (communication_service_availability): copied from
+    # FlowConfig.survival_time_ms (scheduler/flow.py, dormant at 0.0 --
+    # docs/wp7-plan.md Decision #3). A plain float like pdb_ms/gfbr_bps,
+    # not Optional -- it's a static config value always present once this
+    # field exists at all, not a "predates WP7" sentinel; M14's own
+    # pending/ok gate reuses M03's completion_ts_by_role_s check instead.
+    survival_time_ms: float = 0.0
 
     # Populated only when driver.run(..., record_timeseries=True) was used.
     # Per-slot series, aligned to RunRecord.timeseries_time_s.
@@ -245,6 +252,7 @@ class RunRecord:
                 gfbr_bps=fc.gfbr_bps,
                 pdb_ms=fc.pdb_ms,
                 priority_level=fc.priority_level,
+                survival_time_ms=fc.survival_time_ms,
                 bytes_arrived=m["bytes_arrived"],
                 bytes_delivered=m["bytes_delivered"],
                 bytes_dropped_pdb=m["bytes_dropped"],
