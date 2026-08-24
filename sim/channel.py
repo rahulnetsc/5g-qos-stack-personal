@@ -11,6 +11,16 @@ and a link budget, instead of the scenario author's hand-picked constant.
 This is computed once, at construction, per link (static geometry) -- a UE
 without ``position`` set (every existing scenario) is completely
 unaffected; ``mean_snr_db`` stays exactly the authored value.
+
+WP-Join commit 3 (docs/wp-join-plan.md sec1.5): a UE with ``UEConfig.
+scripted_fade`` set gets ``snr_db`` forced deterministically -- no AR(1)
+noise -- for every slot inside a configured window, and reset cleanly to
+the clean mean the instant a window ends. Needed because blockage's own
+stochastic Markov process, and the AR(1) process's own mean-reversion
+lag, both make "exactly when does SNR cross a threshold" unanswerable in
+closed form -- WP-Join's join/RLF acceptance tests need an exact,
+repeatable answer. A UE without ``scripted_fade`` set (every existing
+scenario) is completely unaffected.
 """
 
 import math
@@ -22,7 +32,7 @@ from scheduler.link import bits_per_prb, cce_aggregation_level
 
 from .blockage import step as blockage_step
 from .blockage import transition_probability
-from .config import UEConfig
+from .config import ScriptedFadeWindow, UEConfig
 from .pathloss import inf_los_probability, inf_path_loss_db
 
 __all__ = ["bits_per_prb", "cce_aggregation_level", "ChannelModel"]
@@ -141,6 +151,22 @@ class ChannelModel:
     while Blocked -- independent of ``position``/path loss, composing on
     top of whichever mean is already in effect. Every UE without
     ``blockage`` set (every existing scenario) is unaffected.
+
+    WP-Join commit 3: a UE with ``scripted_fade`` set has ``snr_db``
+    forced to an exact, deterministic value for every slot inside a
+    configured window -- bypassing the AR(1) recursion entirely while
+    active (not merely shifting its mean, the way blockage does): at this
+    module's typical ``coherence_slots``, a shifted mean alone would take
+    many hundreds to thousands of slots to actually converge, which would
+    make a "scripted" fade's real depth-vs-time behaviour unknowable in
+    closed form -- exactly the property this mechanism exists to fix.
+    Every UE without ``scripted_fade`` set (every existing scenario) is
+    unaffected; the underlying AR(1) innovation draw still happens for
+    every UE every slot regardless (its result is only discarded, not
+    skipped, while a window is active) so a scenario mixing scripted and
+    unscripted UEs never has one UE's fade state change the other's draw
+    order (CLAUDE.md's RNG-independence rule, applied here without a new
+    stream: this mechanism draws nothing of its own at all).
     """
 
     def __init__(
@@ -201,6 +227,12 @@ class ChannelModel:
                 ue.blockage.mean_unblocked_slots
             )
             self._blocked[ue.ue_id] = False
+        # WP-Join commit 3: only tracked for UEs that opt in. No RNG here
+        # at all -- the fade is a scenario-authored, deterministic
+        # override, not a draw (docs/wp-join-plan.md sec1.5).
+        self._scripted_fade: dict[int, tuple[ScriptedFadeWindow, ...]] = {
+            ue.ue_id: ue.scripted_fade for ue in ues if ue.scripted_fade
+        }
         # alpha so lag-K autocorrelation is ~1/e at K = coherence_slots
         self.alpha = {
             ue.ue_id: float(np.exp(-1.0 / max(ue.coherence_slots, 1))) for ue in ues
@@ -227,7 +259,7 @@ class ChannelModel:
                 self._snr_hist[ue.ue_id] = deque(maxlen=self._cqi_delay + 1)
                 self._snr_reported[ue.ue_id] = self.mean_snr_db[ue.ue_id]
 
-    def update(self, _slot_index: int) -> None:
+    def update(self, slot_index: int) -> None:
         # Advance blockage state before computing this slot's effective
         # mean, so a transition drawn this slot affects this slot's SNR --
         # matching the CQI pipeline's own "advance, then read" ordering
@@ -245,8 +277,38 @@ class ChannelModel:
             mean = self.mean_snr_db[ue_id]
             if self._blocked.get(ue_id, False):
                 mean -= self._blockage_extra_loss_db[ue_id]
+            # The innovation draw always happens, for every UE, regardless
+            # of scripted-fade state below -- only its RESULT is discarded
+            # while a window is active, never the draw itself (see this
+            # class's own docstring on why, and CLAUDE.md's RNG-
+            # independence rule).
             innovation = self._innovation_scale[ue_id] * self.sigma_db * self.rng.normal()
             self.snr_db[ue_id] = mean + alpha * (self.snr_db[ue_id] - mean) + innovation
+        # WP-Join commit 3: scripted fade overrides the AR(1) result above
+        # for any UE with an active window this slot -- deterministic, no
+        # noise -- and resets cleanly to the clean mean the instant a
+        # window ends (docs/wp-join-plan.md sec1.5: without this reset,
+        # the AR(1) recursion's own mean-reversion lag would leave snr_db
+        # stuck near the fade value for many hundreds of slots after
+        # recovery, defeating the whole point of a "scripted", exact-
+        # timing fade). A no-op loop (0 iterations) for every UE without
+        # ``scripted_fade`` set.
+        for ue_id, windows in self._scripted_fade.items():
+            active_loss_db = 0.0
+            in_window = False
+            just_ended = False
+            for window in windows:
+                if window.start_slot <= slot_index < window.end_slot:
+                    in_window = True
+                    active_loss_db += window.extra_loss_db
+                elif slot_index == window.end_slot:
+                    just_ended = True
+            if not (in_window or just_ended):
+                continue
+            mean = self.mean_snr_db[ue_id]
+            if self._blocked.get(ue_id, False):
+                mean -= self._blockage_extra_loss_db[ue_id]
+            self.snr_db[ue_id] = mean - active_loss_db if in_window else mean
         # Advance the CQI reporting pipeline. Independent of the AR(1)
         # innovation RNG so loss/delay draws don't perturb channel state.
         if self._cqi_delay > 0:

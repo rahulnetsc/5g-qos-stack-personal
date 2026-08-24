@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from sim.channel import ChannelModel
-from sim.config import BlockageConfig, UEConfig
+from sim.config import BlockageConfig, ScriptedFadeWindow, UEConfig
 
 
 def test_ue_without_position_keeps_authored_mean_snr_db():
@@ -273,3 +273,93 @@ def test_los_probability_height_uses_actual_gnb_position_not_a_fixed_table():
         "for InF-SH; a near-zero difference means h_bs_m isn't actually "
         "using gnb_position"
     )
+
+
+# -- WP-Join commit 3: scripted fade (docs/wp-join-plan.md sec1.5) ----------
+
+
+def test_scripted_fade_window_rejects_invalid_bounds():
+    with pytest.raises(ValueError):
+        ScriptedFadeWindow(start_slot=-1, end_slot=10, extra_loss_db=30.0)
+    with pytest.raises(ValueError):
+        ScriptedFadeWindow(start_slot=10, end_slot=10, extra_loss_db=30.0)
+    with pytest.raises(ValueError):
+        ScriptedFadeWindow(start_slot=0, end_slot=10, extra_loss_db=-1.0)
+
+
+def test_ue_without_scripted_fade_is_unaffected():
+    ue = UEConfig(ue_id=1, mean_snr_db=20.0)
+    channel = ChannelModel([ue], np.random.default_rng(0))
+    for slot in range(50):
+        channel.update(slot)
+    assert channel.get_snr_db(1) != pytest.approx(20.0 - 30.0)
+
+
+def test_scripted_fade_forces_exact_snr_during_window_and_resets_cleanly_at_end():
+    """stationary_std_db=0.0 isolates the override from AR(1) noise, so
+    the values during/after the window can be checked exactly, not just
+    approximately. The window is deliberately much shorter than
+    coherence_slots would need for a mean-shift to converge on its own
+    (docs/wp-join-plan.md sec1.5's own reasoning for why this can't just
+    shift ``mean_snr_db`` and let AR(1) catch up)."""
+    ue = UEConfig(
+        ue_id=1, mean_snr_db=20.0, coherence_slots=2000,
+        scripted_fade=(ScriptedFadeWindow(start_slot=10, end_slot=20, extra_loss_db=30.0),),
+    )
+    channel = ChannelModel([ue], np.random.default_rng(0), stationary_std_db=0.0)
+    for slot in range(10):  # slots 0..9 -- before the window starts at slot 10
+        channel.update(slot)
+    assert channel.get_snr_db(1) == pytest.approx(20.0)  # not yet in the window
+
+    for slot in range(10, 20):  # slots 10..19 -- exactly [start_slot, end_slot)
+        channel.update(slot)
+        assert channel.get_snr_db(1) == pytest.approx(20.0 - 30.0), (
+            f"slot {slot}: expected the exact deterministic fade value, "
+            f"got {channel.get_snr_db(1)}"
+        )
+
+    channel.update(20)  # end_slot -- reset instant
+    assert channel.get_snr_db(1) == pytest.approx(20.0), (
+        "AR(1) mean-reversion lag would otherwise leave snr_db stuck near "
+        "the fade value for hundreds of slots after the window ends -- "
+        "the whole reason this mechanism resets explicitly rather than "
+        "just letting AR(1) recover on its own"
+    )
+    channel.update(21)  # one slot after the window -- ordinary AR(1) resumes
+    assert channel.get_snr_db(1) == pytest.approx(20.0)  # stationary_std_db=0.0 -- no noise to move it
+
+
+def test_scripted_fade_draws_no_rng_of_its_own():
+    """The fade mechanism introduces no new stochastic draw at all (module
+    docstring) -- confirmed here by running two otherwise-identical models
+    that differ only in whether the UE's fade window is active, and
+    checking the SHARED innovation stream's own state ends up identical
+    either way. If the fade skipped or added a draw, these would diverge."""
+    ue_with_fade = UEConfig(
+        ue_id=1, mean_snr_db=20.0,
+        scripted_fade=(ScriptedFadeWindow(start_slot=5, end_slot=15, extra_loss_db=30.0),),
+    )
+    ue_without_fade = UEConfig(ue_id=1, mean_snr_db=20.0)
+
+    channel_a = ChannelModel([ue_with_fade], np.random.default_rng(0))
+    channel_b = ChannelModel([ue_without_fade], np.random.default_rng(0))
+    for slot in range(30):
+        channel_a.update(slot)
+        channel_b.update(slot)
+
+    assert channel_a.rng.bit_generator.state == channel_b.rng.bit_generator.state
+
+
+def test_scripted_fade_composes_with_blockage():
+    """Independent of blockage (module docstring) -- both subtract from
+    the same effective mean, so a UE blocked AND mid-fade sees both
+    penalties, not just the fade's."""
+    ue = UEConfig(
+        ue_id=1, mean_snr_db=20.0,
+        blockage=BlockageConfig(mean_unblocked_slots=1, mean_blocked_slots=1_000_000, blocked_extra_loss_db=17.5),
+        scripted_fade=(ScriptedFadeWindow(start_slot=0, end_slot=5, extra_loss_db=10.0),),
+    )
+    channel = ChannelModel([ue], np.random.default_rng(0), stationary_std_db=0.0)
+    channel.update(0)
+    assert channel.is_blocked(1) is True  # p_leave_unblocked=1.0 -- blocks on the first update
+    assert channel.get_snr_db(1) == pytest.approx(20.0 - 17.5 - 10.0)

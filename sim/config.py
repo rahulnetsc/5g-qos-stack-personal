@@ -14,6 +14,7 @@ __all__ = [
     "TDDConfig",
     "CarrierConfig",
     "BlockageConfig",
+    "ScriptedFadeWindow",
     "UEConfig",
     "FlowConfig",
     "ScenarioConfig",
@@ -62,6 +63,32 @@ class BlockageConfig:
     blocked_extra_loss_db: float = 17.5  # midpoint of p5g-sim-plan.md's cited 15-20dB
 
 
+@dataclass(frozen=True)
+class ScriptedFadeWindow:
+    """A single scripted, deterministic SNR fade window (WP-Join commit 3,
+    docs/wp-join-plan.md sec1.5). Unlike ``BlockageConfig`` -- a stochastic
+    two-state Markov process, no ground truth for its dwell times -- this
+    is a scenario-authored, EXACT depth over an EXACT slot range: GT-6.3's
+    join/RLF acceptance tests need a known, repeatable fade that crosses a
+    known SNR threshold at a known time, which a stochastic process
+    structurally cannot guarantee. ``sim/channel.py::ChannelModel`` forces
+    ``snr_db`` deterministically (no AR(1) noise) for every slot in
+    ``[start_slot, end_slot)``, and resets it cleanly to the clean mean at
+    ``end_slot`` -- both ends of the window are exact, not statistical."""
+
+    start_slot: int
+    end_slot: int
+    extra_loss_db: float
+
+    def __post_init__(self) -> None:
+        if self.start_slot < 0:
+            raise ValueError(f"start_slot must be >= 0 (got {self.start_slot})")
+        if self.end_slot <= self.start_slot:
+            raise ValueError(f"end_slot must be > start_slot (got {self.end_slot} <= {self.start_slot})")
+        if self.extra_loss_db < 0.0:
+            raise ValueError(f"extra_loss_db must be >= 0 (got {self.extra_loss_db})")
+
+
 @dataclass
 class UEConfig:
     ue_id: int
@@ -80,6 +107,15 @@ class UEConfig:
     # whichever mean_snr_db is already in effect, hand-authored or
     # path-loss-derived.
     blockage: BlockageConfig | None = None
+    # WP-Join commit 3 (docs/wp-join-plan.md sec1.5): opt-in, deterministic
+    # scripted SNR fade -- () (default) preserves today's behaviour
+    # exactly. Independent of position/blockage; composes as a further,
+    # exact dB penalty on whichever mean/blockage-adjusted mean is already
+    # in effect while a window is active. Built to make sync loss (sim/
+    # rlf.py) reachable at all and its recovery-path timing exact -- see
+    # that module and sim/join.py for why blockage's own stochastic
+    # process can't serve this role.
+    scripted_fade: tuple[ScriptedFadeWindow, ...] = ()
 
 
 @dataclass

@@ -639,7 +639,7 @@ than silently skipped.
 |---|---|---|---|
 | 1 | `sim/join.py` — dormant FSM (§1.6), `JoinConfig`/`JoinEvent`, calibrated delay sampler (D2/D3) | `sim/join.py` (new), `sim/tests/test_join.py` (new) | No — zero driver/config wiring, unit-tested only |
 | 2 | Wire `sim/rlf.py::step()` into `sim/driver.py`'s slot loop, unconditionally, per-UE per-slot on true SNR; two diagnostic counters | `sim/driver.py`, `sim/tests/test_smoke.py` | Live, designed to be inert (§4.1) — no new `UEConfig` field |
-| 3 | Scripted fade in `sim/channel.py` (§1.5) — `UEConfig.scripted_fade`, composes as an extra dB penalty like blockage | `sim/config.py`, `sim/channel.py`, `sim/tests/test_channel.py` | No — opt-in, `[]` default preserves today's behavior exactly |
+| 3 | Scripted fade in `sim/channel.py` (§1.5) — `UEConfig.scripted_fade`, deterministic override (not a mean-shift) while a window is active | `sim/config.py`, `sim/channel.py`, `sim/tests/test_channel.py`, `sim/tests/test_wpjoin_fade_boundary.py` (new — cross-module GT-6.3 boundary characterization) | No — opt-in, `()` default preserves today's behavior exactly |
 | 4 | Panel/schema: M18/M19 at `status: pending`, `JoinEventRecord`/`RunRecord.join_events`, `Scorecard` stubs returning pending on every existing record, `defaults.slo_green_dwell_s` (`[OPEN]`, D-new below) | `config/metric_panel.yml`, `sim/run_record.py`, `sim/scorecard.py`, `sim/tests/test_scorecard.py`, `sim/tests/test_run_record.py`, `regression/baseline_studies_1_3.json` | No — schema only. **The one commit that is not `--check`-clean** (§4.1) |
 | 5 | Radio-layer gate: `UEConfig.join`, `JoinAwareBufferView`, `HarqProcessPool.flush_ue`, RLF-edge → reestablish trigger, re-arm on reconnect, `JoinEventRecord` emission, `join_cold_seed`/`join_reest_seed`. **M18 `pending` → `ok`** | `sim/config.py`, `sim/driver.py`, `sim/join.py`, `sim/harq.py`, `config/metric_panel.yml`, `sim/tests/test_join_gate.py` (new) | No — opt-in, `UEConfig.join=None` default |
 | 6 | Application-layer gate: traffic-admission suppression (warm/cold only), handshake `Message` pair through the real buffer/scheduler/HARQ path. **M19 `pending` → `proxy`** | `sim/driver.py`, `sim/join.py`, `sim/traffic.py`, `config/metric_panel.yml`, `sim/tests/test_join_handshake.py` (new) | No — same opt-in gate as commit 5 |
@@ -795,6 +795,109 @@ points above rather than just restating them:**
    `run()` from `scenario.ues` — the same freshness discipline as
    `harq_pool`/`bsr`/`ul_access` a few lines above it, confirmed by
    inspection (a local, rebuilt every call, nothing module-level).
+
+### Commit 3 — landed
+
+`sim/config.py` (new: `ScriptedFadeWindow`, `UEConfig.scripted_fade`),
+`sim/channel.py` (`ChannelModel` forces `snr_db` deterministically for
+every slot inside a window and resets it at the window's end), `sim/
+tests/test_channel.py` (5 new tests), `sim/tests/test_wpjoin_fade_
+boundary.py` (new, 10 tests — a cross-module characterization composing
+this commit's fade with the already-landed, unmodified `sim/rlf.py` and
+`sim/join.py`, since all three are pure/importable well before commit
+5's driver.py wiring makes them a real pipeline).
+
+**Predicted, before writing any code: fully clean `regression_corpus.py
+--check`** — the same opt-in-default shape as WP6's `position`/
+`blockage` commits (1/2 in that WP's own lineage), **the twentieth such
+prediction in the WP5/WP6/WP-Join lineage** (18th = this WP's commit 1,
+"nothing imports it"; 19th = commit 2, "diagnostic-only, unread"; this is
+the 20th, back to the standard "opt-in default preserves today's
+behaviour exactly" shape — `UEConfig.scripted_fade` defaults to `()`, and
+no corpus scenario sets it). **Confirmed exactly:** `pytest sim/tests -q`
+— 340 passed (325 + 15 new), 1 xfailed (unchanged); `regression_corpus.py
+--check` — clean, zero mismatches; `git diff --stat` touches exactly
+`sim/config.py`, `sim/channel.py`, `sim/tests/test_channel.py`, and the
+new `sim/tests/test_wpjoin_fade_boundary.py` — no `sim/driver.py`, no
+`config/metric_panel.yml`.
+
+**Answering the pre-commit checklist explicitly:**
+
+1. *What must the scripted fade do that blockage can't; are the two
+   GT-6.3 variants still needed?* **Restated, and one thing sharpened
+   while implementing it.** Blockage's defaults (`mean_snr_db=20`,
+   `blocked_extra_loss_db=17.5`) leave a blocked UE at ≈2.5dB, 7.5dB above
+   the `-5.0`dB RLF floor — but the deeper reason blockage can't serve
+   this role isn't just "the default is too shallow," it's that
+   **blockage is a stochastic two-state Markov process with random dwell
+   times**, structurally incapable of guaranteeing a fade crosses a known
+   threshold for a known, exact duration. The sharpened finding, found
+   while implementing (not anticipated in §1.5): **even a hypothetical
+   deep, deterministic blockage-style *mean shift* couldn't deliver this
+   either**, because the AR(1) process only mean-reverts geometrically
+   (rate `alpha` per slot) — at this deployment's typical `coherence_
+   slots` (100-2000), reaching within noise of a new mean takes many
+   hundreds to thousands of slots, and recovering back afterward takes
+   just as long. A "scripted" fade that still needed thousands of slots
+   to actually arrive at its target value, and thousands more to leave
+   it, would not deliver the exact, known-instant transitions GT-6.3's
+   own timing boundaries depend on. `ChannelModel` therefore forces
+   `snr_db` directly (bypassing AR(1) entirely) during the window and
+   resets it explicitly the instant the window ends — the mechanism this
+   commit actually landed, not a deeper blockage config.
+   **The two variants (D6) are still exactly what's needed, now with
+   an exact number instead of a qualitative one — see point 4.**
+2. *Predict the drift; state the falsifiable form.* **Opt-in, default-`
+   ()`, "preserves today's behaviour exactly"** — the same falsifiable
+   form as WP6's `position`/`blockage` commits, not commit 1/2's dormant
+   shapes (`sim/channel.py` is already imported by `sim/driver.py`; this
+   commit adds a new opt-in field to an already-wired module, exactly
+   like `blockage` did). No corpus scenario sets `scripted_fade`, so
+   `ChannelModel`'s SNR computation is byte-identical for every existing
+   scenario — confirmed via `regression_corpus.py --check` above, and via
+   `test_ue_without_scripted_fade_is_unaffected`.
+3. *Does the fade need its own RNG stream?* **No — deterministic by
+   construction, and confirmed empirically, not just asserted.** A
+   scripted fade is scenario-AUTHORED (exact `start_slot`/`end_slot`/
+   `extra_loss_db`), not a draw. `test_scripted_fade_draws_no_rng_of_its_
+   own` goes one step further than commit 1's own floor-equals-ceiling
+   check: rather than checking a dedicated stream draws nothing, it runs
+   two otherwise-identical `ChannelModel`s — one with the fade active,
+   one without — and confirms the SHARED AR(1) innovation stream
+   (`self.rng`) ends in the exact same `bit_generator.state` either way.
+   The innovation draw still happens, every slot, for a faded UE — only
+   discarded, never skipped — so a scenario mixing faded and unfaded UEs
+   can never have one UE's fade state shift another UE's draw order
+   (CLAUDE.md's RNG-independence rule, satisfied here by never having a
+   second stream to isolate in the first place).
+4. *Record the concrete GT-6.3 numbers, not just the qualitative
+   finding.* **Three numbers, all confirmed by execution
+   (`sim/tests/test_wpjoin_fade_boundary.py`), not derived by hand alone:**
+   - **Depth**: `extra_loss_db > mean_snr_db - rlf_snr_floor_db` to cross
+     the floor at all (25dB at this deployment's typical `mean_snr_db=
+     20.0`); **30dB recommended** (5dB of margin, giving an exact -10dB
+     during the window).
+   - **Minimum fade duration to declare RLF at all: `n310 + t310 = 4,010
+     slots (2.005s)`.** Shorter than this, RLF never declares regardless
+     of depth — `n311=1` (default) cancels `T310_RUNNING` on the very
+     first good slot once the fade ends, before `t310`'s 4,000-slot dwell
+     can complete. Not anticipated in §1.5/D6 — found and locked down here.
+   - **The GT-6.3a/6.3b boundary: exactly `n310 + t310 +
+     cell_search_ceiling_slots = 10 + 4,000 + 6,000 = 10,010 slots
+     (5.005s)`.** Fades of 10,009 slots (5.0045s) or shorter reach
+     `REESTABLISH`; 10,010 slots (5.005s) or longer fall back to `IDLE` /
+     a full re-attach — confirmed exactly at both sides of that boundary,
+     not just predicted. The test plan's own literal 10s (20,000-slot)
+     fade sits **almost exactly 2x past this boundary**, confirming D6's
+     finding numerically: it exercises the IDLE-fallback/full-reattach
+     path, not the reestablishment path its own phrasing names. This
+     boundary is governed by whether SNR restores before `t311`'s ceiling
+     is reached, independent of `JoinConfig`'s own random cell-search
+     processing-delay draw *as long as that draw itself stays under the
+     ceiling* — the ~1% tail case (`p_expiry`'s own design point) where it
+     doesn't is a distinct, rarer failure mode (search times out on its
+     own processing delay, not on the channel), not conflated with this
+     finding.
 
 ### 4.1 Falsifiable inertness — commits 1/2/3/5/6/7, and why commit 4 is the one exception
 
@@ -1009,12 +1112,22 @@ with the improvement's sign and magnitude reported.
    scope for a planning document); flagged for a small follow-up README
    correction.
 2. **D6's finding (§3) should reach the test-plan owner, not just this
-   repo**: GT-6.3's literal 10 s scripted fade outlasts `t310+t311=5.0s`
-   and therefore exercises the IDLE-fallback/full-reattach path, not the
-   reestablishment path its own phrasing ("≤10s including
-   re-establishment") describes. This WP builds both variants (D6) rather
-   than silently picking one, but the test plan's own wording is worth
-   raising separately.
+   repo — now with exact numbers (commit 3), not a qualitative estimate.**
+   The GT-6.3a/6.3b boundary is exactly `n310 + t310 +
+   cell_search_ceiling_slots = 10,010 slots (5.005s)`, confirmed by
+   execution: fades of 10,009 slots (5.0045s) or shorter reach
+   `REESTABLISH`; 10,010 slots or longer fall back to `IDLE`/a full
+   re-attach. The test plan's own literal 10s (20,000-slot) scripted fade
+   sits almost exactly 2x past this boundary, so it exercises the
+   IDLE-fallback/full-reattach path, not the reestablishment path its own
+   phrasing ("≤10s including re-establishment") describes. A second,
+   related number worth the same visibility: fades **shorter** than
+   `n310 + t310 = 4,010 slots (2.005s)` never declare RLF at all,
+   regardless of depth — there is a floor on usefully short fades too,
+   not just a ceiling on how long one can be before the path changes.
+   This WP builds both variants (D6) rather than silently picking one,
+   but the test plan's own wording is worth raising separately, with
+   these numbers attached.
 3. **`T_live` (`README` §8, still `[OPEN]`) calibrates M19's green-line and
    every G9/G3 pass judgment** — not this WP's to resolve; M19 is built to
    consume whatever value it resolves to.
@@ -1037,9 +1150,11 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commits 1–2 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+**Commits 1–3 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
 `sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
-diagnostic-only). Commits 3–8 not yet started. Two scope questions that would otherwise be
+diagnostic-only; deterministic scripted fade in `sim/channel.py`, with
+the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s).
+Commits 4–8 not yet started. Two scope questions that would otherwise be
 `[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
 Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)
 will be added after commit 8 lands, following `docs/wp5-plan.md`/`docs/
