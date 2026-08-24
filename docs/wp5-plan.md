@@ -494,7 +494,7 @@ purely additive.
 | 0 | Panel `caveats:` field (M01/M02/M14/M15) + `Scorecard` wiring — **landed** | `config/metric_panel.yml`, `sim/scorecard.py`, `sim/tests/test_scorecard.py` | N/A — scoring-layer only, `regression_corpus.py` never calls `Scorecard.score()` |
 | 1 | `HarqProcess`/`HarqProcessPool` core state (asymmetric `dl_capacity=8`/`ul_capacity=16`, Decision 2) + `combining_gain_db()` | `sim/harq.py` (new), `sim/tests/test_harq.py` (new) | No — dormant, unit-tested only (WP1 precedent) |
 | 2 | `Allocation.harq_pid`/`is_retx` fields; `bler_for_mcs_with_combining()` composition (Decision 1b) | `scheduler/interfaces.py`, `sim/harq.py` (**not** `scheduler/link.py` — see correction below), tests | No — new optional fields default to old behavior; `bler_for_mcs` itself untouched, composition uncalled until 4a/4b |
-| 3 | Process-pool gating on new-data grants (no multi-slot delay yet) | `sim/driver.py`, `sim/harq.py` | Live, but **designed to be inert** — delivery still synchronous, so the pool never actually binds |
+| 3 | Process-pool gating on new-data grants (no multi-slot delay yet) — **landed** | `sim/driver.py` | Live, but **designed to be inert** — delivery still synchronous, so the pool never actually binds |
 | 4a | Deferred drain + real multi-slot retry, **DL** | `sim/driver.py`, `sim/metrics.py` (`bytes_harq_retx`/`bytes_harq_lost` counters) | Live — the big DL fidelity landing |
 | 4b | Deferred drain + real multi-slot retry, **UL** — resolves the `sched_ul_bytes`/k2-HARQ gap `sim/bsr.py`'s own docstring flags (CLAUDE.md known issues) | `sim/driver.py`, interaction with `sim/bsr.py`/`sim/ul_access.py` (their own logic unchanged — see note) | Live — the big UL fidelity landing |
 | 6 | OLLA bug #1 only (`get_mcs_from_bler`'s round-count ratchet) | `scheduler/link.py` or new `sim/olla.py`, `sim/driver.py` | Live |
@@ -531,6 +531,57 @@ from `sim.driver`/etc.; adding `from scheduler.link import bler_for_mcs`
 matches the allowed, already-established direction `sim.driver` uses).
 `sim/harq.py`'s own docstring is corrected to stop claiming "no simulator
 or scheduler imports."
+
+**Commit 3 — landed.** First WP5 commit to touch `sim/driver.py`.
+**Falsifiable inertness argument, made precise before writing any code:**
+every `Allocation` the existing per-slot loop processes is wrapped —
+unmodified in between — with one `harq_pool.allocate(...)` immediately
+before its existing (untouched) delivery logic and one `harq_pool.free
+(...)` immediately after, **within that same loop iteration**, before the
+next `Allocation` (even one for the identical `(ue_id, direction)` key) is
+reached. Consequently occupancy for any key never exceeds 1 at any instant
+`allocate()`/`exhausted()` could observe it — a structural property of the
+code (sequential allocate-then-free, never allocate-allocate-then-
+free-both), true for *any* scenario, not contingent on which 22 happen to
+be in the corpus. Since `dl_capacity=8`/`ul_capacity=16` (Decision 2) are
+both `>= 1`, `allocate()` can therefore never return `None` under this
+discipline — `harq_exhausted_count` is counted (real OAI's own
+`harq_exhausted` diagnostic, `ia_p5g_scheduler.c`) but unreachable this
+commit **by construction**. It would have bound only under a different,
+not-chosen design (e.g. allocating for every `Allocation` up front and
+freeing them all at slot-end).
+
+**Scope confirmed:** the wrap adds two bookkeeping lines around each
+iteration and changes zero lines of the existing body (BLER computation,
+`ue_lcp.fill`/`buffers.drain`, `bsr.on_ul_grant`, `ul_access.on_ul_grant`,
+`metrics.record_*`, PRB/CCE accounting). Exhaustion is counted, not
+enforced — blocking delivery on it would itself be a behavior change, out
+of scope until 4a/4b give exhaustion something to actually bind on.
+
+**Two counters, not one, and why:** `summary["harq_exhausted_count"]`
+alone would pass trivially if gating silently never ran at all (a wiring
+bug), which is a different failure than "runs but never binds" — added
+`summary["harq_allocate_calls"]` alongside it so a test can tell the two
+apart. Neither is threaded into `RunRecord` (`RunRecord.from_summary` only
+reads keys it names explicitly, same idiom as `_ue_lcp`/`_message_ledger`)
+— this is *why* `--check` stays fully clean rather than "clean but for one
+new trivial field" (WP7 commits 4/6/7/8's pattern for a field that *does*
+reach `RunRecord`).
+
+**Test, on the scenario the argument actually turns on:** `sim/tests/
+test_smoke.py::test_wp5_harq_process_pool_gating_is_live_but_never_binds`
+runs `factory_robots_scenario` (README §8: the one scenario with
+multi-flow UEs sharing a slot, UEs 8/9/10) through `RoundRobin`, and
+asserts both `harq_allocate_calls > 0` (gating is actually live) and
+`harq_exhausted_count == 0` (it never bound) — exercising exactly the
+"2+ Allocations for one key in one slot" case that would break occupancy
+≤ 1 under the not-chosen design, not an arbitrary scenario that happens
+not to.
+
+**Predicted, before writing any code: fully clean `--check` — the 13th
+such prediction in this WP7/WP5 lineage. Confirmed exactly:** `pytest
+sim/tests -q` 237 passed (236 + 1 new), `regression_corpus.py --check`
+clean, zero mismatches.
 
 **Commit 2 — landed.** `Allocation.harq_pid: int = -1`/`is_retx: bool =
 False` (`scheduler/interfaces.py`) + `bler_for_mcs_with_combining()`

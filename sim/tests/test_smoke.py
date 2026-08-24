@@ -1649,3 +1649,31 @@ def test_ue_lcp_pbr_round_protects_gbr_from_a_greedy_best_effort_flow():
         f"GBR flow should be served first from its PBR bucket, got {fills}"
     )
     assert fills.get(9, 0) == 1_000, "best-effort gets only the remainder"
+
+
+def test_wp5_harq_process_pool_gating_is_live_but_never_binds():
+    """docs/wp5-plan.md WP5 commit 3: process-pool gating wraps every
+    Allocation this commit, but delivery is still synchronous, so no
+    (ue_id, direction) key should ever hold more than one process at a
+    time -- harq_exhausted_count must stay 0.
+
+    factory_robots_scenario is used deliberately, not an arbitrary smoke
+    scenario: README.md sec8 documents it as the one scenario with
+    multi-flow UEs sharing a slot (UEs 8/9/10, GBR video + a
+    different-class flow each) -- exactly the case that would break
+    occupancy <= 1 under a different (not chosen) design, per this
+    commit's inertness argument.
+
+    harq_allocate_calls > 0 is asserted alongside harq_exhausted_count ==
+    0 on purpose: a bare exhaustion-count-is-zero check would also pass
+    if gating silently never ran at all, which is a different bug than
+    "runs but never binds" and this test must be able to tell them apart.
+    """
+    from sim.scenarios import factory_robots_scenario
+
+    summary = run(factory_robots_scenario(), RoundRobin())
+    assert summary["harq_allocate_calls"] > 0, (
+        "gating never ran -- can't distinguish this from harq_exhausted_count==0 "
+        "meaning 'never binds' rather than 'never wired up'"
+    )
+    assert summary["harq_exhausted_count"] == 0

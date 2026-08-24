@@ -7,6 +7,7 @@ from .bsr import BsrModel
 from .buffer import BufferModel
 from .channel import ChannelModel, bits_per_prb
 from .config import ScenarioConfig
+from .harq import HarqProcessPool
 from .messages import FrameLedger, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
@@ -73,6 +74,20 @@ def run(
         scenario.flows, buffers, grid.slot_duration_s, rng, ledger=message_ledger
     )
     metrics = Metrics(record_timeseries=record_timeseries)
+    # WP5 commit 3 (docs/wp5-plan.md): process-pool gating only -- no
+    # multi-slot delay yet, delivery below is still synchronous. Each
+    # Allocation's process is allocated immediately before its (unchanged)
+    # delivery logic and freed immediately after, within the same loop
+    # iteration, before the next Allocation is touched -- so occupancy for
+    # any (ue_id, direction) key never exceeds 1 at any instant allocate()/
+    # exhausted() could observe it, regardless of how many Allocations one
+    # UE gets in one slot. Since dl_capacity=8/ul_capacity=16 (Decision 2)
+    # are both >=1, allocate() can never return None under this discipline
+    # -- harq_exhausted_count below is counted as the diagnostic the plan
+    # names, but is unreachable this commit BY CONSTRUCTION, not by luck.
+    harq_pool = HarqProcessPool()
+    harq_allocate_calls = 0
+    harq_exhausted_count = 0
 
     scheduler.configure(scenario.flows, grid.slot_duration_s, grid)
 
@@ -127,6 +142,27 @@ def run(
         for alloc in scheduler.allocate(slot_grid, buffers, channel):
             if alloc.bytes_capacity <= 0:
                 continue
+
+            # WP5 commit 3: allocate a HARQ process for this new-data
+            # grant, entirely bracketing the existing (unmodified) body
+            # below -- see the module-level comment on harq_pool. No
+            # scheduler ever sets is_retx=True (Decision 4); this commit
+            # only ever allocates for is_retx=False grants.
+            harq_direction = "UL" if alloc.ue_grant else "DL"
+            harq_qfi = -1 if alloc.ue_grant else alloc.qfi
+            harq_allocate_calls += 1
+            harq_proc = harq_pool.allocate(
+                alloc.ue_id, harq_direction, alloc.bytes_capacity, slot_index, qfi=harq_qfi
+            )
+            if harq_proc is None:
+                # Unreachable this commit (see module-level comment) --
+                # counted, not enforced: blocking delivery here would
+                # change existing behaviour, which is out of scope until
+                # commits 4a/4b give exhaustion something real to bind on.
+                harq_exhausted_count += 1
+            else:
+                alloc.harq_pid = harq_proc.pid
+
             symbols = (
                 slot_grid.dl_symbols if alloc.direction == "DL" else slot_grid.ul_symbols
             )
@@ -180,6 +216,12 @@ def run(
                 dl_prbs_used_this_slot += alloc.prbs
             else:
                 ul_prbs_used_this_slot += alloc.prbs
+
+            # WP5 commit 3: free the process in the same iteration it was
+            # allocated in -- delivery above is still synchronous, so
+            # there is nothing left for the process to wait on yet.
+            if harq_proc is not None:
+                harq_pool.free(alloc.ue_id, harq_direction, harq_proc.pid)
         metrics.record_cce(cce_used_this_slot, slot_grid.pdcch_cce_budget)
         # Close the loop for rate-adaptive sources: their offered load
         # responds to what they actually got.
@@ -212,6 +254,15 @@ def run(
         )
 
     summary = metrics.summary(horizon_s, buffers)
+    # WP5 commit 3: diagnostic counters only, deliberately NOT threaded
+    # into RunRecord (RunRecord.from_summary only reads keys it names
+    # explicitly -- same idiom as the _ue_lcp/_message_ledger handles
+    # below), so regression_corpus.py --check (which snapshots
+    # RunRecord.to_dict() only) can't see these. harq_allocate_calls > 0
+    # is what distinguishes "gating is live and never binds" from "gating
+    # isn't running" -- see sim/tests/test_smoke.py.
+    summary["harq_allocate_calls"] = harq_allocate_calls
+    summary["harq_exhausted_count"] = harq_exhausted_count
     # WP7: true per-message completion latency, replacing the head-of-line
     # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
     # the message ledger and merged into the same per-flow summary dict the
