@@ -37,8 +37,9 @@ re-derive the formula from that stale citation.
 ## 1. The HARQ mechanism, plain language
 
 **What the gNB holds.** Per (UE, direction), a pool of up to `N` HARQ
-processes (real 5G: `N=16`, TS 38.321 §5.3.2.1 — no vendored value in this
-repo's `oai-branches/`, see Decision 2). Each process is either free, or
+processes — real OAI's own fallback-when-unconfigured defaults are
+**asymmetric by direction: 8 for DL, 16 for UL** (not one shared spec-
+ceiling value; see Decision 2 for the exact citation). Each process is either free, or
 busy holding one in-flight transport block (TB): how many bytes it carries,
 how many times it's been sent, and the slot it's next due for action. Real
 OAI keeps the busy ones on a `retrans_dl_harq`/`retrans_ul_harq` list and
@@ -279,12 +280,24 @@ port the numbers, but flag them in `sim/harq.py`'s docstring and a new
 README §8 `[OPEN]` entry as an unsourced literature approximation, not a
 verified constant, same treatment as `FIVE_QI_LCG`/`sr_period_slots`.
 
+**Saturation beyond the table, flagged explicitly (not just inherited):**
+`.get(retx_count, _IR_GAIN_DB[3])` clamps every attempt past the third to
+the *same* `8.0 dB` (IR) / `retx_count × 3.0 dB`-uncapped (Chase) bonus —
+ported as-is from the branch, not derived. This matters because the table
+only goes to `retx_count=3` while the real retry cap is `harq_round_max`
+(§2), a config value with no vendored default confirmed here — if a
+scenario's `harq_round_max` exceeds 4, every attempt past the third gets an
+identical, unvarying, uncalibrated bonus rather than a value that
+continues to reflect diminishing returns. `sim/harq.py`'s docstring must
+state this explicitly next to the table, not leave it to be discovered by
+reading `.get()`'s fallback argument.
+
 **Not built at all, per explicit rejection:** the reachability-weighted
 `effective_SE(Δ)` formula, neither as the driving mechanism nor as a
 derived/reported diagnostic — it has no provenance anywhere on disk, and no
 `metric_panel.yml` entry would consume it as a diagnostic.
 
-### Decision 1b — flagged, not yet resolved: `bler_sigmoid` vs. today's `bler_for_mcs`
+### Decision 1b — resolved: compose with today's `bler_for_mcs`; `bler_sigmoid` is not reintroduced
 
 The mined branch's combining-gain mechanism is paired with its own BLER
 curve, `bler_sigmoid(delta_snr_db)` — a sigmoid keyed on instantaneous-SNR
@@ -293,29 +306,73 @@ the current codebase's actual BLER mechanism.** `scheduler/link.py` today
 has `bler_for_mcs(mcs_threshold_db, true_snr_db, base_bler=0.10)` — a
 different, already-shipped, already-tested model: BLER doubles per dB of
 shortfall between the scheduler's picked-MCS threshold and the true SNR
-(WP1/WP4-era, postdates the May-2026 branch). Reintroducing `bler_sigmoid`
-as a second, parallel BLER mechanism would leave two competing
-SNR→BLER curves in the codebase with no stated rule for when each applies.
+(WP1/WP4-era, postdates the May-2026 branch).
 
-**Recommendation (not finalized — flagging for sign-off before commit 2 is
-coded):** compose `combining_gain_db(retx_count)` with the *existing*
-`bler_for_mcs`, by adding the dB gain to the SNR argument before the call —
-combining gain is, physically, "the channel looks this many dB better for
-this attempt," which is orthogonal to *which* SNR→BLER curve consumes it.
-This preserves the already-tested mismatch-aware model and avoids shipping
-`bler_sigmoid` as dead-on-arrival duplicate machinery. If this is wrong,
-say so before commit 2.
+**Decided: compose, don't reintroduce.**
+`bler_for_mcs(mcs_threshold_db, true_snr_db + combining_gain_db(retx_count,
+mode))` — combining gain is an SNR-domain quantity, so it adds into the
+existing curve's SNR argument rather than needing a second curve.
+`bler_for_mcs` is the shipped, tested model every current result depends
+on; two BLER curves differing only by which commit wrote them is the same
+problem WP7 solved by unifying its jitter distributions onto one shared
+helper (`_clipped_gaussian_jitter_ms`) rather than writing a second one per
+generator. `bler_sigmoid` is not ported.
 
-### Decision 2 — process pool size `N`: no vendored value; default 16
+**Flagged, not a blocker: this composition stacks three uncalibrated
+constructs into one modelled probability** — `bler_for_mcs`'s
+doubles-per-dB slope, the `{0, 4.0, 6.5, 8.0}` dB IR table (Decision 1),
+and `base_bler=0.10`. Each is individually flagged already (in this
+document and in `scheduler/link.py`'s own docstrings); the *composition*
+had not been, anywhere, until now. Recorded as its own new `README.md` §8
+`[OPEN]` entry (landed alongside this document's own commit) rather than
+left implicit across three separate places.
+
+### Decision 2 — process pool size `N`: real OAI fallback defaults, asymmetric by direction — DL 8, UL 16
 
 Real OAI sizes `available_dl_harq`/`available_ul_harq` from UE-capability
-config (`nrofHARQ-ProcessesForPDSCH` etc.), not a literal constant in any
-vendored file. TS 38.321 §5.3.2.1's ceiling is 16, and the mined branch used
-16 as a literal default. **Decided:** 16, as a config-swept knob (matching
-`sr_period_slots`/`cqi_delay_slots` precedent), explicitly flagged as "the
-spec ceiling, not a confirmed *deployed* value" — this repo's own
-`oai-branches/` doesn't confirm this specific deployment configures 16
-rather than fewer.
+config, and the config accessor's own fallback-when-unconfigured values
+**are** vendored and findable — `nr_mac_common.c:2724-2744`:
+
+```c
+2724	// 32 HARQ processes supported in rel17, default is 8
+2725	int get_nrofHARQ_ProcessesForPDSCH(const NR_UE_ServingCell_Info_t *sc_info)
+2726	{
+2727	  if (sc_info && sc_info->nrofHARQ_ProcessesForPDSCH_v1700)
+2728	    return 32;
+2729	  if (!sc_info || !sc_info->nrofHARQ_ProcessesForPDSCH)
+2730	    return 8;
+2731	  int IEvalues[] = {2, 4, 6, 10, 12, 16};
+2732	  return IEvalues[*sc_info->nrofHARQ_ProcessesForPDSCH];
+2733	}
+2734	
+2735	// 32 HARQ processes supported in rel17, default is 16
+2736	int get_nrofHARQ_ProcessesForPUSCH(const NR_UE_ServingCell_Info_t *sc_info)
+2737	{
+2738	  if (sc_info && sc_info->nrofHARQ_ProcessesForPUSCH_r17)
+2739	    return 32;
+2740	  return 16;
+2741	}
+```
+
+This is a stronger citation than "the spec ceiling" — it's OAI's own
+code-level behavior when RRC doesn't explicitly configure a count, and
+**it's asymmetric**: DL defaults to **8**, UL to **16**, both capped at 16
+pre-Rel17 (32 if the `_v1700`/`_r17` extension fields are set — not
+confirmed present or absent for this deployment). `gNB_scheduler_
+primitives.c:2613-2668` also independently clamps `nrofHARQ > 16 → 16` for
+non-`dci_00_10` formats before sizing `available_dl_harq`/`available_ul_
+harq`, confirming 16 is a real ceiling in the code path that actually
+allocates the process lists, not just the accessor's return value.
+
+**Decided:** `HarqProcessPool` takes separate `dl_capacity: int = 8`,
+`ul_capacity: int = 16` (not one shared `N`), as config-swept knobs
+(matching `sr_period_slots`/`cqi_delay_slots` precedent). **This is a
+different claim from a flagged, ungrounded default**: these are OAI's own
+fallback values for an unconfigured deployment, cited exactly above — what
+remains unconfirmed is only whether *this specific* deployment's RRC
+overrides them (via `nrofHARQ_ProcessesForPDSCH`'s `{2,4,6,10,12,16}` index
+or the Rel17 extension fields), not whether the fallback numbers themselves
+are real.
 
 ### Decision 3 — k1/k2/RTT granularity: two separate swept knobs, not one lumped RTT
 
@@ -400,20 +457,33 @@ answer:
   together, for whoever next needs WP1 live — not silently dropped, not
   silently bundled into WP5.
 
-### Decision 6 — no `metric_panel.yml` status flips; flagging a real tension
+### Decision 6 — resolved: no status change; a new `caveats:` field instead — landed ahead of commit 1
 
-Checked every metric's `requires:` field directly (17 entries, §-checked
+Checked every metric's `requires:` field directly (17 entries, checked
 against the file, not memory) — **none names WP5.** WP5 therefore promotes
-**zero** panel statuses by the letter of the rule. Flagging, not fixing
-unilaterally (a status/definition change needs the same care CLAUDE.md
-gives the panel's multiplicity guard): this creates a real tension with the
-charter's own text — *"BLER is currently a scalar discount with no
-retransmission... every deadline result on this branch is unreliable until
-this lands"* — while M01/M02/M13/M14/M15 (every deadline/latency metric)
-already show `status: ok` today, silently HARQ-blind. Recorded here for the
-same reason M04's proxy-vs-ok gap was recorded rather than quietly fixed;
-whoever reviews this plan should decide whether an `ok`-with-caveat
-annotation is warranted, separate from WP5's own commits.
+**zero** panel statuses by the letter of the rule. This surfaced a real
+tension with the charter's own text — *"BLER is currently a scalar discount
+with no retransmission... every deadline result on this branch is
+unreliable until this lands"* — while M01/M02/M14/M15 (M13 needs a
+load-ramp study, not scored per-run, so it's excluded here) already show
+`status: ok` today, silently HARQ-blind.
+
+**Decided: not a status change.** Reverting to `proxy` would be wrong —
+these metrics *are* computed exactly from true per-message data; the gap
+is a missing simulator mechanism (no HARQ yet), not a measurement
+approximation, and collapsing the two loses information `status` exists to
+carry. Instead: `config/metric_panel.yml` gains an additive `caveats:`
+field (list of str, optional, empty for most metrics) — M01/M02/M14/M15
+each get a `caveats` entry stating "HARQ-blind until WP5 commits 4a/4b
+land," with the concrete mechanism named. `sim/scorecard.py::Scorecard.
+score()` attaches every metric's caveats list to its `MetricResult`
+unconditionally (empty list otherwise) so a caveat travels with the value
+the same way M03/M14's `t_live_s`/`survival_time_ms` already do — never a
+bare number. Same treatment M04's proxy-vs-ok gap got: recorded rather than
+quietly resolved either direction. **Landed** in its own small commit
+before commit 1 (`config/metric_panel.yml`, `sim/scorecard.py`,
+`sim/tests/test_scorecard.py`) — pre-registration holds, since this is
+purely additive.
 
 ---
 
@@ -421,8 +491,9 @@ annotation is warranted, separate from WP5's own commits.
 
 | # | Commit | Files | Wired live? |
 |---|---|---|---|
-| 1 | `HarqProcess`/`HarqProcessPool` core state + `combining_gain_db()` | `sim/harq.py` (new), `sim/tests/test_harq.py` (new) | No — dormant, unit-tested only (WP1 precedent) |
-| 2 | `Allocation.harq_pid`/`is_retx` fields; combining-gain composition in `scheduler/link.py` (pending Decision 1b sign-off) | `scheduler/interfaces.py`, `scheduler/link.py`, tests | No — new optional fields default to old behavior |
+| 0 | Panel `caveats:` field (M01/M02/M14/M15) + `Scorecard` wiring — **landed** | `config/metric_panel.yml`, `sim/scorecard.py`, `sim/tests/test_scorecard.py` | N/A — scoring-layer only, `regression_corpus.py` never calls `Scorecard.score()` |
+| 1 | `HarqProcess`/`HarqProcessPool` core state (asymmetric `dl_capacity=8`/`ul_capacity=16`, Decision 2) + `combining_gain_db()` | `sim/harq.py` (new), `sim/tests/test_harq.py` (new) | No — dormant, unit-tested only (WP1 precedent) |
+| 2 | `Allocation.harq_pid`/`is_retx` fields; combining-gain composition with `bler_for_mcs` in `scheduler/link.py` (Decision 1b, resolved) | `scheduler/interfaces.py`, `scheduler/link.py`, tests | No — new optional fields default to old behavior |
 | 3 | Process-pool gating on new-data grants (no multi-slot delay yet) | `sim/driver.py`, `sim/harq.py` | Live, but **designed to be inert** — delivery still synchronous, so the pool never actually binds |
 | 4a | Deferred drain + real multi-slot retry, **DL** | `sim/driver.py`, `sim/metrics.py` (`bytes_harq_retx`/`bytes_harq_lost` counters) | Live — the big DL fidelity landing |
 | 4b | Deferred drain + real multi-slot retry, **UL** — resolves the `sched_ul_bytes`/k2-HARQ gap `sim/bsr.py`'s own docstring flags (CLAUDE.md known issues) | `sim/driver.py`, interaction with `sim/bsr.py`/`sim/ul_access.py` (their own logic unchanged — see note) | Live — the big UL fidelity landing |
@@ -496,36 +567,51 @@ references any new field yet, matching WP7 commits 1/3/9's precedent.
 
 ## 5. `metric_panel.yml` — no promotions (Decision 6)
 
-No metric's `requires:` names WP5; none flip status. The metrics whose
-*accuracy* (not gating status) changes materially once commits 4a/4b land:
-M01, M02, M06, M09, M10, M11, M12, M13, M14, M15, M17 — every metric that
-touches latency, PDB, throughput, or PRB/CCE utilization. M04 stays
-`proxy` (WP5 doesn't touch it, same as WP7's deliberate non-bundling). M03,
-M07, M08, M16 expected roughly inert (no direct HARQ-timing dependency in
-their definitions) — not confidently predicted either way, low priority to
+No metric's `requires:` names WP5; none flip status. M01/M02/M14/M15 now
+carry a `caveats` entry recording their HARQ-blind gap ahead of commits
+4a/4b (Decision 6, already landed). The metrics whose *accuracy* (not
+gating status) changes materially once commits 4a/4b land: M01, M02, M06,
+M09, M10, M11, M12, M13, M14, M15, M17 — every metric that touches latency,
+PDB, throughput, or PRB/CCE utilization. M04 stays `proxy` (WP5 doesn't
+touch it, same as WP7's deliberate non-bundling). M03, M07, M08, M16
+expected roughly inert (no direct HARQ-timing dependency in their
+definitions) — not confidently predicted either way, low priority to
 verify.
 
 ---
 
 ## 6. Flags — out of order, blocked, or needing sign-off before coding
 
-1. **`bler_sigmoid` vs. `bler_for_mcs` (Decision 1b)** — recommendation
-   made, not confirmed. Needs sign-off before commit 2.
+1. **Resolved:** `bler_sigmoid` is not reintroduced; combining gain
+   composes with `bler_for_mcs` (Decision 1b) — confirmed, no longer open.
 2. **OLLA bug #2 is blocked** on WP1's `shrink_to_power_budget` activation,
    itself out of WP5's charter (Decision 5) — new README §8 item, not
    silently dropped or bundled.
 3. **The charter's literal "`scheduler/reservation.py`, `two_tier.py`"
    naming is stale** for this branch's actual phase ordering; resolved via
    the orthogonal driver-level pattern (Decision 4), not a blocker.
-4. **`metric_panel.yml`'s deadline/latency metrics show `ok` while
-   HARQ-blind** (Decision 6) — flagged, not resolved; a status/definition
-   question outside this plan's authority to settle unilaterally.
-5. **The IR/Chase dB constants are an unsourced literature approximation**
-   per the mined branch's own §11 caveat (Decision 1) — ported anyway (no
-   better numbers exist), flagged in code + a new README §8 item.
+4. **Resolved:** `metric_panel.yml`'s deadline/latency metrics keep
+   `status: ok` and gain an additive `caveats:` field instead (Decision 6,
+   landed) — not a status/definition change, so pre-registration holds.
+5. **The IR/Chase dB constants are an unsourced literature approximation,
+   and their composition with `bler_for_mcs` compounds three uncalibrated
+   constructs into one probability** (Decision 1, Decision 1b) — ported
+   anyway (no better numbers exist), flagged in code + two new README §8
+   items (the table itself, and the composition).
 6. **k1_slots/k2_slots defaults (4 and 2) are representative midpoints of
    real per-transmission-selectable ranges, not confirmed deployed values**
    (Decision 3) — same honesty standard as `sr_period_slots`.
+7. **`combining_gain_db`'s saturation beyond `retx_count=3` is ported
+   as-is and interacts with `harq_round_max`** (Decision 1) — every attempt
+   past the third gets an identical, uncalibrated bonus if a scenario's
+   retry cap exceeds 4. Must be stated in `sim/harq.py`'s docstring, not
+   left to be discovered by reading `.get()`'s fallback argument.
+8. **Decision 2's `dl_capacity=8`/`ul_capacity=16` are OAI's own
+   fallback-when-unconfigured values (`nr_mac_common.c:2724-2744`), not a
+   confirmed value for this specific deployment's RRC config** — a
+   different, stronger claim than "a flagged default": the fallback
+   numbers are real cited code, only whether *this* deployment overrides
+   them via RRC is unconfirmed.
 
 Nothing else found blocked. WP5 has no dependency on WP6 (channel) or
 WP-Join, and — per Decision 4 — no dependency on Phase 2 either, despite

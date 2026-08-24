@@ -16,7 +16,7 @@ adapter) without caring how it was produced.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -35,6 +35,13 @@ class MetricResult:
     status: str  # "ok" | "proxy" | "pending"
     unit: str
     note: str = ""
+    # Pre-registered, panel-authored limitations that travel with the value
+    # regardless of status -- e.g. "ok" (exact, from real data) but computed
+    # under a simulator mechanism that's itself still a simplification (see
+    # config/metric_panel.yml's own `caveats:` field, docs/wp5-plan.md
+    # Decision 6). Populated by Scorecard.score() from the panel, not by
+    # each metric's own method -- see that method's docstring.
+    caveats: list[str] = field(default_factory=list)
 
 
 def load_panel(path: Path = _DEFAULT_PANEL_PATH) -> dict:
@@ -87,6 +94,12 @@ class Scorecard:
     def __init__(self, panel_path: Path = _DEFAULT_PANEL_PATH) -> None:
         self.panel = load_panel(panel_path)
         self.defaults = self.panel.get("defaults", {})
+        # id -> its pre-registered caveats list (empty for most metrics).
+        # Read once here, not per-score-call, since the panel file itself
+        # doesn't change within a process lifetime.
+        self._caveats_by_id: dict[str, list[str]] = {
+            m["id"]: list(m.get("caveats", [])) for m in self.panel["metrics"]
+        }
 
     # -- single-run metrics --------------------------------------------
 
@@ -118,6 +131,12 @@ class Scorecard:
         # M16 (ul_dl_shared_bearer_correlation) needs a named flow pair --
         # see correlate_flows() below, not part of the automatic per-run scan.
         out["M17"] = self._m17_frame_freeze_and_effective_fps(record)
+        # Attach the panel's own pre-registered caveats here, uniformly,
+        # rather than in each _mNN method -- a caveat is a property of the
+        # metric's definition (config/metric_panel.yml), not of any one
+        # run's data, so it shouldn't be up to each method to remember.
+        for metric_id, result in out.items():
+            result.caveats = list(self._caveats_by_id.get(metric_id, []))
         return out
 
     def _has_true_latency(self, record: RunRecord) -> bool:

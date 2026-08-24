@@ -25,6 +25,18 @@
 # after any WP lands and confirm the metrics it was supposed to unlock
 # actually flipped status -- a WP that doesn't change a status it claimed
 # to fix is itself a finding.
+#
+# `caveats` (optional, list of str) records a limitation of the *simulator
+# mechanism* a metric is computed from, distinct from `status`/`requires`.
+# Added by docs/wp5-plan.md Decision 6: M01/M02/M14/M15 are exact per their
+# own definition (real per-message data, correctly computed) and stay
+# `status: ok` -- reverting to `proxy` would be wrong, since the gap is a
+# missing simulator mechanism (no HARQ yet), not a measurement
+# approximation. A caveat records that gap without corrupting what
+# `status` means. sim/scorecard.py::Scorecard.score() attaches every
+# metric's caveats list to its MetricResult unconditionally (empty list if
+# none registered), so a caveat travels with the value the same way
+# M14/M03's t_live_s/survival_time_ms do -- never a bare number.
 
 schema_version: 1
 
@@ -46,6 +58,14 @@ metrics:
       A RunRecord produced before WP7's message ledger was wired up (no
       message_count on any FlowRecord) falls back to the old head-of-line
       proxy in scorecard.py -- see that module's _has_true_latency.
+    caveats:
+      - >
+        HARQ-blind until WP5 commits 4a/4b land (docs/wp5-plan.md): BLER is
+        currently a one-shot discount applied at grant time, not a
+        retransmission -- this value is exact for what the simulator
+        models today, but doesn't yet reflect HARQ RTT delay or max-retx
+        residual loss, so it reads optimistic relative to a system with
+        real HARQ (README.md sec3/sec4).
 
   - id: M02
     name: pdb_violation_rate
@@ -63,6 +83,13 @@ metrics:
       (bytes_delivered_late_pdb / bytes_arrived, WP3 -- sim/buffer.py's
       drain() tags each removed chunk's age against the flow's PDB at
       drain time).
+    caveats:
+      - >
+        HARQ-blind until WP5 commits 4a/4b land (docs/wp5-plan.md): the
+        "delivered, but later than PDB" component can't yet reflect a
+        transmission that failed and needed a HARQ retry -- that delay
+        doesn't exist in the simulator yet, so this rate is optimistic
+        relative to a system with real HARQ (README.md sec3/sec4).
 
   - id: M03
     name: liveness_gap_distribution
@@ -234,6 +261,12 @@ metrics:
       never quotable without that context. This is the number that fills
       in G11's row on the Guarantee Sheet. Pre-WP7-commit-4 records report
       status=pending (same gate as M03).
+    caveats:
+      - >
+        HARQ-blind until WP5 commits 4a/4b land (docs/wp5-plan.md): reuses
+        M03's gap mechanism, so it inherits the same optimism -- a gap that
+        would include a HARQ retry's RTT in a system with real HARQ is not
+        yet modeled (README.md sec3/sec4).
 
   - id: M15
     name: command_jitter_p99_p50
@@ -244,6 +277,13 @@ metrics:
     status: ok
     requires: null
     note: WP7 -- same true-latency fields as M01; same pre-WP7 fallback.
+    caveats:
+      - >
+        HARQ-blind until WP5 commits 4a/4b land (docs/wp5-plan.md): same
+        true-latency fields as M01, so the same optimism applies -- p99 in
+        particular is where a HARQ retry's RTT would land once modeled,
+        so this jitter figure understates the eventual tail (README.md
+        sec3/sec4).
 
   - id: M16
     name: ul_dl_shared_bearer_correlation

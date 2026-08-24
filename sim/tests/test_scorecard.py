@@ -62,6 +62,24 @@ def test_panel_loads_and_has_seventeen_metrics():
     assert len(ids) == len(set(ids)), "duplicate metric ids in the panel"
 
 
+def test_caveats_travel_with_the_value_for_registered_metrics_only():
+    """docs/wp5-plan.md Decision 6: a caveat is additive metadata on
+    MetricResult, not a status change -- M01/M02/M14/M15 are HARQ-blind
+    (registered in config/metric_panel.yml) and must carry that caveat
+    regardless of status; every other metric must get an empty list, not
+    an omitted attribute (same "never silently omit" discipline as a
+    pending row)."""
+    rec, _ = _record()
+    sc = Scorecard()
+    results = sc.score(rec)
+    for mid in ("M01", "M02", "M14", "M15"):
+        assert results[mid].caveats, f"{mid} should carry its registered caveat"
+        assert all(isinstance(c, str) and c for c in results[mid].caveats)
+    for mid, res in results.items():
+        if mid not in ("M01", "M02", "M14", "M15"):
+            assert res.caveats == []
+
+
 def test_score_emits_every_scoreable_metric_row():
     rec, _ = _record()
     sc = Scorecard()

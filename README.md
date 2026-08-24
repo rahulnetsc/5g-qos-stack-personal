@@ -532,6 +532,25 @@ they survive it:
   variance must set a nonzero value explicitly, rather than inheriting an
   invented constant silently. Revisit if/when a scenario actually needs
   correlated-burst jitter to be non-degenerate.
+- `[OPEN]` **WP5's combining-gain composition stacks three uncalibrated
+  constructs into one modelled retransmission success probability.**
+  Scoping WP5 (`docs/wp5-plan.md` Decision 1), the new per-attempt
+  combining gain composes with `scheduler/link.py`'s already-shipped
+  `bler_for_mcs` as `bler_for_mcs(threshold, true_snr_db +
+  combining_gain_db(retx_count))`. Each of the three pieces is already
+  individually flagged as not PHY-defensible on its own — `bler_for_mcs`'s
+  "doubles per dB below threshold" slope, the ported `{0, 4.0, 6.5, 8.0}`
+  dB IR-combining table (the mined `feat/harq-bler-retx` branch's own
+  §11 calls these "approximations derived from... literature," no specific
+  curve cited), and `base_bler=0.10` — but the *composition* was never
+  flagged anywhere before this entry. A retransmission's modelled success
+  probability is now the product of three things, none of which trace to
+  a measurement. Recorded here rather than left implicit across three
+  separate docstrings, same reasoning as `FIVE_QI_LCG`/`sr_period_slots`.
+  Not blocking WP5 (no better numbers exist), but revisit together if any
+  one of the three is ever recalibrated — recalibrating one in isolation
+  changes the composed probability in a way none of the three docstrings
+  alone would reveal.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either
