@@ -13,6 +13,7 @@ from scheduler.flow import FlowConfig
 __all__ = [
     "TDDConfig",
     "CarrierConfig",
+    "BlockageConfig",
     "UEConfig",
     "FlowConfig",
     "ScenarioConfig",
@@ -39,6 +40,28 @@ class CarrierConfig:
     center_freq_ghz: float = 3.31968
 
 
+@dataclass(frozen=True)
+class BlockageConfig:
+    """Two-state Markov blockage (docs/wp6-plan.md Decision 3, sim/
+    blockage.py). Dwell times in slots, not milliseconds -- matching
+    ``k1_slots``/``k2_slots``/``cqi_delay_slots``/``sr_period_slots``'s
+    own convention, and numerology-agnostic the same way those are.
+
+    No ground truth (literature or vendored) exists in this repo for
+    factory blockage rate/duration -- these defaults are an order-of-
+    magnitude anchor to ``p5g-sim-plan.md``'s own "hundreds of
+    milliseconds" motivating text (at this deployment's 0.5ms/slot,
+    600 slots = 300ms), not a confirmed value. Nothing about the
+    mechanism itself restricts ``mean_blocked_slots`` to that regime --
+    see ``sim/tests/test_blockage.py`` for the same construction
+    exercised at a "short" (shorter-than-a-HARQ-retry-cycle) setting too.
+    """
+
+    mean_unblocked_slots: int = 4000
+    mean_blocked_slots: int = 600
+    blocked_extra_loss_db: float = 17.5  # midpoint of p5g-sim-plan.md's cited 15-20dB
+
+
 @dataclass
 class UEConfig:
     ue_id: int
@@ -51,8 +74,12 @@ class UEConfig:
     # (sim/pathloss.py), and mean_snr_db above is ignored for this UE.
     position: tuple[float, float, float] | None = None
     inf_scenario: str | None = None  # one of sim.pathloss.INF_SUB_SCENARIOS
-    # WP6 commit 2 (docs/wp6-plan.md Decision 3) will add a `blockage`
-    # field here, independent of position/inf_scenario -- not this commit.
+    # WP6 (docs/wp6-plan.md Decision 3): opt-in two-state Markov blockage.
+    # None (default) preserves today's behaviour exactly. Independent of
+    # position/inf_scenario -- composes as a further dB penalty on
+    # whichever mean_snr_db is already in effect, hand-authored or
+    # path-loss-derived.
+    blockage: BlockageConfig | None = None
 
 
 @dataclass

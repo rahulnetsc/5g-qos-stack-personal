@@ -83,6 +83,10 @@ def run(
         # with ``position`` set -- every existing scenario is unaffected.
         los_seed=scenario.seed ^ 0x105105,
         shadow_fading_seed=scenario.seed ^ 0x5FADE5,
+        # WP6 commit 2 (docs/wp6-plan.md Decision 3): a fourth independent
+        # stream for two-state Markov blockage transitions, only drawn
+        # from for a UE with ``blockage`` set.
+        blockage_seed=scenario.seed ^ 0x424C4F4B,  # ASCII "BLOK"
     )
     buffers = BufferModel()
     bsr = BsrModel(scenario.flows, grid.slot_duration_s)

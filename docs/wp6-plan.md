@@ -320,32 +320,60 @@ to Decision 2's position opt-in would force scenario authors who just want
 
 **Decided:** `UEConfig` gains a fourth field, `blockage:
 BlockageConfig | None = None` — independent of `position`. `BlockageConfig`
-(new dataclass, `sim/channel.py` or a small new `sim/blockage.py`) carries
-`mean_unblocked_ms`, `mean_blocked_ms`, `blocked_extra_loss_db`. The
-per-slot transition probabilities are the standard two-state
-(Gilbert-Elliott-style) construction: `p(unblocked→blocked) =
-slot_duration_ms / mean_unblocked_ms`, `p(blocked→unblocked) =
-slot_duration_ms / mean_blocked_ms` (memoryless/geometric approximation
-of an exponential dwell time — the same "coherence time → AR(1) alpha"
-translation `ChannelModel` already does for small-scale fading, `sim/
-channel.py:51-53`, applied to a discrete process instead of a continuous
-one). **No ground truth exists in this repo for factory blockage rate or
-duration** — flagged the same way `sr_period_slots`/`k1_slots` are:
-representative defaults (duration order-of-magnitude anchored to
-`p5g-sim-plan.md:557`'s "hundreds of milliseconds," e.g.
-`mean_blocked_ms≈300`), not confirmed values, swept properly in WP9.
+(new frozen dataclass, `sim/config.py`) carries `mean_unblocked_slots`,
+`mean_blocked_slots`, `blocked_extra_loss_db` — **in slots, not
+milliseconds**, a deliberate deviation from this Decision's original
+draft (which used `_ms` names) made while actually writing the code: every
+other timing knob in this codebase (`k1_slots`/`k2_slots`/
+`cqi_delay_slots`/`sr_period_slots`) is slot-denominated, numerology-
+agnostic the same way, and there is no reason for this one mechanism to
+be the exception. The per-slot transition probabilities (`sim/
+blockage.py::transition_probability`) are the standard two-state
+(Gilbert-Elliott-style) construction: `p_leave = 1 / mean_dwell_slots`
+(memoryless/geometric approximation of an exponential dwell time — the
+same "coherence time → AR(1) alpha" translation `ChannelModel` already
+does for small-scale fading, `sim/channel.py:51-53`, applied to a
+discrete process instead of a continuous one), clamped to 1.0 when the
+configured mean dwell is at or below one slot.
+
+**No ground truth — literature or vendored — exists anywhere for factory
+blockage rate or duration; this is stronger than "a flagged default,"
+worth stating explicitly per the sign-off's own question.**
+`p5g-sim-plan.md:557`'s "a forklift or robot arm crossing the path — a
+15-20 dB drop lasting hundreds of milliseconds" is this project's own
+qualitative *motivating description* for why WP6 includes blockage at
+all, not a measured distribution from any external literature source —
+unlike, say, WP5's IR/Chase combining-gain table, which at least cites an
+unnamed literature basis (`docs/wp5-plan.md` Decision 1). `mean_blocked_
+slots=600` (300ms at 0.5ms/slot) is this document's own order-of-magnitude
+anchor to that phrase, nothing more.
+
+**Nothing about the mechanism itself restricts it to that "long" regime —
+confirmed in commit 2, not just claimed.** `transition_probability` is a
+pure `1/mean_dwell_slots` relationship with no long-duration assumption
+baked in anywhere; `sim/tests/test_channel.py::
+test_blockage_dwell_matches_configured_mean_at_both_short_and_long_
+settings` empirically verifies the same construction reproduces its
+configured mean dwell at `mean_blocked_slots=4` (2ms — shorter than even
+the ~8-slot/4ms UL HARQ retry cycle, `sim/driver.py`'s defaults) just as
+well as at the 600-slot default. This is what makes commit 4's two-
+configuration falsifiability design (§4 prediction #2) mechanically sound
+rather than aspirational — the "short" arm isn't fighting the
+parameterisation to exist.
 
 **New independent RNG stream, per CLAUDE.md's standing rule** ("every new
 independent random draw needs its own seed stream... WP5 found a real bug
 from *not* following this"): blockage transitions draw from their own
-`blockage_rng = np.random.default_rng(scenario.seed ^
-<new_constant>)`, distinct from `cqi_seed`, `harq_rng_dl`, `harq_rng_ul`.
-**Also flagged:** if Decision 2's path-loss commit adds a per-UE LOS/NLOS
-realization draw (a per-link Bernoulli draw from TR 38.901's clutter-
-density LOS probability, drawn once at scenario setup, not per-slot), that
-needs its own independent stream too (`los_rng`), separate from
-`blockage_rng` — two new mechanisms, two new streams, not one shared
-"channel extras" RNG.
+`self._blockage_rng` (`sim/channel.py`), seeded `scenario.seed ^
+0x424C4F4B` (ASCII "BLOK", `sim/driver.py`) — distinct from `cqi_seed`,
+`harq_rng_dl`, `harq_rng_ul`, and commit 1's own two new streams
+(`los_seed`, `shadow_fading_seed`). **This is the fourth independent
+stream WP6 has added across its first two commits** (LOS realization and
+shadow fading in commit 1, blockage in commit 2) — confirmed independent
+in `sim/tests/test_channel.py::
+test_blockage_transitions_use_their_own_independent_rng_stream`, the same
+"change one seed, hold the others fixed, confirm the result changes"
+check commit 1's own LOS/shadow-fading independence test used.
 
 ### Decision 4 — sync-loss (RLF-declaration) threshold lands in WP6, dormant; recovery timing stays WP-Join's
 
@@ -497,10 +525,10 @@ was silently dropped by oversight.
 
 | # | Commit | Files | Wired live? |
 |---|---|---|---|
-| 1 | TR 38.901 InF path loss + LOS probability (Decision 2, 5, 6) | `sim/pathloss.py` (new), `sim/config.py` (`UEConfig.position`/`inf_scenario`, `ScenarioConfig.gnb_position`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_pathloss.py` (new) | No — dormant on the existing corpus (no scenario sets `position`), same falsifiable-inertness argument as `docs/wp5-plan.md` commit 2 |
-| 2 | Two-state Markov blockage (Decision 3) | `sim/channel.py` or `sim/blockage.py` (new), `sim/config.py` (`UEConfig.blockage`), `sim/tests/test_blockage.py` (new) | No — dormant on the existing corpus (no scenario sets `blockage`), independent RNG stream added but unused until referenced |
-| 3 | Sync-loss / RLF detection (Decision 4) — **needs sign-off first** | `sim/rlf.py` (new), `sim/tests/test_rlf.py` (new) | No — dormant, unit-tested only, matching `sim/power.py`/`sim/olla.py` precedent; zero `sim/driver.py` changes |
-| 4 | WP6's own acceptance-criterion demo: one new scenario exercising blockage (and optionally path loss) on an existing baseline scheduler, run at **two** `mean_blocked_ms` settings so the exhaustion-spike claim is falsifiable (Decision 5, see prediction #2 below) | `sim/scenarios/scenario_config_7.yml` (new, or similar) + a short comparison script/test — **no existing scenario file touched** | Yes, but scoped to the new scenario only; existing 22-record corpus untouched |
+| 1 | TR 38.901 InF path loss + LOS probability (Decision 2, 5, 6) — **landed** | `sim/pathloss.py` (new), `sim/config.py` (`UEConfig.position`/`inf_scenario`, `ScenarioConfig.gnb_position`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_pathloss.py` (new) | No — dormant on the existing corpus (no scenario sets `position`), same falsifiable-inertness argument as `docs/wp5-plan.md` commit 2 |
+| 2 | Two-state Markov blockage (Decision 3) — **landed** | `sim/blockage.py` (new), `sim/config.py` (`UEConfig.blockage`, `BlockageConfig`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_blockage.py`, `sim/tests/test_channel.py` (new/extended) | No — dormant on the existing corpus (no scenario sets `blockage`), independent RNG stream added but unused until referenced |
+| 3 | Sync-loss / RLF detection (Decision 4) — **sign-off given, not yet coded** | `sim/rlf.py` (new), `sim/tests/test_rlf.py` (new) | No — dormant, unit-tested only, matching `sim/power.py`/`sim/olla.py` precedent; zero `sim/driver.py` changes |
+| 4 | WP6's own acceptance-criterion demo: one new scenario exercising blockage (and optionally path loss) on an existing baseline scheduler, run at **two** `mean_blocked_slots` settings so the exhaustion-spike claim is falsifiable (Decision 5, see prediction #2 below) | `sim/scenarios/scenario_config_7.yml` (new, or similar) + a short comparison script/test — **no existing scenario file touched** | Yes, but scoped to the new scenario only; existing 22-record corpus untouched |
 
 **Predicted, before writing any code — commits 1-3: fully clean `--check`.**
 This is the same falsifiable-inertness pattern as `docs/wp5-plan.md`
@@ -540,18 +568,26 @@ metric's `status` promotes; see §5.**
    **Made falsifiable, per sign-off feedback:** the mechanism claims the
    effect is driven by blockage duration *relative to the retry cycle*,
    not by blockage merely existing — so commit 4's scenario/script must
-   run `mean_blocked_ms` at **two** settings, not one: a "short" setting
-   below both retry-cycle lengths (e.g. ~2-3 ms, shorter than the ~4 ms UL
-   cycle) and a "long" one anchored to `p5g-sim-plan.md:557`'s "hundreds of
-   milliseconds" (e.g. ~300 ms). **Predicted:** short blockage leaves
-   `harq_exhausted_count`/`bytes_harq_lost` close to WP5's own baseline
-   rate (most in-flight TBs get all their retry attempts either entirely
-   before or entirely after the brief dip, not stranded inside it); long
-   blockage spikes it well above baseline. If short and long both spike
-   equally, or neither does, the "duration vs. retry-cycle" mechanism as
-   stated is wrong, not just quantitatively off — this is the falsifiable
-   form the sign-off asked for, distinguishing "exhaustion spikes" from
-   "exhaustion always spikes whenever blockage exists at all."
+   run `BlockageConfig.mean_blocked_slots` at **two** settings, not one: a
+   "short" setting below both retry-cycle lengths (e.g. 4 slots = 2ms,
+   shorter than the ~8-slot/4ms UL cycle) and a "long" one anchored to
+   `p5g-sim-plan.md:557`'s "hundreds of milliseconds" (commit 2's own
+   default, 600 slots = 300ms). **Confirmed in commit 2, not just assumed:
+   the same Markov construction reproduces its configured mean dwell at
+   both settings** (`sim/tests/test_channel.py::
+   test_blockage_dwell_matches_configured_mean_at_both_short_and_long_
+   settings`, empirical run-length check within 35% relative tolerance at
+   both 4-slot and 600-slot means) — so commit 4's two-configuration
+   design is mechanically sound, not just intended. **Predicted:** short
+   blockage leaves `harq_exhausted_count`/`bytes_harq_lost` close to WP5's
+   own baseline rate (most in-flight TBs get all their retry attempts
+   either entirely before or entirely after the brief dip, not stranded
+   inside it); long blockage spikes it well above baseline. If short and
+   long both spike equally, or neither does, the "duration vs. retry-cycle"
+   mechanism as stated is wrong, not just quantitatively off — this is the
+   falsifiable form the sign-off asked for, distinguishing "exhaustion
+   spikes" from "exhaustion always spikes whenever blockage exists at
+   all."
 3. (High) **M01 `flow_latency_percentiles`** — p95/p98/p99 for the blocked
    UE's flows spike during/immediately after blockage; p50 comparatively
    unaffected (most slots are unblocked).
@@ -586,6 +622,52 @@ commit's scenario, same reasoning `docs/wp5-plan.md` commit 4a used for
 the same metrics), M16 (needs a caller-specified UL/DL bearer pair,
 `config/metric_panel.yml` M16's own `requires:` — not exercised unless
 the new scenario's own test explicitly asks for it).
+
+**Commit 1 — landed.** `sim/pathloss.py` (new, five InF sub-scenarios per
+§0), `sim/config.py` (`UEConfig.position`/`inf_scenario`,
+`ScenarioConfig.gnb_position`, `CarrierConfig.center_freq_ghz`), `sim/
+channel.py` (opt-in wiring + two new RNG streams), `sim/tests/
+test_pathloss.py` + `sim/tests/test_channel.py` (new). **Predicted, before
+writing any code: fully clean `--check`.** **Confirmed exactly:** `pytest
+sim/tests -q` — 275 passed (254 + 21 new), 1 xfailed (unchanged);
+`regression_corpus.py --check` — clean, zero mismatches.
+
+**Commit 2 — landed.** `sim/blockage.py` (new, pure two-state Markov
+functions), `sim/config.py` (`BlockageConfig`, `UEConfig.blockage`), `sim/
+channel.py` (opt-in wiring + third new RNG stream, `is_blocked()`
+accessor), `sim/tests/test_blockage.py` (new) + `sim/tests/test_channel.py`
+(extended). **Predicted, before writing any code: fully clean `--check` —
+the sixteenth such prediction in this WP5/WP6 lineage** (matching the
+falsifiable-inertness pattern of every prior opt-in-default-`None`
+commit). **Confirmed exactly:** `pytest sim/tests -q` — 286 passed (275 +
+11 new), 1 xfailed (unchanged); `regression_corpus.py --check` — clean,
+zero mismatches.
+
+**Answering the sign-off's explicit questions, not left implicit:**
+1. *Does the parameterisation support a "short" (shorter-than-retry-cycle)
+   blockage regime, or only "long"?* **Both, confirmed empirically** — see
+   Decision 3's update above and `sim/tests/test_channel.py::
+   test_blockage_dwell_matches_configured_mean_at_both_short_and_long_
+   settings` (4-slot and 600-slot means, both within 35% relative
+   tolerance of configured over many cycles). Nothing in `sim/blockage.py`
+   is duration-regime-specific.
+2. *Are the transcribed values literature-sourced, and do they only cover
+   long blockages?* **Neither — there is no literature source at all**,
+   for either regime. `p5g-sim-plan.md:557`'s "hundreds of milliseconds"
+   is this project's own qualitative motivating description, and only the
+   *default* (`mean_blocked_slots=600`) is anchored to it; a "short"
+   configuration is exactly as easy to construct and exactly as
+   well-supported (i.e., equally unconfirmed either way) as the default.
+   This is recorded as a finding per the sign-off's own framing, not
+   glossed over.
+3. *Does blockage need its own RNG stream?* **Yes — a fourth new
+   independent stream** (`blockage_seed`, `0x424C4F4B`), distinct from
+   commit 1's `los_seed`/`shadow_fading_seed` and the pre-existing
+   `cqi_seed`/`harq_rng_dl`/`harq_rng_ul`. Confirmed independent by test,
+   not just asserted in a docstring.
+4. *Does any panel metric flip?* **No** — checked `requires:` directly
+   again for commit 2; still none name WP6. See §5, unchanged from
+   commit 1's conclusion.
 
 ---
 

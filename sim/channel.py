@@ -20,6 +20,8 @@ import numpy as np
 
 from scheduler.link import bits_per_prb, cce_aggregation_level
 
+from .blockage import step as blockage_step
+from .blockage import transition_probability
 from .config import UEConfig
 from .pathloss import INF_BS_HEIGHT_M, inf_los_probability, inf_path_loss_db
 
@@ -109,6 +111,13 @@ class ChannelModel:
     ``UEConfig.mean_snr_db`` directly -- see ``derive_mean_snr_db`` above.
     Every other UE (``position is None``, every existing scenario) is
     unaffected; this is opt-in, not a replacement of the existing pipeline.
+
+    WP6 commit 2: a UE with ``blockage`` set (docs/wp6-plan.md Decision 3)
+    additionally runs a two-state Markov process (``sim/blockage.py``)
+    that subtracts ``blocked_extra_loss_db`` from its large-scale mean
+    while Blocked -- independent of ``position``/path loss, composing on
+    top of whichever mean is already in effect. Every UE without
+    ``blockage`` set (every existing scenario) is unaffected.
     """
 
     def __init__(
@@ -124,16 +133,19 @@ class ChannelModel:
         bandwidth_hz: float = 30_000_000,
         los_seed: int = 0,
         shadow_fading_seed: int = 0,
+        blockage_seed: int = 0,
     ):
         self.rng = rng
         # WP6 (docs/wp6-plan.md Decision 2/3): independent RNG streams for
-        # the two new per-link draws this commit adds (LOS/NLOS realization,
-        # shadow fading) -- CLAUDE.md's rule that every new independent
-        # random draw needs its own seed stream, same precedent as
-        # cqi_seed/harq_rng_dl/harq_rng_ul. Unused (never drawn from) for
-        # any UE without ``position`` set.
+        # the three new per-UE draws WP6 adds (LOS/NLOS realization,
+        # shadow fading, blockage transitions) -- CLAUDE.md's rule that
+        # every new independent random draw needs its own seed stream,
+        # same precedent as cqi_seed/harq_rng_dl/harq_rng_ul. Each is
+        # unused (never drawn from) for a UE that doesn't opt into the
+        # corresponding mechanism.
         los_rng = np.random.default_rng(int(los_seed))
         shadow_fading_rng = np.random.default_rng(int(shadow_fading_seed))
+        self._blockage_rng = np.random.default_rng(int(blockage_seed))
         self.mean_snr_db: dict[int, float] = {}
         for ue in ues:
             if ue.position is not None:
@@ -148,6 +160,24 @@ class ChannelModel:
             else:
                 self.mean_snr_db[ue.ue_id] = ue.mean_snr_db
         self.snr_db = dict(self.mean_snr_db)
+        # Blockage state -- only tracked for UEs that opt in. Starts
+        # Unblocked (a deterministic, non-stationary initial condition,
+        # matching self.snr_db's own start-at-mean convention above).
+        self._blockage_extra_loss_db: dict[int, float] = {}
+        self._p_leave_blocked: dict[int, float] = {}
+        self._p_leave_unblocked: dict[int, float] = {}
+        self._blocked: dict[int, bool] = {}
+        for ue in ues:
+            if ue.blockage is None:
+                continue
+            self._blockage_extra_loss_db[ue.ue_id] = ue.blockage.blocked_extra_loss_db
+            self._p_leave_blocked[ue.ue_id] = transition_probability(
+                ue.blockage.mean_blocked_slots
+            )
+            self._p_leave_unblocked[ue.ue_id] = transition_probability(
+                ue.blockage.mean_unblocked_slots
+            )
+            self._blocked[ue.ue_id] = False
         # alpha so lag-K autocorrelation is ~1/e at K = coherence_slots
         self.alpha = {
             ue.ue_id: float(np.exp(-1.0 / max(ue.coherence_slots, 1))) for ue in ues
@@ -175,8 +205,23 @@ class ChannelModel:
                 self._snr_reported[ue.ue_id] = self.mean_snr_db[ue.ue_id]
 
     def update(self, _slot_index: int) -> None:
+        # Advance blockage state before computing this slot's effective
+        # mean, so a transition drawn this slot affects this slot's SNR --
+        # matching the CQI pipeline's own "advance, then read" ordering
+        # below. Independent RNG stream (self._blockage_rng), never drawn
+        # from for a UE without ``blockage`` set.
+        for ue_id in self._blocked:
+            draw = float(self._blockage_rng.random())
+            self._blocked[ue_id] = blockage_step(
+                self._blocked[ue_id],
+                self._p_leave_blocked[ue_id],
+                self._p_leave_unblocked[ue_id],
+                draw,
+            )
         for ue_id, alpha in self.alpha.items():
             mean = self.mean_snr_db[ue_id]
+            if self._blocked.get(ue_id, False):
+                mean -= self._blockage_extra_loss_db[ue_id]
             innovation = self._innovation_scale[ue_id] * self.sigma_db * self.rng.normal()
             self.snr_db[ue_id] = mean + alpha * (self.snr_db[ue_id] - mean) + innovation
         # Advance the CQI reporting pipeline. Independent of the AR(1)
@@ -205,3 +250,8 @@ class ChannelModel:
         if self._cqi_delay <= 0:
             return self.snr_db[ue_id]
         return self._snr_reported.get(ue_id, self.mean_snr_db[ue_id])
+
+    def is_blocked(self, ue_id: int) -> bool:
+        """Current two-state Markov blockage state (docs/wp6-plan.md
+        Decision 3). Always False for a UE without ``blockage`` set."""
+        return self._blocked.get(ue_id, False)
