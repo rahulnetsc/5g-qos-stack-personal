@@ -206,7 +206,7 @@ def run(
                     # + (harq_round_max-1) retries) all failed -- residual
                     # loss, a SECOND, distinct discard path from PDB
                     # expiry (sim/buffer.py::discard_harq_loss).
-                    buffers.discard_harq_loss(proc.ue_id, proc.qfi, proc.tb_bytes, now_s)
+                    buffers.discard_harq_loss(proc.ue_id, proc.qfi, proc.tb_bytes, now_s, pdb_s)
                     harq_pool.free(proc.ue_id, proc.direction, proc.pid)
                 else:
                     proc.retx_count += 1
@@ -246,10 +246,19 @@ def run(
                         buffers.drain(proc.ue_id, qfi, byts, now_s, pdb_s)
                         metrics.record_delivery(proc.ue_id, qfi, byts)
                         per_flow_delivered[(proc.ue_id, qfi)] += byts
+                    # WP5 end-of-WP review fix: this retry's confirmed-
+                    # receipt event, decrementing estimated_ul_buffer only
+                    # NOW -- it was never called for this TB at its
+                    # original (failed) grant time (see the main alloc
+                    # loop's now-delivered_bytes=0 on_ul_grant call).
+                    bsr.on_ul_confirmed_receipt(
+                        proc.ue_id, sum(byts for _, byts in remaining_split)
+                    )
                     harq_pool.free(proc.ue_id, proc.direction, proc.pid)
                 elif proc.retx_count >= harq_round_max - 1:
                     for qfi, byts in remaining_split:
-                        buffers.discard_harq_loss(proc.ue_id, qfi, byts, now_s)
+                        pdb_s = pdb_by_flow.get((proc.ue_id, qfi), 1.0)
+                        buffers.discard_harq_loss(proc.ue_id, qfi, byts, now_s, pdb_s)
                     harq_pool.free(proc.ue_id, proc.direction, proc.pid)
                 else:
                     proc.retx_count += 1
@@ -344,15 +353,18 @@ def run(
                     ue_flows_by_ue.get(alloc.ue_id, []), alloc.bytes_capacity, buffers
                 )
                 # BSR: if pending, assemble/quantise a report from the true
-                # post-fill per-LCG backlog; always credit sched_ul_bytes
-                # and restart the retx timer -- see
-                # sim/bsr.py::BsrModel.on_ul_grant. Fires at GRANT time
-                # regardless of eventual HARQ outcome, crediting the FILLED
-                # amount (what went on the air), not a delivery-confirmed
-                # one -- real OAI credits sched_ul_bytes on every grant.
+                # current per-LCG backlog; always credit sched_ul_bytes and
+                # restart the retx timer -- see sim/bsr.py::BsrModel.
+                # on_ul_grant. Fires at GRANT time regardless of eventual
+                # HARQ outcome (matches real OAI: sched_ul_bytes credits
+                # every grant). delivered_bytes=0 here on purpose (WP5
+                # end-of-WP review fix): the SDU-receipt decrement of
+                # estimated_ul_buffer must wait for CONFIRMED delivery --
+                # see on_ul_confirmed_receipt below, called only once
+                # success is known, not unconditionally at grant time.
                 ue_filled_bytes = sum(byts for _, byts in ue_split)
                 bsr.on_ul_grant(
-                    alloc.ue_id, alloc.bytes_capacity, ue_filled_bytes, slot_index, buffers
+                    alloc.ue_id, alloc.bytes_capacity, 0, slot_index, buffers
                 )
                 ul_access.on_ul_grant(alloc.ue_id)
                 if success:
@@ -361,6 +373,7 @@ def run(
                         buffers.drain(alloc.ue_id, qfi, byts, now_s, pdb_s)
                         metrics.record_delivery(alloc.ue_id, qfi, byts)
                         per_flow_delivered[(alloc.ue_id, qfi)] += byts
+                    bsr.on_ul_confirmed_receipt(alloc.ue_id, ue_filled_bytes)
                     harq_pool.free(alloc.ue_id, harq_direction, harq_proc.pid)
                 else:
                     harq_proc.retx_count = 1

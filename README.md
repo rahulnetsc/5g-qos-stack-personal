@@ -625,7 +625,8 @@ they survive it:
   WP3/WP4's crumb-fraction shortfall (§8, still ~10x short of hardware's
   48-52% even after WP4's SR-floor fix — commit 4b's own measurement on
   `factory_robots_scenario`/`TwoTier`@1.0× moved it again, 4.4503% →
-  5.1233%, mean crumb size 146.03 → 135.38 bytes, same direction as
+  4.9558% (corrected post-WP5-end-of-WP-review; see CLAUDE.md's known
+  issues), mean crumb size 146.03 → 134.44 bytes, same direction as
   WP4's own move, still far short) all look like facets of one thing:
   **the uplink access chain dominates outcomes at low load and for small
   messages, more than the scheduling policy layered on top of it does.**

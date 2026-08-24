@@ -176,7 +176,12 @@ class BufferModel:
         return removed
 
     def discard_harq_loss(
-        self, ue_id: int, qfi: int, bytes_count: int, now_s: float = 0.0
+        self,
+        ue_id: int,
+        qfi: int,
+        bytes_count: int,
+        now_s: float = 0.0,
+        pdb_s: float = float("inf"),
     ) -> int:
         """Remove up to bytes_count bytes from the head, counted as HARQ
         max-retx loss -- NOT a delivery (unlike drain(), which always
@@ -190,7 +195,15 @@ class BufferModel:
         perspective this IS a drop, just for a different top-level reason
         than PDB expiry -- config/metric_panel.yml's M02 does not yet
         fold bytes_dropped_harq into its own count; see docs/wp5-plan.md
-        commit 4a for that gap."""
+        commit 4a for that gap.
+
+        WP5 end-of-WP review fix: `late` is computed per chunk exactly
+        like `drain()` does (`(now_s - chunk[0]) > pdb_s`), not hardcoded
+        `True` -- harq_round_max exhaustion is an attempt-count budget,
+        independent of the PDB clock, so an abandoned TB is not
+        necessarily late in PDB terms yet. `pdb_s` defaults to infinity
+        (never late) for a caller that doesn't have or care about it,
+        matching `drain()`'s own optional-`pdb_s` convention."""
         if bytes_count <= 0:
             return 0
         key = (ue_id, qfi)
@@ -201,6 +214,7 @@ class BufferModel:
         while remaining > 0 and chunks:
             chunk = chunks[0]
             take = min(remaining, chunk[1])
+            chunk_late = (now_s - chunk[0]) > pdb_s
             chunk[1] -= take
             removed += take
             remaining -= take
@@ -209,7 +223,7 @@ class BufferModel:
                     self._completed[key].append(MessageCompletion(
                         message=chunk[2],
                         complete=False,
-                        late=True,
+                        late=chunk_late,
                         completion_ts_s=now_s,
                         delivered_bytes=chunk[2].delivered_bytes,
                         dropped_bytes=take,

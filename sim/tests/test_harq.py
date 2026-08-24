@@ -6,6 +6,7 @@ is imported by driver.py or any scenario/scheduler."""
 import pytest
 
 from scheduler.link import bler_for_mcs
+from sim.buffer import BufferModel
 from sim.harq import (
     DEFAULT_DL_CAPACITY,
     DEFAULT_UL_CAPACITY,
@@ -178,3 +179,57 @@ def test_free_raises_for_an_unknown_pid():
     pool = HarqProcessPool(dl_capacity=2, ul_capacity=2)
     with pytest.raises(KeyError):
         pool.free(ue_id=1, direction="DL", pid=99)
+
+
+# -- sim.buffer.BufferModel.discard_harq_loss ------------------------------
+# WP5 end-of-WP review: harq_round_max exhaustion is an attempt-count
+# budget, independent of the PDB clock -- a TB can be abandoned before OR
+# after its PDB has technically passed. `late` must reflect which one
+# actually happened, not be hardcoded True regardless.
+
+
+def test_discard_harq_loss_is_not_late_when_pdb_has_not_passed():
+    buffers = BufferModel()
+    buffers.register(1, 2)
+    buffers.enqueue(1, 2, 1000, timestamp_s=0.0)
+    removed = buffers.discard_harq_loss(1, 2, 1000, now_s=0.05, pdb_s=1.0)
+    assert removed == 1000
+    assert buffers.state(1, 2).bytes_dropped_harq == 1000
+
+
+def test_discard_harq_loss_message_completion_reflects_true_lateness():
+    from sim.messages import Message
+
+    buffers = BufferModel()
+    buffers.register(1, 2)
+    on_time_msg = Message(id=1, ue_id=1, qfi=2, size_bytes=500, generation_ts_s=0.0)
+    late_msg = Message(id=2, ue_id=1, qfi=2, size_bytes=500, generation_ts_s=0.0)
+    buffers.enqueue(1, 2, 500, timestamp_s=0.0, message=on_time_msg)
+    buffers.enqueue(1, 2, 500, timestamp_s=0.0, message=late_msg)
+
+    # First chunk (on_time_msg) exhausts well within its PDB.
+    buffers.discard_harq_loss(1, 2, 500, now_s=0.05, pdb_s=1.0)
+    # Second chunk (late_msg) exhausts long after its PDB would have passed.
+    buffers.discard_harq_loss(1, 2, 500, now_s=5.0, pdb_s=1.0)
+
+    completions = buffers.pop_completions(1, 2)
+    assert len(completions) == 2
+    assert completions[0].message is on_time_msg
+    assert completions[0].late is False
+    assert completions[1].message is late_msg
+    assert completions[1].late is True
+
+
+def test_discard_harq_loss_defaults_to_never_late_without_pdb_s():
+    """A caller that doesn't pass pdb_s (matching drain()'s own optional-
+    pdb_s convention) gets late=False regardless of now_s, not a
+    hardcoded True."""
+    buffers = BufferModel()
+    buffers.register(1, 2)
+    from sim.messages import Message
+
+    msg = Message(id=1, ue_id=1, qfi=2, size_bytes=200, generation_ts_s=0.0)
+    buffers.enqueue(1, 2, 200, timestamp_s=0.0, message=msg)
+    buffers.discard_harq_loss(1, 2, 200, now_s=1000.0)  # no pdb_s
+    completions = buffers.pop_completions(1, 2)
+    assert completions[0].late is False

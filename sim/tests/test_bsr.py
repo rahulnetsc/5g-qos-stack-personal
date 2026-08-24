@@ -239,6 +239,38 @@ def test_scalar_decrements_on_every_grant_independent_of_pending():
     assert st.estimated_ul_buffer_per_lcg == [0] * 8  # per-LCG array untouched
 
 
+def test_on_ul_confirmed_receipt_is_the_harq_aware_split_of_the_decrement():
+    """WP5 end-of-WP review: through WP4, on_ul_grant's delivered_bytes
+    decrement of estimated_ul_buffer WAS the confirmed-receipt event,
+    because grant and delivery were the same call. A HARQ-aware caller
+    (sim/driver.py, commit 4b) must be able to credit sched_ul_bytes at
+    grant time WITHOUT prematurely decrementing estimated_ul_buffer for
+    an attempt whose outcome isn't known yet -- delivered_bytes=0 does
+    that (on_ul_grant's own behaviour is otherwise unchanged, per the
+    test above) -- and then confirm receipt separately, once success is
+    actually known, via on_ul_confirmed_receipt."""
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    flows = [_flow(1, 2, 0)]
+    bsr = BsrModel(flows, _SLOT_S)
+
+    st = bsr._state[1]
+    st.estimated_ul_buffer = 1000
+    buffers.enqueue(1, 2, 9999, 0.0)
+
+    # Grant time: sched_ul_bytes credits, estimated_ul_buffer does NOT
+    # move yet -- the attempt's outcome isn't known.
+    bsr.on_ul_grant(ue_id=1, tb_size=300, delivered_bytes=0, slot_index=0, buffers=buffers)
+    assert st.sched_ul_bytes == 300
+    assert st.estimated_ul_buffer == 1000  # unchanged -- not yet confirmed
+
+    # Confirmation arrives later (possibly after retries, a separate
+    # call, no new sched_ul_bytes credit -- that already happened).
+    bsr.on_ul_confirmed_receipt(ue_id=1, delivered_bytes=300)
+    assert st.estimated_ul_buffer == 700
+    assert st.sched_ul_bytes == 300  # untouched by confirmation
+
+
 def test_bsr_not_assembled_when_not_pending():
     """on_ul_grant must not touch estimated_ul_buffer_per_lcg at all unless
     pending -- the crux of event-triggering."""

@@ -828,7 +828,7 @@ mismatches, `harq_rng` fix included):
 |---|---|---|---|
 | 1 | Mixed M01/M02 for UL, not clean "up" | p50 70↑/**173↓**; p98 **216↑**/98↓; p99 194↑/129↓ -- genuinely mixed, not one direction | **Held** |
 | 2 | `sched_ul_bytes` AMOUNT not flat (full-TB-fill fix) | Not directly observable in `RunRecord` (internal BSR state); crumb-fraction shift (#3) is consistent, indirect evidence | **Held, indirect evidence only** |
-| 3 | Crumb fraction closer to hardware | Measured directly: 4.4503% (WP4) → **5.1233%** (162/3162, `factory_robots_scenario`/`TwoTier`@1.0×), mean crumb size 146.03→135.38 bytes | **Held** — still ~10x short of hardware's 48-52% |
+| 3 | Crumb fraction closer to hardware | Measured directly: 4.4503% (WP4) → 5.1233% (162/3162, `factory_robots_scenario`/`TwoTier`@1.0×) *(superseded — measured under the `estimated_ul_buffer` bug §7's review found; corrected figure is **4.9558%**, 157/3168, mean crumb size 146.03→134.44 bytes)* | **Held** — still ~10x short of hardware's 48-52% |
 | 4 | SR-chain interaction, no directional call | Real, and larger than "some extra SR events": full masking blocks the SR-triggered fresh-grant path for the whole retry cycle -- see the new README §8 finding below | **Held, and is now the commit's second headline finding** |
 | 5 | SPS/double-grant extends to UL | `harq_masked_flow_double_grant_count`: 3,628 (4a) → **7,092** (4b), incl. 1,220 on `study2/pdcch_limited` (all-UL) | **Held** |
 
@@ -1023,3 +1023,107 @@ What's left, explicitly not silently dropped:
   directions as of commit 4b; nothing outstanding here specifically, but
   worth remembering if a future WP adds a third traffic direction or
   multi-connectivity concept that this design didn't anticipate.
+
+---
+
+## 8. End-of-WP judgment-calls review
+
+Per CLAUDE.md's standing step, reread the full diff (`fc719d7..87e8bc0`,
+all seven commits) looking for judgment calls a reasonable person could
+have made differently and where being wrong wouldn't show in any test —
+WP5 had more mid-implementation decisions than any prior WP (the binary-
+delivery switch, full masking, the RNG split, the `ChannelModel`-wrap
+rejection), so this pass matters more than usual. Two real findings,
+both fixed in this review, not deferred silently — same discipline as
+WP3's M02 bug and WP7's own review-commit fixes.
+
+**Finding 1 (major): `sim/bsr.py::on_ul_grant`'s `estimated_ul_buffer`
+decrement fired at grant/attempt time, not confirmed-receipt time —
+violating a pre-WP5 CLAUDE.md invariant, not just a stale comment.**
+CLAUDE.md already stated, before WP5 existed: *"the scalar
+`estimated_ul_buffer` IS decremented on real data receipt."* Through
+WP4, "grant" and "confirmed receipt" were the same call (no retry
+existed), so this invariant held automatically regardless of when the
+decrement fired. Commit 4b's UL wiring called `on_ul_grant` with the
+full LCP-fill amount **before** checking whether the attempt succeeded
+— meaning `estimated_ul_buffer` was credited as "received" for bytes
+that might fail and retry, or might be permanently lost (exhaustion) and
+never arrive at all. Silently wrong: no test asserted on
+`estimated_ul_buffer`'s value under HARQ retry specifically (the
+existing `test_scalar_decrements_on_every_grant_independent_of_pending`
+predates HARQ and only ever exercises the always-succeeds case, where
+grant-time and confirmed-time coincide, so it couldn't have caught
+this). Blast radius was bounded, not runaway: masking already prevents
+a second grant to the same key while one is pending, so the error
+never compounds across multiple attempts, and the next BSR always
+overwrites `estimated_ul_buffer` from fresh real per-LCG data regardless
+— but the error was real for the window between a failed attempt and
+the next BSR, and it fed `broadcast()`'s `B` gate (crumb-collapse) and
+`bytes_reported` every slot in that window.
+
+**Fix**: `on_ul_grant` itself is unchanged — its behaviour for any
+existing/direct caller (`sim/tests/test_bsr.py`, written pre-WP5) stays
+byte-for-byte identical, since it still decrements by whatever
+`delivered_bytes` it's given, unconditionally, exactly as before. The
+decrement is now factored into a separately-callable
+`on_ul_confirmed_receipt(ue_id, delivered_bytes)`, which `on_ul_grant`
+calls internally (preserving old behaviour for old callers).
+`sim/driver.py`'s HARQ-aware UL wiring now calls `on_ul_grant` with
+`delivered_bytes=0` at grant time (crediting `sched_ul_bytes`/restarting
+the retx timer/BSR-quantisation-if-pending — all correctly grant-time,
+unaffected) and calls `on_ul_confirmed_receipt` separately, only once
+success is actually known — immediately for a first-try success, later
+for a retry that eventually succeeds, never for exhaustion. New test:
+`sim/tests/test_bsr.py::test_on_ul_confirmed_receipt_is_the_harq_aware_
+split_of_the_decrement`.
+
+**A second, genuinely separate, NOT-built question surfaced by the same
+docstring, recorded rather than conflated with the bug above**: real
+hardware ALSO decrements `sched_ul_bytes` itself at confirmed-SDU-
+reception time (`gNB_scheduler_ulsch.c:1096-1098`), separate from the
+`+= tb_size` grant-time credit — omitted through WP4 specifically
+because grant and delivery were the same call, reasoning that no longer
+holds now that UL has a real k2 gap. This is a new mechanism, not a bug
+fix, and stays not-built, its own future commit if taken up — recorded
+in `sim/bsr.py::on_ul_grant`'s own docstring and in CLAUDE.md's
+crumb-fraction item.
+
+**Consequence for an already-reported number**: the commit 4b crumb-
+fraction measurement (4.4503% → 5.1233%) was taken *under* this bug.
+Re-measured post-fix: **4.9558%** (157/3168, mean crumb size 134.44
+bytes) — still the predicted direction, a smaller move than first
+reported (+0.51 points of the ~45-point gap, not +0.67). Corrected in
+CLAUDE.md, README §8, and this document's own commit-4b table (which
+keeps the original figure visible, marked superseded, rather than
+silently rewriting history).
+
+**Finding 2 (moderate): `sim/buffer.py::discard_harq_loss` hardcoded
+`MessageCompletion.late=True` unconditionally.** `harq_round_max`
+exhaustion is an attempt-count budget, independent of the PDB clock (WP5
+§1's own stated design) — a TB can be abandoned before its PDB has
+technically passed. Silently wrong today only because `MessageCompletion
+.late` is write-only: nothing in `scorecard.py` consumes it yet (reserved
+for M04's future exactness upgrade, per WP7's own notes) — whoever builds
+that upgrade would have inherited an incorrect signal for every
+HARQ-exhaustion drop. **Fix**: added an optional `pdb_s` parameter
+(defaulting to infinity, matching `drain()`'s own convention) and
+computed `late` per chunk exactly like `drain()` does
+(`(now_s - chunk[0]) > pdb_s`); `sim/driver.py`'s two call sites now pass
+the already-computed `pdb_s` they had sitting nearby unused. New tests in
+`sim/tests/test_harq.py` cover both a not-yet-late and a genuinely-late
+exhaustion, plus the no-`pdb_s`-given default.
+
+**Checked and NOT a finding**: `ue_lcp.fill()`'s token-bucket consumption
+(real, grant-time, unrelated to confirmed delivery — correct as-is);
+`ul_access.on_ul_grant()`'s SR-flag clear (real hardware clears on grant
+receipt, not confirmed delivery, per `oai-port-map.md` row 11 — correct
+as-is); `metrics.record_prb_use`/`record_delivery` pairing (PRB usage is
+attempt-time, delivery is confirmed-time, correctly distinct, no
+double-count risk found).
+
+**Final state after both fixes**: `pytest sim/tests -q` — 254 passed
+(250 + 4 new), 1 xfailed (unchanged). `regression_corpus.py --capture`
+run and `--check` reconfirmed clean against the new baseline — the fixes
+are real fidelity changes with their own regression diff (5,771
+mismatches), captured and recorded here, not silently absorbed into an
+unrelated commit.

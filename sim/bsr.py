@@ -232,47 +232,70 @@ class BsrModel:
         """Call once per UE per slot, for the UE's `ue_grant=True`
         allocation, after `buffers.drain()` has applied it.
 
-        Always: credit `sched_ul_bytes` and restart the retx timer -- both
-        happen on *every* grant regardless of whether it carries a BSR
-        (`gNB_scheduler_ulsch.c:2730`; the retx-restart is the ground
-        truth's "a crumb trickle suppresses the one recovery path" note).
-        Also always decrements the scalar `estimated_ul_buffer` by
-        `delivered_bytes` (SDU-receipt effect, `gNB_scheduler_ulsch.c:
-        544-547`, finding (b)) -- independent of the per-LCG array, which
-        only a BSR touches; this is what lets the two desync.
+        Always: credit `sched_ul_bytes`, restart the retx timer, AND
+        decrement the scalar `estimated_ul_buffer` by `delivered_bytes`
+        (SDU-receipt effect, `gNB_scheduler_ulsch.c:544-547`, finding
+        (b)) -- independent of the per-LCG array, which only a BSR
+        touches; this is what lets the two desync. This method's own
+        behaviour is UNCHANGED by WP5 and stays exactly what every
+        pre-WP5 caller (`sim/tests/test_bsr.py`) already exercises:
+        whatever `delivered_bytes` you pass decrements the scalar, right
+        here, unconditionally.
+
+        WP5 finding (docs/wp5-plan.md end-of-WP review), fixed at the
+        CALLER, not here: through WP4, grant and confirmed delivery were
+        the same call, so "decrement at grant time" and "decrement at
+        confirmed receipt" were indistinguishable -- CLAUDE.md's own
+        pre-WP5 invariant ("the scalar *is* decremented on real data
+        receipt") held either way. WP5 commits 4a/4b made a HARQ-tracked
+        UL attempt's outcome genuinely deferred (retries, or permanent
+        loss, before or instead of confirmed receipt). Calling THIS
+        method with the full attempted amount at grant time, before the
+        outcome is known, would credit "received" for bytes that might
+        fail and retry or never arrive at all -- a real bug this review
+        found in `sim/driver.py`'s commit-4b wiring, not in this method.
+        The fix: `sim/driver.py` now calls this method with
+        `delivered_bytes=0` at grant time (so `sched_ul_bytes`/the retx
+        timer/BSR-quantisation-if-pending still fire correctly, grant-
+        time as always) and calls `on_ul_confirmed_receipt` below
+        separately, only once an attempt actually succeeds -- immediately
+        for a first-try success, or later for a retry that eventually
+        does. `on_ul_grant` itself needed no change; only how it gets
+        called did.
 
         Only if `pending`: assemble and quantise a BSR from the true
-        post-drain per-LCG backlog, reset `sched_ul_bytes` and the
+        current per-LCG backlog, reset `sched_ul_bytes` and the
         periodic timer, and clear `pending` -- matching
         `gNB_scheduler_ulsch.c:626-679` (both formats reset
         `sched_ul_bytes = 0` unconditionally, but only on actual BSR
         reception, not every grant).
 
-        Judgment call, recorded because it's easy to get wrong the other
-        way: the ground truth ALSO decrements `sched_ul_bytes` itself at
-        confirmed-SDU-reception time (`gNB_scheduler_ulsch.c:1096-1098`,
-        `-= sdu_lenP`, in `_nr_rx_sdu`, before `nr_process_mac_pdu` even
-        runs) -- separate from, and in addition to, the `+= tb_size` credit
-        at grant time (line 2730 above). On real hardware those two events
-        are genuinely separated by the k2 grant-to-transmission delay, so
-        `sched_ul_bytes` spends that window elevated, tracking "granted but
-        not yet confirmed" bytes; if several grants pipeline within one k2
-        window it can outrace confirmation and force a real collapse. This
-        sim has no k2/HARQ-round separation -- grant and delivery are the
-        same call -- so decrementing what was just incremented in the same
-        step would mostly cancel out and mute the exact crumb-collapse
-        effect WP3 exists to demonstrate. An equally defensible alternative
-        (mirror the decrement anyway, using `delivered_bytes` as the
-        confirmed amount) was considered and rejected on that basis, not
-        because it's wrong on its face. WP4 added a real SR path
-        (`sim/ul_access.py`) without adding k2/HARQ-round separation; if
-        the measured crumb-fraction shortfall (README §8) persists after
-        WP4, this omission is still a plausible contributor to check next.
+        A DIFFERENT, NOT-BUILT judgment call, distinct from the bug just
+        described: the ground truth ALSO decrements `sched_ul_bytes`
+        itself at confirmed-SDU-reception time (`gNB_scheduler_ulsch.c:
+        1096-1098`, `-= sdu_lenP`, in `_nr_rx_sdu`, before
+        `nr_process_mac_pdu` even runs) -- separate from, and in addition
+        to, the `+= tb_size` credit at grant time (line 2730 above). On
+        real hardware those two events are genuinely separated by the k2
+        grant-to-transmission delay, so `sched_ul_bytes` spends that
+        window elevated, tracking "granted but not yet confirmed" bytes;
+        if several grants pipeline within one k2 window it can outrace
+        confirmation and force a real collapse. Through WP4 this sim had
+        no k2/HARQ-round separation, so decrementing what was just
+        incremented in the same step would have mostly cancelled out and
+        muted the exact crumb-collapse effect WP3 exists to demonstrate --
+        that reasoning no longer applies now that WP5 gives UL a real k2
+        gap. **Not built here anyway**: adding a second `sched_ul_bytes`
+        decrement is a genuinely new mechanism, not a bug fix, and
+        deserves its own commit/regression diff, not a bundle with the
+        `estimated_ul_buffer` fix above. CLAUDE.md's crumb-fraction known
+        issue names this as the remaining candidate after the
+        `estimated_ul_buffer` fix's own contribution is measured.
         """
         st = self._state[ue_id]
         st.sched_ul_bytes += tb_size
         st.retx_deadline_slot = slot_index + self._retx_bsr_slots
-        st.estimated_ul_buffer = max(0, st.estimated_ul_buffer - delivered_bytes)
+        self.on_ul_confirmed_receipt(ue_id, delivered_bytes)
 
         if not st.pending:
             return
@@ -304,6 +327,29 @@ class BsrModel:
         st.sched_ul_bytes = 0
         st.pending = False
         st.periodic_deadline_slot = slot_index + self._periodic_bsr_slots
+
+    def on_ul_confirmed_receipt(self, ue_id: int, delivered_bytes: int) -> None:
+        """The SDU-receipt decrement of the scalar `estimated_ul_buffer`
+        (`gNB_scheduler_ulsch.c:544-547`, finding (b)), factored out (WP5
+        end-of-WP review) so a HARQ-aware caller can fire it only once a
+        TB is actually received -- `on_ul_grant` above still calls this
+        internally, unconditionally, for backward-compatible behaviour
+        with every pre-WP5 caller.
+
+        For a HARQ-tracked UL attempt, call this directly (not via
+        `on_ul_grant`) from wherever the outcome resolves to success --
+        immediately, for a first-try success, or later, for a retry that
+        eventually succeeds. Do NOT call it on failure-pending-retry or
+        on max-retx exhaustion: those bytes were never received, so
+        `estimated_ul_buffer` should stay as-is until the next BSR
+        corrects it from the real per-LCG backlog (matching this
+        module's own already-accepted "the scalar and the per-LCG array
+        legitimately desync between BSRs" invariant, CLAUDE.md) --
+        independent of the per-LCG array, which only a BSR touches; this
+        is what lets the two desync.
+        """
+        st = self._state[ue_id]
+        st.estimated_ul_buffer = max(0, st.estimated_ul_buffer - delivered_bytes)
 
     def broadcast(self, buffers, ul_access) -> None:
         """Every slot, every UE: recompute

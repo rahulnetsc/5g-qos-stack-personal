@@ -143,6 +143,59 @@ separate `ul_lcg_deficit_bytes`-style counter in the real C, never
 `estimated_ul_buffer_per_lcg` itself; the scalar *is* decremented on real
 data receipt but the per-LCG array is not, so the two legitimately desync
 between BSRs. Both are deliberate, not oversights.
+**Since WP5: "real data receipt" means *confirmed* receipt, not grant
+time — they stopped being the same event once UL HARQ retry existed.**
+`on_ul_grant(..., delivered_bytes=...)` still decrements unconditionally
+whatever it's given (kept byte-for-byte backward compatible for pre-WP5
+callers), but the HARQ-aware call site in `driver.py` now passes
+`delivered_bytes=0` at grant time and calls the separate
+`on_ul_confirmed_receipt(ue_id, delivered_bytes)` only once a HARQ attempt
+is actually known to have succeeded. WP5's own end-of-WP review found and
+fixed a real bug here: the first UL-retry implementation called the old
+unconditional decrement at grant time regardless of outcome, crediting
+"received" for bytes that could still fail, retry, or be lost to
+max-retx exhaustion. If you add another UL delivery path, wire it to
+`on_ul_confirmed_receipt` on success, never to `on_ul_grant`'s
+`delivered_bytes` directly.
+
+**HARQ delivery is a binary per-TB draw, not a fractional discount — do
+not reintroduce `bytes_capacity * (1 - bler)`.** Pre-WP5, every DL/UL
+grant applied a deterministic fractional loss straight to delivered
+bytes; real HARQ has no concept of "70% of a transport block," only
+success/failure per attempt (`sim/harq.py::draw_harq_outcome`). WP5 found
+this fractional model was the dominant driver of the pre-4a/post-4a
+latency-metric drift — every latency number before commit 4a was shaped
+more by this unphysical smoothing artifact than by anything a real
+network does. A future "smooth out the noisy binary outcome" change would
+be reintroducing exactly the artifact WP5 removed, not an improvement.
+
+**`sim/harq.py::HarqAwareBufferView` fully masks (`bytes_queued=0`/
+`bytes_reported=0`) a flow with a HARQ process pending — this is a FIFO
+correctness requirement, not a modeling preference, and must not be
+loosened to a partial/proportional mask.** `sim/buffer.py`'s `drain()`/
+`expire()` consume by byte count, not by chunk identity — they don't know
+which bytes are "the ones already granted and in flight." A second grant
+issued to a masked flow while its first TB is still pending would drain
+whatever bytes are oldest by FIFO order, which may not be the pending
+ones, silently corrupting delivery/completion bookkeeping rather than
+just being a suboptimal scheduling choice. `scheduler/two_tier.py`'s SPS
+path defeats this non-destructively by pooling backlog across a UE's
+SPS-eligible flows before masking is applied (README §8,
+`harq_masked_flow_double_grant_count`) — that's a flagged, deliberately
+unfixed limitation of SPS specifically (Phase-2-doomed per this doc's own
+SPS rule above), not evidence that masking itself can be relaxed
+elsewhere.
+
+**Every new independent random draw needs its own seed stream — do not
+share an RNG across two different draws.** Precedent: `cqi_seed =
+scenario.seed ^ 0xC9C9C9C9`. WP5 found a real bug from *not* following
+this: `harq_rng` was one shared stream for both DL and UL outcome draws;
+the moment UL started consuming draws too, it perturbed DL's own draw
+interleaving order, moving pure-DL flows in `--check` with zero DL-
+mechanism change. Fixed with independent `harq_rng_dl`/`harq_rng_ul`
+(`scenario.seed ^ 0x48415251` / `... ^ 0xFFFFFFFF`). When adding any new
+stochastic mechanism, give it its own XOR'd seed rather than reusing an
+existing RNG object, even one that looks unrelated to what you're adding.
 
 **BSR quantisation tables come from vendored OAI source, not the 3GPP
 spec text or memory.** `sim/bsr.py`'s `NR_SHORT_BSR_TABLE`/
@@ -221,9 +274,19 @@ for every WP, not an opportunistic one.
   writeup. **The `sched_ul_bytes`/k2-HARQ omission is now largely ruled
   out as the gap's explanation, not still an open candidate**: WP5 commit
   4b landed the real k2/HARQ pipelining this item asked for, and crumb
-  fraction moved to 5.1233% (162/3162) — **+0.67 percentage points of the
-  ~45-point gap to hardware's 48-52%.** Revisit with WP9's wider sweep for
-  what the other ~44 points are.
+  fraction moved to **4.9558%** (157/3168) — **+0.51 percentage points of
+  the ~45-point gap to hardware's 48-52%.** (First measured at 5.1233%
+  under a bug WP5's own end-of-WP review found and fixed — `sim/bsr.py::
+  on_ul_grant` was decrementing `estimated_ul_buffer` at grant/attempt
+  time instead of confirmed-receipt time, `docs/wp5-plan.md` — corrected
+  here to the post-fix figure, not the first one measured.) A second,
+  separate candidate this item's own text didn't previously distinguish:
+  real hardware ALSO decrements `sched_ul_bytes` itself at confirmed-
+  receipt time (a second decrement, on top of the `+= tb_size` grant-time
+  credit) once a real k2 gap exists — deliberately not built (`sim/
+  bsr.py::on_ul_grant`'s docstring), since it's a new mechanism, not a bug
+  fix, and needs its own commit. Revisit with WP9's wider sweep for what
+  the remaining gap is.
 - H5 (`p5g-sim-plan.md` line 338, two-tier degrades as flows-per-LCG
   grows) is not demonstrable on any current scenario — WP3's default 5QI→
   LCG mapping deliberately separates QoS classes into different LCGs, so
