@@ -218,8 +218,12 @@ for every WP, not an opportunistic one.
   process (79 bytes, inside hardware's 72-107 range → 146 bytes, outside
   it, now dominated by the SR path's fixed report floor rather than an
   organic collapse). Not chased further; see README §8 for the full
-  writeup, including the `sched_ul_bytes`/k2-HARQ omission still flagged
-  as a candidate contributor. Revisit with WP9's wider sweep.
+  writeup. **The `sched_ul_bytes`/k2-HARQ omission is now largely ruled
+  out as the gap's explanation, not still an open candidate**: WP5 commit
+  4b landed the real k2/HARQ pipelining this item asked for, and crumb
+  fraction moved to 5.1233% (162/3162) — **+0.67 percentage points of the
+  ~45-point gap to hardware's 48-52%.** Revisit with WP9's wider sweep for
+  what the other ~44 points are.
 - H5 (`p5g-sim-plan.md` line 338, two-tier degrades as flows-per-LCG
   grows) is not demonstrable on any current scenario — WP3's default 5QI→
   LCG mapping deliberately separates QoS classes into different LCGs, so

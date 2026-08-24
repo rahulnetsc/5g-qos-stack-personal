@@ -436,9 +436,18 @@ adding it widens scope"). The two bugs found scoping WP5 don't get the same
 answer:
 
 - **Bug #1** (`num_dl_sched <= 3` forces `-1`, `+1` also gated on `> 3`,
-  §2) is self-contained — it only reads the round-count state (`stats->
-  rounds[0]`/`[1]`, i.e. total attempts vs. retx attempts) that WP5's own
-  HARQ engine produces as a byproduct of tracking retries. It also now has
+  §2) is self-contained — it needs nothing outside WP5's own files
+  (`sim/harq.py`/`sim/driver.py`/the new `sim/olla.py`), no scheduler or
+  buffer changes. **Correction, found scoping commit 6**: "reads the
+  round-count state... WP5's own HARQ engine produces as a byproduct"
+  overstated what already existed — nothing in commits 1-4b tracks a
+  cumulative, windowed history of transmissions vs. first-retries per UE;
+  `HarqProcess.retx_count` is per-in-flight-process and resets on
+  `free()`. Commit 6 adds this bookkeeping fresh (`OllaRoundCounters`,
+  `sim/olla.py`) rather than reusing something already produced. "Self-
+  contained" (no cross-cutting dependencies) still holds; "already
+  produced as a byproduct" did not, and is corrected here rather than
+  left standing. It also now has
   a forcing function README §3 didn't have when OLLA was excluded: an idle
   UE has `num_dl_sched=0`, permanently ratcheting toward `min_mcs`,
   compounding with WP4's SR-chain on resume-after-silence (G4) — a named
@@ -456,6 +465,33 @@ answer:
   New README §8 `[OPEN]` item: activating `sim/power.py` plus this clamp,
   together, for whoever next needs WP1 live — not silently dropped, not
   silently bundled into WP5.
+
+### Decision 5b — bug #1 lands dormant, not wired into grant sizing
+
+Found scoping commit 6, not anticipated when Decision 5 was written: real
+`get_mcs_from_bler`'s ratcheted MCS reaches exactly one call site (it
+directly becomes the grant's MCS before TBS sizing). This simulator has no
+persistent per-UE MCS anywhere grant sizing reads — link adaptation here
+is stateless, a pure function of instantaneous (possibly CQI-delayed) SNR.
+The only zero-scheduler-change route to feed a ratcheted value in is
+wrapping `ChannelModel.get_reported_snr_db()`, matching the pattern
+already used for HARQ (`HarqAwareBufferView`, `ReducedSlotView`) — but
+every current scheduler calls that same method for things that are not
+MCS selection: PF's ranking, `TwoTier`'s `_r_avg`, Tier-1's capacity
+estimates. Wrapping it would feed OLLA's ratcheted value into every one of
+those unrelated reads too. That is not a fidelity trade-off between two
+honest options — it is a different mechanism wearing OLLA's name, with a
+failure mode no test would catch and no metric would attribute to OLLA.
+
+**Decided: land the ratchet dormant, matching WP1's `sim/power.py`
+precedent exactly** — pure functions/dataclasses (`sim/olla.py`),
+unit-tested against the C's exact -1/+1 asymmetry, zero `sim/driver.py`
+changes, not wired into any scheduler. Activation belongs in Phase 2's
+fresh scheduler rewrite, where MCS selection can live at the one call
+site it actually needs to, not bolted on via a wrapper that leaks into
+unrelated call sites. New README §8 `[OPEN]` item records this, plus the
+compounding-vs-coincidence test (§4 below) that couldn't run without live
+wiring, so Phase 2 doesn't have to re-derive it.
 
 ### Decision 6 — resolved: no status change; a new `caveats:` field instead — landed ahead of commit 1
 
@@ -497,7 +533,7 @@ purely additive.
 | 3 | Process-pool gating on new-data grants (no multi-slot delay yet) — **landed** | `sim/driver.py` | Live, but **designed to be inert** — delivery still synchronous, so the pool never actually binds |
 | 4a | Deferred drain + real multi-slot retry, **DL** | `sim/driver.py`, `sim/metrics.py` (`bytes_harq_retx`/`bytes_harq_lost` counters) | Live — the big DL fidelity landing |
 | 4b | Deferred drain + real multi-slot retry, **UL** — resolves the `sched_ul_bytes`/k2-HARQ gap `sim/bsr.py`'s own docstring flags (CLAUDE.md known issues) — **landed** | `sim/driver.py`, `sim/harq.py` (`ul_split`, UL masking, `draw_dl_outcome`→`draw_harq_outcome` rename), `sim/tests/test_ul_access.py` (threshold+docstring) | Live — the big UL fidelity landing |
-| 6 | OLLA bug #1 only (`get_mcs_from_bler`'s round-count ratchet) | `scheduler/link.py` or new `sim/olla.py`, `sim/driver.py` | Live |
+| 6 | OLLA bug #1 only (`get_mcs_from_bler`'s round-count ratchet) — **landed, dormant** | `sim/olla.py` (new) — **not** `scheduler/link.py` or `sim/driver.py` (Decision 5b) | No — dormant, unit-tested only (WP1 `sim/power.py` precedent) |
 
 **Note on 4b and `sim/bsr.py`:** `BsrModel.on_ul_grant`'s `sched_ul_bytes +=
 tb_size` credit fires **at grant time** in real OAI (already faithfully
@@ -838,18 +874,77 @@ assertions already pass).
 xfail persists unchanged). `regression_corpus.py --capture` run and
 `--check` reconfirmed clean against the new baseline.
 
-*Commit 6 (OLLA bug #1):*
-1. (Moderate) M01/M02 for low-rate control flows (`periodic_control`/
-   `condition_monitor`, WP7) — worse, since their natural
-   `num_dl_sched <= 3` between bursts ratchets them toward `min_mcs`. Ties
-   directly to the G4/SR-chain interaction flagged in Decision 5.
-2. (Low) M10/M11 — direction depends on how often the ratchet fires on the
-   22-record corpus's actual scenarios; no confident call either way.
-3. Flag: this commit is the one most likely to interact unpredictably with
-   README §8's existing WP4 SR-chain findings (both the negative
-   load-inversion result and the qfi8/qfi9 regression anomaly) — recommend
-   re-checking those specific scenarios after this commit lands, not just
-   the generic corpus diff.
+*Commit 6 (OLLA bug #1) — original pre-code predictions, superseded, not
+deleted:* the three predictions below (M01/M02 worse for low-rate flows,
+uncertain M10/M11 direction, unpredictable interaction with WP4's SR-chain
+findings) all assumed the ratchet would be *wired into grant sizing*.
+Scoping the commit found that wiring it in without touching scheduler
+code requires wrapping `ChannelModel.get_reported_snr_db()`, which bleeds
+into unrelated scheduler logic (PF's ranking, `TwoTier`'s `_r_avg`,
+Tier-1's capacity estimates) — Decision 5b, decided with the user: land
+the ratchet **dormant** instead, matching WP1's `sim/power.py` precedent.
+Recorded here rather than silently dropped, since the reasoning (low-rate
+flows are the ones the ratchet targets, and it could compound with the
+access-chain finding on the same UEs) is still correct and still relevant
+— to Phase 2, once OLLA is actually wired in.
+
+**Revised prediction, made before writing code: fully clean `--check` —
+the 14th such prediction in this lineage, and the strongest form of it.**
+Every prior "predicted clean" commit (WP7 commits 1/3/9, WP5 commits 0-3)
+was clean because no scenario referenced a new field yet, even though the
+new code was reachable from `driver.py`. This one is stronger: `sim/
+driver.py` is not touched *at all* this commit, so there is no code path
+by which anything in `sim/olla.py` could run during a `driver.run()` call,
+regardless of scenario. Falsifiable the same way as every prediction in
+this lineage — if any driver-reachable code path is later found calling
+into `sim/olla.py`, the "dormant" claim is wrong and must be retracted.
+
+**Commit 6 — landed.** `sim/olla.py` (new, dormant): `OllaRoundCounters`
+(cumulative `rounds0`/`rounds1`, `record_new_tx`/`record_first_retry`),
+`OllaOptions`/`OllaState` (mirroring `NR_bler_options_t`/`NR_bler_stats_t`),
+`init_olla_state` (mirrors `init_bler_stats` — seeds at `min_mcs`),
+`update_mcs_from_bler` (the ratchet itself, bug-for-bug per
+`gNB_scheduler_primitives.c:787-822`). `MCS_INDEX_COUNT = 12` gives
+`_MCS_TABLE`'s implicit row ordering explicit indices for the ratchet to
+operate on, without importing that private table across modules — checked
+directly against it in a test instead (`sim/tests/test_olla.py::
+test_mcs_index_count_matches_the_shared_table`), same discipline
+`sim/bsr.py`'s own vendored-table tests use.
+
+13 new tests, covering: the `-1`-on-either/`+1`-on-both asymmetry
+(isolating each disjunct separately, including the case where good BLER
+alone would have qualified for `+1` but low activity forces `-1` instead);
+the idle-UE case (`num_dl_sched=0`, confirmed the EWMA becomes a literal
+no-op on `bler` while `mcs` still ratchets down); strictly-`+1`-per-window
+climb-back (three consecutive favourable windows, asserted `[1, 2, 3]`,
+never a jump); `min_mcs`/`max_mcs` floors/ceilings; the per-call `max_mcs`
+parameter being clamped by `options.max_mcs`, not the reverse; the
+`BLER_UPDATE_FRAME` gate firing at exactly the boundary and not before;
+frame-counter wraparound at 1024. All 13 passed on first run.
+
+**Predicted fully clean, confirmed exactly:** `pytest sim/tests -q` — 250
+passed (237 + 13 new), 1 xfailed (unchanged from commit 4b).
+`regression_corpus.py --check` — clean, no `--capture` needed (nothing
+that reaches `RunRecord` changed).
+
+**Decision 5's "self-contained" premise corrected, not silently
+inherited** — see Decision 5 above: the round counts did not already
+exist; commit 6 built them fresh. **Decision 5b records the dormant-
+landing choice** in full, including why wrapping the channel view was
+rejected rather than accepted with a caveat.
+
+**The compounding-vs-coincidence test, recorded for Phase 2 rather than
+run now** (README.md §8's new commit-6 entry has the short form; full
+method here): once OLLA is wired in, compare per-UE aggregate degradation
+— not per-flow — between UEs with *both* a low-rate/OLLA-ratcheted DL
+flow and a low-rate/SR-access-chain-limited UL flow, against UEs with only
+one condition present. Additive degradation (consistent with summing each
+mechanism's isolated effect) is coincidental co-occurrence; supra-additive
+degradation is a genuine interaction between the two mechanisms, worth
+naming as such rather than left as three items (this one, WP4's
+load-inversion result, WP3/WP4's crumb-fraction shortfall) that merely
+rhyme. This can't run with OLLA dormant — recorded now so Phase 2 doesn't
+have to re-derive the method, only supply the wiring.
 
 ---
 
@@ -904,3 +999,27 @@ verify.
 Nothing else found blocked. WP5 has no dependency on WP6 (channel) or
 WP-Join, and — per Decision 4 — no dependency on Phase 2 either, despite
 the charter's literal wording suggesting otherwise.
+
+---
+
+## 7. Status
+
+All commits in the charter's own numbering (0, 1, 2, 3, 4a, 4b, 6 — the
+gap at 5 is the charter's own numbering, not a skipped commit) are landed.
+What's left, explicitly not silently dropped:
+
+- **OLLA bug #2** (power-headroom-forces-MCS-down) — blocked on WP1's
+  `sim/power.py` activation, out of WP5's charter (Decision 5).
+- **OLLA bug #1's grant-sizing wiring** — deliberately dormant (Decision
+  5b); belongs to Phase 2's fresh scheduler rewrite.
+- **The compounding-vs-coincidence test** (README §8, this doc's commit 6
+  section) — designed, can't run until OLLA is wired in; Phase 2's job.
+- **The SPS/masking accounting-drift finding** (README §8, commits 4a/4b)
+  — deliberately not fixed; Phase 2's rewrite must not reintroduce it.
+- **The compound-uncertainty in the combining-gain composition** (README
+  §8, Decision 1/1b) — ported anyway, flagged, revisit only if any of the
+  three composed constructs is recalibrated.
+- **UL split-preemption's DL/UL asymmetry** — fully solved for both
+  directions as of commit 4b; nothing outstanding here specifically, but
+  worth remembering if a future WP adds a third traffic direction or
+  multi-connectivity concept that this design didn't anticipate.

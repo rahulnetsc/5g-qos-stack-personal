@@ -632,6 +632,40 @@ they survive it:
   Worth stating as an explicit hypothesis for WP9 to test directly across
   its full sweep, rather than three separately-filed items that happen to
   rhyme.
+- `[OPEN]` **WP5 commit 6: OLLA's round-count MCS ratchet
+  (`get_mcs_from_bler`) is ported bug-for-bug and unit-tested, but doesn't
+  reach grant sizing — it's landed dormant, the same way WP1's `sim/
+  power.py` was.** This simulator has no persistent per-UE MCS anywhere
+  grant sizing reads (link adaptation here is entirely stateless: a
+  function of instantaneous, possibly-CQI-delayed SNR). Real hardware's
+  `get_mcs_from_bler` output reaches exactly one call site — it directly
+  becomes the grant's MCS before TBS sizing. The only route to feed a
+  ratcheted value in without touching scheduler code is wrapping
+  `ChannelModel.get_reported_snr_db()` (matching the pattern already used
+  for HARQ's `HarqAwareBufferView`/`ReducedSlotView`) — but every current
+  scheduler calls that same method for things that have nothing to do
+  with MCS selection: PF's ranking, `TwoTier`'s `_r_avg`, Tier-1's
+  capacity estimates. Wrapping it would feed OLLA's ratcheted value into
+  every one of those unrelated reads too, silently distorting scheduler
+  behaviour that no test checks and no metric attributes to OLLA — not a
+  fidelity trade-off, a different mechanism wearing OLLA's name. **Not
+  built**: activation belongs in Phase 2's fresh scheduler rewrite, where
+  MCS selection can live at the one call site it actually needs to.
+  `sim/olla.py` is ready for that — pure functions/dataclasses, unit-
+  tested against the C's exact -1/+1 asymmetry (`docs/wp5-plan.md`
+  commit 6) — Phase 2 needs to design the per-UE manager/wiring, not
+  re-derive the ratchet itself.
+
+  **The compounding-vs-coincidence test designed while scoping this
+  commit couldn't run with OLLA dormant — recorded here so it isn't lost
+  before Phase 2 activates it**: compare per-UE aggregate degradation
+  (not per-flow) between UEs with *both* a low-rate/OLLA-ratcheted DL flow
+  and a low-rate/SR-access-chain-limited UL flow, against UEs with only
+  one condition. Additive degradation (sum of each mechanism's isolated
+  effect) is coincidental co-occurrence; supra-additive degradation is a
+  genuine interaction worth naming as such, rather than three items
+  (this one, WP4's load-inversion result, the crumb-fraction shortfall)
+  that only rhyme. Full method in `docs/wp5-plan.md` commit 6.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either
