@@ -506,8 +506,21 @@ buffer drain (and `ue_lcp.fill()`'s per-flow split feeding it) defers to
 ACK. Getting this wrong would silently break WP3's already-verified BSR
 port.
 
+**Commit 0 — landed** (`fc719d7`). Scoring-layer only; `regression_corpus.
+py` never calls `Scorecard.score()`, so no prediction was even needed —
+confirmed by running both anyway: `pytest sim/tests -q` 216 passed,
+`--check` clean.
+
+**Commit 1 — landed.** `sim/harq.py` (`HarqProcess`/`HarqProcessPool`,
+asymmetric `dl_capacity=8`/`ul_capacity=16`, `combining_gain_db`) +
+`sim/tests/test_harq.py` (13 tests). **Predicted, before writing any code:
+fully clean `--check`, same as WP7 commits 3/5** — new, unimported by
+`driver.py` or any scenario/scheduler. **Confirmed exactly:** `pytest
+sim/tests -q` 229 passed (216 + 13 new), `regression_corpus.py --check`
+clean, zero mismatches.
+
 **Predicted metric movement, ranked by confidence within each commit.**
-Commits 1-3 predicted **fully clean** `--check` — falsifiable, no scenario
+Commits 2-3 predicted **fully clean** `--check` — falsifiable, no scenario
 references any new field yet, matching WP7 commits 1/3/9's precedent.
 
 *Commit 4a (DL):*
