@@ -5,11 +5,13 @@ is imported by driver.py or any scenario/scheduler."""
 
 import pytest
 
+from scheduler.link import bler_for_mcs
 from sim.harq import (
     DEFAULT_DL_CAPACITY,
     DEFAULT_UL_CAPACITY,
     HarqProcess,
     HarqProcessPool,
+    bler_for_mcs_with_combining,
     combining_gain_db,
 )
 
@@ -40,6 +42,48 @@ def test_chase_gain_is_linear_and_uncapped():
 
 def test_ir_is_the_default_mode():
     assert combining_gain_db(2) == combining_gain_db(2, mode="ir")
+
+
+# -- bler_for_mcs_with_combining -----------------------------------------
+
+
+def test_composition_is_a_no_op_at_retx_count_zero():
+    """docs/wp5-plan.md Decision 1b: identical to bler_for_mcs directly
+    until a caller passes retx_count > 0."""
+    thresh = 10.0
+    for true_snr in (thresh, thresh - 1, thresh - 2, thresh + 5):
+        assert bler_for_mcs_with_combining(thresh, true_snr) == bler_for_mcs(thresh, true_snr)
+        assert bler_for_mcs_with_combining(thresh, true_snr, retx_count=0) == bler_for_mcs(
+            thresh, true_snr
+        )
+
+
+def test_composition_matches_shifting_the_snr_by_the_combining_gain():
+    thresh = 10.0
+    true_snr = thresh - 2.0  # -2 dB shortfall -> bler_for_mcs quadruples base_bler
+    for retx in (1, 2, 3):
+        gain = combining_gain_db(retx, mode="ir")
+        expected = bler_for_mcs(thresh, true_snr + gain)
+        assert bler_for_mcs_with_combining(thresh, true_snr, retx_count=retx) == expected
+
+
+def test_composition_improves_bler_as_retx_count_rises_at_a_fixed_shortfall():
+    """A later attempt should never be *worse* than an earlier one at the
+    same true SNR -- combining gain only ever adds SNR headroom."""
+    thresh, true_snr = 10.0, 3.5  # -6.5 dB shortfall
+    values = [
+        bler_for_mcs_with_combining(thresh, true_snr, retx_count=r) for r in (0, 1, 2, 3)
+    ]
+    assert values[0] == 1.0  # -6.5dB shortfall with no combining is a total loss (capped)
+    assert values == sorted(values, reverse=True)
+    assert len(set(values)) > 2  # not just a two-step plateau -- the table's shape is visible
+    assert values[-1] < values[0]
+
+
+def test_composition_defaults_to_ir_mode():
+    thresh, true_snr, retx = 10.0, 4.0, 2
+    assert bler_for_mcs_with_combining(thresh, true_snr, retx_count=retx) == \
+        bler_for_mcs_with_combining(thresh, true_snr, retx_count=retx, mode="ir")
 
 
 # -- HarqProcess ---------------------------------------------------------

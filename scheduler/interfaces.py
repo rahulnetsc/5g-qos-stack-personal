@@ -47,6 +47,17 @@ class Allocation:
     # and are emitted per flow, because there the gNB really does choose.
     ue_grant: bool = False
 
+    # WP5 (docs/wp5-plan.md) -- dormant until commit 3+ wires sim/harq.py
+    # into the driver. Every scheduler emits these at their defaults today
+    # (a scheduler never originates a retransmission itself -- that's
+    # decided entirely at the driver level, docs/wp5-plan.md Decision 4:
+    # "orthogonal driver-level model, zero required scheduler changes").
+    # ``harq_pid`` identifies which HarqProcess this Allocation belongs to
+    # (-1 = not yet assigned / not HARQ-tracked). ``is_retx`` is set only by
+    # the driver's own retransmission path, never by a scheduler.
+    harq_pid: int = -1
+    is_retx: bool = False
+
 
 class SlotView(Protocol):
     """One slot's resource grid, as the scheduler reads it."""

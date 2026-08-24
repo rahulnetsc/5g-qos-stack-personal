@@ -1,18 +1,27 @@
 """WP5 -- HARQ core state: N processes per UE per direction, and the
 per-attempt combining-gain function.
 
-Pure functions/state only -- no simulator or scheduler imports. Not wired
-into driver.py yet; see docs/wp5-plan.md commit 3+ for when this becomes
-live (process-pool gating first, still inert; then commits 4a/4b make it
-load-bearing). Every citation and decision here is recorded in full in
-docs/wp5-plan.md -- this module's docstrings repeat only what a reader
-needs to not silently misuse the numbers.
+Pure functions/state -- no simulator (driver.py/buffer.py/etc.) imports.
+This module DOES import ``scheduler.link.bler_for_mcs`` (commit 2) to
+compose it with ``combining_gain_db``; that's the allowed dependency
+direction (``sim`` -> ``scheduler``, already used by ``sim/driver.py``),
+not the reverse -- ``scheduler/interfaces.py`` states the package must
+depend on nothing outside itself, so the composition lives here, not in
+``scheduler/link.py`` (docs/wp5-plan.md Decision 1b).
+
+Not wired into driver.py yet; see docs/wp5-plan.md commit 3+ for when this
+becomes live (process-pool gating first, still inert; then commits 4a/4b
+make it load-bearing). Every citation and decision here is recorded in
+full in docs/wp5-plan.md -- this module's docstrings repeat only what a
+reader needs to not silently misuse the numbers.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
+
+from scheduler.link import bler_for_mcs
 
 Direction = Literal["DL", "UL"]
 
@@ -74,6 +83,32 @@ def combining_gain_db(retx_count: int, mode: str = "ir") -> float:
     if mode == "ir":
         return _IR_GAIN_DB.get(retx_count, _IR_GAIN_DB[3])
     return _CHASE_GAIN_DB_PER_RETX * retx_count
+
+
+def bler_for_mcs_with_combining(
+    mcs_threshold_db: float,
+    true_snr_db: float,
+    retx_count: int = 0,
+    mode: str = "ir",
+) -> float:
+    """``scheduler.link.bler_for_mcs``, with HARQ combining gain composed
+    in as an SNR-domain bonus (docs/wp5-plan.md Decision 1b) -- NOT a
+    second BLER curve; ``bler_for_mcs`` itself is untouched.
+
+    ``retx_count=0`` (the default) makes this identical to calling
+    ``bler_for_mcs`` directly -- ``combining_gain_db(0, ...)`` is 0.0 in
+    both modes, so this composition is a no-op until a caller passes a
+    positive ``retx_count``. Not called anywhere yet -- driver.py wires it
+    in at commits 4a/4b, once a retransmission attempt actually exists to
+    have a ``retx_count`` greater than zero.
+
+    Flagged (docs/wp5-plan.md Decision 1b, README.md sec8): this composes
+    three uncalibrated constructs into one modelled probability --
+    ``bler_for_mcs``'s doubles-per-dB slope, the ``combining_gain_db`` IR/
+    Chase table, and its own ``base_bler`` default -- each individually
+    flagged already, not previously as a composition.
+    """
+    return bler_for_mcs(mcs_threshold_db, true_snr_db + combining_gain_db(retx_count, mode))
 
 
 # ---------------------------------------------------------------------------

@@ -493,7 +493,7 @@ purely additive.
 |---|---|---|---|
 | 0 | Panel `caveats:` field (M01/M02/M14/M15) + `Scorecard` wiring — **landed** | `config/metric_panel.yml`, `sim/scorecard.py`, `sim/tests/test_scorecard.py` | N/A — scoring-layer only, `regression_corpus.py` never calls `Scorecard.score()` |
 | 1 | `HarqProcess`/`HarqProcessPool` core state (asymmetric `dl_capacity=8`/`ul_capacity=16`, Decision 2) + `combining_gain_db()` | `sim/harq.py` (new), `sim/tests/test_harq.py` (new) | No — dormant, unit-tested only (WP1 precedent) |
-| 2 | `Allocation.harq_pid`/`is_retx` fields; combining-gain composition with `bler_for_mcs` in `scheduler/link.py` (Decision 1b, resolved) | `scheduler/interfaces.py`, `scheduler/link.py`, tests | No — new optional fields default to old behavior |
+| 2 | `Allocation.harq_pid`/`is_retx` fields; `bler_for_mcs_with_combining()` composition (Decision 1b) | `scheduler/interfaces.py`, `sim/harq.py` (**not** `scheduler/link.py` — see correction below), tests | No — new optional fields default to old behavior; `bler_for_mcs` itself untouched, composition uncalled until 4a/4b |
 | 3 | Process-pool gating on new-data grants (no multi-slot delay yet) | `sim/driver.py`, `sim/harq.py` | Live, but **designed to be inert** — delivery still synchronous, so the pool never actually binds |
 | 4a | Deferred drain + real multi-slot retry, **DL** | `sim/driver.py`, `sim/metrics.py` (`bytes_harq_retx`/`bytes_harq_lost` counters) | Live — the big DL fidelity landing |
 | 4b | Deferred drain + real multi-slot retry, **UL** — resolves the `sched_ul_bytes`/k2-HARQ gap `sim/bsr.py`'s own docstring flags (CLAUDE.md known issues) | `sim/driver.py`, interaction with `sim/bsr.py`/`sim/ul_access.py` (their own logic unchanged — see note) | Live — the big UL fidelity landing |
@@ -518,6 +518,36 @@ fully clean `--check`, same as WP7 commits 3/5** — new, unimported by
 `driver.py` or any scenario/scheduler. **Confirmed exactly:** `pytest
 sim/tests -q` 229 passed (216 + 13 new), `regression_corpus.py --check`
 clean, zero mismatches.
+
+**Correction found scoping commit 2, before writing any code:** this
+table originally placed the `bler_for_mcs`/`combining_gain_db` composition
+in `scheduler/link.py`. `scheduler/interfaces.py`'s own docstring states
+the package must "depend on nothing outside itself"; `scheduler/link.py`
+today imports nothing from `sim/` (checked directly — zero hits), and
+putting the composition there would need `from sim.harq import
+combining_gain_db`, the first `scheduler` → `sim` dependency ever. The
+composition instead lives in `sim/harq.py` (already importing nothing
+from `sim.driver`/etc.; adding `from scheduler.link import bler_for_mcs`
+matches the allowed, already-established direction `sim.driver` uses).
+`sim/harq.py`'s own docstring is corrected to stop claiming "no simulator
+or scheduler imports."
+
+**Commit 2 — landed.** `Allocation.harq_pid: int = -1`/`is_retx: bool =
+False` (`scheduler/interfaces.py`) + `bler_for_mcs_with_combining()`
+(`sim/harq.py`) + `sim/tests/test_interfaces.py` (new, 3 tests) +
+`sim/tests/test_harq.py` (4 more tests). **Predicted, before writing any
+code:** (1) the two new `Allocation` fields are inert — every current
+`Allocation(...)` construction site (`scheduler/two_tier.py`,
+`sim/baselines/_mac.py`) uses all-keyword args, confirmed by grep before
+writing, so appending defaulted fields changes nothing; (2)
+`bler_for_mcs_with_combining` cannot be reached with `retx_count > 0` by
+anything today, not because no caller happens to pass one, but because
+**nothing calls it at all yet** — it's a new sibling function,
+`bler_for_mcs` itself stays byte-for-byte unmodified (confirmed: its only
+real call site is `sim/driver.py:148`, untouched this commit). Predicted
+fully clean `--check`. **Confirmed exactly:** `pytest sim/tests -q` 236
+passed (229 + 7 new), `regression_corpus.py --check` clean, zero
+mismatches.
 
 **Predicted metric movement, ranked by confidence within each commit.**
 Commits 2-3 predicted **fully clean** `--check` — falsifiable, no scenario
