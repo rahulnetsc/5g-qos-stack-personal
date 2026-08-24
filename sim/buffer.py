@@ -15,6 +15,13 @@ class BufferState:
     # than PDB" component). Distinct from bytes_dropped_pdb, which never
     # reaches drain() at all -- expire() removes those first.
     bytes_delivered_late_pdb: int = 0
+    # WP5 (docs/wp5-plan.md sec1): bytes abandoned after HARQ max-retx
+    # exhaustion -- a SECOND, distinct loss path from bytes_dropped_pdb
+    # (PDB-clock-driven, via expire()). Removed via discard_harq_loss(),
+    # not drain() (never delivered) or expire() (harq_round_max is an
+    # attempt-count budget, independent of the PDB clock -- a TB can
+    # exhaust its retries before its PDB has technically passed).
+    bytes_dropped_harq: int = 0
     lcg: int = -1                    # this flow's logical channel group (-1 = DL / n/a)
     estimated_ul_buffer_per_lcg: int = 0  # gNB's raw per-LCG estimate, uncapped by
                                            # sched_ul_bytes (bytes_reported is capped)
@@ -164,6 +171,53 @@ class BufferModel:
         state.bytes_delivered_late_pdb += late
         state.hol_timestamp_s = chunks[0][0] if chunks else 0.0
         self._delivered_cum[key] += removed
+        if key not in self._bsr_managed:
+            state.bytes_reported = state.bytes_queued
+        return removed
+
+    def discard_harq_loss(
+        self, ue_id: int, qfi: int, bytes_count: int, now_s: float = 0.0
+    ) -> int:
+        """Remove up to bytes_count bytes from the head, counted as HARQ
+        max-retx loss -- NOT a delivery (unlike drain(), which always
+        credits delivered_cum/bytes_reported as successful) and NOT a
+        PDB-clock discard (unlike expire(), which only fires once a
+        chunk's age exceeds the flow's PDB). WP5 (docs/wp5-plan.md sec1):
+        a HARQ process can exhaust harq_round_max independent of whether
+        the flow's PDB has technically passed yet -- this is the path
+        that removes those bytes. Tags the MessageCompletion the same way
+        expire() does (complete=False), since from the message's own
+        perspective this IS a drop, just for a different top-level reason
+        than PDB expiry -- config/metric_panel.yml's M02 does not yet
+        fold bytes_dropped_harq into its own count; see docs/wp5-plan.md
+        commit 4a for that gap."""
+        if bytes_count <= 0:
+            return 0
+        key = (ue_id, qfi)
+        state = self._buffers[key]
+        chunks = self._chunks[key]
+        remaining = bytes_count
+        removed = 0
+        while remaining > 0 and chunks:
+            chunk = chunks[0]
+            take = min(remaining, chunk[1])
+            chunk[1] -= take
+            removed += take
+            remaining -= take
+            if chunk[1] == 0:
+                if chunk[2] is not None:
+                    self._completed[key].append(MessageCompletion(
+                        message=chunk[2],
+                        complete=False,
+                        late=True,
+                        completion_ts_s=now_s,
+                        delivered_bytes=chunk[2].delivered_bytes,
+                        dropped_bytes=take,
+                    ))
+                chunks.popleft()
+        state.bytes_queued -= removed
+        state.bytes_dropped_harq += removed
+        state.hol_timestamp_s = chunks[0][0] if chunks else 0.0
         if key not in self._bsr_managed:
             state.bytes_reported = state.bytes_queued
         return removed

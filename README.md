@@ -551,6 +551,36 @@ they survive it:
   one of the three is ever recalibrated — recalibrating one in isolation
   changes the composed probability in a way none of the three docstrings
   alone would reveal.
+- `[OPEN]` **WP5 commit 4a's per-flow HARQ masking is defeated,
+  non-destructively, by `scheduler/two_tier.py::_allocate_sps`'s
+  UE-level backlog pooling — measured at 3,628 occurrences across 13 of
+  22 regression-corpus cases, all `TwoTier`.** `_allocate_sps` sizes one
+  UE's combined SPS grant off the *sum* of backlog across every
+  SPS-eligible flow of that UE; masking a single pending flow's
+  `bytes_queued` to 0 doesn't zero that sum if the UE has other,
+  unmasked flows, so `_allocate_sps`/`_emit_grant` still hands the masked
+  flow a nonzero share. `sim/driver.py`'s defensive guard
+  (`harq_masked_flow_double_grant_count`) catches this before any
+  `buffers.drain()` call and skips the delivery — **this is accounting
+  drift, not FIFO corruption**: the pending retry's reserved bytes are
+  never double-booked, so docs/wp5-plan.md commit 4a's correctness
+  argument holds. What's left is real but contained: the skipped
+  delivery's PRBs are wasted, and `TwoTier`'s own `_virtual_q`/
+  `committed_this_slot` bookkeeping updates as though it delivered a
+  share it didn't. **Deliberately not fixed**: `_allocate_sps` is exactly
+  the SPS/Configured-Grant machinery CLAUDE.md already flags as
+  shouldn't-exist-at-all (real hardware two-tier defers SPS to a Phase 2
+  that was never built, and `scheduler/two_tier.py` gets rewritten fresh
+  from OAI source in Phase 2, §4 above) — fixing accounting drift in a
+  code path that's getting deleted, at the cost of docs/wp5-plan.md
+  Decision 4's "zero scheduler changes" claim, is the wrong trade.
+  **`harq_masked_flow_double_grant_count` is being kept as a permanent
+  diagnostic, not a one-off debugging counter**: it reads 0 for every
+  scheduler without UE-level-pooled SPS (confirmed: 0 on PF/RoundRobin/
+  Gradient across the full corpus), so it doubles as a regression check
+  for Phase 2 — **whoever rewrites `two_tier.py`/`reservation.py` fresh
+  from OAI source must not reintroduce a backlog-pooling grant path that
+  makes this counter nonzero again.**
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

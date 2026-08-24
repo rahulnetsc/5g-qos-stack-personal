@@ -158,11 +158,16 @@ class Metrics:
             tput_bps = (m.bytes_delivered * 8) / horizon_s if horizon_s > 0 else 0.0
             arr_bps = (m.bytes_arrived * 8) / horizon_s if horizon_s > 0 else 0.0
             late_pdb = buffers.state(ue_id, qfi).bytes_delivered_late_pdb if buffers else 0
+            # WP5 (docs/wp5-plan.md commit 4a): read straight from
+            # BufferState at summary time, same pattern as late_pdb above
+            # -- no separate Metrics.record_*/driver.py call needed.
+            harq_lost = buffers.state(ue_id, qfi).bytes_dropped_harq if buffers else 0
             out["flows"][f"ue{ue_id}_qfi{qfi}"] = {
                 "bytes_arrived": m.bytes_arrived,
                 "bytes_delivered": m.bytes_delivered,
                 "bytes_dropped": m.bytes_dropped,
                 "bytes_delivered_late_pdb": late_pdb,
+                "bytes_harq_lost": harq_lost,
                 "throughput_bps": round(tput_bps, 1),
                 "offered_bps": round(arr_bps, 1),
                 "delivery_ratio": round(

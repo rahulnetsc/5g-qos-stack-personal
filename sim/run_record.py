@@ -114,6 +114,20 @@ class FlowRecord:
     # pending/ok gate reuses M03's completion_ts_by_role_s check instead.
     survival_time_ms: float = 0.0
 
+    # WP5 commit 4a (docs/wp5-plan.md): bytes abandoned after HARQ
+    # max-retx exhaustion -- distinct from bytes_dropped_pdb (PDB-clock
+    # discard) and bytes_delivered_late_pdb (delivered, just late). Placed
+    # here (defaulted), not among the required fields above, for the same
+    # dataclass-field-ordering reason survival_time_ms is here rather than
+    # beside pdb_ms -- a later field can't default ahead of an earlier
+    # required one. 0 is unambiguous on a pre-4a record (the mechanism
+    # didn't exist, so genuinely zero bytes were ever dropped this way) --
+    # unlike message_count/etc., no Optional/None "predates this field"
+    # sentinel is needed. NOT yet folded into M02 (config/metric_panel.
+    # yml) -- see docs/wp5-plan.md commit 4a for that deliberately
+    # separate gap.
+    bytes_harq_lost: int = 0
+
     # Populated only when driver.run(..., record_timeseries=True) was used.
     # Per-slot series, aligned to RunRecord.timeseries_time_s.
     ts_backlog_bytes: Optional[list[int]] = None
@@ -259,6 +273,7 @@ class RunRecord:
                 bytes_delivered=m["bytes_delivered"],
                 bytes_dropped_pdb=m["bytes_dropped"],
                 bytes_delivered_late_pdb=m.get("bytes_delivered_late_pdb", 0),
+                bytes_harq_lost=m.get("bytes_harq_lost", 0),
                 throughput_bps=m["throughput_bps"],
                 offered_bps=m["offered_bps"],
                 delivery_ratio=m["delivery_ratio"],
