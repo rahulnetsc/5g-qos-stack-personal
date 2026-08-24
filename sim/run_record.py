@@ -155,6 +155,34 @@ class FlowRecord:
 
 
 @dataclass
+class JoinEventRecord:
+    """One join/re-join/re-establishment event (WP-Join commit 4, docs/
+    wp-join-plan.md sec5). Assembled by sim/driver.py from sim/join.py's
+    JoinStepResult edges once commit 5/6 wire the mechanism live -- this
+    dataclass carries no computation of its own, only raw timestamps/
+    counts, the same "thresholding happens in scorecard.py, not here"
+    discipline M03/M14 already use for T_live.
+
+    ``rf_restore_*``/``rlf_declared_at_slot`` are only ever set for
+    ``path == "reestablish"``; ``attached_*`` is None iff the event never
+    completed before the run's horizon (counted, not excluded, by M18/
+    M19 -- see config/metric_panel.yml)."""
+
+    ue_id: int
+    path: str  # "warm" | "cold" | "reestablish"
+    trigger_slot: int
+    trigger_ts_s: float
+    rf_restore_slot: Optional[int] = None
+    rf_restore_ts_s: Optional[float] = None
+    attached_slot: Optional[int] = None
+    attached_ts_s: Optional[float] = None
+    phases: dict[str, float] = field(default_factory=dict)  # phase name -> duration_ms
+    timer_expiries: dict[str, int] = field(default_factory=dict)  # phase name -> count
+    rlf_declared_at_slot: Optional[int] = None
+    handshake_rtt_ms: Optional[float] = None
+
+
+@dataclass
 class SystemRecord:
     horizon_s: float
     dl_prb_utilization: float
@@ -183,6 +211,14 @@ class RunRecord:
     timeseries_time_s: Optional[list[float]] = None
     timeseries_slot_index: Optional[list[int]] = None
     meta: dict[str, Any] = field(default_factory=dict)
+    # WP-Join commit 4 (docs/wp-join-plan.md sec5): None means "this
+    # record predates WP-Join" (every record before this commit, and
+    # every record from a scenario that doesn't opt into UEConfig.join --
+    # driver.py's own wiring, commit 5, is what tells the two apart);
+    # [] is a real "this run had zero join/RLF events" -- the same
+    # never-None-post-landing convention message_count/completion_ts_by_
+    # role_s already establish above.
+    join_events: Optional[list[JoinEventRecord]] = None
 
     def has_timeseries(self) -> bool:
         return self.timeseries_time_s is not None
@@ -210,6 +246,9 @@ class RunRecord:
             "timeseries_time_s": self.timeseries_time_s,
             "timeseries_slot_index": self.timeseries_slot_index,
             "meta": self.meta,
+            "join_events": (
+                [asdict(e) for e in self.join_events] if self.join_events is not None else None
+            ),
         }
 
     @classmethod
@@ -225,6 +264,10 @@ class RunRecord:
             timeseries_time_s=d.get("timeseries_time_s"),
             timeseries_slot_index=d.get("timeseries_slot_index"),
             meta=d.get("meta", {}),
+            join_events=(
+                [JoinEventRecord(**e) for e in d["join_events"]]
+                if d.get("join_events") is not None else None
+            ),
         )
 
     @classmethod

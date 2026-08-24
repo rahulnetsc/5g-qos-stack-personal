@@ -1126,6 +1126,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.0",
         "study": 1
@@ -2335,6 +2336,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.0",
         "study": 1
@@ -3564,6 +3566,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.0",
         "study": 1
@@ -4781,6 +4784,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.0",
         "study": 1
@@ -6010,6 +6014,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.5",
         "study": 1
@@ -7215,6 +7220,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.5",
         "study": 1
@@ -8396,6 +8402,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.5",
         "study": 1
@@ -9577,6 +9584,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult1.5",
         "study": 1
@@ -10814,6 +10822,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult2.0",
         "study": 1
@@ -12067,6 +12076,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult2.0",
         "study": 1
@@ -13320,6 +13330,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult2.0",
         "study": 1
@@ -14573,6 +14584,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult2.0",
         "study": 1
@@ -15794,6 +15806,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult3.0",
         "study": 1
@@ -17047,6 +17060,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult3.0",
         "study": 1
@@ -18300,6 +18314,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult3.0",
         "study": 1
@@ -19553,6 +19568,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "overload_mult3.0",
         "study": 1
@@ -21048,6 +21064,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "pdcch_limited",
         "study": 2
@@ -22599,6 +22616,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "pdcch_limited",
         "study": 2
@@ -24158,6 +24176,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "pdcch_limited",
         "study": 2
@@ -24799,6 +24818,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "latency_bound",
         "study": 3
@@ -25440,6 +25460,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "latency_bound",
         "study": 3
@@ -26081,6 +26102,7 @@
           "xr_frame_period_ms": null
         }
       },
+      "join_events": null,
       "meta": {
         "case": "latency_bound",
         "study": 3

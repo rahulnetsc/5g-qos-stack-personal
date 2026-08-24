@@ -1,7 +1,8 @@
+import dataclasses
 import json
 
 from sim.driver import run
-from sim.run_record import RunRecord, flow_key
+from sim.run_record import JoinEventRecord, RunRecord, flow_key
 from sim.scenarios import smoke_scenario
 from sim.baselines.pf import ProportionalFair
 
@@ -82,3 +83,37 @@ def test_flows_by_filters_correctly():
     assert len(gbr) + len(rec.flows_by(flow_class="Delay")) + len(
         rec.flows_by(flow_class="PF")
     ) == len(rec.flows)
+
+
+# -- WP-Join commit 4: join_events (docs/wp-join-plan.md sec5) --------------
+
+
+def test_join_events_defaults_to_none_predating_wpjoin():
+    rec = _run_record()
+    assert rec.join_events is None
+    d = rec.to_dict()
+    assert d["join_events"] is None
+    assert RunRecord.from_dict(d).join_events is None
+
+
+def test_join_events_empty_list_round_trips_as_a_real_empty_list_not_none():
+    rec = dataclasses.replace(_run_record(), join_events=[])
+    d = rec.to_dict()
+    assert d["join_events"] == []  # a real "zero events", distinct from None ("predates WP-Join")
+    assert RunRecord.from_dict(d).join_events == []
+
+
+def test_join_events_roundtrip_to_dict_and_back():
+    events = [
+        JoinEventRecord(
+            ue_id=1, path="reestablish", trigger_slot=100, trigger_ts_s=0.05,
+            rf_restore_slot=6100, rf_restore_ts_s=3.05, attached_slot=6500, attached_ts_s=3.25,
+            phases={"reestablish": 200.0}, timer_expiries={}, rlf_declared_at_slot=100,
+            handshake_rtt_ms=12.5,
+        ),
+    ]
+    rec = dataclasses.replace(_run_record(), join_events=events)
+    d = rec.to_dict()
+    json.dumps(d)  # must stay plain-JSON-serialisable with the new field
+    rec2 = RunRecord.from_dict(d)
+    assert rec2.join_events == events

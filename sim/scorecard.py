@@ -131,6 +131,8 @@ class Scorecard:
         # M16 (ul_dl_shared_bearer_correlation) needs a named flow pair --
         # see correlate_flows() below, not part of the automatic per-run scan.
         out["M17"] = self._m17_frame_freeze_and_effective_fps(record)
+        out["M18"] = self._m18_rejoin_interruption_time(record)
+        out["M19"] = self._m19_slo_recovery_time(record, cfg["slo_green_dwell_s"])
         # Attach the panel's own pre-registered caveats here, uniformly,
         # rather than in each _mNN method -- a caveat is a property of the
         # metric's definition (config/metric_panel.yml), not of any one
@@ -658,6 +660,152 @@ class Scorecard:
         )
         return MetricResult("M15", "command_jitter_p99_p50",
                              {"flow": worst, "jitter_ms": worst_jitter}, status, "ms", note)
+
+    def _m18_rejoin_interruption_time(self, record: RunRecord) -> MetricResult:
+        """WP-Join commit 4 (config/metric_panel.yml). Every record today
+        has join_events is None (predates WP-Join) or [] (no scenario yet
+        populates it) -- this always reports pending until commit 5 wires
+        a real UEConfig.join scenario, but the computation itself is
+        written now (not deferred) so commits 5/6 need touch nothing here,
+        only config/metric_panel.yml's status field (docs/wp-join-plan.md
+        sec4's own commit/file mapping)."""
+        if record.join_events is None:
+            return MetricResult(
+                "M18", "rejoin_interruption_time", None, "pending", "ms",
+                "requires WP-Join (RunRecord.join_events); record predates it",
+            )
+        if not record.join_events:
+            return MetricResult(
+                "M18", "rejoin_interruption_time", None, "pending", "ms",
+                "no join/re-join/re-establishment events occurred this run",
+            )
+        by_path: dict[str, Any] = {}
+        for path in ("warm", "cold", "reestablish"):
+            events = [e for e in record.join_events if e.path == path]
+            if not events:
+                continue
+            completed = [e for e in events if e.attached_ts_s is not None]
+            n_never_completed = len(events) - len(completed)
+            durations_ms = [(e.attached_ts_s - e.trigger_ts_s) * 1000.0 for e in completed]
+            phase_samples: dict[str, list[float]] = {}
+            for e in completed:
+                for phase_name, dur_ms in e.phases.items():
+                    phase_samples.setdefault(phase_name, []).append(dur_ms)
+            entry: dict[str, Any] = {
+                "n_events": len(events),
+                "n_never_completed": n_never_completed,
+                "p50_ms": _percentile(durations_ms, 0.50) if durations_ms else None,
+                "p95_ms": _percentile(durations_ms, 0.95) if durations_ms else None,
+                "max_ms": max(durations_ms) if durations_ms else None,
+                "phase_p95_ms": {k: _percentile(v, 0.95) for k, v in phase_samples.items()},
+                "timer_expiry_count": sum(sum(e.timer_expiries.values()) for e in events),
+            }
+            if path == "reestablish":
+                # GT-6.3's own pass line is measured from RF-restore, not
+                # from RLF declaration (config/metric_panel.yml's own
+                # definition) -- reported alongside, never in place of,
+                # the trigger-to-attach figure above.
+                rf_durations_ms = [
+                    (e.attached_ts_s - e.rf_restore_ts_s) * 1000.0
+                    for e in completed if e.rf_restore_ts_s is not None
+                ]
+                entry["rf_restore_to_attached_p95_ms"] = (
+                    _percentile(rf_durations_ms, 0.95) if rf_durations_ms else None
+                )
+            by_path[path] = entry
+        return MetricResult(
+            "M18", "rejoin_interruption_time", {"by_path": by_path}, "ok", "ms",
+            "computed directly from RunRecord.join_events' timestamps; events "
+            "that never completed before the run's horizon are counted "
+            "(n_never_completed), not excluded",
+        )
+
+    def _m19_slo_recovery_time(self, record: RunRecord, slo_green_dwell_s: float) -> MetricResult:
+        """WP-Join commit 4. Same always-pending-today shape as M18 above
+        -- see that method's docstring."""
+        if record.join_events is None:
+            return MetricResult(
+                "M19", "slo_recovery_time", None, "pending", "ms",
+                "requires WP-Join (RunRecord.join_events); record predates it",
+            )
+        if not record.join_events:
+            return MetricResult(
+                "M19", "slo_recovery_time", None, "pending", "ms",
+                "no join/re-join/re-establishment events occurred this run",
+            )
+        if not record.has_timeseries():
+            return MetricResult(
+                "M19", "slo_recovery_time", None, "pending", "ms",
+                "requires record_timeseries=True; record has none",
+            )
+        time_s = record.timeseries_time_s
+        by_path: dict[str, Any] = {}
+        for path in ("warm", "cold", "reestablish"):
+            events = [e for e in record.join_events if e.path == path]
+            if not events:
+                continue
+            durations_ms = []
+            n_never_recovered = 0
+            for e in events:
+                start_ts_s = (
+                    e.rf_restore_ts_s if path == "reestablish" and e.rf_restore_ts_s is not None
+                    else e.trigger_ts_s
+                )
+                ue_flows = [
+                    fr for fr in record.flows.values()
+                    if fr.ue_id == e.ue_id and fr.ts_hol_delay_s is not None
+                ]
+                recovered_ts_s = self._first_sustained_green(
+                    time_s, ue_flows, start_ts_s, slo_green_dwell_s
+                )
+                if recovered_ts_s is None:
+                    n_never_recovered += 1
+                    continue
+                durations_ms.append((recovered_ts_s - start_ts_s) * 1000.0)
+            by_path[path] = {
+                "n_events": len(events),
+                "n_never_recovered": n_never_recovered,
+                "p50_ms": _percentile(durations_ms, 0.50) if durations_ms else None,
+                "p95_ms": _percentile(durations_ms, 0.95) if durations_ms else None,
+                "max_ms": max(durations_ms) if durations_ms else None,
+                "slo_green_dwell_s": slo_green_dwell_s,
+            }
+        return MetricResult(
+            "M19", "slo_recovery_time", {"by_path": by_path}, "proxy", "ms",
+            "proxy: 'green' is judged from head-of-line delay against each "
+            "flow's own pdb_ms only, not a full GFBR contract check -- an "
+            "exact per-message SLO evaluation reusing WP7's message ledger "
+            "is a follow-on commit, not this one; events never green before "
+            "the run ends are counted (n_never_recovered), not excluded",
+        )
+
+    def _first_sustained_green(
+        self, time_s: list[float], ue_flows: list[FlowRecord], start_ts_s: float, dwell_s: float,
+    ) -> Optional[float]:
+        """First timestamp >= start_ts_s at which every one of ue_flows'
+        head-of-line delays has stayed within its own pdb_ms for at least
+        dwell_s continuously. None if that never happens before the run
+        ends, or if the UE has no flow with timeseries data at all."""
+        if not ue_flows:
+            return None
+        start_idx = next((i for i, t in enumerate(time_s) if t >= start_ts_s), None)
+        if start_idx is None:
+            return None
+        green_since: Optional[float] = None
+        for i in range(start_idx, len(time_s)):
+            t = time_s[i]
+            all_green = all(
+                i < len(fr.ts_hol_delay_s) and fr.ts_hol_delay_s[i] <= fr.pdb_ms / 1000.0
+                for fr in ue_flows
+            )
+            if all_green:
+                if green_since is None:
+                    green_since = t
+                elif t - green_since >= dwell_s:
+                    return green_since
+            else:
+                green_since = None
+        return None
 
     # -- metrics that need extra arguments, called explicitly ----------
 

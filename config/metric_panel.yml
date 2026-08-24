@@ -320,6 +320,65 @@ metrics:
       source's real claimed frame rate, not a time-discretisation artifact.
       Pre-WP7-commit-7 records report status=pending.
 
+  # --- M18/M19 are the panel's FIRST additions since WP0 pre-
+  # --- registration (docs/wp-join-plan.md sec5). Not foreseeable at WP0:
+  # --- WP-Join itself postdates this panel by seven prior WPs, added to
+  # --- README.md sec4 only after the guarantee-document review -- there
+  # --- was no G9/join/RLF mechanism anywhere in sim/ for WP0 to have
+  # --- pre-registered a placeholder against (unlike M04/M09/M16, which
+  # --- WERE foreseeable then and got proxy/pending placeholders at WP0).
+  # --- No existing M01-M17 entry above is changed to accommodate these.
+  # --- Landed at WP-Join commit 4 of 8 (schema); promoted at commits 5/6.
+
+  - id: M18
+    name: rejoin_interruption_time
+    definition: >
+      Per join/re-join/re-establishment event, wall-clock from the
+      event's own trigger instant to procedure completion (radio
+      attached AND app handshake complete), broken down by path
+      (warm/cold/reestablish) and by phase. For the reestablish path,
+      also reported from the RF-restore instant, which is what GT-6.3's
+      own pass line is measured from -- not from RLF declaration.
+    guarantees: [G9]
+    unit: ms
+    direction: lower_better
+    status: pending
+    requires: "WP-Join (join/RLF event log, RunRecord.join_events)"
+    note: >
+      Added WP-Join commit 4 (not at WP0 -- see the comment above this
+      entry). Computed directly from RunRecord.join_events' timestamps,
+      grouped by JoinEventRecord.path; events that never completed
+      before the run's horizon are counted (n_never_completed), not
+      excluded from the row, same "never silently omit" discipline as a
+      pending metric itself. -> ok at commit 5 (docs/wp-join-plan.md
+      sec4), once a real UEConfig.join scenario can populate join_events
+      at all -- every record today has join_events=None or [], so this
+      reports pending regardless of the computation being ready.
+
+  - id: M19
+    name: slo_recovery_time
+    definition: >
+      Per event, time from the event's trigger (RF-restore, for the
+      reestablish path) to the first sustained window (defaults.
+      slo_green_dwell_s) in which every flow of the recovering UE is
+      back inside its own PDB. Events where SLOs never go green before
+      the run ends are counted, not excluded.
+    guarantees: [G9, G3]
+    unit: ms
+    direction: lower_better
+    status: pending
+    requires: >
+      WP-Join (join event log) + record_timeseries=True; an exact
+      per-message SLO evaluation reusing WP7's message ledger is a
+      follow-on commit, not this one
+    note: >
+      Added WP-Join commit 4 (not at WP0 -- see the comment above this
+      entry). proxy, staying proxy: "green" is judged from head-of-line
+      delay against each flow's own pdb_ms only, not a full GFBR
+      contract check -- a deliberate simplification, not an oversight.
+      -> proxy at commit 6 (docs/wp-join-plan.md sec4), once a real
+      scenario with record_timeseries=True can populate join_events.
+
 # Statistical policy (docs/p5g-sim-plan.md sec 7 / sec 5.3): the rule of
 # three. Demonstrating a miss rate <= eps at 95% confidence with zero
 # observed misses needs n >= 3/eps samples. Every zero-miss claim produced
@@ -336,3 +395,4 @@ defaults:
   gbr_contract_fraction: 0.95   # M07 / M08: "delivering >=95% of GFBR"
   survival_miss_n: 3            # M04: [OPEN] in docs/p5g-sim-plan.md sec 7 -- start at 3, report as f(N)
   t_live_s: 2.0                 # [OPEN] in docs/p5g-sim-plan.md sec 13 -- MEC liveness timeout, unconfirmed
+  slo_green_dwell_s: 1.0         # M19: [OPEN] -- anchored to M09's own 1s Jain window, not independently calibrated

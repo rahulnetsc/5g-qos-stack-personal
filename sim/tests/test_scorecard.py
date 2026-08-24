@@ -3,7 +3,7 @@ import dataclasses
 import pytest
 
 from sim.driver import run
-from sim.run_record import FlowRecord, RunRecord, SystemRecord
+from sim.run_record import FlowRecord, JoinEventRecord, RunRecord, SystemRecord
 from sim.scorecard import Scorecard, load_panel
 from sim.scenarios import smoke_scenario, factory_robots_scenario
 from sim.baselines.pf import ProportionalFair
@@ -34,12 +34,14 @@ def _flow_record(key_suffix: str, *, message_count, delay_p50=0.0, delay_p99=0.0
     return FlowRecord(**defaults)
 
 
-def _run_record(flows: list[FlowRecord]) -> RunRecord:
+def _run_record(flows: list[FlowRecord], *, timeseries_time_s=None, join_events=None) -> RunRecord:
     return RunRecord(
         schema_version=1, scenario_name="synthetic", scheduler_name="X", seed=0,
         arm={}, flows={f.key: f for f in flows},
         system=SystemRecord(horizon_s=1.0, dl_prb_utilization=0.0,
                              ul_prb_utilization=0.0, cce_utilization=0.0),
+        timeseries_time_s=timeseries_time_s,
+        join_events=join_events,
     )
 
 
@@ -55,9 +57,11 @@ def _record(scenario_fn=smoke_scenario, record_timeseries=False, **run_kwargs):
     ), sc
 
 
-def test_panel_loads_and_has_seventeen_metrics():
+def test_panel_loads_and_has_nineteen_metrics():
+    """M18/M19 (WP-Join commit 4, docs/wp-join-plan.md sec5) are the
+    panel's first additions since WP0's original 17."""
     panel = load_panel()
-    assert len(panel["metrics"]) == 17
+    assert len(panel["metrics"]) == 19
     ids = [m["id"] for m in panel["metrics"]]
     assert len(ids) == len(set(ids)), "duplicate metric ids in the panel"
 
@@ -566,3 +570,106 @@ def test_first_violation_order_over_a_load_ramp():
     res = sc.first_violation_order(records, class_of)
     assert res.status == "ok"
     assert isinstance(res.value["order_5qi"], list)
+
+
+# -- WP-Join commit 4: M18/M19 (docs/wp-join-plan.md sec5) ------------------
+
+
+def test_m18_is_pending_when_join_events_predates_wpjoin():
+    rec = _run_record([_flow_record("1", message_count=1)])  # join_events=None by default
+    res = Scorecard().score(rec)["M18"]
+    assert res.status == "pending"
+    assert res.value is None
+    assert "predates" in res.note
+
+
+def test_m18_is_pending_when_no_join_events_occurred():
+    rec = _run_record([_flow_record("1", message_count=1)], join_events=[])
+    res = Scorecard().score(rec)["M18"]
+    assert res.status == "pending"
+    assert res.value is None
+
+
+def test_m18_computes_per_path_breakdown_and_counts_never_completed():
+    events = [
+        JoinEventRecord(
+            ue_id=1, path="cold", trigger_slot=0, trigger_ts_s=0.0,
+            attached_slot=1000, attached_ts_s=0.5,
+            phases={"rrc_establish": 300.0, "pdu_session": 50.0},
+            timer_expiries={"rrc_establish": 1},
+        ),
+        JoinEventRecord(
+            ue_id=2, path="reestablish", trigger_slot=2000, trigger_ts_s=1.0,
+            rf_restore_slot=2400, rf_restore_ts_s=1.2,
+            attached_slot=3000, attached_ts_s=1.5,
+        ),
+        JoinEventRecord(
+            ue_id=3, path="warm", trigger_slot=4000, trigger_ts_s=2.0,
+            # never completed -- attached_ts_s stays None
+        ),
+    ]
+    rec = _run_record([_flow_record("1", message_count=1)], join_events=events)
+    res = Scorecard().score(rec)["M18"]
+    assert res.status == "ok"
+
+    cold = res.value["by_path"]["cold"]
+    assert cold["n_events"] == 1
+    assert cold["n_never_completed"] == 0
+    assert cold["p50_ms"] == pytest.approx(500.0)
+    assert cold["phase_p95_ms"] == {"rrc_establish": pytest.approx(300.0), "pdu_session": pytest.approx(50.0)}
+    assert cold["timer_expiry_count"] == 1
+    assert "rf_restore_to_attached_p95_ms" not in cold
+
+    reest = res.value["by_path"]["reestablish"]
+    assert reest["p50_ms"] == pytest.approx(500.0)  # trigger (RLF declared) -> attached
+    assert reest["rf_restore_to_attached_p95_ms"] == pytest.approx(300.0)  # RF-restore -> attached
+
+    warm = res.value["by_path"]["warm"]
+    assert warm["n_events"] == 1
+    assert warm["n_never_completed"] == 1
+    assert warm["p50_ms"] is None
+    assert warm["max_ms"] is None
+
+
+def test_m19_is_pending_when_join_events_predates_wpjoin():
+    rec = _run_record([_flow_record("1", message_count=1)])
+    res = Scorecard().score(rec)["M19"]
+    assert res.status == "pending"
+
+
+def test_m19_is_pending_without_timeseries_even_with_join_events():
+    events = [JoinEventRecord(ue_id=1, path="cold", trigger_slot=0, trigger_ts_s=0.0)]
+    rec = _run_record([_flow_record("1", message_count=1)], join_events=events)
+    res = Scorecard().score(rec)["M19"]
+    assert res.status == "pending"
+    assert "record_timeseries" in res.note
+
+
+def test_m19_computes_recovery_time_from_sustained_green_hol_delay():
+    time_s = [round(0.1 * i, 3) for i in range(11)]  # 0.0 .. 1.0, 0.1s apart
+    # Bad (over PDB) for the first 3 samples, then green for the rest --
+    # pdb_ms=50 -> pdb_s=0.05.
+    recovering = _flow_record(
+        "1", message_count=1, pdb_ms=50.0,
+        ts_hol_delay_s=[1.0, 1.0, 1.0] + [0.01] * 8,
+    )
+    stuck = _flow_record(
+        "2", message_count=1, pdb_ms=50.0,
+        ts_hol_delay_s=[1.0] * 11,  # never recovers
+    )
+    stuck = dataclasses.replace(stuck, ue_id=2)
+    events = [
+        JoinEventRecord(ue_id=1, path="cold", trigger_slot=0, trigger_ts_s=0.0),
+        JoinEventRecord(ue_id=2, path="cold", trigger_slot=0, trigger_ts_s=0.0),
+    ]
+    rec = _run_record([recovering, stuck], timeseries_time_s=time_s, join_events=events)
+    res = Scorecard().score(rec, slo_green_dwell_s=0.2)["M19"]
+    assert res.status == "proxy"
+
+    cold = res.value["by_path"]["cold"]
+    assert cold["n_events"] == 2
+    assert cold["n_never_recovered"] == 1  # UE 2 never sustains green for 0.2s
+    # UE 1: green_since=0.3s (index 3, first slot at/under pdb_s), and
+    # t=0.5s (index 5) is the first point >= 0.2s after that -- so the
+    # sustained window is confirmed at t=0.3s, duration = 0.3s = 300ms.
+    assert cold["p50_ms"] == pytest.approx(300.0)

@@ -949,6 +949,76 @@ diff; that would hide a real schema change rather than show it.
 `SCHEMA_VERSION` stays at 1, matching WP7's own precedent of adding
 Optional-defaulted fields without a version bump.
 
+### Commit 4 — landed
+
+`sim/run_record.py` (new: `JoinEventRecord`, `RunRecord.join_events`),
+`config/metric_panel.yml` (M18/M19 at `status: pending`,
+`defaults.slo_green_dwell_s`), `sim/scorecard.py` (`_m18_rejoin_
+interruption_time`, `_m19_slo_recovery_time`, `_first_sustained_green` —
+the full computation, not a placeholder, since `sim/driver.py` is
+deliberately untouched this commit and commits 5/6 (§4's own file list)
+touch only `config/metric_panel.yml`'s `status` field, not `sim/
+scorecard.py` again), `sim/tests/test_run_record.py` (+3),
+`sim/tests/test_scorecard.py` (+6, plus the existing seventeen-metrics
+test renamed to nineteen), `regression/baseline_studies_1_3.json`
+(re-captured).
+
+**Predicted, before writing any code: exactly 22 structural mismatches,
+zero numeric — confirmed exactly, not approximately.**
+
+1. *Restate the predicted diff precisely; confirm it landed exactly.*
+   `--check` (run BEFORE `--capture`, specifically to see the predicted
+   diff rather than immediately erase it) printed **exactly 22
+   mismatches**, one per record, each of the *exact* literal form
+   predicted:
+   ```
+   study1/overload_mult1.0/PF.join_events: MISSING in baseline -> None
+   ... (22 total, one per study{1,2,3}/case/scheduler combination)
+   ```
+   All 22 records — not 21, not 23 — because `RunRecord.join_events`
+   defaults to `None` for every record regardless of scenario or
+   scheduler (nothing in `sim/driver.py` sets it; this commit doesn't
+   touch that file at all), and the corpus has exactly 22 (study 1: 4
+   capacity multipliers × 4 scheduler variants = 16; study 2: 3
+   schedulers; study 3: 3 schedulers; 16+3+3=22, `scripts/regression_
+   corpus.py::_cases()`). No adjustment to the prediction was needed —
+   confirmed exactly, not "close enough."
+2. *Zero numeric drift is load-bearing — how to tell structural from
+   numeric in the diff.* `_diff_value`'s two branches produce
+   textually distinguishable output: a numeric mismatch reads
+   `"{path}: {a} -> {b} (delta {b-a:+.6g})"` (produced only by the
+   `_is_number(a) and _is_number(b)` branch); a structural (key-
+   presence) mismatch reads `"{path}.{k}: MISSING in baseline -> {v!r}"`
+   and never carries a `delta` clause at all. **All 22 lines are the
+   second form; zero contain the word `delta`.** Grepped for it
+   directly rather than eyeballed: `grep delta` over the `--check`
+   output returns nothing. If a schema addition had also changed a
+   computed number, at least one line would carry a `delta` clause
+   alongside the structural ones — this run has none, confirming the
+   split is clean, not merely plausible.
+3. *What M19 still needs; confirm nothing else moves.* Checked against
+   the panel file directly, not memory: M19's `requires:` field states
+   *"WP-Join (join event log) + `record_timeseries=True`; an exact
+   per-message SLO evaluation reusing WP7's message ledger is a
+   follow-on commit, not this one."* Confirmed unchanged from the plan.
+   `requires:`/`status` on every other entry (M01–M17) checked directly
+   against the file both before and after this commit's edit — byte-
+   identical; only M18/M19's own two new entries and the new
+   `defaults.slo_green_dwell_s` line were added.
+4. *Confirm the late-addition provenance and §5-preamble note are in the
+   committed file, not just the plan doc.* Both are — verified by
+   reading `config/metric_panel.yml` directly after editing it, not by
+   re-reading this document: the file's own M04/M09/M16 section is
+   followed by a standalone comment block ("M18/M19 are the panel's
+   FIRST additions since WP0 pre-registration...") immediately before
+   the M18 entry, and each of M18's and M19's own `note:` fields opens
+   with *"Added WP-Join commit 4 (not at WP0 -- see the comment above
+   this entry)."* `pytest sim/tests -q` — 349 passed (340 + 9 new), 1
+   xfailed (unchanged). `regression_corpus.py --check` — clean after
+   `--capture` (`git diff` on the baseline file: exactly 22 line
+   additions, one `"join_events": null,` per record, no other line
+   touched).
+
 ---
 
 ## 5. `config/metric_panel.yml` additions
@@ -1150,11 +1220,14 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commits 1–3 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+**Commits 1–4 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
 `sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
 diagnostic-only; deterministic scripted fade in `sim/channel.py`, with
-the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s).
-Commits 4–8 not yet started. Two scope questions that would otherwise be
+the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s;
+M18/M19 + `RunRecord.join_events` schema, regression baseline
+re-captured with exactly the predicted 22-record structural diff and
+zero numeric drift). Commits 5–8 not yet started. Two scope questions
+that would otherwise be
 `[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
 Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)
 will be added after commit 8 lands, following `docs/wp5-plan.md`/`docs/
