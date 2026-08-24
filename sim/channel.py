@@ -23,7 +23,7 @@ from scheduler.link import bits_per_prb, cce_aggregation_level
 from .blockage import step as blockage_step
 from .blockage import transition_probability
 from .config import UEConfig
-from .pathloss import INF_BS_HEIGHT_M, inf_los_probability, inf_path_loss_db
+from .pathloss import inf_los_probability, inf_path_loss_db
 
 __all__ = ["bits_per_prb", "cce_aggregation_level", "ChannelModel"]
 
@@ -65,13 +65,36 @@ def derive_mean_snr_db(
     random draw needs its own seed stream. Shadow fading (also per-link,
     log-normal, sigma from Table 7.4.1-1) draws from a second independent
     stream (``shadow_fading_rng``) -- two new mechanisms, two new streams.
+
+    ``h_bs_m`` (fed into ``inf_los_probability``'s SH/DH height-scaling
+    term) is ``gnb_position[2]`` -- the actual configured height -- not
+    ``INF_BS_HEIGHT_M``'s per-sub-scenario calibration constant (end-of-WP
+    review finding, docs/wp6-plan.md sec 8): using the table value here
+    would silently decouple the height used for LOS probability from the
+    height ``d_3d_m`` below actually uses, for any scenario that sets a
+    ``gnb_position`` height other than the sub-scenario's own calibration
+    default. ``INF_BS_HEIGHT_M`` stays exported as a reference a scenario
+    author can use to pick a ``gnb_position`` height consistent with their
+    chosen ``inf_scenario`` -- it is advisory only, not consumed here.
     """
-    assert ue.position is not None and ue.inf_scenario is not None
+    if ue.position is None or ue.inf_scenario is None:
+        # Raise, don't assert (end-of-WP review, docs/wp6-plan.md sec 8):
+        # `inf_scenario is None` is a real, user-reachable authoring
+        # mistake (set position, forgot inf_scenario), not just an
+        # internal invariant -- an `assert` is stripped under `python -O`
+        # and gives a less actionable message than the other new WP6
+        # modules' own ValueError-on-bad-input convention (sim/pathloss.py,
+        # sim/blockage.py, sim/rlf.py).
+        raise ValueError(
+            f"UEConfig(ue_id={ue.ue_id}): position and inf_scenario must "
+            f"both be set to opt into TR 38.901 path loss (got "
+            f"position={ue.position!r}, inf_scenario={ue.inf_scenario!r})"
+        )
     d_2d_m = _euclidean_distance(
         (ue.position[0], ue.position[1], 0.0), (gnb_position[0], gnb_position[1], 0.0)
     )
     d_3d_m = _euclidean_distance(ue.position, gnb_position)
-    h_bs_m = INF_BS_HEIGHT_M[ue.inf_scenario]
+    h_bs_m = gnb_position[2]
     h_ut_m = ue.position[2]
     p_los = inf_los_probability(ue.inf_scenario, d_2d_m, h_bs_m, h_ut_m)
     is_los = bool(los_rng.random() < p_los)

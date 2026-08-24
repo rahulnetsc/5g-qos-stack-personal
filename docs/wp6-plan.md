@@ -944,7 +944,85 @@ their actual results after landing:** commits 1-3 predicted fully clean
 commit 4 predicted a metric movement and, on the first attempt, checked
 the wrong counter and the wrong `cqi_delay_slots` setting — both caught by
 actually running it rather than assumed correct, and both corrected in
-the open rather than quietly fixed. `docs/wp5-plan.md`'s own end-of-WP
-judgment-calls review (CLAUDE.md's standing step) is the natural next
-pass here, once this document's outstanding README §8 items (§6 above)
-are landed.
+the open rather than quietly fixed.
+
+---
+
+## 8. End-of-WP judgment-calls review
+
+Per CLAUDE.md's standing step, reread the full diff (`7648475..46a104a`,
+the plan commit plus all four code commits) looking for undocumented
+decisions or silent bugs — the same pass that caught WP3's M02 bug and
+WP5's two end-of-WP findings. Two real findings, both fixed in this
+review, not deferred silently.
+
+**Finding 1 (moderate): `derive_mean_snr_db` fed a fixed per-sub-scenario
+table constant into `inf_los_probability`'s height-scaling term instead
+of the actually-configured `gnb_position` height — silently decoupling
+LOS probability from the same geometry `d_3d_m` already used.**
+`sim/channel.py::derive_mean_snr_db` computed `d_3d_m =
+_euclidean_distance(ue.position, gnb_position)` (correctly using
+whatever height `gnb_position` actually specified) but then set `h_bs_m
+= INF_BS_HEIGHT_M[ue.inf_scenario]` (`sim/pathloss.py`'s Table 7.8-7
+calibration-example lookup, keyed only by sub-scenario name) — completely
+ignoring `gnb_position[2]`. For InF-SH/DH, `inf_los_probability`'s own
+`k_subsce` scaling term is `(h_BS - h_UT) / (h_c - h_UT)`, so any scenario
+that ever set a `gnb_position` height *other than* the sub-scenario's own
+8.0m/1.5m calibration default would get a LOS probability computed
+against the wrong height — silently, since nothing checks the two agree.
+Measured directly before fixing: a UE at `inf_scenario="SH"` gave nearly
+identical average `mean_snr_db` (150-seed average) whether `gnb_position`
+was set to height 3.0m or 8.0m, confirming the height genuinely wasn't
+being read.
+
+Every existing test happened not to catch this because every one of them
+was (unintentionally) written with `gnb_position`'s height already
+matching `INF_BS_HEIGHT_M`'s table value for its chosen `inf_scenario` —
+so the bug was latent, not yet triggered by anything in the corpus or the
+demo (commit 4's own scenario never sets `position` at all). It would
+have bitten the first time WP9's sweep (or any future scenario) set a
+`gnb_position` height that didn't happen to match the calibration
+default.
+
+**Fix**: `h_bs_m` is now `gnb_position[2]` directly. `INF_BS_HEIGHT_M`
+stays exported from `sim/pathloss.py` — repurposed in the docstring as an
+advisory reference a scenario author can consult to pick a `gnb_position`
+height consistent with a chosen `inf_scenario`, not consumed internally
+by the mechanism anymore. New test,
+`sim/tests/test_channel.py::test_los_probability_height_uses_actual_
+gnb_position_not_a_fixed_table`, averages over 150 seeds at two
+deliberately-mismatched heights and checks the resulting LOS-probability-
+driven `mean_snr_db` shift is real (>1dB) — a fixed-table regression
+would show ~0 difference.
+
+**Finding 2 (minor): `derive_mean_snr_db` used a bare `assert` for a
+real, user-reachable authoring mistake (setting `position` without
+`inf_scenario`), inconsistent with every other new WP6 module's
+raise-on-bad-input convention.** `sim/pathloss.py` and `sim/rlf.py` both
+raise `ValueError` with an actionable message for invalid input
+(CLAUDE.md: "loudly wrong beats silently wrong"); this one `assert` would
+both produce a less informative message and be silently stripped under
+`python -O`. Not a currently-triggered bug (nothing in the corpus or
+commit 4's demo sets `position` without `inf_scenario`), but a real gap
+in input validation quality on a path a scenario author could actually
+hit. **Fix**: raises `ValueError` naming the UE id and both field values.
+New test, `test_position_without_inf_scenario_raises_a_clear_error`.
+
+**Checked and NOT a finding**: `t310_slots()`'s use of Python's `round()`
+(half-to-even) rather than the `roundf()` (half-away-from-zero) CLAUDE.md
+requires when *porting measured OAI C behaviour* — this doesn't apply
+here, since `t310_ms -> slots` is a new simulator-side derived quantity
+with no C-source `roundf()` call it needs to stay faithful to (unlike
+`sim/power.py`'s `_round_half_away_from_zero`, which mirrors a real
+`(int)roundf(...)` cast in `gNB_scheduler_ulsch.c`). Also checked:
+`ChannelModel`'s three new RNG streams (`los_rng`/`shadow_fading_rng`/
+`_blockage_rng`) are consumed in `for ue in ues` iteration order, so
+reordering UEs in a scenario would reshuffle draws for other
+position/blockage-opted-in UEs — this is the same order-dependence the
+AR(1) process's own per-UE draws already have, not a new inconsistency
+WP6 introduced, so not flagged as a finding here.
+
+**Final state after both fixes**: `pytest sim/tests -q` — 303 passed
+(301 + 2 new), 1 xfailed (unchanged); `regression_corpus.py --check` —
+clean, zero mismatches (both fixes are invisible to the existing corpus,
+since no corpus scenario sets `position`).

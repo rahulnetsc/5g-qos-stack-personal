@@ -1,8 +1,9 @@
 # feat/high-fidelity-sim — a realistic 5G QoS simulator, and the two-tier-vs-reservation regime map
 
-**Status:** Phase 1 in progress — WP0, WP1, and WP3 landed (§4). This branch is a
-rebuild, not a patch — nothing in `scheduler/` or `sim/` from `main` is
-assumed correct or reused as-is.
+**Status:** Phase 1 nearly complete — WP0, WP1, WP3, WP4, WP7, WP5, and WP6
+landed (§4); only WP-Join remains before Phase 2 (both schedulers) begins.
+This branch is a rebuild, not a patch — nothing in `scheduler/` or `sim/`
+from `main` is assumed correct or reused as-is.
 **Branch:** `feat/high-fidelity-sim`, forked from `main`.
 **Not merged into this branch, by decision:** `feat/harq-bler-retx`,
 `feat/sim-fidelity-phy-layer`, `feat/oai-integration`. All three diverged
@@ -112,8 +113,8 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 | 2 | WP1 | `min_rb`, power headroom, SNR→PRB floor | `p5g-sim-plan.md` §9; PHR noted sim-only (inert on hardware) | Done |
 | 3 | WP3 | BSR realism: per-LCG, quantised, event-triggered, short-BSR aliasing, `sched_ul_bytes` collapse-to-crumb | `p5g-sim-plan.md` §9; mechanics verified line-for-line against `gNB_scheduler_ulsch.c` (§7) | Done — 3 commits (quantisation/LCG structure, event-triggering/crumb gate, M02 per-chunk tracking); crumb-fraction and H5-scenario gaps open (§8) |
 | 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; ground truth vendored from the live OAI checkout, not `oai-branches/` (§7); mechanics verified against `gNB_scheduler_uci.c`/`nr_ue_procedures.c` | Done — cold-start probe retired (§8); SR-chain inversion calibration target (§11) **not reproduced** — negative result, reported not tuned (§8); regression-check predictions verified against `--check`'s actual output and mostly falsified (§8) |
-| 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Pending |
-| 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Pending |
+| 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Done — 9 commits (message-ledger plumbing; M01/M15 true latency; base factory generators + MAVLink multi-role `periodic_control`; M03; `xr_video` generator; `FrameLedger` + M05/M06; M17; M14; `cycle_clock`/`sync_group` + aggressor knobs); RTSP/TCP UL/DL coupling deliberately unbuilt (§8) |
+| 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Done — 6 commits (0, 1, 2, 3, 4a, 4b, 6 — gap at 5 is the charter's own numbering); binary-delivery switch dominates pre/post-4a drift (§8); OLLA bug #1 landed dormant, bug #2 blocked on WP1 activation (§8) |
 | 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Done — 4 commits (InF path loss + LOS probability, two-state Markov blockage, sync-loss detection landed dormant per sign-off, blockage×HARQ acceptance-criterion demo); InF sub-scenario naming corrected against spec text (§8); mobility/correlated blockage deliberately deferred (§8) |
 | 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all | Pending |
 

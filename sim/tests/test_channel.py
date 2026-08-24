@@ -19,6 +19,16 @@ def test_ue_without_position_keeps_authored_mean_snr_db():
     assert channel.get_snr_db(1) == 12.5
 
 
+def test_position_without_inf_scenario_raises_a_clear_error():
+    """End-of-WP review finding (docs/wp6-plan.md sec 8): this used to be
+    a bare assert (strippable under python -O, less actionable message)
+    for what is a real, user-reachable authoring mistake, not just an
+    internal invariant."""
+    ue = UEConfig(ue_id=1, position=(10.0, 0.0, 1.5))  # inf_scenario left None
+    with pytest.raises(ValueError):
+        ChannelModel([ue], np.random.default_rng(0), gnb_position=(0.0, 0.0, 8.0))
+
+
 def test_ue_with_position_ignores_authored_mean_snr_db():
     ue = UEConfig(
         ue_id=1,
@@ -223,3 +233,43 @@ def test_blockage_transitions_use_their_own_independent_rng_stream():
     baseline = blocked_slots(1)
     others = [blocked_slots(s) for s in range(2, 8)]
     assert any(v != baseline for v in others)
+
+
+def test_los_probability_height_uses_actual_gnb_position_not_a_fixed_table():
+    """End-of-WP review finding (docs/wp6-plan.md sec 8): derive_mean_snr_db
+    used to pass sim/pathloss.py's INF_BS_HEIGHT_M table constant into
+    inf_los_probability's height-scaling term instead of gnb_position's
+    actual configured height -- silently decoupling LOS probability from
+    the same geometry d_3d_m already uses. InF-SH's height-scaling term
+    only matters for LOS probability (not path loss directly), so this
+    checks the AVERAGE derived mean_snr_db over many LOS/shadow-fading
+    seeds shifts with gnb_position's height, holding UE position and
+    inf_scenario fixed -- a fixed-table bug would show ~0 difference
+    (only the tiny d_3d change from differing heights), not the ~2dB this
+    test's own two heights are chosen to produce."""
+    from sim.channel import derive_mean_snr_db
+
+    def average_mean_snr_db(gnb_height_m: float, n_seeds: int = 150) -> float:
+        values = []
+        for seed in range(n_seeds):
+            ue = UEConfig(ue_id=1, position=(50.0, 0.0, 1.5), inf_scenario="SH")
+            values.append(
+                derive_mean_snr_db(
+                    ue,
+                    gnb_position=(0.0, 0.0, gnb_height_m),
+                    center_freq_ghz=3.5,
+                    los_rng=np.random.default_rng(seed),
+                    shadow_fading_rng=np.random.default_rng(seed + 10_000),
+                    bandwidth_hz=30_000_000,
+                )
+            )
+        return sum(values) / len(values)
+
+    high_bs = average_mean_snr_db(8.0)  # near-certain LOS at this distance
+    low_bs = average_mean_snr_db(2.1)  # just above h_c=2.0m -- much lower LOS probability
+    assert high_bs - low_bs > 1.0, (
+        f"high_bs={high_bs}, low_bs={low_bs} -- gnb_position's height should "
+        "materially change LOS probability (and thus average mean_snr_db) "
+        "for InF-SH; a near-zero difference means h_bs_m isn't actually "
+        "using gnb_position"
+    )

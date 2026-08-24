@@ -47,6 +47,17 @@ bare `python` invocation that works.
   actually needed. Only `sim/traffic.py`'s `periodic_control`/
   `condition_monitor` kind reads it; every other kind ignores `sync_group`
   silently.
+- `sim/pathloss.py`, `sim/blockage.py` — WP6. TR 38.901 InF path loss/LOS
+  probability (the real five sub-scenarios are SL/DL/SH/DH/HH — not the
+  four this repo's own docs used to cite, README §8) and two-state Markov
+  blockage. Both opt-in via `UEConfig.position`/`inf_scenario`/`blockage`
+  (default `None` preserves pre-WP6 behaviour exactly); wired into
+  `sim/channel.py`, not `driver.py`.
+- `sim/rlf.py` — WP6. Sync-loss (RLF) *detection* only (`n310`-armed
+  `t310` dwell, `n311`-gated cancel) — dormant, matching `sim/power.py`'s
+  landing pattern. Recovery timing (`t311`/`t300`/`t301`/`t319`) is
+  WP-Join's, not this file's — see invariants below for the exact
+  interface WP-Join consumes.
 - `config/metric_panel.yml` — the pre-registered metric panel. See rules below.
 - `scheduler/` — `two_tier.py`, `tier1.py`, `link.py`, `flow.py`.
   `flow.py::FlowConfig.lcg` self-resolves from 5QI via `__post_init__` — see
@@ -186,6 +197,61 @@ unfixed limitation of SPS specifically (Phase-2-doomed per this doc's own
 SPS rule above), not evidence that masking itself can be relaxed
 elsewhere.
 
+**`harq_exhausted_count` and `bytes_harq_lost` are two different counters
+measuring two different failure modes — do not conflate them.**
+`harq_exhausted_count` (`sim/driver.py`) counts HARQ *pool* exhaustion:
+`HarqProcessPool.allocate()` returned `None` because every process slot
+for that (UE, direction) was already busy (`dl_capacity=8`/
+`ul_capacity=16`, WP5 Decision 2) — a scheduling-eligibility problem.
+`bytes_harq_lost` (`buffers.discard_harq_loss`, surfaced per-flow via
+`Metrics.summary()`) counts *retry-cap* exhaustion: a TB that used all
+`harq_round_max` attempts and still failed — a link-quality problem. A
+scenario can have zero of one and many of the other. WP6 commit 4's own
+demo hit exactly this confusion first-hand: checked `harq_exhausted_count`
+after adding blockage, saw 0 in every arm, briefly read that as a
+refutation of the whole mechanism — the real signal was always in
+`bytes_harq_lost` (`docs/wp6-plan.md` commit 4).
+
+**A TB's `Allocation.snr_used_db` (the MCS-pick-time SNR) freezes at its
+ORIGINAL grant and is reused unchanged across every retry — this makes
+`cqi_delay_slots` load-bearing for any interaction between a
+time-varying channel and HARQ retry, not just a CQI-realism nicety.**
+`sim/harq.py::HarqProcess.snr_used_db` is set once in `allocate()`; every
+later `draw_harq_outcome` call for that process (`sim/driver.py`'s retry
+loop) reuses it rather than re-picking against a fresh reported SNR. So a
+fresh grant issued *while a channel condition is already in effect* (e.g.
+mid-blockage) gets its threshold matched to the CURRENT degraded SNR and
+sees no elevated BLER — only a TB whose threshold was committed *before*
+a condition changed and evaluated *after* is at risk. At
+`cqi_delay_slots=0` this only happens by rare coincidence (a TB caught
+specifically mid-retry at the exact transition instant); at a realistic
+`cqi_delay_slots=8` (`scripts/scheduler_study.py::CQI_DELAY_SLOTS`, the
+value every real study in this branch runs with, not the driver's bare
+`0` default), every fresh grant issued in the ~8 slots after a transition
+inherits a stale threshold, turning a rare coincidence into a near-
+certainty. Confirmed empirically, not just reasoned: WP6's blockage×HARQ
+interaction showed unreliable, overlapping results at `cqi_delay_slots=0`
+(0-6193 bytes lost across 7 seeds, overlapping the no-blockage baseline)
+and a clean, non-overlapping separation at `cqi_delay_slots=8` (5200-
+21514 vs 0-800, `docs/wp6-plan.md` commit 4). Before concluding a
+time-varying-channel interaction with HARQ is weak or absent, check
+`cqi_delay_slots` first.
+
+**`sim/rlf.py`'s `RlfDetectorState`/`RlfStepResult` is WP-Join's
+contract — consume it, don't extend the state machine inside `sim/
+rlf.py` itself.** It exposes exactly three things: `sync_state` (the
+level — `IN_SYNC`/`T310_RUNNING`/`RLF_DECLARED`), `RlfStepResult.
+rlf_declared_this_slot` (an edge-triggered event, true for the one slot
+RLF is declared — react to this, don't poll the level and re-derive the
+edge), and `rlf_declared_at_slot` (timestamp). `step()` never un-declares
+RLF once reached — re-arming after a real reattach belongs to WP-Join (a
+fresh `RlfDetectorState`, or a reset method WP-Join adds when it needs
+one), not something to build into this module speculatively. `t311`/
+`t300`/`t301`/`t319` (the recovery-side timers, also real values in
+`calibration-logs/twotier_startup_gnb.log:17`) are deliberately out of
+`sim/rlf.py`'s scope — WP-Join's own timers, not a missing piece here
+(`docs/wp6-plan.md` Decision 4).
+
 **Every new independent random draw needs its own seed stream — do not
 share an RNG across two different draws.** Precedent: `cqi_seed =
 scenario.seed ^ 0xC9C9C9C9`. WP5 found a real bug from *not* following
@@ -193,20 +259,31 @@ this: `harq_rng` was one shared stream for both DL and UL outcome draws;
 the moment UL started consuming draws too, it perturbed DL's own draw
 interleaving order, moving pure-DL flows in `--check` with zero DL-
 mechanism change. Fixed with independent `harq_rng_dl`/`harq_rng_ul`
-(`scenario.seed ^ 0x48415251` / `... ^ 0xFFFFFFFF`). When adding any new
-stochastic mechanism, give it its own XOR'd seed rather than reusing an
-existing RNG object, even one that looks unrelated to what you're adding.
+(`scenario.seed ^ 0x48415251` / `... ^ 0xFFFFFFFF`). WP6 added three more
+on the same principle (`los_seed`/`shadow_fading_seed`/`blockage_seed`,
+`scenario.seed ^ 0x105105` / `^ 0x5FADE5` / `^ 0x424C4F4B`) — no violation
+found that time, a clean instance of following the rule rather than a
+second bug. When adding any new stochastic mechanism, give it its own
+XOR'd seed rather than reusing an existing RNG object, even one that
+looks unrelated to what you're adding.
 
-**BSR quantisation tables come from vendored OAI source, not the 3GPP
-spec text or memory.** `sim/bsr.py`'s `NR_SHORT_BSR_TABLE`/
-`NR_LONG_BSR_TABLE` are transcribed from `oai-branches/two-tier/
-nr_mac_common.c` (see that file's own citation for the exact commit) and
-checked byte-for-byte against it by `sim/tests/test_bsr.py` on every test
-run. If a future change touches these tables, re-verify against that
-vendored file, not by re-deriving from the spec — 38.321 tabulates rather
-than publishing a generating formula, so "reconstructing" a table by
-formula is exactly the same silent-wrongness risk as recalling it from
-memory.
+**Spec/hardware-derived numeric tables get transcribed from the actual
+source text, never reconstructed from memory or re-derived by formula —
+this applies to any such table, not just BSR's.** `sim/bsr.py`'s
+`NR_SHORT_BSR_TABLE`/`NR_LONG_BSR_TABLE` are transcribed from
+`oai-branches/two-tier/nr_mac_common.c` (see that file's own citation for
+the exact commit) and checked byte-for-byte against it by `sim/tests/
+test_bsr.py` on every test run — 38.321 tabulates rather than publishing
+a generating formula, so "reconstructing" a table by formula is exactly
+the same silent-wrongness risk as recalling it from memory. **Confirmed
+as a general rule, not a BSR-specific one, by WP6**: this repo's own docs
+had mis-cited TR 38.901's InF sub-scenario naming (SL/DL/SH/HH, omitting
+InF-DH) from a session's recollection; the fix was fetching the actual
+ATIS transposition of the spec and transcribing `sim/pathloss.py`'s path-
+loss/LOS-probability tables from `pdftotext`-extracted spec text, cited
+by table and page, not from memory. If a future change touches any
+spec-derived table (BSR, path loss, or otherwise), re-verify against the
+real source, not by re-deriving it.
 
 ## Rules for the WP0 machinery
 
