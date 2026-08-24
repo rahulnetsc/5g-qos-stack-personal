@@ -10,6 +10,8 @@ from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_ha
 from .messages import FrameLedger, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
+from .rlf import RlfDetectorConfig, RlfDetectorState
+from .rlf import step as rlf_step
 from .ue_lcp import UeLcp
 from .ul_access import UlAccessModel
 from scheduler import Scheduler
@@ -164,6 +166,22 @@ def run(
     pdb_by_flow = {(f.ue_id, f.qfi): f.pdb_ms / 1000.0 for f in scenario.flows}
     horizon_s = scenario.horizon_slots * grid.slot_duration_s
 
+    # WP-Join commit 2 (docs/wp-join-plan.md sec4): sim/rlf.py's detector
+    # runs unconditionally for every UE -- sync-loss DETECTION is a
+    # property of every real UE, not an opt-in feature; it's the
+    # CONSEQUENCES (WP-Join commit 5's gate) that stay opt-in. No new
+    # UEConfig field -- one RlfDetectorConfig (its own cited defaults,
+    # calibration-logs/twotier_startup_gnb.log:17), one RlfDetectorState
+    # per UE, built fresh this run() call like every other per-UE model
+    # above (harq_pool/bsr/ul_access). Nothing reads the result yet --
+    # rlf_step_calls/rlf_declared_count are diagnostic-only, same idiom as
+    # harq_allocate_calls below, and deliberately not threaded into
+    # RunRecord.
+    rlf_config = RlfDetectorConfig()
+    rlf_states: dict[int, RlfDetectorState] = {ue.ue_id: RlfDetectorState() for ue in scenario.ues}
+    rlf_step_calls = 0
+    rlf_declared_count = 0
+
     for slot_index in range(scenario.horizon_slots):
         ue_lcp.refill(grid.slot_duration_s)
         now_s = slot_index * grid.slot_duration_s
@@ -174,6 +192,21 @@ def run(
             per_flow_arrived[(ue_id, qfi)] += byts
 
         channel.update(slot_index)
+        # RLF detection reads the TRUE instantaneous SNR (sim/rlf.py's own
+        # convention, matching HARQ's), so it must run after channel.
+        # update() -- and before the HARQ resolution block below, which is
+        # where WP-Join commit 5's gate will eventually need to act on a
+        # declared RLF before that slot's retransmissions are serviced
+        # (docs/wp-join-plan.md sec1.8). Placed here now so commit 5 can
+        # wire its consequence in without moving this call site.
+        for ue in scenario.ues:
+            rlf_step_calls += 1
+            rlf_result = rlf_step(
+                rlf_states[ue.ue_id], rlf_config, channel.get_snr_db(ue.ue_id),
+                slot_index, grid.slot_duration_s,
+            )
+            if rlf_result.rlf_declared_this_slot:
+                rlf_declared_count += 1
         # Moved ahead of BSR (WP5 commit 4a): the HARQ resolution step
         # below needs slot_grid.dl_symbols before scheduler.allocate()
         # runs; slot_grid itself never depended on BSR/traffic state.
@@ -475,6 +508,14 @@ def run(
     summary["harq_allocate_calls"] = harq_allocate_calls
     summary["harq_exhausted_count"] = harq_exhausted_count
     summary["harq_masked_flow_double_grant_count"] = harq_masked_flow_double_grant_count
+    # WP-Join commit 2: same diagnostic-only idiom as the three counters
+    # above -- rlf_step_calls confirms the wiring actually ran every slot
+    # for every UE (distinguishing "never declares because it's dormant"
+    # from "never declares because it's genuinely never triggered");
+    # rlf_declared_count is asserted, not assumed, in sim/tests/
+    # test_smoke.py (docs/wp-join-plan.md sec4.1 point 4).
+    summary["rlf_step_calls"] = rlf_step_calls
+    summary["rlf_declared_count"] = rlf_declared_count
     # WP7: true per-message completion latency, replacing the head-of-line
     # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
     # the message ledger and merged into the same per-flow summary dict the

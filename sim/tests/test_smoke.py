@@ -1720,3 +1720,28 @@ def test_wp5_harq_process_pool_gating_is_live_but_never_binds():
         "meaning 'never binds' rather than 'never wired up'"
     )
     assert summary["harq_exhausted_count"] == 0
+
+
+def test_wpjoin_rlf_detector_runs_every_slot_and_never_declares_on_the_corpus():
+    """docs/wp-join-plan.md WP-Join commit 2: sim/rlf.py::step() is now
+    called unconditionally, per UE per slot, on every scenario. Checked,
+    not assumed, on the regression corpus's own scenarios (all at
+    mean_snr_db=20.0, far from RlfDetectorConfig's default -5.0dB floor):
+    rlf_declared_count==0 across all 22 study-1/2/3 cases (1,144,000 total
+    rlf_step_calls). Asserting rlf_step_calls > 0 alongside it, same
+    reason as harq_allocate_calls above: a bare declared_count==0 would
+    also pass if the wiring silently never ran at all, a different bug
+    this test must be able to tell apart from "runs but never fires".
+
+    If this ever starts failing after an unrelated change, that is a
+    genuine finding about the corpus's own channel realism (an AR(1) tail
+    event dipping 25dB below a 20dB mean for 10+ consecutive slots) --
+    investigate before assuming a bug, per the same document's citation
+    discipline.
+    """
+    from sim.scenarios import factory_robots_scenario, latency_bound_scenario, sensor_dense_scenario
+
+    for scenario in (factory_robots_scenario(), sensor_dense_scenario(), latency_bound_scenario()):
+        summary = run(scenario, RoundRobin())
+        assert summary["rlf_step_calls"] == len(scenario.ues) * scenario.horizon_slots
+        assert summary["rlf_declared_count"] == 0

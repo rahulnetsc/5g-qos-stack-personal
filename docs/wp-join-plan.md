@@ -737,7 +737,66 @@ neither `sim/driver.py` nor `config/metric_panel.yml`, changed.
    land at commit 4, per the checklist above — confirmed via `git status`
    showing zero touch to that file this commit.
 
+### Commit 2 — landed
 
+`sim/driver.py` (new: `rlf_config`/`rlf_states`/`rlf_step_calls`/
+`rlf_declared_count`, wired into the slot loop right after `channel
+.update(slot_index)`, before the HARQ-resolution block), `sim/tests/
+test_smoke.py` (new test). `sim/rlf.py` itself untouched.
+
+**Predicted, before writing any code: fully clean `regression_corpus.py
+--check`.** This commit's inertness is a different shape from every
+other commit in this WP, worth stating precisely rather than reusing the
+same sentence by habit: `sim/rlf.py::step()` now runs **unconditionally**,
+for every UE, every slot, on every scenario — there is no new `UEConfig`
+field gating whether it runs at all (detection is a property of every
+real UE, not a feature). What keeps this commit inert is that **nothing
+downstream reads its output yet** — `rlf_step_calls`/`rlf_declared_count`
+are diagnostic-only, merged into `summary` the same way `harq_allocate_
+calls` already is, deliberately not threaded into `RunRecord`. **Confirmed
+exactly:** `pytest sim/tests -q` — 325 passed (324 + 1 new), 1 xfailed
+(unchanged); `regression_corpus.py --check` — clean, zero mismatches;
+`git diff --stat` touches exactly `sim/driver.py` (+41) and `sim/tests/
+test_smoke.py` (+25) — no `config/metric_panel.yml`, no `sim/config.py`.
+
+**Answering the pre-commit checklist explicitly, confirming the four
+points above rather than just restating them:**
+
+1. *Which config field gates it?* **None — see above.** Checked
+   empirically, not just structurally, before writing the permanent test:
+   ran all 22 regression-corpus cases (`scripts/regression_corpus.py::
+   _cases()`) with the instrumentation in place — **1,144,000 total
+   `rlf_step_calls`, 0 `rlf_declared_count`**, across every study/case/
+   scheduler combination. Every corpus UE sits at `mean_snr_db=20.0`
+   (`scripts/scheduler_study.py`), 25dB above `RlfDetectorConfig`'s
+   default `-5.0`dB floor — a real finding recorded here, not assumed
+   from the default's distance alone, since an AR(1) fading tail could in
+   principle still dip that far.
+2. *Ordering confirmed live, not just planned:* placed immediately after
+   `channel.update(slot_index)`, before `slot_grid = grid.slot_grid(...)`
+   and the HARQ-resolution block — exactly where commit 5's own gate will
+   need to act on a declared RLF before that slot's retransmissions are
+   serviced (sec1.8), so that commit won't need to move this call site.
+3. *Live, repeated-call behaviour vs. the unit tests:* the state machine
+   itself is unmodified and already unit-tested (WP6, `sim/tests/
+   test_rlf.py`, 12 tests); this commit adds no new logic there, only a
+   caller. Two things ARE genuinely new relative to those tests: (a)
+   `test_rlf.py` feeds hand-crafted step sequences; this is the first time
+   `step()` has processed a real, continuously AR(1)-varying SNR trace
+   across a full multi-thousand-slot horizon, uninterrupted, at the
+   corpus's actual UE counts. (b) `rlf_step_calls == len(scenario.ues) *
+   scenario.horizon_slots` is asserted specifically to confirm no slot/UE
+   combination is silently skipped or double-counted across that many
+   calls — the same "count that matters, not just present" pairing
+   `test_wp5_harq_process_pool_gating_is_live_but_never_binds` already
+   established for `harq_allocate_calls`.
+4. *Per-UE state driver.py must now own and reset between runs:*
+   `rlf_states: dict[int, RlfDetectorState]`, built fresh at the top of
+   `run()` from `scenario.ues` — the same freshness discipline as
+   `harq_pool`/`bsr`/`ul_access` a few lines above it, confirmed by
+   inspection (a local, rebuilt every call, nothing module-level).
+
+### 4.1 Falsifiable inertness — commits 1/2/3/5/6/7, and why commit 4 is the one exception
 
 **Commits 1, 3, 5, 6, 7: standard opt-in-default-`None`/`[]` inertness**,
 the same claim WP5 (commits 0/1/2/3/6) and WP6 (commits 1/2/3) each made
@@ -978,8 +1037,9 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commit 1 of 8 landed** (`sim/join.py`, dormant FSM + delay sampler).
-Commits 2–8 not yet started. Two scope questions that would otherwise be
+**Commits 1–2 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+`sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
+diagnostic-only). Commits 3–8 not yet started. Two scope questions that would otherwise be
 `[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
 Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)
 will be added after commit 8 lands, following `docs/wp5-plan.md`/`docs/
