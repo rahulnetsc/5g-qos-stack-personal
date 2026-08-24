@@ -114,7 +114,7 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 | 4 | WP4 | Uplink access chain: SR → grant → BSR → grant, `sr-ProhibitTimer`, `sr-TransMax`→RACH boundary | `p5g-sim-plan.md` §9; ground truth vendored from the live OAI checkout, not `oai-branches/` (§7); mechanics verified against `gNB_scheduler_uci.c`/`nr_ue_procedures.c` | Done — cold-start probe retired (§8); SR-chain inversion calibration target (§11) **not reproduced** — negative result, reported not tuned (§8); regression-check predictions verified against `--check`'s actual output and mostly falsified (§8) |
 | 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Pending |
 | 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Pending |
-| 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Pending |
+| 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Done — 4 commits (InF path loss + LOS probability, two-state Markov blockage, sync-loss detection landed dormant per sign-off, blockage×HARQ acceptance-criterion demo); InF sub-scenario naming corrected against spec text (§8); mobility/correlated blockage deliberately deferred (§8) |
 | 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all | Pending |
 
 ### Phase 2 — both schedulers, written fresh against verified OAI source
@@ -685,6 +685,47 @@ they survive it:
   genuine interaction worth naming as such, rather than three items
   (this one, WP4's load-inversion result, the crumb-fraction shortfall)
   that only rhyme. Full method in `docs/wp5-plan.md` commit 6.
+- `[OPEN]` **WP6: correlated multi-UE blockage and AGV mobility are
+  deliberately not built.** `p5g-sim-plan.md` §9's WP6 file list names
+  `sim/mobility.py` as "New, optional... so blockage correlates across UEs
+  sharing an aisle." Decided not to build it (`docs/wp6-plan.md`
+  Decision 7): no guarantee in §5's G1-G12 traceability table names
+  correlated multi-UE blockage specifically, per-UE independent blockage
+  already gives WP6's own acceptance criterion something to test, and this
+  is the same treatment §3 already gave UE mobility/OLLA when scoping the
+  branch ("revisit only if a specific GT/T test fails and \[mobility\] is
+  the diagnosed cause"). Not an oversight — recorded here so the spec's
+  file list doesn't silently imply otherwise.
+- `[OPEN]` **WP6 commit 4: blockage x HARQ retry interaction confirmed —
+  a single flow's residual HARQ loss under long blockage exceeds WP5's
+  entire prior corpus, and the mechanism is narrower than first assumed.**
+  `Allocation.snr_used_db` freezes a TB's MCS threshold at its original
+  grant and reuses it unchanged across every retry (`sim/harq.py::
+  HarqProcess.snr_used_db`) — a fresh grant issued *while already blocked*
+  gets a threshold matched to the current (degraded) SNR and sees no
+  mismatch at all; only a TB whose threshold was committed *before* true
+  SNR dropped and evaluated *after* is at risk. At the driver's bare
+  `cqi_delay_slots=0` this only happens for the rare TB caught mid-retry
+  at the exact transition instant (measured: long-blockage
+  `bytes_harq_lost` ranged 0-6193 across 7 seeds, overlapping the
+  no-blockage baseline on several). At `cqi_delay_slots=8`
+  (`scripts/scheduler_study.py::CQI_DELAY_SLOTS` — the value every real
+  study in this branch actually runs with, not the bare default) every
+  fresh grant in the ~8 slots after a transition inherits the stale
+  threshold, and the effect becomes dramatic and reliable: no-blockage
+  and short-blockage (4 slots, below the ~18-slot DL retry cycle) stayed
+  in 0-800 bytes on 7 of 7 seeds; long-blockage (600 slots) stayed in
+  5200-21514 bytes on the same 7 seeds — non-overlapping. That range
+  alone, from one flow in one run, exceeds WP5's own measured total
+  (`bytes_harq_lost` nonzero on only 6 of 510 flow-records across the
+  entire 22-scenario/3-study corpus, `docs/wp5-plan.md` commit 4b).
+  Demonstrated in `sim/tests/test_wp6_blockage_harq_interaction.py`, kept
+  deliberately outside the regression corpus (`docs/wp6-plan.md` §4: a
+  multi-configuration hypothesis test, not a fixed-baseline scenario).
+  **Read together with WP5's own "uplink access chain dominates at low
+  load" hypothesis cluster** (this document's WP4/WP5 items above) as a
+  candidate fourth facet of the same underlying story, per WP9's wider
+  sweep — not chased further here.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

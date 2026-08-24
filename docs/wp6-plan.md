@@ -555,7 +555,7 @@ was silently dropped by oversight.
 | 1 | TR 38.901 InF path loss + LOS probability (Decision 2, 5, 6) — **landed** | `sim/pathloss.py` (new), `sim/config.py` (`UEConfig.position`/`inf_scenario`, `ScenarioConfig.gnb_position`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_pathloss.py` (new) | No — dormant on the existing corpus (no scenario sets `position`), same falsifiable-inertness argument as `docs/wp5-plan.md` commit 2 |
 | 2 | Two-state Markov blockage (Decision 3) — **landed** | `sim/blockage.py` (new), `sim/config.py` (`UEConfig.blockage`, `BlockageConfig`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_blockage.py`, `sim/tests/test_channel.py` (new/extended) | No — dormant on the existing corpus (no scenario sets `blockage`), independent RNG stream added but unused until referenced |
 | 3 | Sync-loss / RLF detection (Decision 4) — **landed** | `sim/rlf.py` (new), `sim/tests/test_rlf.py` (new) | No — dormant, unit-tested only, matching `sim/power.py`/`sim/olla.py` precedent; zero `sim/driver.py`/`sim/config.py` changes |
-| 4 | WP6's own acceptance-criterion demo: one new scenario exercising blockage (and optionally path loss) on an existing baseline scheduler, run at **two** `mean_blocked_slots` settings so the exhaustion-spike claim is falsifiable (Decision 5, see prediction #2 below) | `sim/scenarios/scenario_config_7.yml` (new, or similar) + a short comparison script/test — **no existing scenario file touched** | Yes, but scoped to the new scenario only; existing 22-record corpus untouched |
+| 4 | WP6's own acceptance-criterion demo: a hand-built scenario exercising blockage on RoundRobin, run at **two** `mean_blocked_slots` settings so the exhaustion-spike claim is falsifiable (Decision 5, see prediction #2 below) — **landed** | `sim/tests/test_wp6_blockage_harq_interaction.py` (new; scenario built in-line, not a `sim/scenarios/*.yml` file) | Yes, but scoped to this test file's own runs only — **stays outside `scripts/regression_corpus.py`'s 22-record corpus entirely** (see below), not added as a 23rd record |
 
 **Predicted, before writing any code — commits 1-3: fully clean `--check`.**
 This is the same falsifiable-inertness pattern as `docs/wp5-plan.md`
@@ -566,10 +566,35 @@ reachable from the 22-record corpus changes behaviour. Commit 3 is the
 untouched, so there is no path by which `sim/rlf.py` could run during any
 `driver.run()` call regardless of scenario.
 
-**Commit 4 is the only one predicted to move numbers, and only for its own
-new scenario** — not scored against `--check`'s existing 22 records at all
-(it adds a 23rd, which `--capture` must pick up deliberately, with a
-commit message stating why, per CLAUDE.md's re-baseline rule).
+**Commit 4 is the only one predicted to move numbers, and only within its
+own dedicated test file** — not scored against `--check`'s existing 22
+records at all, and **not added as a 23rd record either** (Decision below):
+this demo is a multi-configuration hypothesis test by construction (its
+entire point is comparing short vs. long at the same traffic/UE), not a
+fixed single-run snapshot the corpus format is built to diff against, so
+it lives in `sim/tests/` and is checked by its own assertions every
+`pytest` run instead.
+
+**Decided: stays outside the regression corpus, answering the sign-off's
+third question.** Three reasons, not just one: (1) the corpus format is
+one fixed run per (scenario, scheduler) — this demo's whole point is
+running the SAME scenario at multiple `BlockageConfig` settings, which
+doesn't fit that shape without either picking one arbitrary setting
+(defeating the point) or inventing a multi-record corpus convention no
+other WP needed; (2) this scenario is deliberately extreme (a single UE,
+`blocked_extra_loss_db=17.5`, a non-default `cqi_delay_slots=8` passed
+explicitly) to make one specific mechanism legible, not a realistic
+workload meant to anchor future comparisons the way `factory_robots_
+scenario`/`sensor_dense_scenario`/`latency_bound_scenario` are; (3) joining
+the corpus means every future WP's `--check` diff would include this
+scenario's own stochastic blockage/HARQ numbers, adding noise to
+attribution for changes that have nothing to do with WP6 — against the
+corpus's own stated purpose (CLAUDE.md: "simulator bugs are caught as
+they land... the whole point of the corpus"). Every future WP therefore
+inherits nothing from this commit's own scenario; `sim/pathloss.py`/`sim/
+blockage.py`/`sim/rlf.py` (the actual mechanisms, still available to any
+scenario that opts in) are what future work inherits, not this specific
+demo.
 
 **Ranked predictions for commit 4, checked against `requires:` fields in
 `config/metric_panel.yml` directly (not assumed) — none name WP6, so no
@@ -579,42 +604,56 @@ metric's `status` promotes; see §5.**
    UE(s) during blocked intervals; this is the acceptance criterion itself
    (`p5g-sim-plan.md:562-563`: "sustained multi-hundred-millisecond
    starvation").
-2. (High) **`bytes_harq_lost`/`harq_exhausted_count`** (WP5's counters,
-   `sim/driver.py:131,330,463`) — expected far above WP5's baseline rate
-   of 6-of-510 flow-records, **but only at the "long blockage" setting.**
-   Per §2's cited numbers: one full HARQ retry cycle is ~12 ms (DL) /
-   ~4 ms (UL); a blockage event lasting "hundreds of milliseconds"
-   (Decision 3) outlasts *many* consecutive retry cycles, so every attempt
-   issued for the blocked UE during that whole window should exhaust, not
-   just the one in flight at blockage onset. This is the answer to prompt
-   item (d)'s explicit question — yes, this interaction is real and should
-   be one of the largest-magnitude, most confidently predicted effects in
-   this WP, on the same footing as WP5's own headline binary-delivery
-   finding.
+2. (High) **`bytes_harq_lost`** (WP5's residual-loss counter,
+   `buffers.discard_harq_loss` — **not** `harq_exhausted_count`, a
+   correction made below after actually running this) — expected far
+   above WP5's baseline rate of 6-of-510 flow-records, **but only at the
+   "long blockage" setting, and — corrected from this prediction's first
+   draft — only reliably once a realistic `cqi_delay_slots` is in play,
+   not at the driver's bare `cqi_delay_slots=0` default.**
 
-   **Made falsifiable, per sign-off feedback:** the mechanism claims the
-   effect is driven by blockage duration *relative to the retry cycle*,
-   not by blockage merely existing — so commit 4's scenario/script must
-   run `BlockageConfig.mean_blocked_slots` at **two** settings, not one: a
-   "short" setting below both retry-cycle lengths (e.g. 4 slots = 2ms,
-   shorter than the ~8-slot/4ms UL cycle) and a "long" one anchored to
-   `p5g-sim-plan.md:557`'s "hundreds of milliseconds" (commit 2's own
-   default, 600 slots = 300ms). **Confirmed in commit 2, not just assumed:
-   the same Markov construction reproduces its configured mean dwell at
-   both settings** (`sim/tests/test_channel.py::
-   test_blockage_dwell_matches_configured_mean_at_both_short_and_long_
-   settings`, empirical run-length check within 35% relative tolerance at
-   both 4-slot and 600-slot means) — so commit 4's two-configuration
-   design is mechanically sound, not just intended. **Predicted:** short
-   blockage leaves `harq_exhausted_count`/`bytes_harq_lost` close to WP5's
-   own baseline rate (most in-flight TBs get all their retry attempts
-   either entirely before or entirely after the brief dip, not stranded
-   inside it); long blockage spikes it well above baseline. If short and
-   long both spike equally, or neither does, the "duration vs. retry-cycle"
-   mechanism as stated is wrong, not just quantitatively off — this is the
-   falsifiable form the sign-off asked for, distinguishing "exhaustion
-   spikes" from "exhaustion always spikes whenever blockage exists at
-   all."
+   **Mechanism, refined after tracing the actual code (not the original
+   looser framing):** `Allocation.snr_used_db` is frozen at a TB's
+   *original* grant and reused unchanged across every retry
+   (`sim/harq.py::HarqProcess.snr_used_db`). A fresh grant issued *while
+   already blocked* gets its MCS threshold matched to the current
+   (degraded) reported SNR, so it does **not** see elevated BLER — "every
+   attempt issued during the blocked window fails," this prediction's
+   original framing, is **not** how the mechanism works. What actually
+   drives loss is a TB whose threshold was committed **before** true SNR
+   dropped and then evaluated **after** it dropped — at `cqi_delay_
+   slots=0` this only happens for the rare TB caught specifically
+   mid-retry at the exact transition slot; with a realistic
+   `cqi_delay_slots=8` (`scripts/scheduler_study.py::CQI_DELAY_SLOTS` —
+   CLAUDE.md's own note that this, not `0`, is what every real study in
+   this branch runs with), *every* fresh grant issued in the ~8 slots
+   after a transition inherits a stale-good threshold, turning a rare
+   coincidence into a per-episode near-certainty. One full DL retry cycle
+   is `(harq_round_max-1) * (k1_slots+k2_slots)` = 3×6 = 18 slots (~9ms,
+   not the ~12ms in this prediction's first draft) / UL: 3×2 = 6 slots
+   (~3ms) — both still far below a "hundreds of milliseconds" blockage,
+   which is what lets long blockage keep a straddling TB's *entire*
+   remaining retry cycle inside the mismatch window while short blockage
+   lets later retries land after the dip has already ended and the
+   channel has recovered.
+
+   **Made falsifiable, per sign-off feedback:** run `BlockageConfig.
+   mean_blocked_slots` at **two** settings — "short" (4 slots, below both
+   retry-cycle lengths, commit 2-verified) and "long" (600 slots, commit
+   2's own default, `p5g-sim-plan.md:557`'s "hundreds of milliseconds").
+   **Predicted:** short stays close to the no-blockage baseline; long
+   spikes far above it. **Measured across 7 fixed seeds
+   (`sim/tests/test_wp6_blockage_harq_interaction.py`): no-blockage and
+   short both stayed in 0-800 bytes on every seed; long stayed in
+   5200-21514 bytes on every seed — a clean, non-overlapping separation,
+   not just "long averages higher."** Full table and the refutation
+   criterion in that test file's own docstring. **At `cqi_delay_slots=0`,
+   the same long-blockage arm ranged 0-6193 across the same 7 seeds,
+   overlapping the no-blockage range** — confirming the mechanism exists
+   at `cqi_delay_slots=0` but isn't a reliable demonstration there,
+   exactly why the demo uses `8`, and recorded as a real, checked finding
+   (`test_pure_retry_freeze_without_cqi_delay_is_too_unreliable_to_
+   demonstrate`), not silently patched over.
 3. (High) **M01 `flow_latency_percentiles`** — p95/p98/p99 for the blocked
    UE's flows spike during/immediately after blockage; p50 comparatively
    unaffected (most slots are unblocked).
@@ -736,6 +775,67 @@ driver.py`) changed.
    `rlf_declared_this_slot` (edge event), `rlf_declared_at_slot`
    (timestamp) — no more, since nothing else has a named consumer yet.
 
+**Commit 4 — landed.** `sim/tests/test_wp6_blockage_harq_interaction.py`
+(new, 3 tests) — no `sim/scenarios/*.yml`, `sim/driver.py`,
+`sim/config.py`, or `scripts/regression_corpus.py` changes; the scenario
+is built in-line in the test file (single UE, single dense DL flow,
+RoundRobin). **First prediction (this doc's own §4 item 2, first draft)
+was wrong, caught by actually running it, not adjusted after the fact
+without saying so:**
+
+- Checking `harq_exhausted_count` (as originally planned) showed 0 in
+  every arm — looked like a refutation. Investigation found this counter
+  is HARQ **pool** exhaustion (`sim/harq.py::HarqProcessPool` returning
+  `None`), an entirely different thing from retry-cap exhaustion
+  (`bytes_harq_lost`, `buffers.discard_harq_loss`) — this scenario's
+  single flow never contends for its 8-deep pool, so 0 there is expected
+  and uninformative either way. Switched to `bytes_harq_lost`, the metric
+  CLAUDE.md's own text already names for this ("the retry budget before a
+  TB is abandoned (residual loss, `bytes_harq_lost`)").
+- With the right metric, at `cqi_delay_slots=0` (the isolated-mechanism
+  design this commit's checklist entry originally specified), the effect
+  was real but unreliable — long-blockage `bytes_harq_lost` ranged 0-6193
+  across 7 seeds, overlapping the no-blockage baseline's 0-1000 range on
+  several of them. Traced to `Allocation.snr_used_db` being frozen at
+  grant time (§4 item 2's rewrite above): without CQI delay, only a TB
+  caught by rare coincidence mid-retry at the exact transition slot sees
+  a mismatch; everything else granted fresh during an already-blocked
+  window is correctly matched from the start.
+- Switching to `cqi_delay_slots=8` (`scripts/scheduler_study.py::
+  CQI_DELAY_SLOTS`) made the effect dramatic and reliable: no-blockage
+  and short-blockage stayed in 0-800 bytes on every one of 7 seeds;
+  long-blockage stayed in 5200-21514 bytes on every one of the same 7
+  seeds — zero overlap. Recorded as a corrected understanding (CQI delay
+  is *necessary* for a reliable demonstration, not an avoidable confound
+  this commit should isolate away from), not silently substituted.
+
+**Quantitative comparison against WP5's own baseline, per the sign-off's
+first question:** WP5 measured `bytes_harq_lost` nonzero on only 6 of 510
+flow-records across the *entire* 22-scenario/3-study regression corpus
+(`docs/wp5-plan.md` commit 4a/4b), most of those 6 in the low hundreds of
+bytes. This single demo flow's long-blockage arm alone produces
+5200-21514 bytes lost — more than that entire corpus combined, from one
+mechanism, in one flow, over one 15,000-slot run. "Exhaustion spikes"
+means exactly this: not a percentage-point movement on an existing
+metric, but a single flow generating more HARQ-loss bytes by itself than
+WP5 found across the whole prior corpus.
+
+**Falsifiability, per the sign-off's second question:** the short arm
+(`mean_blocked_slots=4`) is in every comparison above — commit 2 already
+verified this Markov construction reproduces a 4-slot mean dwell as
+faithfully as a 600-slot one (§4 commit 2 answer #1), so the short arm
+isn't a token gesture. The refutation criterion was stated before running
+anything (this file's own docstring): non-overlapping separation on every
+seed, not "long averages higher." Had long landed inside short's 0-800
+range on any tested seed, or short landed in the thousands, that would
+have refuted the duration mechanism outright — it didn't, on 7 of 7 seeds
+tried.
+
+**`pytest sim/tests -q`** — 301 passed (298 + 3 new), 1 xfailed
+(unchanged); **`regression_corpus.py --check`** — clean, zero mismatches
+(confirming the "stays outside the corpus" decision structurally: `git
+status` after this commit shows only the one new test file).
+
 ---
 
 ## 5. `metric_panel.yml` — no promotions, no new caveats
@@ -813,22 +913,38 @@ entry — not WP6 itself, which never touches those scenarios.
 
 ---
 
-## 7. Status — all pre-coding gates cleared
+## 7. Status — all four commits landed
 
-- Decision 4's WP6/WP-Join sync-loss boundary — **signed off.**
+- Decision 4's WP6/WP-Join sync-loss boundary — **signed off**, and
+  implemented per that sign-off (commit 3).
 - The InF sub-scenario naming — **verified against TR 38.901 Table 7.2-4**
-  (§0): the real set is `SL`/`DL`/`SH`/`DH`/`HH`, not the repo's
-  `SL`/`DL`/`SH`/`HH`; `sim/pathloss.py` implements the real five.
+  (§0): the real set is `SL`/`DL`/`SH`/`DH`/`HH`, not the repo's original
+  `SL`/`DL`/`SH`/`HH`; `sim/pathloss.py` implements the real five
+  (commit 1).
 - The path-loss/LOS-probability coefficients — **verified against
   TR 38.901 Tables 7.4.1-1/7.4.2-1/7.2-4/7.8-7** (§2, Decision 6), quoted
   from a direct `pdftotext` extraction of `ATIS.3GPP.38.901.V1610.pdf`,
   not reconstructed from memory. `sim/tests/test_pathloss.py` re-verifies
-  the transcription independently, per CLAUDE.md's BSR-table rule.
-- Commit 4's blockage-duration prediction is now built to be falsifiable
-  (short vs. long `mean_blocked_ms`, §4 prediction #2), not just directionally
-  plausible.
+  the transcription independently, per CLAUDE.md's BSR-table rule
+  (commit 1).
+- Two-state Markov blockage, verified to support both a short
+  (below-retry-cycle) and long (hundreds-of-ms) regime with the same
+  construction (commit 2).
+- Sync-loss detection, `n310`-armed `t310`-dwell / `n311`-cancel, landed
+  dormant with the WP6/WP-Join interface specified (commit 3).
+- Commit 4's blockage-duration prediction was built to be falsifiable
+  (short vs. long `mean_blocked_slots`) and, once run, **corrected a
+  wrong first guess about which metric and which `cqi_delay_slots`
+  setting actually shows the effect** (§4 commit 4 report) before
+  confirming the claim on 7 of 7 seeds tried, non-overlapping.
 
-Proceeding to commit 1: `sim/pathloss.py` (TR 38.901 InF path loss + LOS
-probability), `sim/config.py` (`UEConfig.position`/`inf_scenario`,
-`ScenarioConfig.gnb_position`), `sim/channel.py` wiring (opt-in), and
-`sim/tests/test_pathloss.py`.
+**All four commits' predictions, before writing code, checked against
+their actual results after landing:** commits 1-3 predicted fully clean
+`--check` (15th-17th in the WP5/WP6 lineage) and were exactly clean;
+commit 4 predicted a metric movement and, on the first attempt, checked
+the wrong counter and the wrong `cqi_delay_slots` setting — both caught by
+actually running it rather than assumed correct, and both corrected in
+the open rather than quietly fixed. `docs/wp5-plan.md`'s own end-of-WP
+judgment-calls review (CLAUDE.md's standing step) is the natural next
+pass here, once this document's outstanding README §8 items (§6 above)
+are landed.
