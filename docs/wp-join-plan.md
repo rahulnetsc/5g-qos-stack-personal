@@ -684,7 +684,60 @@ opt-in; until a scenario sets `UEConfig.join`, every existing metric is
 computed by exactly the simulator that existed before this WP, not a
 join-blind approximation of a more-real one.
 
-### 4.1 Falsifiable inertness — commits 1/2/3/5/6/7, and why commit 4 is the one exception
+### Commit 1 — landed
+
+`sim/join.py` (new: `JoinPhase`, `JoinEvent`, `JoinConfig`, `JoinRngStreams`/
+`init_join_rng_streams`, `JoinState`/`init_join_state`, `JoinStepResult`,
+`step()`), `sim/tests/test_join.py` (new, 21 tests). **Predicted, before
+writing any code: fully clean `--check` — the eighteenth such prediction
+in the WP5/WP6/WP-Join lineage** (verified against the file directly:
+`docs/wp6-plan.md` commit 3 was the seventeenth — line 772 — so this is
+the next), **and the strongest form of it**, matching `sim/rlf.py`/`sim/
+olla.py`'s own precedent: `sim/driver.py` and `sim/config.py` are not
+touched at all this commit, so there is no code path by which anything in
+`sim/join.py` could run during a `driver.run()` call, regardless of
+scenario. **Confirmed exactly:** `pytest sim/tests -q` — 324 passed (303 +
+21 new), 1 xfailed (unchanged); `regression_corpus.py --check` — clean,
+zero mismatches; `git status` after this commit touches exactly `sim/
+join.py` and `sim/tests/test_join.py` — no other file, in particular
+neither `sim/driver.py` nor `config/metric_panel.yml`, changed.
+
+**Answering the pre-commit checklist explicitly, not left implicit:**
+
+1. *Is the inertness claim "nothing imports it" or "imported but never
+   reached"?* **"Nothing imports it"** — the strongest form. `sim/join.py`
+   has zero call sites outside its own test file, the same as `sim/
+   rlf.py` at WP6 commit 3 and `sim/olla.py` at WP5 commit 6.
+2. *Is `sim/rlf.py`'s contract still sufficient once writing against it?*
+   **Yes — and the boundary ended up stricter than sec1.6 first
+   described.** `sim/join.py` does not import `sim/rlf.py` at all:
+   `step()` takes `rlf_declared_this_slot` as a plain `bool` parameter,
+   not an `RlfDetectorState`/`RlfStepResult` object. "Consume, don't
+   extend" (CLAUDE.md) is therefore enforced at the type signature, not
+   only the docstring — `sim/join.py` cannot reach into `sim/rlf.py`'s
+   state machine even by accident, since it never holds a reference to
+   it. The one place this method could have leaked a gap — `sim/join.py`
+   needing to know the RLF SNR floor for `CELL_SEARCH`'s SNR-restoration
+   gate — is handled by `JoinConfig.rlf_snr_floor_db`, a value the wiring
+   commit (5) must copy from the same UE's `RlfDetectorConfig`, documented
+   in the module docstring as that commit's responsibility, not solved by
+   importing the type. No gap found; nothing added to `sim/rlf.py`.
+3. *Per-path RNG seeds, tested for independence?* **Three streams, XOR-
+   tagged exactly as sec3 D9 specifies** — `init_join_rng_streams(seed)`
+   returns `cold = seed ^ 0x434F4C44`, `reest = seed ^ 0x52454553`,
+   `warm = seed ^ 0x4A4F494E`. `test_rng_streams_are_independent_and_
+   reproducible` confirms same-seed reproducibility and three-way
+   independence by draw, not just by construction; `test_deterministic_
+   delay_consumes_no_rng_draw_when_ceiling_equals_floor` confirms the
+   deterministic branch (PDU-session/app-restart at their 0.0 defaults)
+   draws nothing at all, checked via the generator's own `bit_generator
+   .state`, matching the standard this repo already holds `harq_rng_dl`/
+   `harq_rng_ul` to.
+4. *Any `config/metric_panel.yml` change this commit?* **None.** M18/M19
+   land at commit 4, per the checklist above — confirmed via `git status`
+   showing zero touch to that file this commit.
+
+
 
 **Commits 1, 3, 5, 6, 7: standard opt-in-default-`None`/`[]` inertness**,
 the same claim WP5 (commits 0/1/2/3/6) and WP6 (commits 1/2/3) each made
@@ -925,8 +978,9 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Not started.** This document is the plan; no commit has landed. Two
-scope questions that would otherwise be `[OPEN]` here were put to the user
-and are recorded resolved at D0a/D0b. Section 8 (end-of-WP judgment-calls
-review, per CLAUDE.md's standing step) will be added after commit 8 lands,
-following `docs/wp5-plan.md`/`docs/wp6-plan.md`'s own precedent.
+**Commit 1 of 8 landed** (`sim/join.py`, dormant FSM + delay sampler).
+Commits 2–8 not yet started. Two scope questions that would otherwise be
+`[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
+Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)
+will be added after commit 8 lands, following `docs/wp5-plan.md`/`docs/
+wp6-plan.md`'s own precedent.
