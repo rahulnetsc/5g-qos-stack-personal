@@ -333,8 +333,26 @@ they survive it:
   unconfirmed. Calibrates every G3/G9 pass line.
 - `[OPEN]` The uplink capacity constant (`p5g-sim-plan.md` §4.2) — resolve
   against GT-3.2's ceiling re-measurement, or sweep it as an axis.
-- `[OPEN]` InF sub-scenario (SL/DL/SH/HH) for the headline configuration —
-  deployment-dependent, sweep in WP6 rather than picking blind.
+- `[OPEN]` InF sub-scenario (SL/DL/SH/DH/HH — corrected below) for the
+  headline configuration — deployment-dependent, sweep in WP6 rather than
+  picking blind.
+- `[RESOLVED]` **This document previously named the InF sub-scenarios
+  "SL/DL/SH/HH," omitting InF-DH — verified wrong against TR 38.901 Table
+  7.2-4 while scoping WP6 (`docs/wp6-plan.md` §0), not just suspected.**
+  The spec defines five InF sub-scenarios: `InF-SL`/`InF-DL`/`InF-SH`
+  (sparse/dense clutter × low/high BS height) plus `InF-DH` (dense
+  clutter, high BS — the fourth clutter×height member this document
+  dropped) and `InF-HH` ("high Tx, high Rx" — both antennas elevated
+  above clutter, a structurally different, always-LOS case with no NLOS
+  path-loss row of its own in Table 7.4.1-1). The likely source of the
+  error: a reader skimming for "the four InF path-loss formulas" sees
+  exactly four named rows (SL/DL/SH/DH) and, without checking Table 7.2-4
+  first, could mis-transcribe the fourth as "HH" from memory of the
+  sub-scenario *list* rather than the *path-loss table*. `sim/pathloss.py`
+  (WP6 commit 1) implements the real five; `p5g-sim-plan.md:670`'s own
+  "(SL/DL/SH/HH)" is left as-is per this document's own policy of not
+  editing that file (§0) — its four-item text is now known-stale in the
+  same category as `p5g-sim-plan.md`'s original WP ordering.
 - `[OPEN]` Survival-time threshold N (`p5g-sim-plan.md` §7) — start at 3,
   report H6 as a function of N.
 - `[OPEN]` **WP3 exposed a UL scheduling deadlock that only WP4 can properly

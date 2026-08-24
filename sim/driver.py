@@ -74,6 +74,15 @@ def run(
         cqi_loss_rate=cqi_loss_rate,
         # Independent seed so CQI-loss draws don't perturb the AR(1) stream.
         cqi_seed=scenario.seed ^ 0xC9C9C9C9,
+        gnb_position=scenario.gnb_position,
+        center_freq_ghz=scenario.carrier.center_freq_ghz,
+        bandwidth_hz=scenario.carrier.bandwidth_hz,
+        # WP6 (docs/wp6-plan.md Decision 2/3): independent seeds for the
+        # per-link LOS-realization and shadow-fading draws, same precedent
+        # as cqi_seed/harq_rng_dl/harq_rng_ul. Only drawn from for a UE
+        # with ``position`` set -- every existing scenario is unaffected.
+        los_seed=scenario.seed ^ 0x105105,
+        shadow_fading_seed=scenario.seed ^ 0x5FADE5,
     )
     buffers = BufferModel()
     bsr = BsrModel(scenario.flows, grid.slot_duration_s)
