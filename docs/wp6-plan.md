@@ -14,20 +14,66 @@ README §6's sync-loss threshold (lines 192-199), which feeds WP-Join. Read
 
 ---
 
-## 0. A naming flag, before anything else
+## 0. The naming flag — checked and resolved against spec text
 
-Both `README.md:336` and `p5g-sim-plan.md:670` write the four InF
-sub-scenarios as **"SL/DL/SH/HH."** My own recollection of TR 38.901 Table
-7.4.1-1 is that the fourth variant is **InF-DH** (Dense clutter, High BS
-height) — SL/DL/SH/DH, not SL/DL/SH/HH. I am not confident enough in that
-recollection to silently "correct" this repo's own docs, and CLAUDE.md's
-standing instruction for a comment/code (or here, doc/spec) mismatch is to
-flag it and ask, not reconcile silently in either direction. **Flagging,
-not resolving:** whoever writes `sim/pathloss.py` must check the actual
-TR 38.901 table before naming the fourth enum value, and if it really is
-"DH" in the spec, this plan's and the two docs' "HH" should be corrected
-together, not left as a second undocumented mismatch alongside the
-Tier-1-period and deficit-drain ones CLAUDE.md already tracks.
+Per sign-off: (a) checked whether anything in this repo or `oai-branches/`
+cites TR 38.901 §7.2/§7.4 directly rather than repeating this repo's own
+naming — it does not (`grep -rn "38\.901\|InF-\|Table 7\.2\|Table 7\.4"`
+across the whole tree hits only `README.md`, `p5g-sim-plan.md`, this
+document, and three `oai-branches/two-tier/*.c` files whose matches are
+false positives on unrelated citations — `TS 38.211 Table 7.4.1.1.2-3/-4`
+DMRS positions, `TS 38.213 Table 7.2.1-1` PDCCH candidates, and a bare
+`pathloss` variable name in `nr_ue_scheduler.c:263`'s PHR code. None is a
+38.901 InF citation). (b) Rather than stop at "unverified, use repo
+naming," I fetched the actual spec text — ATIS's transposition of 3GPP
+TR 38.901 V16.1.0 (`ATIS.3GPP.38.901.V1610.pdf`, the ATIS/3GPP joint
+document, publicly hosted), extracted with `pdftotext -layout` (the PDF's
+own embedded text layer, not an OCR or LLM-summarized reading — the
+extracted text preserves the spec's own Unicode math glyphs, e.g. `𝑃𝐿 =
+33 + 25.5 log10(𝑑3𝐷) + 20 log10(𝑓𝑐)`, verbatim). This is no longer an
+unverified recollection — it's a direct read of the primary source, cited
+by table and page number below.
+
+**Finding: the repo's own "SL/DL/SH/HH" is verifiably incomplete, not just
+possibly mistyped.** TR 38.901's actual Table 7.2-4 (spec-text extract,
+`38901.txt:1216-1230`, ATIS PDF p.23) defines **five** InF sub-scenarios,
+not four: **InF-SL, InF-DL, InF-SH, InF-DH, InF-HH** — sparse/dense clutter
+crossed with low/high BS height, *plus* a fifth, structurally different
+case, InF-HH ("high Tx, high Rx" — both antennas elevated above clutter,
+independent of clutter density). The repo's four-item list keeps
+InF-HH but drops **InF-DH** (dense clutter, high BS) — the actual fourth
+member of the clutter×height cross-product. This is exactly the
+"conflating InF clutter variants (S/D × L/H) with InF-HH's antenna-
+placement meaning" the sign-off named as a candidate failure mode, and
+the spec text confirms it as the actual one.
+
+**Why the omission is easy to make and easy to miss**: InF-HH is
+special-cased in **both** tables that matter — Table 7.4.2-1 (LOS
+probability, `38901.txt:1806-1824`, ATIS p.31) gives it
+`Pr_LOS = 1` unconditionally (always LOS, no clutter-density formula
+needed), and correspondingly **Table 7.4.1-1 has no NLOS path-loss row for
+InF-HH at all** (`38901.txt:1671-1710`, ATIS pp.30-31) — only the shared
+`PL_LOS` formula ever applies to it, since NLOS is never reached. A reader
+skimming for "the four InF path-loss formulas" would see exactly four
+named rows (SL/DL/SH/DH) and, without checking Table 7.2-4 first, could
+plausibly mis-transcribe the fourth as "HH" from memory of the sub-
+scenario *list* rather than the *path-loss table* — which is what I
+suspect happened whenever this repo's own docs first wrote "HH."
+
+**Decided, now that this is verified rather than guessed:** implement the
+real five-member enum (`SL`, `DL`, `SH`, `DH`, `HH`), not the repo's
+four-item list — using a known-incomplete enum in new code, once the gap
+is confirmed rather than suspected, would just be re-authoring the same
+mistake with better documentation. `InF-HH` gets no NLOS branch in
+`sim/pathloss.py` (matching the spec: `bler`-equivalent path loss for
+InF-HH is always `PL_LOS`, LOS probability always 1.0 — this is a real
+simplification in the *spec's own model*, not one WP6 is introducing).
+**New README §8 item, landed alongside WP6's first commit:** `README.md:
+336` and `p5g-sim-plan.md:670`'s "(SL/DL/SH/HH)" should be corrected to
+name the real five-member set — recorded as a doc fix, not silently
+folded into this plan's own text, per the same discipline that keeps
+`p5g-sim-plan.md` itself unedited as the historical record (README §0)
+while README carries the correction.
 
 ---
 
@@ -127,27 +173,76 @@ threshold is `-2.0` dB (`bits_per_prb` returns `(0, 1.0)` — untransmittable
 `docs/wp5-plan.md` Decision 1b) — this is the established "compose in the
 SNR domain, don't add a second curve" precedent WP6 follows (Decision 1).
 
-**TR 38.901 InF path loss / LOS probability — spec structure, coefficients
-flagged as unverified.** I recall the general shape with reasonable
-confidence: a common LOS formula (log-distance + frequency dependent,
-valid over a stated 3D-distance range), four sub-scenario-specific NLOS
-formulas combined with the LOS formula via `PL_NLOS = max(PL_LOS, PL')`,
-and a LOS-probability function of 2D distance and clutter parameters
-(density ratio, average clutter element size) that differs between the
-two low-BS sub-scenarios and the two high-BS ones. **I am not citing
-specific numeric coefficients here** — unlike the OAI C source (checked
-line-for-line) or the calibration log (read directly above), I have no
-vendored copy of TR 38.901 §7.4.1/§7.4.2 in this repo to check against,
-and reconstructing coefficients from memory is exactly the failure mode
-CLAUDE.md's BSR-table rule already names: *"38.321 tabulates rather than
-publishing a generating formula, so 'reconstructing' a table by formula is
-exactly the same silent-wrongness risk as recalling it from memory."* The
-same standard applies to 38.901's tables. **Action for the coding commit,
-not this plan:** transcribe the actual PL/LOS-probability formulas and
-per-sub-scenario coefficients from the TR 38.901 spec text directly (or a
-verified secondary source), and add a test that checks the transcription
-the same way `sim/tests/test_bsr.py` checks the BSR tables byte-for-byte —
-not "derive it from a formula I'm recalling."
+**TR 38.901 InF path loss / LOS probability — verified against spec text
+(§0), not reconstructed from memory.** Source: `ATIS.3GPP.38.901.V1610.pdf`
+(3GPP TR 38.901 V16.1.0, ATIS transposition), extracted with
+`pdftotext -layout` — the PDF's embedded text layer, quoted verbatim
+below, not an OCR/LLM-summarized paraphrase. Per CLAUDE.md's BSR-table
+rule ("reconstructing a table by formula is exactly the same
+silent-wrongness risk as recalling it from memory"), this is the same
+standard applied to 38.901: the numbers below are transcribed from the
+spec text directly, and `sim/tests/test_pathloss.py` must check the
+transcription byte-for-byte the same way `sim/tests/test_bsr.py` checks
+the BSR tables, not re-derive it.
+
+*Common LOS formula, Table 7.4.1-1 (`38901.txt:1666`, ATIS p.30) — applies
+to all five InF sub-scenarios:*
+
+```
+PL_LOS = 31.84 + 21.50*log10(d_3D) + 19.00*log10(f_c)      sigma_SF = 4.3
+```
+
+*Per-sub-scenario NLOS, same table (`38901.txt:1671-1710`, ATIS pp.30-31),
+each combined with `PL_LOS` via `max()`:*
+
+```
+InF-SL: PL' = 33.00 + 25.5*log10(d_3D) + 20*log10(f_c)     sigma_SF = 5.7
+        PL_NLOS = max(PL', PL_LOS)
+
+InF-DL: PL' = 18.6  + 35.7*log10(d_3D) + 20*log10(f_c)     sigma_SF = 7.2
+        PL_NLOS = max(PL', PL_LOS, PL_InF-SL)   <- note: maxes against
+                                                    InF-SL's NLOS value
+                                                    too, not just PL_LOS
+
+InF-SH: PL' = 32.4  + 23.0*log10(d_3D) + 20*log10(f_c)     sigma_SF = 5.9
+        PL_NLOS = max(PL', PL_LOS)
+
+InF-DH: PL' = 33.63 + 21.9*log10(d_3D) + 20*log10(f_c)     sigma_SF = 4.0
+        PL_NLOS = max(PL', PL_LOS)
+
+InF-HH: no NLOS row exists -- PrLOS(InF-HH) = 1 always (below), so only
+        PL_LOS ever applies.
+```
+
+`f_c` in GHz, `d_3D` in metres. Validity range `1 <= d_3D <= 600 m`
+(`38901.txt:1689`, stated once against the InF row); frequency range
+`0.5 < f_c < 100 GHz` (Note 2, `38901.txt:1728-1730` — 100 GHz is the
+"all other scenarios" bound, not RMa's 30 GHz one). **InF-DL's NLOS
+formula maxing against InF-SL's own NLOS value (not just the shared
+`PL_LOS`) is easy to drop by analogy with the other three rows — flag it
+explicitly in `sim/pathloss.py`'s docstring, not just here.**
+
+*LOS probability, Table 7.4.2-1 (`38901.txt:1806-1824`, ATIS p.31):*
+
+```
+InF-SL, InF-SH, InF-DL, InF-DH:
+    Pr_LOS(d_2D) = exp(-d_2D / k_subsce)
+    where k_subsce = -d_clutter / ln(1 - r)                    (SL, DL)
+                    = -d_clutter/ln(1-r) * (h_BS-h_UT)/(h_c-h_UT)  (SH, DH)
+
+InF-HH:
+    Pr_LOS = 1   (always LOS -- both antennas elevated above clutter)
+```
+
+`d_clutter` (typical clutter size), `r` (clutter density ratio, fraction
+of surface area occupied by clutter), and `h_c` (effective clutter height)
+are per Table 7.2-4 (`38901.txt:1216-1281`, ATIS p.23) — see Decision 6
+for the calibration-study example values.
+
+**What Decision 5/6 below still need to decide, since the spec leaves
+them open:** `d_clutter`/`r`/`h_c`/BS-height numeric values for *this*
+deployment (the spec gives typical/example ranges, not a single number —
+same "representative, not confirmed" epistemic tier as `sr_period_slots`).
 
 ---
 
@@ -311,30 +406,32 @@ representative-not-confirmed default in this document.
 new scope boundary between WP6 and WP-Join that neither `p5g-sim-plan.md`
 nor README §6 stated explicitly.
 
-### Decision 5 — InF sub-scenario exposure: enum now, sweep in WP9, one arbitrary default for WP6's own acceptance demo
+### Decision 5 — InF sub-scenario exposure: real five-member enum now, sweep in WP9, one arbitrary default for WP6's own acceptance demo
 
 Per prompt item (a) and README §8 (line 336): the sub-scenario choice is
 "deployment-dependent, sweep in WP6 rather than picking blind" — read as
 *WP6 builds the mechanism so the axis is sweepable*, not *WP6 itself picks
 the headline answer*. **Decided:** `UEConfig.inf_scenario` (Decision 2) is
-a plain string/enum with all four variants implemented and tested
-individually (not just one "the factory" path); `scripts/regime_sweep.py`
-(WP9, Phase 3) is where the actual cross-sub-scenario comparison happens,
-against the full metric panel, per README §4's phasing.
+a plain string/enum with all **five** verified variants implemented and
+tested individually (`SL`, `DL`, `SH`, `DH`, `HH` — §0; not the repo's
+previous four-item list) — `InF-HH` implemented as the always-LOS special
+case (no NLOS branch, per §2); `scripts/regime_sweep.py` (WP9, Phase 3) is
+where the actual cross-sub-scenario comparison happens, against the full
+metric panel, per README §4's phasing.
 
 **A default is still needed for WP6's own acceptance-criterion demo**
 (a new scenario exercising path loss/blockage — Decision 2/3's opt-in
 design means the existing 22-record corpus can't exercise this at all).
-Picking one for that purpose only, **flagged as arbitrary, not a claimed
-answer to the deployment question**: whichever variant matches "a
-production floor with equipment-height obstruction, not open warehouse
-space" (dense clutter) — deferred to the naming resolution in §0, since I
-won't commit to "InF-DH" vs "InF-HH" as a concrete value until that's
-checked against the real table. The important property is that this
-choice carries **zero evidentiary weight** — it's a demo default, not a
-Phase-3 finding, and the commit message must say so.
+**Decided: InF-DH** (dense clutter, high BS) for the demo scenario —
+"a production floor with equipment-height obstruction and overhead-mounted
+radios," a plausible private-5G factory deployment, and (now that §0 is
+resolved) an unambiguous, spec-real choice. **Flagged as arbitrary
+regardless**: this carries **zero evidentiary weight** on the actual
+deployment question — it's a demo default so WP6's own acceptance
+criterion has something concrete to run, not a Phase-3 finding, and the
+commit message must say so.
 
-### Decision 6 — link-budget constants (Tx power, noise figure): flagged, not vendored
+### Decision 6 — link-budget constants: Tx power flagged (no repo ground truth); noise figure and clutter parameters now anchored to the spec's own calibration example
 
 Deriving an SNR from path loss needs a link budget: `SNR_db = tx_power_dbm
 + tx_gain_db - PL_db - noise_figure_db - thermal_noise_dbm(bandwidth_hz)`
@@ -344,14 +441,41 @@ floor). **No prior mechanism in this repo computes an absolute link
 budget** — `sim/power.py` (WP1) works entirely in relative power-headroom
 terms (`ph_factor`, dB deltas), never an absolute dBm Tx power or noise
 figure — so this isn't a duplicate-mechanism risk the way WP5's BLER
-curve was; it's a genuinely new quantity. **Decided:** UE Tx power
-defaults to 23 dBm (3GPP UE power class 3, TS 38.101-1 — an actual spec
-value, citable with more confidence than the InF coefficients above);
-gNB receiver noise figure defaults to a representative literature value
-(5-7 dB range typically cited for NR gNB receivers) — **flagged exactly
-like WP5's IR/Chase dB table**: ported/used because no better number
-exists in this repo, not because it's confirmed for this deployment.
-Antenna/cable gains: 0 dB (unmodelled), same honesty standard.
+curve was; it's a genuinely new quantity.
+
+**Decided, Tx power:** UE Tx power defaults to 23 dBm (3GPP UE power
+class 3, TS 38.101-1 — an actual spec value, no change from the original
+plan). No gNB Tx power / antenna gain value is vendored anywhere in this
+repo; still flagged as representative-not-confirmed.
+
+**Upgraded from a flagged literature guess to a spec-cited example,
+found while verifying §0/§2: TR 38.901's own InF calibration study**
+(Table 7.8-7, `38901.txt:5578-5625`, ATIS p.91 — "Simulation assumptions
+for large scale calibration for the indoor factory scenario") **states
+concrete example values for every clutter/link-budget parameter WP6
+needs**, not just the abstract ranges in Table 7.2-4:
+
+```
+UT noise figure:        9 dB
+BS height:               1.5 m  (InF-SL, InF-DL)
+                          8 m    (InF-SH, InF-DH)
+Clutter density r:       20%   (low clutter)  /  60%  (high clutter)
+Clutter height h_c:       2 m   (low clutter)  /   6 m  (high clutter)
+Carrier frequency:       3.5 GHz, 28 GHz
+Bandwidth:               100 MHz
+Hall size:               120x60 m (InF-SL, InF-DH), 300x150 m (InF-DL, InF-SH)
+```
+
+**Decided:** use these as the module's defaults, cited to Table 7.8-7
+directly rather than an invented or half-remembered "5-7 dB" placeholder.
+**Still flagged, honestly:** this is the spec's own *calibration-study*
+setup (used to validate the model against reference simulators), not a
+confirmed value for *this* factory deployment — same epistemic tier as
+`sr_period_slots`, just with a stronger citation than before. One gap:
+Table 7.8-7 gives only a UT-side noise figure, not a separate gNB-side
+one; **decided to reuse 9 dB symmetrically for both UL and DL noise-figure
+terms**, flagged explicitly as a same-value-both-directions
+simplification, not a second vendored gNB number.
 
 ### Decision 7 — mobility / correlated multi-UE blockage: deferred out of WP6
 
@@ -376,7 +500,7 @@ was silently dropped by oversight.
 | 1 | TR 38.901 InF path loss + LOS probability (Decision 2, 5, 6) | `sim/pathloss.py` (new), `sim/config.py` (`UEConfig.position`/`inf_scenario`, `ScenarioConfig.gnb_position`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_pathloss.py` (new) | No — dormant on the existing corpus (no scenario sets `position`), same falsifiable-inertness argument as `docs/wp5-plan.md` commit 2 |
 | 2 | Two-state Markov blockage (Decision 3) | `sim/channel.py` or `sim/blockage.py` (new), `sim/config.py` (`UEConfig.blockage`), `sim/tests/test_blockage.py` (new) | No — dormant on the existing corpus (no scenario sets `blockage`), independent RNG stream added but unused until referenced |
 | 3 | Sync-loss / RLF detection (Decision 4) — **needs sign-off first** | `sim/rlf.py` (new), `sim/tests/test_rlf.py` (new) | No — dormant, unit-tested only, matching `sim/power.py`/`sim/olla.py` precedent; zero `sim/driver.py` changes |
-| 4 | WP6's own acceptance-criterion demo: one new scenario exercising blockage (and optionally path loss) on an existing baseline scheduler (Decision 5) | `sim/scenarios/scenario_config_7.yml` (new, or similar) — **no existing scenario file touched** | Yes, but scoped to the new scenario only; existing 22-record corpus untouched |
+| 4 | WP6's own acceptance-criterion demo: one new scenario exercising blockage (and optionally path loss) on an existing baseline scheduler, run at **two** `mean_blocked_ms` settings so the exhaustion-spike claim is falsifiable (Decision 5, see prediction #2 below) | `sim/scenarios/scenario_config_7.yml` (new, or similar) + a short comparison script/test — **no existing scenario file touched** | Yes, but scoped to the new scenario only; existing 22-record corpus untouched |
 
 **Predicted, before writing any code — commits 1-3: fully clean `--check`.**
 This is the same falsifiable-inertness pattern as `docs/wp5-plan.md`
@@ -402,15 +526,32 @@ metric's `status` promotes; see §5.**
    starvation").
 2. (High) **`bytes_harq_lost`/`harq_exhausted_count`** (WP5's counters,
    `sim/driver.py:131,330,463`) — expected far above WP5's baseline rate
-   of 6-of-510 flow-records. Per §2's cited numbers: one full HARQ retry
-   cycle is ~12 ms (DL) / ~4 ms (UL); a blockage event lasting "hundreds of
-   milliseconds" (Decision 3) outlasts *many* consecutive retry cycles, so
-   every attempt issued for the blocked UE during that whole window should
-   exhaust, not just the one in flight at blockage onset. This is the
-   answer to prompt item (d)'s explicit question — yes, this interaction
-   is real and should be one of the largest-magnitude, most confidently
-   predicted effects in this WP, on the same footing as WP5's own
-   headline binary-delivery finding.
+   of 6-of-510 flow-records, **but only at the "long blockage" setting.**
+   Per §2's cited numbers: one full HARQ retry cycle is ~12 ms (DL) /
+   ~4 ms (UL); a blockage event lasting "hundreds of milliseconds"
+   (Decision 3) outlasts *many* consecutive retry cycles, so every attempt
+   issued for the blocked UE during that whole window should exhaust, not
+   just the one in flight at blockage onset. This is the answer to prompt
+   item (d)'s explicit question — yes, this interaction is real and should
+   be one of the largest-magnitude, most confidently predicted effects in
+   this WP, on the same footing as WP5's own headline binary-delivery
+   finding.
+
+   **Made falsifiable, per sign-off feedback:** the mechanism claims the
+   effect is driven by blockage duration *relative to the retry cycle*,
+   not by blockage merely existing — so commit 4's scenario/script must
+   run `mean_blocked_ms` at **two** settings, not one: a "short" setting
+   below both retry-cycle lengths (e.g. ~2-3 ms, shorter than the ~4 ms UL
+   cycle) and a "long" one anchored to `p5g-sim-plan.md:557`'s "hundreds of
+   milliseconds" (e.g. ~300 ms). **Predicted:** short blockage leaves
+   `harq_exhausted_count`/`bytes_harq_lost` close to WP5's own baseline
+   rate (most in-flight TBs get all their retry attempts either entirely
+   before or entirely after the brief dip, not stranded inside it); long
+   blockage spikes it well above baseline. If short and long both spike
+   equally, or neither does, the "duration vs. retry-cycle" mechanism as
+   stated is wrong, not just quantitatively off — this is the falsifiable
+   form the sign-off asked for, distinguishing "exhaustion spikes" from
+   "exhaustion always spikes whenever blockage exists at all."
 3. (High) **M01 `flow_latency_percentiles`** — p95/p98/p99 for the blocked
    UE's flows spike during/immediately after blockage; p50 comparatively
    unaffected (most slots are unblocked).
@@ -470,18 +611,24 @@ entry — not WP6 itself, which never touches those scenarios.
 
 ## 6. Flags — out of order, blocked, or needing sign-off before coding
 
-1. **Decision 4 (sync-loss threshold placement, WP6 vs WP-Join) needs
-   sign-off before commit 3.** This plan draws a new scope boundary
-   neither source document stated explicitly; get confirmation the same
-   way README §6's own WP-Join RACH-depth item already asks for it.
-2. **§0's naming flag (SL/DL/SH/HH vs SL/DL/SH/DH) must be checked against
-   the real TR 38.901 table before `sim/pathloss.py`'s enum is written**,
-   not inherited from this repo's two existing (possibly wrong) mentions.
-3. **§2's numeric path-loss/LOS-probability coefficients are unverified**
-   — flagged with the same severity as CLAUDE.md's BSR-table rule. This is
-   the single highest-risk item in this plan: getting a table wrong here
-   is silent-wrong, not loud-wrong, exactly the failure mode CLAUDE.md
-   warns about.
+1. **Resolved, sign-off given:** Decision 4 (sync-loss threshold placement,
+   WP6 detection / WP-Join recovery) is confirmed. No longer open.
+2. **Resolved, verified against spec text (§0):** the repo's own
+   "SL/DL/SH/HH" is confirmed incomplete — TR 38.901 Table 7.2-4 defines
+   five InF sub-scenarios (`SL`/`DL`/`SH`/`DH`/`HH`), and `sim/pathloss.py`
+   implements the real five, not the repo's four. New README §8 item
+   (landed with commit 1) records that `README.md:336`/`p5g-sim-plan.md:
+   670` should be corrected to match.
+3. **Resolved, verified against spec text (§2):** the path-loss/
+   LOS-probability formulas and coefficients are transcribed from
+   `ATIS.3GPP.38.901.V1610.pdf` (3GPP TR 38.901 V16.1.0) via direct
+   `pdftotext` extraction of the PDF's embedded text layer, cited by table
+   and page number — not reconstructed from memory. `sim/tests/
+   test_pathloss.py` must still check the transcription byte-for-byte
+   against that same source before commit 1 lands, per CLAUDE.md's
+   BSR-table discipline — verifying *this document's* transcription is
+   not the same as the implementation's own test verifying *its*
+   transcription; both need to happen.
 4. **WP6's own acceptance criterion (`p5g-sim-plan.md:562-563`) is partly
    stale for this branch's phase ordering, same species of issue as
    WP5's stale `scheduler/reservation.py`/`two_tier.py` charter reference
@@ -517,17 +664,22 @@ entry — not WP6 itself, which never touches those scenarios.
 
 ---
 
-## 7. Summary of what needs a decision before coding starts
+## 7. Status — all pre-coding gates cleared
 
-- Sign-off on Decision 4's WP6/WP-Join boundary for sync-loss (item 1
-  above).
-- Resolution of the SL/DL/SH/HH-vs-DH naming question against the actual
-  spec table (item 2).
-- Verification of TR 38.901's actual path-loss/LOS-probability
-  coefficients before `sim/pathloss.py` is written, not before this plan
-  is approved — the plan's mechanism design (Decision 1, 2, 6) doesn't
-  depend on the specific numbers, only the coding commit does.
+- Decision 4's WP6/WP-Join sync-loss boundary — **signed off.**
+- The InF sub-scenario naming — **verified against TR 38.901 Table 7.2-4**
+  (§0): the real set is `SL`/`DL`/`SH`/`DH`/`HH`, not the repo's
+  `SL`/`DL`/`SH`/`HH`; `sim/pathloss.py` implements the real five.
+- The path-loss/LOS-probability coefficients — **verified against
+  TR 38.901 Tables 7.4.1-1/7.4.2-1/7.2-4/7.8-7** (§2, Decision 6), quoted
+  from a direct `pdftotext` extraction of `ATIS.3GPP.38.901.V1610.pdf`,
+  not reconstructed from memory. `sim/tests/test_pathloss.py` re-verifies
+  the transcription independently, per CLAUDE.md's BSR-table rule.
+- Commit 4's blockage-duration prediction is now built to be falsifiable
+  (short vs. long `mean_blocked_ms`, §4 prediction #2), not just directionally
+  plausible.
 
-Everything else in this document (Decisions 2, 3, 5, 6, 7; the commit
-checklist; the metric predictions) is ready to implement once those three
-are settled.
+Proceeding to commit 1: `sim/pathloss.py` (TR 38.901 InF path loss + LOS
+probability), `sim/config.py` (`UEConfig.position`/`inf_scenario`,
+`ScenarioConfig.gnb_position`), `sim/channel.py` wiring (opt-in), and
+`sim/tests/test_pathloss.py`.
