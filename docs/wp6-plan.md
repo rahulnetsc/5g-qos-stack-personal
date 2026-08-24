@@ -375,17 +375,25 @@ test_blockage_transitions_use_their_own_independent_rng_stream`, the same
 "change one seed, hold the others fixed, confirm the result changes"
 check commit 1's own LOS/shadow-fading independence test used.
 
-### Decision 4 — sync-loss (RLF-declaration) threshold lands in WP6, dormant; recovery timing stays WP-Join's
+### Decision 4 — sync-loss (RLF-declaration) DETECTION lands in WP6, dormant; recovery timing stays WP-Join's — sign-off given, corrected before commit 3
 
 The prompt requires a decision here, not inheritance of either README
 §6's WP-Join framing or `p5g-sim-plan.md`'s silence. Looking at what the
 calibration banner's timers actually govern:
 
-- `t310`/`n310`/`n311` govern **detection**: how long (and after how many
-  bad indications) the UE declares RLF, and what cancels that countdown.
-  This is a function of instantaneous channel quality alone — it doesn't
-  need a join/attach state machine to define, only a floor and a dwell
-  timer.
+- `t310`/**`n310`**/`n311` govern **detection**: how long (and after how
+  many bad indications) the UE declares RLF, and what cancels that
+  countdown. This is a function of instantaneous channel quality alone —
+  it doesn't need a join/attach state machine to define, only a floor and
+  a dwell timer. **`n310` belongs here too, corrected from this
+  Decision's earlier draft**, which named only `t310`/`n311` in this
+  bullet and then, in its own next paragraph, collapsed `n310` away
+  entirely (approximating it as `n310=1`) rather than actually placing it
+  on the detection side and using it. `n310` gates *when the t310 dwell
+  timer itself starts counting* — there's no reading of "detection" that
+  excludes the condition that arms the detector's own timer, and once
+  commit 3 was actually being coded there was no reason not to use the
+  real cited value (10) instead of discarding it.
 - `t311` governs the **reestablishment search window** — how long the UE
   may spend finding a suitable cell and sending
   `RRCReestablishmentRequest` after RLF is already declared.
@@ -394,45 +402,64 @@ calibration banner's timers actually govern:
   squarely about what happens *after* a UE decides it needs to
   (re)connect, not about detecting that it needs to.
 
-**Decided:** WP6 owns detection only — `rlf_snr_floor_db` (a threshold)
-and the `t310`-dwell / `n311`-cancel state machine, landed **dormant**,
-matching the `sim/power.py` (WP1) / `sim/olla.py` (WP5 commit 6)
-precedent exactly: a new small module (`sim/rlf.py`), pure
-functions/dataclass state, unit-tested against the exact timer values
-above, **not wired into `sim/driver.py`, any buffer, or any scheduler**.
-`t311`/`t300`/`t301`/`t319` — everything about the *recovery* procedure —
-stay entirely WP-Join's, since that's a new state machine (attach/RACH/
-reestablishment) this branch doesn't have yet, and README §8's own open
-item ("calibrated delay distribution... needs your sign-off") already
-flags that WP-Join's timing-model shape is an open decision independent
-of this one.
+**Decided, sign-off given:** WP6 owns detection only — `rlf_snr_floor_db`
+(a threshold) and the full `n310`-armed `t310`-dwell / `n311`-cancel state
+machine, landed **dormant**, matching the `sim/power.py` (WP1) / `sim/
+olla.py` (WP5 commit 6) precedent exactly: a new small module (`sim/
+rlf.py`), pure functions/dataclass state, unit-tested against the exact
+timer values below, **not wired into `sim/driver.py`, `sim/config.py`,
+any buffer, or any scheduler**. `t311`/`t300`/`t301`/`t319` — everything
+about the *recovery* procedure — stay entirely WP-Join's, since that's a
+new state machine (attach/RACH/reestablishment) this branch doesn't have
+yet, and README §8's own open item ("calibrated delay distribution...
+needs your sign-off") already flags that WP-Join's timing-model shape is
+an open decision independent of this one.
 
-**`n310` is not modelled precisely, and this is a deliberate
-simplification, not a silent drop.** Real RLF detection counts `n310`
-consecutive **out-of-sync indications**, and the indication-sampling
-period is UE-implementation-defined — nothing in this repo's calibration
-data gives that cadence. Modelling `n310` at a fixed 10-consecutive-*slots*
-cadence (5 ms at 0.5 ms/slot) would be inventing a parameter with strictly
-less justification than not modelling it at all. **Decided:** collapse
-detection to "if `get_snr_db(ue)` stays below `rlf_snr_floor_db` for a
-continuous `t310` (2000 ms), declare RLF; if it rises back above the floor
-before `t310` expires, cancel the timer" — which is exactly what `n311=1`
-already means (one recovery sample cancels), so that part of the real
-mechanism is reproduced exactly, not approximated. Only `n310`'s
-multi-sample counting structure is collapsed into a single continuous-
-dwell check. State this in `sim/rlf.py`'s own docstring, not just here.
-
-**`rlf_snr_floor_db` needs a default with no ground truth for it either.**
-Recommended anchor: `_MCS_TABLE`'s own lowest threshold minus its stated
-margin — `scheduler/link.py:68`'s existing "no viable MCS" floor
+**`t310`/`n310`/`n311` are real, measured, deployed values — cite the log
+directly, don't call them representative defaults.**
+`calibration-logs/twotier_startup_gnb.log:17`'s startup banner: `t310
+2000, n310 10, ..., n311 1` (ms/counts) — this is the actual deployed
+gNB's own RRC/MAC config, the same citation strength as `sim/pathloss.py`
+citing TR 38.901's tables, not the `sr_period_slots`/`k1_slots` epistemic
+tier. **`rlf_snr_floor_db` is the one exception, and stays a genuine
+choice**: no calibration log or spec text anywhere in this repo gives an
+SNR/RSRP/RSRQ threshold for out-of-sync detection (a normally-internal
+PHY implementation choice, not an RRC-visible config value). Anchored to
+`scheduler/link.py:68`'s existing "no viable MCS" floor
 (`_MCS_TABLE[0][0] - 3.0` = `-5.0` dB) — reusing a boundary the codebase
-already treats as physically meaningful ("untransmittable") rather than
-inventing an unrelated number. Flagged the same way as every other
-representative-not-confirmed default in this document.
+already treats as physically meaningful rather than inventing an
+unrelated number, flagged the same way as every other representative-not-
+confirmed default in this document.
 
-**This decision needs sign-off before commit 3 lands** (§6) — it draws a
-new scope boundary between WP6 and WP-Join that neither `p5g-sim-plan.md`
-nor README §6 stated explicitly.
+**`n310`/`n311`'s counting structure is approximated, and this is a
+deliberate, stated simplification, not a silent drop — corrected from
+collapsing `n310` away entirely.** Real RLF detection counts `n310`/
+`n311` consecutive **out-of-sync/in-sync indications**, and the
+indication-sampling period is UE-implementation-defined — nothing in this
+repo's calibration data gives that cadence. **Decided (revised): model
+`n310`/`n311` as real consecutive-SLOT counters using the cited values
+(10 and 1) directly** — one slot standing in for one indication, an
+approximation of the counting *cadence* (at 0.5ms/slot, `n310=10` slots is
+5ms, almost certainly faster than any real UE's indication period) but
+not of the counting *structure* itself, which is now reproduced exactly
+rather than collapsed to `n310=1`. `n311` is implemented generically
+(a configurable consecutive-good-slots threshold), not hardcoded to "1",
+so a deployment with a different `n311` would be handled correctly. State
+this approximation in `sim/rlf.py`'s own docstring, not just here.
+
+**The WP6/WP-Join interface, decided now since this is the seam between
+two separate work packages:** `sim/rlf.py` exposes three things, no more —
+`RlfDetectorState.sync_state` (the level: `IN_SYNC`/`T310_RUNNING`/
+`RLF_DECLARED`, for any code checking "is this UE currently failed" at an
+arbitrary point), `RlfStepResult.rlf_declared_this_slot` (an edge-
+triggered event, true for exactly the one slot RLF is declared — WP-Join
+should react to this to start its own reattach procedure exactly once,
+not re-derive the edge by polling the level state), and
+`RlfDetectorState.rlf_declared_at_slot` (the slot index, for timing/
+metrics). `step()` never un-declares RLF once reached — re-arming after a
+real reattach is WP-Join's job (constructing a fresh `RlfDetectorState`,
+or a reset method WP-Join adds when it needs one), not something this
+module invents without a consumer to justify it.
 
 ### Decision 5 — InF sub-scenario exposure: real five-member enum now, sweep in WP9, one arbitrary default for WP6's own acceptance demo
 
@@ -527,7 +554,7 @@ was silently dropped by oversight.
 |---|---|---|---|
 | 1 | TR 38.901 InF path loss + LOS probability (Decision 2, 5, 6) — **landed** | `sim/pathloss.py` (new), `sim/config.py` (`UEConfig.position`/`inf_scenario`, `ScenarioConfig.gnb_position`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_pathloss.py` (new) | No — dormant on the existing corpus (no scenario sets `position`), same falsifiable-inertness argument as `docs/wp5-plan.md` commit 2 |
 | 2 | Two-state Markov blockage (Decision 3) — **landed** | `sim/blockage.py` (new), `sim/config.py` (`UEConfig.blockage`, `BlockageConfig`), `sim/channel.py` (wiring, opt-in), `sim/tests/test_blockage.py`, `sim/tests/test_channel.py` (new/extended) | No — dormant on the existing corpus (no scenario sets `blockage`), independent RNG stream added but unused until referenced |
-| 3 | Sync-loss / RLF detection (Decision 4) — **sign-off given, not yet coded** | `sim/rlf.py` (new), `sim/tests/test_rlf.py` (new) | No — dormant, unit-tested only, matching `sim/power.py`/`sim/olla.py` precedent; zero `sim/driver.py` changes |
+| 3 | Sync-loss / RLF detection (Decision 4) — **landed** | `sim/rlf.py` (new), `sim/tests/test_rlf.py` (new) | No — dormant, unit-tested only, matching `sim/power.py`/`sim/olla.py` precedent; zero `sim/driver.py`/`sim/config.py` changes |
 | 4 | WP6's own acceptance-criterion demo: one new scenario exercising blockage (and optionally path loss) on an existing baseline scheduler, run at **two** `mean_blocked_slots` settings so the exhaustion-spike claim is falsifiable (Decision 5, see prediction #2 below) | `sim/scenarios/scenario_config_7.yml` (new, or similar) + a short comparison script/test — **no existing scenario file touched** | Yes, but scoped to the new scenario only; existing 22-record corpus untouched |
 
 **Predicted, before writing any code — commits 1-3: fully clean `--check`.**
@@ -668,6 +695,46 @@ zero mismatches.
 4. *Does any panel metric flip?* **No** — checked `requires:` directly
    again for commit 2; still none name WP6. See §5, unchanged from
    commit 1's conclusion.
+
+**Commit 3 — landed.** `sim/rlf.py` (new: `SyncState`, `RlfDetectorConfig`,
+`RlfDetectorState`, `RlfStepResult`, `t310_slots()`, `step()`), `sim/
+tests/test_rlf.py` (new, 12 tests). **Predicted, before writing any code:
+fully clean `--check` — the seventeenth such prediction in this WP5/WP6
+lineage, and the strongest form of it** (same as WP5 commit 6 / `sim/
+olla.py`): `sim/driver.py` and `sim/config.py` are not touched at all this
+commit, so there is no code path by which anything in `sim/rlf.py` could
+run during a `driver.run()` call, regardless of scenario — a state
+machine's dormancy claim is exactly as falsifiable as a continuous
+quantity's (WP1/WP5's precedent) when nothing calls it at all. **Confirmed
+exactly:** `pytest sim/tests -q` — 298 passed (286 + 12 new), 1 xfailed
+(unchanged); `regression_corpus.py --check` — clean, zero mismatches;
+`git status` after this commit touches exactly `sim/rlf.py` and `sim/
+tests/test_rlf.py`, confirming no other file (in particular `sim/
+driver.py`) changed.
+
+**Answering the sign-off's explicit questions:**
+1. *Cite the calibration log the way commit 1 cited spec tables; say
+   which values are measured vs. still a choice.* **`t310_ms=2000`,
+   `n310=10`, `n311=1` are measured** — `calibration-logs/
+   twotier_startup_gnb.log:17`'s real startup banner, cited directly in
+   `sim/rlf.py`'s own docstring and `RlfDetectorConfig`'s. **`rlf_snr_
+   floor_db=-5.0` is still a choice** — no calibration log or spec text
+   anywhere in this repo gives an out-of-sync SNR threshold; anchored to
+   `scheduler/link.py:68`'s existing "no viable MCS" floor instead of an
+   unrelated invented number.
+2. *Does detection need n310, and was the split named correctly?*
+   **Yes, and the split was corrected, not inherited** — see Decision 4's
+   rewrite above. `n310` gates when `t310` itself arms, which is squarely
+   a detection-side concept; `sim/rlf.py` now uses the real cited value
+   (10) as a genuine consecutive-slot counter, not collapsed to `n310=1`
+   the way this Decision's first draft had it.
+3. *Confirm this state-transition commit still lands dormant and predict
+   clean.* **Confirmed** — see above; predicted and landed as the
+   seventeenth clean `--check` in the lineage.
+4. *What does detection expose for WP-Join, decided now?* **Three things,
+   specified in Decision 4's rewrite**: `sync_state` (level),
+   `rlf_declared_this_slot` (edge event), `rlf_declared_at_slot`
+   (timestamp) — no more, since nothing else has a named consumer yet.
 
 ---
 
