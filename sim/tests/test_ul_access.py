@@ -247,13 +247,26 @@ def test_sr_retires_the_cold_start_deadlock_without_it():
     SR-triggered grant's report floor from an initial 1-byte value to 150
     bytes (matching this branch's own established "crumb" definition,
     README/CLAUDE.md) let most small messages complete in the triggering
-    grant itself, recovering most of the gap (~50% mean -> ~82% mean) --
-    but a residual tie-breaking pattern in PF's own ranking (unmodified
+    grant itself, recovering most of the gap (WP4: ~50% mean -> ~82% mean)
+    -- but a residual tie-breaking pattern in PF's own ranking (unmodified
     per Phase 1's no-scheduler-changes constraint: many simultaneously-
     cold UEs score identically, and Python's stable sort always favours
     the same few on ties) still leaves a handful of UEs starved. See
     docs/oai-port-map.md for the full trace. test_sr_preserves_delivery_on_
     the_branch_s_main_scenario below is the fairer, representative check.
+
+    WP5 commit 4b (docs/wp5-plan.md, README.md sec8): the ~82% WP4 figure
+    above is no longer what this test measures and the absolute-delivery
+    assertion below is loosened accordingly -- HARQ retry's full masking
+    (a FIFO-correctness requirement, not a modelling choice) blocks a
+    retrying flow from taking a fresh SR-triggered grant for the whole
+    retry cycle, which costs more than failing fast does for this
+    scenario's small, one-shot-completion traffic. Measured mean dropped
+    to ~47%. The SR MECHANISM itself is unaffected and still verified by
+    the other two assertions below (retires the deadlock, ~10x over the
+    no-SR case) -- only the absolute-delivery bar is loosened, and only
+    because the number it used to check no longer means what this
+    docstring used to say it means.
     """
     from sim.scenarios import sensor_dense_scenario
     from sim.baselines.pf import ProportionalFair
@@ -295,7 +308,14 @@ def test_sr_retires_the_cold_start_deadlock_without_it():
         f"SR mean delivery {mean_with_sr:.1%} should be far above the "
         f"no-replacement deadlock {mean_no_replacement:.1%}"
     )
-    assert mean_with_sr > 0.6, f"SR mean delivery {mean_with_sr:.1%} too low"
+    # WP5 commit 4b: loosened from 0.6 -- guards against the SR mechanism
+    # breaking again (a return to something near the no-replacement
+    # deadlock), not against a specific absolute-delivery level. HARQ
+    # retry's masking now depresses this to ~47% (measured), a real,
+    # documented result (README.md sec8, docs/wp5-plan.md commit 4b), not
+    # tuned to hide a regression -- 0.4 sits comfortably below the
+    # measured value while still catching the mechanism actually failing.
+    assert mean_with_sr > 0.4, f"SR mean delivery {mean_with_sr:.1%} too low"
 
 
 def test_sr_preserves_delivery_on_the_branch_s_main_scenario():

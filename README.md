@@ -554,7 +554,11 @@ they survive it:
 - `[OPEN]` **WP5 commit 4a's per-flow HARQ masking is defeated,
   non-destructively, by `scheduler/two_tier.py::_allocate_sps`'s
   UE-level backlog pooling — measured at 3,628 occurrences across 13 of
-  22 regression-corpus cases, all `TwoTier`.** `_allocate_sps` sizes one
+  22 regression-corpus cases, all `TwoTier`, on commit 4a (DL only).
+  **Confirmed to extend to UL on commit 4b, exactly as predicted**: total
+  rose to 7,092 (including 1,220 hits on `study2/pdcch_limited`, an
+  all-UL scenario) once UL grants could also be masked-and-pooled the
+  same way. `_allocate_sps` sizes one
   UE's combined SPS grant off the *sum* of backlog across every
   SPS-eligible flow of that UE; masking a single pending flow's
   `bytes_queued` to 0 doesn't zero that sum if the UE has other,
@@ -581,6 +585,53 @@ they survive it:
   for Phase 2 — **whoever rewrites `two_tier.py`/`reservation.py` fresh
   from OAI source must not reintroduce a backlog-pooling grant path that
   makes this counter nonzero again.**
+- `[OPEN]` **WP5 commit 4b: HARQ retry can make UL delivery *worse*, not
+  better, for cold-start-heavy traffic — a real result, not a defect,
+  and directly connected to WP4's own open findings below.** Measured on
+  `sensor_dense_scenario` (`ProportionalFair`):
+
+  | `harq_round_max` / `k2_slots` | mean delivery |
+  |---|---|
+  | `harq_round_max=4` (default) | 0.471 |
+  | `harq_round_max=1` (no retry — instant permanent loss) | 0.576 |
+  | `k2_slots=1` (default is 2 — shorter retry gap) | 0.667 |
+
+  **Mechanism:** commit 4a's full masking (a FIFO-correctness requirement
+  — see that commit's own `[OPEN]` entry above and `docs/wp5-plan.md`
+  commit 4a — not a modeling choice) blocks a retrying flow from
+  receiving *any* new grant, including a fresh SR-triggered cold-start
+  grant, for the whole retry cycle (`k2_slots` × however many retries it
+  takes). For traffic dominated by small, one-shot-completion messages —
+  exactly what WP4's SR report floor exists to serve — sitting out the
+  official retry costs more than failing fast and catching a brand-new
+  grant next opportunity, since the channel condition causing the
+  failure is often transient. **Confirmed NOT cross-flow masking
+  compounding**: zero UEs in `sensor_dense_scenario` have more than one
+  UL flow, so this is a single-flow effect, not masking blocking a
+  sibling flow while one retries.
+
+  **Not fixed, deliberately, on either axis**: masking stays full-
+  strength (weakening it would trade a correctness requirement for a
+  metric); `k2_slots`'s default stays 2 (the midpoint of the real 1-4
+  slot TDA range at μ=1, Decision 3, `docs/wp5-plan.md`) rather than
+  retuned to whatever value happens to pass a test — that is exactly the
+  invented-parameter pattern this branch has avoided everywhere else
+  (`FIVE_QI_LCG`, `sr_period_slots`). That `k2_slots=1` recovers delivery
+  is recorded as the sensitivity **WP9 should sweep**, not a new default.
+
+  **Read together with two already-open items, as one hypothesis, not
+  three unrelated ones**: this finding, WP4's load-inversion negative
+  result (§8, "the hypothesised high-to-low curve" never appearing), and
+  WP3/WP4's crumb-fraction shortfall (§8, still ~10x short of hardware's
+  48-52% even after WP4's SR-floor fix — commit 4b's own measurement on
+  `factory_robots_scenario`/`TwoTier`@1.0× moved it again, 4.4503% →
+  5.1233%, mean crumb size 146.03 → 135.38 bytes, same direction as
+  WP4's own move, still far short) all look like facets of one thing:
+  **the uplink access chain dominates outcomes at low load and for small
+  messages, more than the scheduling policy layered on top of it does.**
+  Worth stating as an explicit hypothesis for WP9 to test directly across
+  its full sweep, rather than three separately-filed items that happen to
+  rhyme.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either

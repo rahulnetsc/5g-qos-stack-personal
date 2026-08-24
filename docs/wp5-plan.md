@@ -496,7 +496,7 @@ purely additive.
 | 2 | `Allocation.harq_pid`/`is_retx` fields; `bler_for_mcs_with_combining()` composition (Decision 1b) | `scheduler/interfaces.py`, `sim/harq.py` (**not** `scheduler/link.py` — see correction below), tests | No — new optional fields default to old behavior; `bler_for_mcs` itself untouched, composition uncalled until 4a/4b |
 | 3 | Process-pool gating on new-data grants (no multi-slot delay yet) — **landed** | `sim/driver.py` | Live, but **designed to be inert** — delivery still synchronous, so the pool never actually binds |
 | 4a | Deferred drain + real multi-slot retry, **DL** | `sim/driver.py`, `sim/metrics.py` (`bytes_harq_retx`/`bytes_harq_lost` counters) | Live — the big DL fidelity landing |
-| 4b | Deferred drain + real multi-slot retry, **UL** — resolves the `sched_ul_bytes`/k2-HARQ gap `sim/bsr.py`'s own docstring flags (CLAUDE.md known issues) | `sim/driver.py`, interaction with `sim/bsr.py`/`sim/ul_access.py` (their own logic unchanged — see note) | Live — the big UL fidelity landing |
+| 4b | Deferred drain + real multi-slot retry, **UL** — resolves the `sched_ul_bytes`/k2-HARQ gap `sim/bsr.py`'s own docstring flags (CLAUDE.md known issues) — **landed** | `sim/driver.py`, `sim/harq.py` (`ul_split`, UL masking, `draw_dl_outcome`→`draw_harq_outcome` rename), `sim/tests/test_ul_access.py` (threshold+docstring) | Live — the big UL fidelity landing |
 | 6 | OLLA bug #1 only (`get_mcs_from_bler`'s round-count ratchet) | `scheduler/link.py` or new `sim/olla.py`, `sim/driver.py` | Live |
 
 **Note on 4b and `sim/bsr.py`:** `BsrModel.on_ul_grant`'s `sched_ul_bytes +=
@@ -722,19 +722,121 @@ open decision, not resolved by this commit.
 `regression_corpus.py --capture` run and `--check` reconfirmed clean
 against the new baseline.
 
-*Commit 4b (UL):*
-1. (High) Same latency/PDB direction as 4a, for UL flows.
-2. (Moderate) Crumb fraction (README §8's long-open item) — plausibly
-   closer to hardware's 48-52% now that real k2/HARQ pipelining exists,
-   closing the gap that item's own text names as a candidate contributor.
-   Stated as a hypothesis to check against `--check`, not asserted.
-3. (High, "should be flat") `sched_ul_bytes` crediting timing — unchanged,
-   per the note above; a good falsifiable check that 4b didn't
-   accidentally touch WP3's BSR port.
+*Commit 4b (UL) — revised before writing code, per commit 4a's real
+lesson (fractional->binary dominates the retry mechanism itself):*
+1. (Revised, was "High, up") M01/M02 for UL flows — **not a clean "up"**,
+   same reason as 4a: p50/utilization likely skew DOWN in aggregate (full
+   TB fill replaces a fractional discount) with only a minority of
+   heavily-retrying flows showing worse tails. Predicting the mixed shape
+   directly this time instead of repeating 2/3/5's miss.
+2. (Revised, was "should be flat") `sched_ul_bytes` crediting timing is
+   unchanged (still fires once, at grant time, per WP3's port) — **but
+   the AMOUNT it credits is not flat.** Pre-4b, `ue_lcp.fill()` was called
+   with the BLER-discounted `delivered` amount, not the full
+   `bytes_capacity` -- double-counting BLER (once by under-filling the TB
+   before LCP, which isn't how a real UE behaves -- it fills the whole
+   granted TB regardless of predicted outcome -- and again via the
+   fractional "delivered" concept itself). Commit 4b fixes this
+   alongside adding retry: `fill()` now gets the full `bytes_capacity`.
+   Expect `sched_ul_bytes`/crumb-fraction-adjacent numbers to move for
+   this reason even setting HARQ retry aside.
+3. (Moderate) Crumb fraction (README §8's long-open item) — plausibly
+   closer to hardware's 48-52% now that real k2/HARQ pipelining exists
+   AND item 2's fuller-fill effect, both candidate contributors named in
+   that item's own text. Stated as a hypothesis to check against
+   `--check`, not asserted.
 4. (Low) `sim/ul_access.py` SR-chain interaction — masked in-flight bytes
    could make a UE's visible backlog look emptier at moments it wasn't
-   before, plausibly triggering extra SR events; no directional call —
+   before, plausibly triggering extra SR events; no directional call --
    check directly against `test_ul_access.py`'s scenarios.
+5. (New) Given 4a's `harq_masked_flow_double_grant_count` finding was
+   TwoTier-SPS-only and UL GBR flows can also be SPS-eligible, expect the
+   SAME counter to fire on UL grants too, on the same TwoTier cases --
+   not a new bug, the same README §8 item extended to UL.
+
+**Commit 4b — landed.** UL deferred drain + real HARQ retry: per-flow
+`ul_split` replay (the UE's own LCP decision at grant time, never redone
+at resolution -- `HarqProcess.ul_split`), per-UE full masking (matching
+DL's per-flow masking, at the granularity UL grants actually happen at),
+and the same preemption/exhaustion resolution as 4a, generalized in
+`draw_dl_outcome` -> `draw_harq_outcome` (renamed -- it was never actually
+DL-specific).
+
+**Bug found and fixed before scoring anything: `harq_rng` shared between
+DL and UL draws.** Once UL started consuming random draws too, the shared
+stream's *interleaving order* shifted, which shifted every subsequent DL
+draw in any scenario with both directions -- confirmed by `PF.flows.
+ue10_qfi82`/`ue1_qfi82` (pure DL flows) moving in the `--check` diff with
+zero change to DL's own mechanism. Fixed with independent `harq_rng_dl`/
+`harq_rng_ul` streams (`scenario.seed ^ 0x48415251` / that XOR'd again
+with `0xFFFFFFFF`), the same isolation principle as `cqi_seed`. After the
+fix, PF's DL flows are exactly stable; a residual few-byte ripple remains
+on **TwoTier only** (`bytes_delivered` off by 1 of 8612, sub-millisecond
+delay-percentile shifts) -- consistent with, and most plausibly explained
+by, TwoTier's Tier-1 LP jointly solving DL+UL capacity (a pre-existing,
+legitimate coupling: adding UL retransmission PRB consumption changes the
+total UL demand fed into that joint solve). **Not fully isolated as a
+code-level certainty**: no corpus scenario runs a coupling-free scheduler
+(RoundRobin) on mixed UL+DL traffic, since `sensor_dense_scenario` (study
+2) is UL-only and `latency_bound_scenario` (study 3) is DL-only -- the
+only two schedulers on mixed-direction traffic in this corpus
+(`factory_robots_scenario`, study 1) are PF and TwoTier, both of which
+have their own independently-documented reason for some cross-direction
+coupling. Flagged here rather than claimed with more certainty than the
+evidence supports.
+
+**Prediction scorecard**, scored against the final `--check` diff (6,394
+mismatches, `harq_rng` fix included):
+
+| # | Predicted | Actual | Verdict |
+|---|---|---|---|
+| 1 | Mixed M01/M02 for UL, not clean "up" | p50 70↑/**173↓**; p98 **216↑**/98↓; p99 194↑/129↓ -- genuinely mixed, not one direction | **Held** |
+| 2 | `sched_ul_bytes` AMOUNT not flat (full-TB-fill fix) | Not directly observable in `RunRecord` (internal BSR state); crumb-fraction shift (#3) is consistent, indirect evidence | **Held, indirect evidence only** |
+| 3 | Crumb fraction closer to hardware | Measured directly: 4.4503% (WP4) → **5.1233%** (162/3162, `factory_robots_scenario`/`TwoTier`@1.0×), mean crumb size 146.03→135.38 bytes | **Held** — still ~10x short of hardware's 48-52% |
+| 4 | SR-chain interaction, no directional call | Real, and larger than "some extra SR events": full masking blocks the SR-triggered fresh-grant path for the whole retry cycle -- see the new README §8 finding below | **Held, and is now the commit's second headline finding** |
+| 5 | SPS/double-grant extends to UL | `harq_masked_flow_double_grant_count`: 3,628 (4a) → **7,092** (4b), incl. 1,220 on `study2/pdcch_limited` (all-UL) | **Held** |
+
+**New finding, not predicted, recorded in `README.md` §8 (not repeated in
+full here): full masking can make MORE retry attempts WORSE for delivery
+ratio on cold-start-heavy UL traffic.** Measured on `sensor_dense_
+scenario`/`ProportionalFair`: `harq_round_max=4` (default) → 0.471 mean
+delivery; `harq_round_max=1` (no retry) → 0.576; `k2_slots=1` (default 2)
+→ 0.667. Confirmed not cross-flow compounding (zero UEs in that scenario
+have >1 UL flow). Masking is not weakened and `k2_slots`'s default is not
+changed -- both would trade a correctness requirement or an honest
+no-ground-truth parameter for a metric. README §8 also connects this to
+WP4's load-inversion negative result and the crumb-fraction shortfall as
+one "access chain dominates at low load / for small messages" hypothesis
+for WP9, rather than three separately-filed items.
+
+**Confirmed the mechanism is genuinely live beyond the one scenario
+investigated**: `bytes_harq_lost` (UL) now fires nonzero on multiple
+flows across `study1`/`study2` (e.g. `study1/overload_mult3.0/TwoTier.
+ue1_qfi2`: 462 bytes; `study2/pdcch_limited/TwoTier.ue11_qfi1`: 169
+bytes) -- real UL residual loss under `harq_round_max=4`, not confined to
+the sensor-dense stress case.
+
+**Test fallout, investigated and fixed with both a threshold and a
+docstring change, not just one:** `sim/tests/test_ul_access.py::
+test_sr_retires_the_cold_start_deadlock_without_it` failed (mean delivery
+47.1%, threshold was `> 0.6`). Its own docstring told the WP4 "~50%
+mean -> ~82% mean" story as the *current* regime -- now stale, since
+retry/masking depresses absolute delivery back down. Loosened the
+threshold to `0.4` (comfortably below 0.471, still a real regression
+guard) **and** rewrote the docstring to say the SR mechanism still works
+structurally (retires the deadlock, ~10x over the no-SR case -- the
+OTHER two assertions in the same test still prove this, unaffected), but
+absolute delivery is now further depressed by the commit-4b retry/
+masking interaction, pointing at the new README §8 entry. A loosened
+threshold under an unchanged docstring is exactly how a number ends up
+quoted later without its caveat (README §7/§8's two-number-sweep-summary
+lesson) -- checked that this test has no second, stronger assertion to
+split out the way 4a's TwoTier test did (it doesn't: the other two
+assertions already pass).
+
+**Final state:** `pytest sim/tests -q` — 237 passed, 1 xfailed (the 4a
+xfail persists unchanged). `regression_corpus.py --capture` run and
+`--check` reconfirmed clean against the new baseline.
 
 *Commit 6 (OLLA bug #1):*
 1. (Moderate) M01/M02 for low-rate control flows (`periodic_control`/

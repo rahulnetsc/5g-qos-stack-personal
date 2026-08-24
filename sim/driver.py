@@ -1,19 +1,18 @@
-import math
 from collections import defaultdict
 
 import numpy as np
 
 from .bsr import BsrModel
 from .buffer import BufferModel
-from .channel import ChannelModel, bits_per_prb
+from .channel import ChannelModel
 from .config import ScenarioConfig
-from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_dl_outcome
+from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
 from .messages import FrameLedger, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
 from .ue_lcp import UeLcp
 from .ul_access import UlAccessModel
-from scheduler import Scheduler, bler_for_mcs, mcs_threshold_for_snr
+from scheduler import Scheduler
 from .traffic import TrafficModel
 
 
@@ -46,10 +45,10 @@ def run(
     delayed ``get_reported_snr_db(ue)`` view that the scheduler consumes
     for MCS picks and grant sizing, while the driver keeps computing BLER
     against the *true* SNR at transmission time. When an Allocation carries
-    an ``snr_used_db`` (the SNR the scheduler saw), the driver uses the
-    mismatch-BLER curve ``bler_for_mcs`` so an aggressively-picked MCS
-    based on stale-optimistic CQI actually costs BLER. Zero preserves the
-    old behaviour.
+    an ``snr_used_db`` (the SNR the scheduler saw), ``sim/harq.py::
+    draw_harq_outcome`` uses the mismatch-BLER curve so an aggressively-
+    picked MCS based on stale-optimistic CQI actually costs BLER. Zero
+    preserves the old behaviour.
 
     ``k1_slots``/``k2_slots`` (WP5, docs/wp5-plan.md Decision 3): DL HARQ
     retry gap, in slots (feedback delay + regrant-to-retransmission gap).
@@ -59,9 +58,12 @@ def run(
     deployed values, same honesty standard as ``sr_period_slots``.
     ``harq_round_max`` (default 4 = 1 original attempt + 3 retries,
     matching ``combining_gain_db``'s table range) is the retry budget
-    before a DL TB is abandoned (residual loss, ``bytes_harq_lost``).
+    before a TB is abandoned (residual loss, ``bytes_harq_lost``).
     ``harq_combining_mode`` selects ``combining_gain_db``'s IR (default)
-    or Chase table. DL only this commit -- UL retry is commit 4b.
+    or Chase table. DL's retry gap is ``k1_slots + k2_slots`` (feedback
+    delay + regrant gap); UL's is ``k2_slots`` alone (commit 4b -- the
+    gNB already knows the decode outcome the instant it finishes
+    decoding, no separate feedback-transit delay to model on that side).
     """
     rng = np.random.default_rng(scenario.seed)
     grid = ResourceGrid(scenario.carrier, scenario.tdd)
@@ -91,28 +93,49 @@ def run(
     )
     metrics = Metrics(record_timeseries=record_timeseries)
     # WP5 (docs/wp5-plan.md). Commit 3 landed process-pool gating,
-    # provably inert (delivery was still synchronous). Commit 4a makes DL
-    # retry load-bearing: a DL Allocation's outcome is now a stochastic
-    # per-TB draw (real HARQ is binary -- there's no "70% of a TB" to
-    # retry), and a FAILED attempt keeps its process busy across slots
-    # instead of freeing it same-slot. harq_exhausted_count can now
-    # genuinely fire (no longer impossible by construction as in commit
-    # 3) if a UE has more simultaneously-retrying DL flows than
-    # dl_capacity=8 -- rare, but no longer structurally ruled out; see
-    # harq_allocate_calls alongside it, same reason commit 3 paired them.
+    # provably inert (delivery was still synchronous). Commit 4a made DL
+    # retry load-bearing; commit 4b extends it to UL. An Allocation's
+    # outcome is a stochastic per-TB draw (real HARQ is binary -- there's
+    # no "70% of a TB" to retry), and a FAILED attempt keeps its process
+    # busy across slots instead of freeing it same-slot. harq_exhausted_
+    # count can genuinely fire (no longer impossible by construction as
+    # in commit 3) if a UE has more simultaneously-retrying flows on one
+    # direction than that direction's pool capacity -- rare, but no
+    # longer structurally ruled out; see harq_allocate_calls alongside
+    # it, same reason commit 3 paired them.
     #
-    # harq_rng is an INDEPENDENT stream from `rng` (channel/traffic),
-    # matching the existing cqi_seed=scenario.seed^0xC9C9C9C9 precedent a
-    # few lines up -- otherwise introducing HARQ would silently reshuffle
-    # draws for flows that never even retry.
+    # harq_rng_dl/harq_rng_ul are INDEPENDENT streams from `rng` (channel/
+    # traffic) AND from each other, matching the existing cqi_seed=
+    # scenario.seed^0xC9C9C9C9 precedent a few lines up -- otherwise
+    # introducing HARQ would silently reshuffle draws for flows that
+    # never even retry. Commit 4b found this the hard way: sharing ONE
+    # harq_rng stream between DL and UL draws (as an earlier version of
+    # this commit did) meant adding UL draws shifted the interleaving
+    # order of DL draws too, perturbing DL flows' numbers in scenarios
+    # with UL traffic even though nothing about DL's own mechanism
+    # changed -- confirmed via regression_corpus.py --check showing
+    # drift on pure-DL flow keys that 4a's own diff never touched. Two
+    # independent streams, not one shared HARQ stream, for the same
+    # reason DL/UL are separate directions in every other HARQ structure
+    # in this module.
     harq_pool = HarqProcessPool()
-    harq_rng = np.random.default_rng(scenario.seed ^ 0x48415251)
+    harq_rng_dl = np.random.default_rng(scenario.seed ^ 0x48415251)
+    harq_rng_ul = np.random.default_rng(scenario.seed ^ 0x48415251 ^ 0xFFFFFFFF)
     harq_rtt_dl = k1_slots + k2_slots
+    # UL's retry gap is k2_slots alone (docs/wp5-plan.md Decision 3,
+    # commit 4b docstring above) -- the gNB learns a UL decode outcome
+    # immediately (no PUCCH-feedback-style transit delay the way DL's k1
+    # models), so only the grant-to-PUSCH gap applies to a retry.
+    harq_rtt_ul = k2_slots
     harq_allocate_calls = 0
     harq_exhausted_count = 0
-    # Diagnostic only (WP5 commit 4a): should never fire given masking,
+    # Diagnostic only (WP5 commit 4a/4b): should never fire given masking,
     # counted rather than trusted -- see the guard at its increment site.
     harq_masked_flow_double_grant_count = 0
+    # WP5 commit 4b: HarqAwareBufferView needs each flow's direction to
+    # decide DL-per-flow vs UL-per-UE masking (BufferState itself carries
+    # no direction field to read this from).
+    direction_by_flow = {(f.ue_id, f.qfi): f.direction for f in scenario.flows}
 
     scheduler.configure(scenario.flows, grid.slot_duration_s, grid)
 
@@ -148,52 +171,92 @@ def run(
         dl_prbs_used_this_slot = 0
         ul_prbs_used_this_slot = 0
 
-        # WP5 commit 4a: resolve DL HARQ processes due this slot BEFORE
-        # BSR/scheduler.allocate() -- their PRBs/CCE must be carved out of
-        # this slot's budget first (docs/wp5-plan.md Decision 4), and a
-        # resolved ACK/exhaustion changes bytes_queued before eligibility
-        # is computed. DL only this commit -- due_this_slot() can only
-        # return DL entries, since UL never persists across slots yet
-        # (commit 3's immediate-free discipline, unchanged for UL below).
+        # WP5 commit 4a/4b: resolve HARQ processes (DL per-flow, UL
+        # per-UE-with-a-stored-split) due this slot BEFORE BSR/scheduler.
+        # allocate() -- their PRBs/CCE must be carved out of this slot's
+        # budget first (docs/wp5-plan.md Decision 4), and a resolved ACK/
+        # exhaustion changes bytes_queued before eligibility is computed.
         retx_prbs_this_slot = 0
         retx_cce_this_slot = 0
         for proc in harq_pool.due_this_slot(slot_index):
-            pdb_s = pdb_by_flow.get((proc.ue_id, proc.qfi), 1.0)
-            if buffers.state(proc.ue_id, proc.qfi).bytes_queued < proc.tb_bytes:
-                # Preempted: PDB expiry is the ONLY other thing that can
-                # touch a masked flow's queue while a process is pending
-                # (docs/wp5-plan.md commit 4a's HarqAwareBufferView) -- if
-                # it did, it already counted the drop via
-                # bytes_dropped_pdb. Free without a second count.
-                harq_pool.free(proc.ue_id, proc.direction, proc.pid)
-                continue
-            retx_prbs_this_slot += proc.prbs
-            retx_cce_this_slot += proc.cce_cost
-            true_snr = channel.get_snr_db(proc.ue_id)
-            success = draw_dl_outcome(
-                harq_rng, true_snr, proc.snr_used_db, proc.retx_count,
-                harq_combining_mode, symbols=slot_grid.dl_symbols,
-            )
-            if success:
-                buffers.drain(proc.ue_id, proc.qfi, proc.tb_bytes, now_s, pdb_s)
-                metrics.record_delivery(proc.ue_id, proc.qfi, proc.tb_bytes)
-                per_flow_delivered[(proc.ue_id, proc.qfi)] += proc.tb_bytes
-                harq_pool.free(proc.ue_id, proc.direction, proc.pid)
-            elif proc.retx_count >= harq_round_max - 1:
-                # Exhausted: harq_round_max total attempts (1 original +
-                # (harq_round_max-1) retries) all failed -- residual loss,
-                # a SECOND, distinct discard path from PDB expiry
-                # (sim/buffer.py::discard_harq_loss, docs/wp5-plan.md sec1).
-                buffers.discard_harq_loss(proc.ue_id, proc.qfi, proc.tb_bytes, now_s)
-                harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+            if proc.direction == "DL":
+                pdb_s = pdb_by_flow.get((proc.ue_id, proc.qfi), 1.0)
+                if buffers.state(proc.ue_id, proc.qfi).bytes_queued < proc.tb_bytes:
+                    # Preempted: PDB expiry is the ONLY other thing that
+                    # can touch a masked flow's queue while a process is
+                    # pending (HarqAwareBufferView) -- if it did, it
+                    # already counted the drop via bytes_dropped_pdb.
+                    # Free without a second count.
+                    harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+                    continue
+                retx_prbs_this_slot += proc.prbs
+                retx_cce_this_slot += proc.cce_cost
+                true_snr = channel.get_snr_db(proc.ue_id)
+                success = draw_harq_outcome(
+                    harq_rng_dl, true_snr, proc.snr_used_db, proc.retx_count,
+                    harq_combining_mode, symbols=slot_grid.dl_symbols,
+                )
+                if success:
+                    buffers.drain(proc.ue_id, proc.qfi, proc.tb_bytes, now_s, pdb_s)
+                    metrics.record_delivery(proc.ue_id, proc.qfi, proc.tb_bytes)
+                    per_flow_delivered[(proc.ue_id, proc.qfi)] += proc.tb_bytes
+                    harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+                elif proc.retx_count >= harq_round_max - 1:
+                    # Exhausted: harq_round_max total attempts (1 original
+                    # + (harq_round_max-1) retries) all failed -- residual
+                    # loss, a SECOND, distinct discard path from PDB
+                    # expiry (sim/buffer.py::discard_harq_loss).
+                    buffers.discard_harq_loss(proc.ue_id, proc.qfi, proc.tb_bytes, now_s)
+                    harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+                else:
+                    proc.retx_count += 1
+                    proc.due_slot = slot_index + harq_rtt_dl
+                # PRBs/CCE are consumed by the attempt regardless of
+                # outcome -- matches the unconditional record_prb_use
+                # below for new grants.
+                metrics.record_prb_use("DL", proc.prbs)
+                cce_used_this_slot += proc.cce_cost
+                dl_prbs_used_this_slot += proc.prbs
             else:
-                proc.retx_count += 1
-                proc.due_slot = slot_index + harq_rtt_dl
-            # PRBs/CCE are consumed by the attempt regardless of outcome --
-            # matches the unconditional record_prb_use below for new grants.
-            metrics.record_prb_use("DL", proc.prbs)
-            cce_used_this_slot += proc.cce_cost
-            dl_prbs_used_this_slot += proc.prbs
+                # UL (commit 4b): proc.ul_split is the UE's own LCP
+                # decision from grant time, replayed verbatim -- never
+                # re-split at resolution (docs/wp5-plan.md commit 4b,
+                # HarqProcess.ul_split docstring). Preemption is checked
+                # PER FLOW in the split, since each has its own buffer/
+                # PDB and can be preempted independently of the others.
+                remaining_split = [
+                    (qfi, byts) for qfi, byts in proc.ul_split
+                    if buffers.state(proc.ue_id, qfi).bytes_queued >= byts
+                ]
+                if not remaining_split:
+                    # Every flow in the split was preempted by PDB expiry
+                    # -- nothing left to retry, no transmission happens.
+                    harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+                    continue
+                retx_prbs_this_slot += proc.prbs
+                retx_cce_this_slot += proc.cce_cost
+                true_snr = channel.get_snr_db(proc.ue_id)
+                success = draw_harq_outcome(
+                    harq_rng_ul, true_snr, proc.snr_used_db, proc.retx_count,
+                    harq_combining_mode, symbols=slot_grid.ul_symbols,
+                )
+                if success:
+                    for qfi, byts in remaining_split:
+                        pdb_s = pdb_by_flow.get((proc.ue_id, qfi), 1.0)
+                        buffers.drain(proc.ue_id, qfi, byts, now_s, pdb_s)
+                        metrics.record_delivery(proc.ue_id, qfi, byts)
+                        per_flow_delivered[(proc.ue_id, qfi)] += byts
+                    harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+                elif proc.retx_count >= harq_round_max - 1:
+                    for qfi, byts in remaining_split:
+                        buffers.discard_harq_loss(proc.ue_id, qfi, byts, now_s)
+                    harq_pool.free(proc.ue_id, proc.direction, proc.pid)
+                else:
+                    proc.retx_count += 1
+                    proc.due_slot = slot_index + harq_rtt_ul
+                metrics.record_prb_use("UL", proc.prbs)
+                cce_used_this_slot += proc.cce_cost
+                ul_prbs_used_this_slot += proc.prbs
 
         # Regular-BSR trigger (arrivals) and periodic/retx timer expiry --
         # both just set `pending`; order between them doesn't matter, only
@@ -224,7 +287,7 @@ def run(
         # wrappers only need the right attributes (structural typing,
         # scheduler/interfaces.py).
         reduced_slot_grid = ReducedSlotView(slot_grid, retx_prbs_this_slot, retx_cce_this_slot)
-        masked_buffers = HarqAwareBufferView(buffers, harq_pool)
+        masked_buffers = HarqAwareBufferView(buffers, harq_pool, direction_by_flow)
 
         for alloc in scheduler.allocate(reduced_slot_grid, masked_buffers, channel):
             if alloc.bytes_capacity <= 0:
@@ -233,11 +296,12 @@ def run(
             harq_direction = "UL" if alloc.ue_grant else "DL"
             harq_qfi = -1 if alloc.ue_grant else alloc.qfi
 
-            # Defensive guard, counted not just trusted (WP5 commit 4a):
-            # masking should already make an already-pending DL flow
-            # ineligible; this only fires if some scheduler grants one
-            # anyway, which would otherwise double-book the same bytes.
-            if harq_direction == "DL" and harq_pool.is_pending(alloc.ue_id, "DL", harq_qfi):
+            # Defensive guard, counted not just trusted (WP5 commit 4a/
+            # 4b): masking should already make an already-pending flow
+            # ineligible (DL per-flow, UL per-UE); this only fires if some
+            # scheduler grants one anyway, which would otherwise
+            # double-book the same bytes (README.md sec8's SPS finding).
+            if harq_pool.is_pending(alloc.ue_id, harq_direction, harq_qfi):
                 harq_masked_flow_double_grant_count += 1
                 continue
 
@@ -259,42 +323,51 @@ def run(
             alloc.harq_pid = harq_proc.pid
 
             if alloc.ue_grant:
-                # Uplink: unchanged from commit 3 -- deterministic
-                # fractional delivery, immediate drain+free, same slot.
-                # UL retry/deferred-drain is commit 4b, not this commit.
+                # Uplink: WP5 commit 4b. Same binary-outcome reasoning as
+                # DL (commit 4a) -- there is no "70% of a TB" to retry.
+                # The UE's own LCP decides the split AT TRANSMISSION TIME
+                # regardless of eventual outcome (a real UE fills the
+                # whole granted TB before it knows whether decode will
+                # succeed -- TS 38.321 sec5.4.3.1) and that decision is
+                # never redone at resolution time (HarqProcess.ul_split
+                # docstring). This also fixes a pre-4b fidelity bug: LCP
+                # used to be fed the BLER-discounted `delivered` amount
+                # instead of the full bytes_capacity, under-filling the TB
+                # relative to real UE behaviour and double-counting BLER.
                 symbols = slot_grid.ul_symbols
                 true_snr = channel.get_snr_db(alloc.ue_id)
-                if math.isnan(alloc.snr_used_db):
-                    _, bler = bits_per_prb(true_snr, symbols=symbols)
-                else:
-                    mcs_thresh = mcs_threshold_for_snr(alloc.snr_used_db)
-                    bler = bler_for_mcs(mcs_thresh, true_snr)
-                delivered = int(alloc.bytes_capacity * (1.0 - bler))
-                # The scheduler sized the block but the UE chooses the
-                # split, so apply the UE's own LCP over its *real*
-                # backlog. The scheduler's virtual-queue drain used a
-                # BSR-based estimate of this split and will differ.
-                ue_delivered_bytes = 0
-                for qfi, byts in ue_lcp.fill(
-                    ue_flows_by_ue.get(alloc.ue_id, []), delivered, buffers
-                ):
-                    pdb_s = pdb_by_flow.get((alloc.ue_id, qfi), 1.0)
-                    buffers.drain(alloc.ue_id, qfi, byts, now_s, pdb_s)
-                    metrics.record_delivery(alloc.ue_id, qfi, byts)
-                    per_flow_delivered[(alloc.ue_id, qfi)] += byts
-                    ue_delivered_bytes += byts
+                success = draw_harq_outcome(
+                    harq_rng_ul, true_snr, alloc.snr_used_db, retx_count=0,
+                    mode=harq_combining_mode, symbols=symbols,
+                )
+                ue_split = ue_lcp.fill(
+                    ue_flows_by_ue.get(alloc.ue_id, []), alloc.bytes_capacity, buffers
+                )
                 # BSR: if pending, assemble/quantise a report from the true
-                # post-drain per-LCG backlog; always credit sched_ul_bytes
+                # post-fill per-LCG backlog; always credit sched_ul_bytes
                 # and restart the retx timer -- see
                 # sim/bsr.py::BsrModel.on_ul_grant. Fires at GRANT time
-                # regardless of eventual HARQ outcome, unchanged by WP5 --
-                # real OAI credits sched_ul_bytes on every grant, not on
-                # confirmed delivery (docs/wp5-plan.md commit-4b note).
+                # regardless of eventual HARQ outcome, crediting the FILLED
+                # amount (what went on the air), not a delivery-confirmed
+                # one -- real OAI credits sched_ul_bytes on every grant.
+                ue_filled_bytes = sum(byts for _, byts in ue_split)
                 bsr.on_ul_grant(
-                    alloc.ue_id, alloc.bytes_capacity, ue_delivered_bytes, slot_index, buffers
+                    alloc.ue_id, alloc.bytes_capacity, ue_filled_bytes, slot_index, buffers
                 )
                 ul_access.on_ul_grant(alloc.ue_id)
-                harq_pool.free(alloc.ue_id, harq_direction, harq_proc.pid)
+                if success:
+                    for qfi, byts in ue_split:
+                        pdb_s = pdb_by_flow.get((alloc.ue_id, qfi), 1.0)
+                        buffers.drain(alloc.ue_id, qfi, byts, now_s, pdb_s)
+                        metrics.record_delivery(alloc.ue_id, qfi, byts)
+                        per_flow_delivered[(alloc.ue_id, qfi)] += byts
+                    harq_pool.free(alloc.ue_id, harq_direction, harq_proc.pid)
+                else:
+                    harq_proc.retx_count = 1
+                    harq_proc.due_slot = slot_index + harq_rtt_ul
+                    harq_proc.ul_split = ue_split
+                    # Stays busy -- resolved by a later slot's
+                    # due_this_slot() pass, above, at the top of this loop.
             else:
                 # Downlink: WP5 commit 4a. Real HARQ is a per-TB binary
                 # decode outcome, not a continuous fraction -- there is no
@@ -306,8 +379,8 @@ def run(
                 # for a retry harq_rtt_dl slots later.
                 symbols = slot_grid.dl_symbols
                 true_snr = channel.get_snr_db(alloc.ue_id)
-                success = draw_dl_outcome(
-                    harq_rng, true_snr, alloc.snr_used_db, retx_count=0,
+                success = draw_harq_outcome(
+                    harq_rng_dl, true_snr, alloc.snr_used_db, retx_count=0,
                     mode=harq_combining_mode, symbols=symbols,
                 )
                 if success:
@@ -363,7 +436,7 @@ def run(
         )
 
     summary = metrics.summary(horizon_s, buffers)
-    # WP5 commits 3/4a: diagnostic counters only, deliberately NOT
+    # WP5 commits 3/4a/4b: diagnostic counters only, deliberately NOT
     # threaded into RunRecord (RunRecord.from_summary only reads keys it
     # names explicitly -- same idiom as the _ue_lcp/_message_ledger
     # handles below), so regression_corpus.py --check (which snapshots

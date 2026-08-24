@@ -12,10 +12,11 @@ dependency direction (``sim`` -> ``scheduler``, already used by
 the package must depend on nothing outside itself, so this composition
 lives here, not in ``scheduler/link.py`` (docs/wp5-plan.md Decision 1b).
 
-Commit 1-3 landed this dormant/inert; commit 4a (DL) makes retry and
-combining gain load-bearing for the first time. Every citation and
-decision here is recorded in full in docs/wp5-plan.md -- this module's
-docstrings repeat only what a reader needs to not silently misuse the
+Commit 1-3 landed this dormant/inert; commit 4a (DL) made retry and
+combining gain load-bearing; commit 4b extends both to UL, per-flow
+split replay and all. Every citation and decision here is recorded in
+full in docs/wp5-plan.md -- this module's docstrings repeat only what a
+reader needs to not silently misuse the
 numbers.
 """
 
@@ -126,7 +127,7 @@ def bler_for_mcs_with_combining(
     return bler_for_mcs(mcs_threshold_db, true_snr_db + combining_gain_db(retx_count, mode))
 
 
-def draw_dl_outcome(
+def draw_harq_outcome(
     rng: np.random.Generator,
     true_snr_db: float,
     snr_used_db: float,
@@ -134,24 +135,27 @@ def draw_dl_outcome(
     mode: str,
     symbols: int,
 ) -> bool:
-    """One DL attempt's binary HARQ outcome (commit 4a). Mirrors
-    ``sim/driver.py``'s existing mismatch-aware-vs-legacy BLER branching
+    """One attempt's binary HARQ outcome -- DL (commit 4a) or UL (commit
+    4b); the BLER computation is direction-agnostic (named ``draw_dl_
+    outcome`` through commit 4a since UL retry didn't exist yet -- renamed
+    here since that was never actually DL-specific). Mirrors ``sim/
+    driver.py``'s existing mismatch-aware-vs-legacy BLER branching
     (``math.isnan(snr_used_db)`` selects the legacy, no-mismatch-modelling
     path used by tests that don't set ``Allocation.snr_used_db``), with
     ``combining_gain_db`` layered on for retries in both branches.
 
     Real HARQ is a per-transport-block binary decode outcome, not a
     continuous fraction -- there is no such thing as "70% of a TB." This
-    is why commit 4a replaces the driver's previous ``delivered =
+    is why commit 4a replaced the driver's previous ``delivered =
     bytes_capacity * (1 - bler)`` deterministic discount with a stochastic
-    draw for DL: ``rng`` must be an INDEPENDENT stream from the channel/
-    traffic RNG (docs/wp5-plan.md commit 4a design discussion), matching
-    the existing ``cqi_seed = scenario.seed ^ 0xC9C9C9C9`` precedent in
+    draw: ``rng`` must be an INDEPENDENT stream from the channel/traffic
+    RNG (docs/wp5-plan.md commit 4a design discussion), matching the
+    existing ``cqi_seed = scenario.seed ^ 0xC9C9C9C9`` precedent in
     ``sim/driver.py`` -- otherwise introducing HARQ would silently
     reshuffle draws for flows that never even retry.
 
-    Returns True (success -- deliver `tb_bytes` in full) or False
-    (failure -- retry or abandon, driver.py decides which).
+    Returns True (success -- deliver the TB in full) or False (failure --
+    retry or abandon, driver.py decides which).
     """
     if math.isnan(snr_used_db):
         _, bler = bits_per_prb(true_snr_db + combining_gain_db(retx_count, mode), symbols=symbols)
@@ -174,8 +178,7 @@ class HarqProcess:
     ``scheduler/interfaces.py::Allocation``); UL grants are per-UE (the UE
     runs its own LCP over the granted TB, TS 38.321 sec5.4.3.1), so a UL
     process's ``qfi`` stays -1, matching ``Allocation.ue_grant``'s own
-    "qfi is then meaningless (-1)" convention (UL retry is commit 4b, not
-    built here).
+    "qfi is then meaningless (-1)" convention.
 
     ``prbs``/``cce_cost``/``snr_used_db`` (commit 4a): the ORIGINAL
     grant's PRB count, DCI/CCE cost, and the scheduler's CQI-based MCS
@@ -184,6 +187,15 @@ class HarqProcess:
     (docs/wp5-plan.md Decision 4), a stated simplification. A retry still
     needs its own DCI, so ``cce_cost`` is real consumption, not overhead
     left uncounted.
+
+    ``ul_split`` (commit 4b, UL only): the UE's own LCP decides how a
+    granted TB splits across its flows AT TRANSMISSION TIME (TS 38.321
+    sec5.4.3.1) -- that decision, and the token-bucket consumption behind
+    it, must not be redone at resolution time (real UEs don't re-split
+    already-sent bits after the fact). Stored here as ``[(qfi, bytes),
+    ...]`` and replayed verbatim -- per-flow, since PDB expiry can
+    preempt individual flows in the split independently (each has its own
+    buffer/PDB, docs/wp5-plan.md commit 4b).
     """
 
     pid: int
@@ -197,6 +209,7 @@ class HarqProcess:
     prbs: int = 0
     cce_cost: int = 0
     snr_used_db: float = math.nan
+    ul_split: list[tuple[int, int]] | None = None
 
     def reset(self) -> None:
         self.busy = False
@@ -207,6 +220,7 @@ class HarqProcess:
         self.prbs = 0
         self.cce_cost = 0
         self.snr_used_db = math.nan
+        self.ul_split = None
 
 
 class HarqProcessPool:
@@ -257,6 +271,7 @@ class HarqProcessPool:
         prbs: int = 0,
         cce_cost: int = 0,
         snr_used_db: float = math.nan,
+        ul_split: list[tuple[int, int]] | None = None,
     ) -> HarqProcess | None:
         """Claim a free process for a new TB. ``None`` if every process
         for this (ue_id, direction) is already busy (harq_exhausted)."""
@@ -270,6 +285,7 @@ class HarqProcessPool:
                 proc.prbs = prbs
                 proc.cce_cost = cce_cost
                 proc.snr_used_db = snr_used_db
+                proc.ul_split = ul_split
                 return proc
         return None
 
@@ -328,8 +344,17 @@ class HarqProcessPool:
 class HarqAwareBufferView:
     """Wraps a ``sim.buffer.BufferModel`` so ``scheduler.allocate()`` sees
     ZERO backlog (``bytes_queued`` and ``bytes_reported``) for any flow
-    with an unresolved in-flight HARQ process -- DL only this commit
-    (``is_pending`` is queried with ``direction="DL"``).
+    with an unresolved in-flight HARQ process. DL is masked per flow
+    (``is_pending(ue_id, "DL", qfi)``); UL is masked per WHOLE UE
+    (``is_pending(ue_id, "UL")``, ``qfi`` ignored) -- commit 4b -- since a
+    UL grant is one TB for the whole UE, split across flows by the UE's
+    own LCP (``sim/ue_lcp.py``) at transmission time; allowing a NEW UL
+    grant while one is pending would call ``fill()`` again against
+    backlog that's partly already reserved, since LCP has no notion of
+    "already spoken for." ``direction_by_flow`` (built by the driver from
+    ``scenario.flows``) is how ``state()`` knows which rule to apply for
+    a given (ue_id, qfi) -- ``BufferModel`` itself has no direction field
+    on ``BufferState`` to read this from directly.
 
     This is a CORRECTNESS REQUIREMENT, not caution, and must not be
     "optimised" to a partial mask (e.g. ``bytes_queued - tb_bytes``):
@@ -347,13 +372,22 @@ class HarqAwareBufferView:
     look grantable again while still mid-retry.
     """
 
-    def __init__(self, buffers, pool: HarqProcessPool) -> None:
+    def __init__(
+        self, buffers, pool: HarqProcessPool, direction_by_flow: dict[tuple[int, int], str]
+    ) -> None:
         self._buffers = buffers
         self._pool = pool
+        self._direction_by_flow = direction_by_flow
 
     def state(self, ue_id: int, qfi: int):
         real = self._buffers.state(ue_id, qfi)
-        if self._pool.is_pending(ue_id, "DL", qfi):
+        direction = self._direction_by_flow.get((ue_id, qfi), "DL")
+        pending = (
+            self._pool.is_pending(ue_id, "UL")
+            if direction == "UL"
+            else self._pool.is_pending(ue_id, "DL", qfi)
+        )
+        if pending:
             masked = copy.copy(real)
             masked.bytes_queued = 0
             masked.bytes_reported = 0
