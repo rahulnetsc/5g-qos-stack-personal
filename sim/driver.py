@@ -7,6 +7,8 @@ from .buffer import BufferModel
 from .channel import ChannelModel
 from .config import ScenarioConfig
 from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
+from .join import JoinAwareBufferView, JoinPhase, init_join_rng_streams, init_join_state, rrc_connected
+from .join import step as join_step
 from .messages import FrameLedger, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
@@ -182,6 +184,25 @@ def run(
     rlf_step_calls = 0
     rlf_declared_count = 0
 
+    # WP-Join commit 5 (docs/wp-join-plan.md sec1.3/sec1.4/sec1.6): the
+    # radio gate. join_states holds a JoinState ONLY for UEs that opt in
+    # via UEConfig.join -- a UE without it is never gated, and rlf.step()
+    # keeps running for it exactly as commit 2 left it, unconditionally.
+    # One shared set of RNG streams for the whole scenario (D9), matching
+    # harq_rng_dl/harq_rng_ul's own per-run, not per-UE, construction.
+    join_rngs = init_join_rng_streams(scenario.seed)
+    join_states = {ue.ue_id: init_join_state(ue.join) for ue in scenario.ues if ue.join is not None}
+    join_configs = {ue.ue_id: ue.join for ue in scenario.ues if ue.join is not None}
+    # Per-UE pointer to the JoinEventRecord-shaped dict currently being
+    # assembled (plain dicts, not sim.run_record.JoinEventRecord instances
+    # -- driver.py stays free of any sim.run_record import, matching the
+    # rest of this module's own summary-dict convention; sim/run_record.py
+    # ::RunRecord.from_summary does the typed construction, same division
+    # of labor as every other summary["flows"][...] field). None means no
+    # event is currently in progress for that UE.
+    join_active_event: dict[int, dict] = {}
+    join_events: list[dict] = []
+
     for slot_index in range(scenario.horizon_slots):
         ue_lcp.refill(grid.slot_duration_s)
         now_s = slot_index * grid.slot_duration_s
@@ -200,13 +221,108 @@ def run(
         # (docs/wp-join-plan.md sec1.8). Placed here now so commit 5 can
         # wire its consequence in without moving this call site.
         for ue in scenario.ues:
-            rlf_step_calls += 1
-            rlf_result = rlf_step(
-                rlf_states[ue.ue_id], rlf_config, channel.get_snr_db(ue.ue_id),
-                slot_index, grid.slot_duration_s,
+            join_state = join_states.get(ue.ue_id)
+            # WP-Join commit 5: sec1.6's gate table -- detection is
+            # meaningless with no serving cell, so a radio-gated UE's
+            # rlf.step() is skipped entirely (its RlfDetectorState just
+            # sits frozen at whatever it was), not merely ignored after
+            # the fact. A UE without join_state (no UEConfig.join set)
+            # is always considered connected -- commit 2's exact,
+            # unconditional behaviour, unchanged.
+            was_connected = join_state is None or rrc_connected(join_state.phase)
+            rlf_declared_this_slot = False
+            if was_connected:
+                rlf_step_calls += 1
+                rlf_result = rlf_step(
+                    rlf_states[ue.ue_id], rlf_config, channel.get_snr_db(ue.ue_id),
+                    slot_index, grid.slot_duration_s,
+                )
+                rlf_declared_this_slot = rlf_result.rlf_declared_this_slot
+                if rlf_declared_this_slot:
+                    rlf_declared_count += 1
+
+            if join_state is None:
+                continue
+
+            prior_phase = join_state.phase
+            prior_phase_elapsed = join_state.phase_elapsed_slots
+            prior_active_path = join_state.active_path
+            jres = join_step(
+                join_state, join_configs[ue.ue_id], join_rngs, slot_index, grid.slot_duration_s,
+                rlf_declared_this_slot=rlf_declared_this_slot,
+                snr_db=channel.get_snr_db(ue.ue_id),
+                # handshake_complete stays False every slot until WP-Join
+                # commit 6 wires the real app-handshake message pair --
+                # every event this commit produces therefore stays
+                # "in progress" (attached_slot=None) for the rest of the
+                # run, a known, documented limitation of this commit
+                # alone (docs/wp-join-plan.md "Commit 5 -- landed").
+                handshake_complete=False,
             )
-            if rlf_result.rlf_declared_this_slot:
-                rlf_declared_count += 1
+            if was_connected and not rrc_connected(join_state.phase):
+                # Just entered a radio-gated state this slot -- flush
+                # pending HARQ before it can keep consuming retx PRBs/CCE
+                # through the outage (sec1.4/sec2b).
+                harq_pool.flush_ue(ue.ue_id)
+            if jres.radio_connected_this_slot:
+                # Re-arm: a fresh RlfDetectorState, constructed exactly
+                # here, at the instant rrc_connected flips true (sec1.6) --
+                # sim/rlf.py itself never un-declares RLF or resets on its
+                # own; this is WP-Join's job, done with the tools sim/
+                # rlf.py's own docstring names, not an extension of it.
+                rlf_states[ue.ue_id] = RlfDetectorState()
+
+            # Event-log assembly (M18/M19, config/metric_panel.yml).
+            # Ordering matters: look up the event that was ALREADY active
+            # going into this call (before any new one this same call
+            # might create) -- otherwise a brand-new event immediately
+            # "absorbs" its own triggering transition's prior phase
+            # (CONNECTED, the idle/waiting state, not a procedure phase)
+            # as if it were a segment inside itself. Found and fixed
+            # exactly this way while verifying the real path against
+            # commit 4's synthetic-fixture assumptions (docs/wp-join-
+            # plan.md "Commit 5 -- landed", review point 1).
+            active_event = join_active_event.get(ue.ue_id)
+            if active_event is not None:
+                if jres.snr_restored_this_slot and active_event["rf_restore_slot"] is None:
+                    active_event["rf_restore_slot"] = slot_index
+                    active_event["rf_restore_ts_s"] = slot_index * grid.slot_duration_s
+                # A "segment" of time in prior_phase ends here on EITHER a
+                # phase change (success) OR a timer-expiry retry that
+                # stays in the SAME phase (RRC_ESTABLISH's own retry never
+                # changes state.phase -- checking phase_changed alone
+                # would silently drop that segment's duration and its
+                # expiry count).
+                if jres.phase_changed or jres.timer_expired_this_slot:
+                    phase_name = prior_phase.value
+                    duration_ms = (prior_phase_elapsed + 1) * grid.slot_duration_s * 1000.0
+                    active_event["phases"][phase_name] = (
+                        active_event["phases"].get(phase_name, 0.0) + duration_ms
+                    )
+                    if jres.timer_expired_this_slot:
+                        active_event["timer_expiries"][phase_name] = (
+                            active_event["timer_expiries"].get(phase_name, 0) + 1
+                        )
+                if jres.phase_changed and join_state.phase is JoinPhase.CONNECTED:
+                    active_event["attached_slot"] = slot_index
+                    active_event["attached_ts_s"] = slot_index * grid.slot_duration_s
+                    join_active_event[ue.ue_id] = None
+
+            if join_state.active_path is not None and prior_active_path is None:
+                new_event = {
+                    "ue_id": ue.ue_id, "path": join_state.active_path,
+                    "trigger_slot": join_state.trigger_slot,
+                    "trigger_ts_s": join_state.trigger_slot * grid.slot_duration_s,
+                    "rf_restore_slot": None, "rf_restore_ts_s": None,
+                    "attached_slot": None, "attached_ts_s": None,
+                    "phases": {}, "timer_expiries": {},
+                    "rlf_declared_at_slot": (
+                        join_state.trigger_slot if join_state.active_path == "reestablish" else None
+                    ),
+                    "handshake_rtt_ms": None,
+                }
+                join_active_event[ue.ue_id] = new_event
+                join_events.append(new_event)
         # Moved ahead of BSR (WP5 commit 4a): the HARQ resolution step
         # below needs slot_grid.dl_symbols before scheduler.allocate()
         # runs; slot_grid itself never depended on BSR/traffic state.
@@ -342,7 +458,15 @@ def run(
         # wrappers only need the right attributes (structural typing,
         # scheduler/interfaces.py).
         reduced_slot_grid = ReducedSlotView(slot_grid, retx_prbs_this_slot, retx_cce_this_slot)
-        masked_buffers = HarqAwareBufferView(buffers, harq_pool, direction_by_flow)
+        # WP-Join commit 5: JoinAwareBufferView composed OUTERMOST over
+        # HarqAwareBufferView (docs/wp-join-plan.md sec1.4) -- a radio-
+        # gated UE's mask strictly subsumes a per-flow HARQ-pending mask,
+        # so nesting order doesn't affect correctness, only which
+        # docstring a future reader meets first. A no-op wrapper (join_
+        # states is empty) for every scenario with no UEConfig.join set.
+        masked_buffers = JoinAwareBufferView(
+            HarqAwareBufferView(buffers, harq_pool, direction_by_flow), join_states
+        )
 
         for alloc in scheduler.allocate(reduced_slot_grid, masked_buffers, channel):
             if alloc.bytes_capacity <= 0:
@@ -516,6 +640,13 @@ def run(
     # test_smoke.py (docs/wp-join-plan.md sec4.1 point 4).
     summary["rlf_step_calls"] = rlf_step_calls
     summary["rlf_declared_count"] = rlf_declared_count
+    # WP-Join commit 5: always present (possibly empty) from this commit
+    # onward, regardless of whether any UE opted into UEConfig.join --
+    # this is the signal sim/run_record.py::RunRecord.from_summary uses to
+    # tell "predates WP-Join" (key absent, join_events=None) apart from
+    # "WP-Join-aware driver, zero events this run" (key present, []),
+    # config/metric_panel.yml's own None-vs-[] convention for M18/M19.
+    summary["join_events"] = join_events
     # WP7: true per-message completion latency, replacing the head-of-line
     # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
     # the message ledger and merged into the same per-flow summary dict the

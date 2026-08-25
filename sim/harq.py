@@ -311,6 +311,27 @@ class HarqProcessPool:
         """True if every process for this (ue_id, direction) is busy."""
         return all(p.busy for p in self._pool(ue_id, direction))
 
+    def flush_ue(self, ue_id: int) -> int:
+        """WP-Join commit 5 (docs/wp-join-plan.md sec1.4/sec2b): frees
+        every busy process for this UE, both directions, on the
+        transition into a radio-gated state -- a UE entering RLF would
+        otherwise keep consuming retransmission PRBs/CCE through the
+        outage (``due_this_slot()`` runs before the masked view is even
+        built), stealing resources from the neighbours GT-6 requires to
+        stay unaffected. No bytes are lost: ``drain()`` only ever runs on
+        success, so a flushed process's bytes remain in ``BufferModel``
+        and are simply re-granted as new data once the UE reconnects --
+        the same thing PDCP retention would do on real hardware. Returns
+        the count freed, for a diagnostic counter; freeing zero (nothing
+        was pending) is the common case, not an error."""
+        freed = 0
+        for direction in ("DL", "UL"):
+            for proc in self._pool(ue_id, direction):
+                if proc.busy:
+                    proc.reset()
+                    freed += 1
+        return freed
+
     def is_pending(self, ue_id: int, direction: Direction, qfi: int = -1) -> bool:
         """True if a specific flow (DL: ``(ue_id, qfi)``; UL: ``ue_id``
         alone, ``qfi`` ignored -- commit 4b) already has an unresolved

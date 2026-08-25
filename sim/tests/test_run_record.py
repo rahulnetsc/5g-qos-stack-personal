@@ -88,11 +88,30 @@ def test_flows_by_filters_correctly():
 # -- WP-Join commit 4: join_events (docs/wp-join-plan.md sec5) --------------
 
 
-def test_join_events_defaults_to_none_predating_wpjoin():
+def test_join_events_is_a_real_empty_list_from_a_live_wpjoin_commit5_run():
+    """Finding, not a fixture to quietly adjust (WP-Join commit 5 review
+    point 1): this test originally asserted a real driver.run() produced
+    join_events=None, written against the pre-commit-5 driver. Commit 5's
+    driver.py now sets summary["join_events"] unconditionally (possibly
+    empty) on every run, whether or not any UE opts into UEConfig.join --
+    so a live run's own RunRecord is never None any more. None is now
+    reserved for a record that lacks the "join_events" key entirely (a
+    stored pre-commit-5 baseline, or a hand-built dict/RunRecord that
+    omits it) -- see the sibling test below."""
     rec = _run_record()
-    assert rec.join_events is None
+    assert rec.join_events == []
     d = rec.to_dict()
-    assert d["join_events"] is None
+    assert d["join_events"] == []
+    assert RunRecord.from_dict(d).join_events == []
+
+
+def test_join_events_is_none_only_when_the_key_is_absent_entirely():
+    """The pre-commit-5 case: a summary dict (or a stored RunRecord.to_dict()
+    snapshot) that never had "join_events" at all -- distinct from a
+    live run's real (possibly empty) list above."""
+    rec = _run_record()
+    d = rec.to_dict()
+    del d["join_events"]
     assert RunRecord.from_dict(d).join_events is None
 
 

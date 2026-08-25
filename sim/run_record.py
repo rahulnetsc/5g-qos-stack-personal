@@ -211,12 +211,14 @@ class RunRecord:
     timeseries_time_s: Optional[list[float]] = None
     timeseries_slot_index: Optional[list[int]] = None
     meta: dict[str, Any] = field(default_factory=dict)
-    # WP-Join commit 4 (docs/wp-join-plan.md sec5): None means "this
-    # record predates WP-Join" (every record before this commit, and
-    # every record from a scenario that doesn't opt into UEConfig.join --
-    # driver.py's own wiring, commit 5, is what tells the two apart);
-    # [] is a real "this run had zero join/RLF events" -- the same
-    # never-None-post-landing convention message_count/completion_ts_by_
+    # WP-Join commit 4/5 (docs/wp-join-plan.md sec5): None means "this
+    # record was produced by a driver.run() that predates commit 5's
+    # wiring" -- from commit 5 onward, EVERY record gets a real list,
+    # [] included, regardless of whether the scenario's UEs opt into
+    # UEConfig.join (from_summary keys this off "join_events" in summary
+    # at all, not off any UE's own config). [] is a real "this run had
+    # zero join/RLF events" -- the same never-None-post-landing
+    # convention message_count/completion_ts_by_
     # role_s already establish above.
     join_events: Optional[list[JoinEventRecord]] = None
 
@@ -366,4 +368,15 @@ class RunRecord:
             timeseries_time_s=ts.get("time_s"),
             timeseries_slot_index=ts.get("slot_index"),
             meta=dict(meta or {}),
+            # WP-Join commit 5: "join_events" in summary at all (even an
+            # empty list) is the signal a WP-Join-aware driver.run() ran --
+            # None here means the summary predates that (no key), which is
+            # the same never-None-once-landed convention this method
+            # already applies via .get() defaults elsewhere, just phrased
+            # as key-presence rather than a None-vs-real-value field
+            # because driver.py always sets it to at least [] once landed.
+            join_events=(
+                [JoinEventRecord(**e) for e in summary["join_events"]]
+                if "join_events" in summary else None
+            ),
         )

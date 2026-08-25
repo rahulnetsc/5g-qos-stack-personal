@@ -342,18 +342,21 @@ metrics:
     guarantees: [G9]
     unit: ms
     direction: lower_better
-    status: pending
-    requires: "WP-Join (join/RLF event log, RunRecord.join_events)"
+    status: ok
+    requires: null
     note: >
       Added WP-Join commit 4 (not at WP0 -- see the comment above this
-      entry). Computed directly from RunRecord.join_events' timestamps,
-      grouped by JoinEventRecord.path; events that never completed
-      before the run's horizon are counted (n_never_completed), not
-      excluded from the row, same "never silently omit" discipline as a
-      pending metric itself. -> ok at commit 5 (docs/wp-join-plan.md
-      sec4), once a real UEConfig.join scenario can populate join_events
-      at all -- every record today has join_events=None or [], so this
-      reports pending regardless of the computation being ready.
+      entry); computation landed commit 4, flipped ok at commit 5 once a
+      real UEConfig.join scenario can populate RunRecord.join_events at
+      all. Computed directly from those timestamps, grouped by
+      JoinEventRecord.path; events that never completed before the run's
+      horizon are counted (n_never_completed), not excluded from the row,
+      same "never silently omit" discipline as a pending metric itself.
+      Every event produced by commit 5 alone reports attached_slot=None
+      (100% n_never_completed) -- WP-Join commit 6's app-handshake message
+      pair is what lets an event ever reach "attached"; this is a known,
+      documented gap, not a bug (docs/wp-join-plan.md "Commit 5 --
+      landed").
 
   - id: M19
     name: slo_recovery_time

@@ -641,7 +641,7 @@ than silently skipped.
 | 2 | Wire `sim/rlf.py::step()` into `sim/driver.py`'s slot loop, unconditionally, per-UE per-slot on true SNR; two diagnostic counters | `sim/driver.py`, `sim/tests/test_smoke.py` | Live, designed to be inert (§4.1) — no new `UEConfig` field |
 | 3 | Scripted fade in `sim/channel.py` (§1.5) — `UEConfig.scripted_fade`, deterministic override (not a mean-shift) while a window is active | `sim/config.py`, `sim/channel.py`, `sim/tests/test_channel.py`, `sim/tests/test_wpjoin_fade_boundary.py` (new — cross-module GT-6.3 boundary characterization) | No — opt-in, `()` default preserves today's behavior exactly |
 | 4 | Panel/schema: M18/M19 at `status: pending`, `JoinEventRecord`/`RunRecord.join_events`, `Scorecard` stubs returning pending on every existing record, `defaults.slo_green_dwell_s` (`[OPEN]`, D-new below) | `config/metric_panel.yml`, `sim/run_record.py`, `sim/scorecard.py`, `sim/tests/test_scorecard.py`, `sim/tests/test_run_record.py`, `regression/baseline_studies_1_3.json` | No — schema only. **The one commit that is not `--check`-clean** (§4.1) |
-| 5 | Radio-layer gate: `UEConfig.join`, `JoinAwareBufferView`, `HarqProcessPool.flush_ue`, RLF-edge → reestablish trigger, re-arm on reconnect, `JoinEventRecord` emission, `join_cold_seed`/`join_reest_seed`. **M18 `pending` → `ok`** | `sim/config.py`, `sim/driver.py`, `sim/join.py`, `sim/harq.py`, `config/metric_panel.yml`, `sim/tests/test_join_gate.py` (new) | No — opt-in, `UEConfig.join=None` default |
+| 5 | Radio-layer gate: `UEConfig.join`, `JoinAwareBufferView`, `HarqProcessPool.flush_ue`, RLF-edge → reestablish trigger, re-arm on reconnect, `JoinEventRecord`-shaped event log emission. **M18 `pending` → `ok`** | `sim/config.py`, `sim/driver.py`, `sim/join.py`, `sim/harq.py`, `config/metric_panel.yml`, `sim/tests/test_join_gate.py` (new) — plus, beyond the original plan: `sim/run_record.py` (`from_summary` needed to read the new key), `sim/tests/test_run_record.py` (a commit-4 fixture assumption this commit invalidated), `regression/baseline_studies_1_3.json` (re-captured) | No — opt-in, `UEConfig.join=None` default |
 | 6 | Application-layer gate: traffic-admission suppression (warm/cold only), handshake `Message` pair through the real buffer/scheduler/HARQ path. **M19 `pending` → `proxy`** | `sim/driver.py`, `sim/join.py`, `sim/traffic.py`, `config/metric_panel.yml`, `sim/tests/test_join_handshake.py` (new) | No — same opt-in gate as commit 5 |
 | 7 | Per-UE scheduler context reset: `SchedulerContextReset.reset_ue()` (duck-typed, additive), implemented in `two_tier.py` only; sim-side per-UE re-inits in `BsrModel`/`UlAccessModel`/`UeLcp` | `scheduler/interfaces.py`, `scheduler/two_tier.py`, `sim/bsr.py`, `sim/ul_access.py`, `sim/ue_lcp.py`, `sim/tests/test_join_reset.py` (new) | No — only invoked on a join-event transition; no effect without one |
 | 8 | Acceptance-criterion demo — **GT-6.3 only** (D0b), two fade-duration variants straddling `t310+t311=5.0s` (GT-6.3a short fade / true reestablish path; GT-6.3b literal 10 s fade / IDLE-fallback path), × TwoTier and PF, `record_timeseries=True`, `isolation_check` scorecard helper. **Also updates `README.md` §5's G9 row** (§0) — qualified, not a bare flip to "Yes" | `sim/tests/test_wpjoin_rlf_recovery.py` (new; scenario built in-line, not `sim/scenarios/*.yml`), `README.md` (§5 G9 row only) | Yes, scoped to this test file's own runs — stays outside the 22-record corpus entirely |
@@ -1019,6 +1019,147 @@ zero numeric — confirmed exactly, not approximately.**
    additions, one `"join_events": null,` per record, no other line
    touched).
 
+### Commit 5 — landed
+
+`sim/config.py` (`UEConfig.join`), `sim/harq.py` (`HarqProcessPool.
+flush_ue`), `sim/join.py` (`JoinAwareBufferView`), `sim/driver.py` (the
+radio gate wired into the slot loop, `JoinAwareBufferView` composed over
+`HarqAwareBufferView`, event-log assembly), `config/metric_panel.yml`
+(M18 `pending` → `ok`), `sim/tests/test_join_gate.py` (new, 15 tests) —
+plus, beyond the original file list, `sim/run_record.py` (`from_summary`
+needed updating to read the new `summary["join_events"]` key — the
+original plan listed only `config/metric_panel.yml` as this commit's
+panel-adjacent file, not `sim/run_record.py` itself), `sim/tests/
+test_run_record.py` (a commit-4 test's own fixture assumption broke —
+see point 1), `regression/baseline_studies_1_3.json` (re-captured — see
+point 3).
+
+**Two real bugs were found and fixed while verifying this commit, both
+by tests catching them before anything shipped, not by inspection alone:**
+
+1. **`JoinAwareBufferView` initially implemented only `state()`** —
+   `scheduler/interfaces.py::BufferView` is a five-method protocol
+   (`state`/`hol_delay_s`/`arrived_cum`/`delivered_cum`/`dropped_cum`);
+   the full `sim/tests -q` run caught this immediately as an
+   `AttributeError` inside `TwoTier` (`buffers.arrived_cum(...)` failing
+   on the wrapper), across 24 failing tests. Fixed by adding the four
+   missing pass-through methods, exactly mirroring `HarqAwareBufferView`'s
+   own shape. This is precisely the "confirm it holds in practice, not
+   just in the docstring" check point 2 asked for — it did NOT hold on
+   the first attempt, and the fix is recorded here rather than the
+   failure being silently absorbed into a "first try" that never
+   happened.
+2. **The event-log assembly recorded a spurious `"connected": 0.5`
+   phase-duration entry on every newly-triggered event** — the code
+   created the new event dict, then immediately looked it up via
+   `join_active_event.get(ue_id)` in the SAME slot's bookkeeping, so the
+   triggering `CONNECTED -> CELL_SEARCH` transition's own prior phase
+   (the idle/waiting state, not a procedure phase) got attributed to the
+   brand-new event. Found by point 1's own real-path-vs-synthetic-fixture
+   check (§ below) — the first real `join_events` entry printed
+   `{"phases": {"connected": 0.5, "cell_search": 1456.0, "reestablish":
+   34.0}, ...}` where the synthetic fixtures never had a `"connected"`
+   key at all. Fixed by looking up the pre-existing active event BEFORE
+   creating any new one, not after; `sim/tests/test_join_gate.py::
+   test_real_reestablish_path_produces_the_shape_commit4s_synthetic_
+   fixtures_assumed` asserts `"connected" not in raw["phases"]`
+   explicitly so this can't silently regress.
+
+**Answering the pre-commit checklist explicitly:**
+
+1. *Does the real path produce what commit 4's synthetic fixtures
+   assumed?* **Yes, after the fix above — checked by actually running a
+   scripted-fade scenario through the real `channel -> rlf.py -> join.py`
+   pipeline**, not by re-reading the synthetic tests. `sim/tests/
+   test_join_gate.py`'s dedicated test drives `UEConfig(scripted_fade=
+   (...), join=JoinConfig())` through a real `driver.run()` and asserts
+   the produced dict has EXACTLY the field set `sim.run_record.
+   JoinEventRecord` declares (an extra or missing key would raise inside
+   `RunRecord.from_summary`'s `JoinEventRecord(**e)` construction, not
+   silently pass), the same `None`-for-incomplete/real-value-for-measured
+   semantics the synthetic fixtures assumed (`attached_slot`/`attached_
+   ts_s`/`handshake_rtt_ms` all `None`; `trigger_slot`/`rf_restore_slot`
+   real ints), and confirmed `Scorecard().score(rec)["M18"]` returns
+   `status == "ok"` with `n_never_completed == 1` on this real record —
+   the exact shape commit 4's hand-built `JoinEventRecord` tests exercised
+   in isolation. The one divergence found (bug 2 above) was fixed, not
+   quietly reconciled into the fixture.
+2. *Does "zero scheduler-interface change" hold in practice; does it
+   compose with `HarqAwareBufferView`?* **Holds now, after bug 1's fix —
+   confirmed by the full existing test suite (24 failures, then 0) rather
+   than assumed from the docstring alone.** Composition confirmed by a
+   dedicated test (`test_composes_over_harq_aware_buffer_view_without_
+   conflict`): a UE masked by the HARQ layer alone, a UE masked by the
+   join layer alone, and — the case that actually exercises "compose,
+   don't conflict" — the SAME UE hitting both conditions at once still
+   reads as masked, not "double-unmasked" by one layer's copy
+   overwriting the other's. `scheduler/two_tier.py`, `pf.py`, `gradient.
+   py`, `round_robin.py` — none were touched.
+3. *Predict the drift; state the falsifiable form precisely.* **Both
+   forms hold, and they're distinguishable in this codebase, unlike
+   commit 2's case:** "no corpus scenario sets `UEConfig.join`" (true,
+   checked) AND, structurally stronger, "nothing is ever gated" — because
+   `join_states` (built as `{ue.ue_id: ... for ue in scenario.ues if
+   ue.join is not None}`) is a dict with NO entry for any UE that didn't
+   opt in, and the per-slot loop's `if join_state is None: continue`
+   means every line commit 5 added is provably unreached for such a UE,
+   not merely never observed to fire. `sim/tests/test_join_gate.py::
+   test_no_ue_config_join_reproduces_pre_commit5_behaviour_exactly` and
+   `test_a_ue_without_join_is_never_gated_even_when_a_sibling_ue_is`
+   check both forms directly, the second specifically because a
+   sibling UE genuinely being gated is what makes "this OTHER UE is
+   unaffected" a real claim rather than a vacuous one (no UE in the
+   scenario was ever gated at all).
+
+   **The regression corpus DID need a re-capture this commit, for a
+   reason distinct from gating.** Not predicted explicitly in this
+   document before writing code — a real gap, flagged here rather than
+   smoothed over: `driver.py` now sets `summary["join_events"]` to a real
+   (possibly empty) list UNCONDITIONALLY, regardless of whether any UE
+   opts in, so that `RunRecord.from_summary` can key off "the key is
+   present at all" to distinguish a WP-Join-aware driver from one that
+   predates it. Commit 4's baseline had `"join_events": null` on every
+   record (a real value, not an absent key, since commit 4 already made
+   `RunRecord.to_dict()` always emit the field); commit 5 changes that
+   value to `[]` for every one of the 22 records, unconditionally.
+   `--check` printed exactly 22 mismatches, every one of the literal form
+   `path.join_events: None -> []`, and — checked directly — **zero
+   contain a `delta` clause**, confirming this is the same non-numeric,
+   structural shape as commit 4's own re-capture, just a value change
+   rather than a key-presence one. This is NOT gating leaking into the
+   corpus (gating structurally cannot, per the point above) — it is the
+   "always populate the list once landed" convention alone, independent
+   of any UE's own configuration. Re-captured; `git diff` on the baseline
+   confirms exactly 22 lines changed (`"join_events": null,` →
+   `"join_events": [],`), nothing else.
+4. *Confirm the commit-2 call-site placement still works without
+   moving it.* **Confirmed — the gating/`join.step()` logic was inserted
+   INSIDE the existing per-UE loop commit 2 placed immediately after
+   `channel.update(slot_index)` and before `slot_grid = grid.slot_grid(
+   ...)`, not moved.** `rlf.step()` itself still runs at exactly that
+   point (now conditionally, per UE); `join.step()` runs immediately
+   after it, still before the HARQ-resolution block, exactly where
+   sec1.8 said commit 5 would need to act — confirmed by the harq-flush
+   call actually preventing a gated UE's stale processes from being
+   resolved in that same slot's HARQ block, not merely by re-reading the
+   plan's own claim.
+
+Two things flagged for a later commit, not fixed here: (a) **`join_
+cold_seed`/`join_reest_seed` are the two RNG streams this commit actually
+draws from** — `join_warm_seed` stays reserved, unused, exactly as D9
+predicted (`app_restart_ceiling_ms` defaults to `0.0`, drawing nothing).
+(b) **A UE can produce at most one `join_events` entry in this commit
+alone** — found while testing re-arm (a second, later scripted fade
+DOES re-declare RLF, `rlf_declared_count == 2`, proving the re-arm
+itself works — but the UE is permanently parked in `APP_HANDSHAKE`
+after its first event, since nothing in this commit ever sets
+`handshake_complete=True`, and `sim/join.py`'s own FSM only reacts to
+`rlf_declared_this_slot` from `JoinPhase.CONNECTED`). Commit 6's
+handshake completion is what returns a UE to `CONNECTED`, able to cycle
+through a second real event — not a defect in re-arming, a scope
+boundary of this commit alone, recorded in `sim/tests/test_join_gate.py`
+itself so it can't be mistaken for an oversight later.
+
 ---
 
 ## 5. `config/metric_panel.yml` additions
@@ -1220,13 +1361,17 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commits 1–4 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+**Commits 1–5 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
 `sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
 diagnostic-only; deterministic scripted fade in `sim/channel.py`, with
 the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s;
 M18/M19 + `RunRecord.join_events` schema, regression baseline
 re-captured with exactly the predicted 22-record structural diff and
-zero numeric drift). Commits 5–8 not yet started. Two scope questions
+zero numeric drift; the radio-layer gate — `JoinAwareBufferView` composed
+over `HarqAwareBufferView`, HARQ-pool flush, RLF re-arm on reconnect,
+M18 `pending` → `ok` — verified end-to-end against a real scripted-fade
+run, two real bugs found and fixed in the process). Commits 6–8 not yet
+started. Two scope questions
 that would otherwise be
 `[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
 Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)

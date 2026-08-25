@@ -1,6 +1,6 @@
 """WP-Join commit 1 -- per-UE join/re-join/RLF-recovery state machine and
-calibrated delay sampler. DORMANT: not wired into ``sim/driver.py``, ``sim/
-config.py``, or any scheduler -- the same landing pattern as ``sim/
+calibrated delay sampler. Landed DORMANT: not wired into ``sim/driver.py``,
+``sim/config.py``, or any scheduler -- the same landing pattern as ``sim/
 power.py`` (WP1), ``sim/olla.py`` (WP5 commit 6), and ``sim/rlf.py`` (WP6
 commit 3). Pure functions/dataclasses only -- no simulator or scheduler
 imports, and in particular **no import of ``sim/rlf.py``**: this module
@@ -8,6 +8,15 @@ consumes ``sim/rlf.py``'s contract (``docs/wp6-plan.md`` Decision 4) as a
 plain ``bool`` passed into ``step()`` (see below), not as an object it
 constructs or holds -- the "consume, don't extend" boundary CLAUDE.md
 records is kept at the type-signature level, not just the docstring level.
+
+**WP-Join commit 5** (docs/wp-join-plan.md sec1.4/sec4) wires this module
+into ``sim/driver.py`` via ``UEConfig.join`` (opt-in, default ``None``)
+and adds ``JoinAwareBufferView`` below -- the radio gate. This module
+still imports nothing from ``sim``/``scheduler`` (``JoinAwareBufferView``
+duck-types its wrapped view exactly like ``sim/harq.py::
+HarqAwareBufferView`` does, needing no import to do it); the FSM/sampler
+above this point in the file remains exactly what commit 1 landed,
+unmodified.
 
 **Ground truth, cited exactly** (``docs/wp-join-plan.md`` sec2):
 ``calibration-logs/twotier_startup_gnb.log:17``'s startup banner --
@@ -61,6 +70,7 @@ draws nothing). See ``init_join_rng_streams``.
 
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -479,3 +489,55 @@ def step(
         timer_expired_this_slot=timer_expired_this_slot,
         snr_restored_this_slot=snr_restored_this_slot,
     )
+
+
+class JoinAwareBufferView:
+    """WP-Join commit 5: wraps another BufferView (composed OUTERMOST over
+    ``sim/harq.py::HarqAwareBufferView`` -- docs/wp-join-plan.md sec1.4)
+    so ``scheduler.allocate()`` sees ZERO backlog (``bytes_queued`` AND
+    ``bytes_reported``) for any UE currently radio-gated -- i.e. any UE
+    with a tracked ``JoinState`` whose ``phase`` is not one of ``rrc_
+    connected``'s set. Masked per WHOLE UE, both directions, unlike
+    ``HarqAwareBufferView``'s per-flow(DL)/per-UE(UL) split -- RRC
+    connectivity is a property of the UE, not of any one flow. Both
+    fields matter: ``TwoTier``'s SPS path reads ``bytes_queued`` directly,
+    bypassing BSR entirely, so masking only ``bytes_reported`` would leave
+    that path open (docs/wp-join-plan.md sec1.4).
+
+    ``hol_delay_s`` and the cumulative arrived/delivered/dropped counters
+    are passed through UNMASKED, exactly matching ``HarqAwareBufferView``'s
+    own choice -- they are either genuinely-known gNB state (HoL age of
+    its own queue) or lifetime accounting later windowing depends on;
+    masking them would corrupt post-recovery demand estimates, not just
+    this slot's grant.
+
+    A UE with no entry in ``join_states`` (no ``UEConfig.join`` set) is
+    never gated -- exactly today's behaviour, unconditionally; this is
+    also why ``join_states`` should hold only UEs that opted in, not
+    every UE in the scenario with a placeholder ``None``."""
+
+    def __init__(self, inner, join_states: dict[int, JoinState]) -> None:
+        self._inner = inner
+        self._join_states = join_states
+
+    def state(self, ue_id: int, qfi: int):
+        real = self._inner.state(ue_id, qfi)
+        join_state = self._join_states.get(ue_id)
+        if join_state is not None and not rrc_connected(join_state.phase):
+            masked = copy.copy(real)
+            masked.bytes_queued = 0
+            masked.bytes_reported = 0
+            return masked
+        return real
+
+    def hol_delay_s(self, ue_id: int, qfi: int, now_s: float) -> float:
+        return self._inner.hol_delay_s(ue_id, qfi, now_s)
+
+    def arrived_cum(self, ue_id: int, qfi: int) -> int:
+        return self._inner.arrived_cum(ue_id, qfi)
+
+    def delivered_cum(self, ue_id: int, qfi: int) -> int:
+        return self._inner.delivered_cum(ue_id, qfi)
+
+    def dropped_cum(self, ue_id: int, qfi: int) -> int:
+        return self._inner.dropped_cum(ue_id, qfi)

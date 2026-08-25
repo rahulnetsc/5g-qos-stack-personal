@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 
 from scheduler.flow import FlowConfig
 
+from .join import JoinConfig
+
 __all__ = [
     "TDDConfig",
     "CarrierConfig",
@@ -116,6 +118,14 @@ class UEConfig:
     # that module and sim/join.py for why blockage's own stochastic
     # process can't serve this role.
     scripted_fade: tuple[ScriptedFadeWindow, ...] = ()
+    # WP-Join commit 5 (docs/wp-join-plan.md sec1.3/sec1.4): opt-in
+    # join/re-join/RLF-recovery state machine. None (default) preserves
+    # today's behaviour exactly -- this UE is never radio-gated, sim/
+    # rlf.py::step() runs unconditionally for it (WP-Join commit 2's
+    # existing behaviour), and sim/driver.py never constructs a sim/
+    # join.py::JoinState for it at all. See sim/join.py's own docstring
+    # for what setting this does.
+    join: JoinConfig | None = None
 
 
 @dataclass
