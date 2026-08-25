@@ -269,6 +269,19 @@ they survive it:
   active LCGs"; the code credits the **full** `tb_size` to every active
   LCG independently. Reproduce the code's behavior, not the comment's
   intent (§4, Phase 2 table).
+- **A third instance of the same comment/code (or, here, doc/default)
+  mismatch — this time in this repo's own Python, found scoping Phase 2.**
+  `scheduler/two_tier.py`'s current `tier1_period_slots` default (`2000`)
+  matches `ia_p5g_scheduler.h`'s stale "1.0 s default" doc comment for
+  Tier-1's re-solve cadence, not the confirmed-real 0.1 s the deployed
+  macro (`IA_P5G_TIER1_PERIOD_S`, `ia_p5g_scheduler.c:74-76`) actually
+  runs at: at this repo's default `numerology=1` (0.5 ms slots),
+  `2000 slots = 1.0 s`. Phase 2's rewrite must default to 200 slots (or
+  derive the slot count from `tier1_period_s=0.1` ÷ `grid.slot_duration_s`
+  so it's numerology-robust), not carry the stale value forward. CLAUDE.md's
+  "reproduce measured behavior, not documented intent" rule now carries
+  this as its third cited instance, and the first found in this codebase's
+  own code rather than in ported OAI C.
 - **A previously-fixed sort bug**, visible in a live comment: sched-
   inactive UEs used to sort to the *front* of the queue ("a bug"), now
   fixed to sort last. Relevant for provenance if any existing hardware

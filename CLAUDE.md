@@ -97,6 +97,20 @@ active LCGs" and then credits the full `tb_size` to every active LCG
 independently. Port the full-credit behavior. Do not make it proportional.
 If you find another comment/code mismatch, flag it and ask — do not
 reconcile it silently in either direction.
+**This rule governs this repo's own stale defaults too, not only values
+ported from OAI source.** Confirmed by a third instance, found scoping
+Phase 2: `scheduler/two_tier.py`'s `tier1_period_slots` default (`2000`)
+was written to match `ia_p5g_scheduler.h`'s doc-commented "1.0 s default"
+for Tier-1's LP re-solve cadence — but that comment is itself stale (see
+the Tier-1-period invariant above); the deployed macro is 0.1 s
+(`IA_P5G_TIER1_PERIOD_S`, `ia_p5g_scheduler.c:74-76`). At this repo's
+default `numerology=1` (`sim/config.py`, `slot_duration_s=0.5ms`),
+`2000 * 0.5ms = 1.0s` — the Python default silently encodes the header's
+wrong value, not the confirmed-real one. Phase 2's rewrite defaults to
+200 slots (or better, derives the slot count from `tier1_period_s=0.1`
+÷ `grid.slot_duration_s` so it survives a numerology change) — this is
+not a special case of the OAI-comment rule, it's the same rule applied to
+a default this codebase itself chose.
 
 **Do not add SPS / Configured Grant to the schedulers.** `main`'s
 `scheduler/two_tier.py` has it (`_SPSReservation`, `_allocate_sps`); the real
