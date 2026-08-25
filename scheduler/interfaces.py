@@ -159,3 +159,37 @@ class Scheduler(Protocol):
         buffers: BufferView,
         channel: ChannelView,
     ) -> list[Allocation]: ...
+
+
+class SchedulerContextReset(Protocol):
+    """WP-Join commit 7 (docs/wp-join-plan.md sec1.9): an OPTIONAL,
+    additive capability -- deliberately NOT part of ``Scheduler`` above,
+    so every existing arm (PF, gradient, RoundRobin, and any future
+    scheduler) stays fully conformant without implementing it.
+    ``sim/driver.py`` discovers this via ``getattr(scheduler, "reset_ue",
+    None)``, calling it only on a UE's radio reconnection -- a scheduler
+    that doesn't implement it is simply never asked.
+
+    ``scope`` is path-dependent, and is itself a no-ground-truth call
+    under test (docs/wp-join-plan.md D7), not a fixed rule:
+    - ``"mac"`` -- true reestablishment succeeded directly (no fallback
+      to a full re-attach). Real hardware retains the UE's context/
+      C-RNTI across reestablishment -- that retention is what makes it
+      fast -- so a scheduler's longer-run fairness/QoS bookkeeping
+      (accumulated GBR deficit, demand belief) is left alone; only
+      state tied to the now-stale pre-outage BSR/MAC reporting cycle is
+      reset.
+    - ``"full"`` -- cold attach, OR a reestablishment attempt that
+      itself timed out and fell back to a full re-attach (no context
+      retained either way on real hardware). Every per-UE value resets
+      to what ``configure()`` would have given a brand-new flow.
+
+    ``buffers`` is passed so an implementation can read this UE's
+    current CUMULATIVE counters (``arrived_cum``/``delivered_cum``) to
+    re-seed any windowed history it resets, rather than clearing it to
+    empty -- a lifetime cumulative counter never resets on its own
+    (``sim/buffer.py`` has no such operation), so a naively-cleared
+    window would compute its next value against zero, not against "now."
+    """
+
+    def reset_ue(self, ue_id: int, scope: str, buffers: BufferView) -> None: ...

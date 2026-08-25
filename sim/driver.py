@@ -213,6 +213,16 @@ def run(
     join_handshake_state: dict[int, str] = {}  # "awaiting_ul" | "awaiting_dl"
     join_handshake_ul_sent_ts_s: dict[int, float] = {}
     join_handshake_complete_this_slot: dict[int, bool] = {}
+    # WP-Join commit 7 (docs/wp-join-plan.md sec1.9): True iff THIS
+    # cycle's path ever passed through JoinPhase.IDLE -- the only way a
+    # "reestablish"-triggered cycle ends up needing a FULL reset instead
+    # of "mac": t311/t301 expiry falls back to a full re-attach (real
+    # hardware retains no context either), even though JoinState.
+    # active_path never changes from "reestablish" for this cycle. Reset
+    # to False at each new event's own trigger, not just at IDLE entry --
+    # a stale True from a PRIOR cycle must never leak into this one's
+    # scope decision.
+    join_used_idle_fallback: dict[int, bool] = {}
 
     for slot_index in range(scenario.horizon_slots):
         ue_lcp.refill(grid.slot_duration_s)
@@ -292,6 +302,29 @@ def run(
                 # rlf.py's own docstring names, not an extension of it.
                 rlf_states[ue.ue_id] = RlfDetectorState()
 
+                # WP-Join commit 7 (sec1.9): fresh per-UE MAC/BSR/SR/LCP
+                # state on every reconnection, cold or reestablished --
+                # both restart the UL access chain. Scope for the
+                # SCHEDULER's own fairness ledger differs: "mac" (true
+                # reestablishment, context retained) leaves it alone;
+                # "full" (cold attach, or a reestablishment that itself
+                # fell back through IDLE) clears it. A path never
+                # touching JoinPhase.IDLE this cycle is the true-
+                # reestablish case; active_path=="cold" or having
+                # touched IDLE is "full" -- warm never reaches here at
+                # all (radio never drops).
+                bsr.reset_ue(ue.ue_id, slot_index)
+                ul_access.reset_ue(ue.ue_id)
+                ue_lcp.reset_ue(ue.ue_id)
+                scheduler_reset_ue = getattr(scheduler, "reset_ue", None)
+                if scheduler_reset_ue is not None:
+                    scope = (
+                        "full"
+                        if join_state.active_path == "cold" or join_used_idle_fallback.get(ue.ue_id, False)
+                        else "mac"
+                    )
+                    scheduler_reset_ue(ue.ue_id, scope, buffers)
+
             # Event-log assembly (M18/M19, config/metric_panel.yml).
             # Ordering matters: look up the event that was ALREADY active
             # going into this call (before any new one this same call
@@ -353,12 +386,20 @@ def run(
                         per_flow_arrived[(ue.ue_id, jcfg.handshake_ul_qfi)] += jcfg.handshake_request_bytes
                         join_handshake_state[ue.ue_id] = "awaiting_ul"
                         join_handshake_ul_sent_ts_s[ue.ue_id] = now_s
+                if jres.phase_changed and join_state.phase is JoinPhase.IDLE:
+                    # WP-Join commit 7: this cycle fell back to a full
+                    # re-attach (t311/t301 expired) -- active_path stays
+                    # "reestablish" throughout, so this is the only
+                    # record of it, consulted at the radio_connected_
+                    # this_slot point above to pick reset_ue's scope.
+                    join_used_idle_fallback[ue.ue_id] = True
                 if jres.phase_changed and join_state.phase is JoinPhase.CONNECTED:
                     active_event["attached_slot"] = slot_index
                     active_event["attached_ts_s"] = slot_index * grid.slot_duration_s
                     join_active_event[ue.ue_id] = None
 
             if join_state.active_path is not None and prior_active_path is None:
+                join_used_idle_fallback[ue.ue_id] = False
                 new_event = {
                     "ue_id": ue.ue_id, "path": join_state.active_path,
                     "trigger_slot": join_state.trigger_slot,

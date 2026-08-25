@@ -172,6 +172,24 @@ class BsrModel:
             for ue_id in self._ue_flows
         }
 
+    def reset_ue(self, ue_id: int, slot_index: int) -> None:
+        """WP-Join commit 7 (docs/wp-join-plan.md sec1.9): fresh per-UE
+        MAC/BSR state on radio reconnection -- reestablishment and cold
+        attach both restart the UL access chain from scratch. No-op for
+        a UE with no UL flows at all (never in ``self._state`` to begin
+        with). Deadlines are seeded ``slot_index`` slots forward, the
+        same "one full interval from construction" rule ``__init__``
+        applies at slot 0 -- seeding them at the absolute
+        ``periodic_bsr_slots``/``retx_bsr_slots`` values instead would
+        put a deadline in the PAST for any reset after startup, forcing
+        an immediate, spurious report."""
+        if ue_id not in self._state:
+            return
+        self._state[ue_id] = _UeBsrState(
+            periodic_deadline_slot=slot_index + self._periodic_bsr_slots,
+            retx_deadline_slot=slot_index + self._retx_bsr_slots,
+        )
+
     def on_arrivals(self, per_flow_arrived: dict[tuple[int, int], int], buffers) -> None:
         """Regular-BSR trigger (TS 38.321 §5.4.5, condensed to LCG
         granularity): an arrival on a previously-empty LCG, or of higher

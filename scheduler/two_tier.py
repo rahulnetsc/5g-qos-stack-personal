@@ -292,6 +292,88 @@ class TwoTier:
             (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
         }
 
+    def reset_ue(self, ue_id: int, scope: str, buffers: BufferView) -> None:
+        """WP-Join commit 7 (docs/wp-join-plan.md sec1.9, D7): the ONLY
+        scheduler in this repo that implements ``interfaces.py::
+        SchedulerContextReset`` -- see that protocol's own docstring for
+        the ``scope`` contract. PF/gradient/RoundRobin implement nothing;
+        their own (checkable, not assumed) reason is documented in
+        docs/wp-join-plan.md's own D8.
+
+        ``"full"`` mirrors exactly what ``configure()`` initialises for
+        one flow, per flow of this UE -- not a separate, independently-
+        invented "fresh" state. ``_arr_hist``/``_del_hist`` are RE-SEEDED
+        with this UE's CURRENT cumulative arrived/delivered bits (one
+        entry), not cleared to empty: ``buffers.arrived_cum``/
+        ``delivered_cum`` are lifetime counters that never reset on
+        their own, so an empty history would compute its very first
+        post-reset window against a "since the dawn of the run" baseline
+        instead of "since this reset" -- self-healing within one
+        ``tier1_period`` either way, but a needless clamp-to-zero
+        artifact for that whole window if skipped (found while writing
+        this method, not assumed from the field list alone).
+        ``_demand_smooth`` is ALSO cleared here even though ``configure()``
+        itself never clears it -- a latent, harmless-in-practice gap in
+        ``configure()`` (invisible there because it's only ever called
+        once per run, immediately after ``__init__`` already left the
+        dict empty), not a precedent this method should replicate: a
+        genuinely fresh UE carrying forward a pre-outage demand EWMA is
+        exactly the kind of residual state GT-6.2 is testing for.
+
+        ``"mac"`` resets only the state structurally tied to the BSR/
+        MAC reporting cycle that a lost radio link invalidates
+        (``_buf_est``/``_buf_hist``, the "tracking" demand estimator's
+        own predict/correct loop; ``_served_this_slot``; the UL shadow
+        token bucket and its predicted-backlog counterpart, which mirror
+        the UE's own MAC-layer bucket -- reset alongside it in ``sim/
+        ue_lcp.py``). It deliberately does NOT touch ``_virtual_q``/
+        ``_demand_bps``/``_targets_bps``/``_gbr_penalty``/``_snr_avg``/
+        ``_arr_hist``/``_del_hist``/``_demand_smooth`` -- real
+        reestablishment retains the UE's context, so the scheduler's
+        longer-run fairness ledger (accumulated GBR deficit, demand
+        belief) is real, owed state, not residue. Whether that
+        retention is correct is GT-6.3's own question (D7); this is the
+        switch to revisit if it turns out to be wrong.
+
+        ``_sps``/``_sps_keys`` need no action either scope:
+        ``_update_sps_reservations`` rebuilds both from scratch every
+        ``tier1_period`` regardless (see that method's own ``self._sps
+        = []`` at its top), so a stale reservation for this UE cannot
+        survive past the next periodic Tier-1 solve.
+        """
+        if scope not in ("mac", "full"):
+            raise ValueError(f"scope must be 'mac' or 'full' (got {scope!r})")
+        ue_flows = [f for f in self._flows if f.ue_id == ue_id]
+        if not ue_flows:
+            return
+
+        for f in ue_flows:
+            key = (f.ue_id, f.qfi)
+            self._buf_est[key] = 0.0
+            self._buf_hist[key] = deque(maxlen=self.bsr_lag_slots + 1)
+            self._served_this_slot[key] = 0
+            if f.direction == "UL":
+                pbr = f.effective_pbr_bps()
+                self._ul_shadow_bucket[key] = [0.0, pbr * (f.bsd_ms / 1000.0), pbr]
+                self._ul_predicted_backlog[key] = 0.0
+
+        if scope == "mac":
+            return
+
+        self._snr_avg.pop(ue_id, None)
+        for f in ue_flows:
+            key = (f.ue_id, f.qfi)
+            demand = estimate_demand_bps(f)
+            self._demand_bps[key] = demand
+            self._targets_bps[key] = demand
+            self._virtual_q[key] = 0.0
+            self._gbr_penalty[key] = self.gbr_penalty_init
+            self._demand_smooth.pop(key, None)
+            arr_now = buffers.arrived_cum(*key) * 8
+            del_now = buffers.delivered_cum(*key) * 8
+            self._arr_hist[key] = deque([arr_now], maxlen=self.tier1_period)
+            self._del_hist[key] = deque([del_now], maxlen=self.tier1_period)
+
     def _track_demand(self, buffers) -> None:
         """One step of the buffer-tracking demand estimator, per slot.
 

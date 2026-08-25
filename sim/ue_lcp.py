@@ -72,6 +72,16 @@ class UeLcp:
         for b in self._buckets.values():
             b.refill(dt_s)
 
+    def reset_ue(self, ue_id: int) -> None:
+        """WP-Join commit 7 (docs/wp-join-plan.md sec1.9): a UE's own
+        MAC-layer token buckets restart empty on radio reconnection,
+        matching __init__'s own tokens=0.0 default -- a real UE does not
+        remember its pre-outage token balance across a lost radio link.
+        No-op (nothing to reset) for a UE with no UL flows at all."""
+        for key, bucket in self._buckets.items():
+            if key[0] == ue_id:
+                bucket.tokens = 0.0
+
     def fill(
         self, ue_flows: list[FlowConfig], tbs_bytes: int, buffers
     ) -> list[tuple[int, int]]:

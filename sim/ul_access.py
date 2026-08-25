@@ -129,6 +129,18 @@ class UlAccessModel:
         self._report_floor = sr_report_floor_bytes
         self._state: dict[int, _UeSrState] = {ue_id: _UeSrState() for ue_id in self._ue_flows}
 
+    def reset_ue(self, ue_id: int) -> None:
+        """WP-Join commit 7 (docs/wp-join-plan.md sec1.9): fresh per-UE SR
+        state on radio reconnection. Unlike BsrModel's timers, every
+        ``_UeSrState`` field defaults to its own "nothing pending, no
+        timer running" value, so no slot-relative seeding is needed here
+        -- ``prohibit_deadline_slot=0`` is inert whenever
+        ``prohibit_active`` is False, which the fresh default already is.
+        No-op for a UE with no UL flows at all."""
+        if ue_id not in self._state:
+            return
+        self._state[ue_id] = _UeSrState()
+
     def on_arrivals(self, per_flow_arrived: dict[tuple[int, int], int], buffers) -> None:
         """SR trigger: new data arriving when this UE has no other way to
         signal it -- no standing grant (SR flag not already set), no SR

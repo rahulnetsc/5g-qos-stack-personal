@@ -643,7 +643,7 @@ than silently skipped.
 | 4 | Panel/schema: M18/M19 at `status: pending`, `JoinEventRecord`/`RunRecord.join_events`, `Scorecard` stubs returning pending on every existing record, `defaults.slo_green_dwell_s` (`[OPEN]`, D-new below) | `config/metric_panel.yml`, `sim/run_record.py`, `sim/scorecard.py`, `sim/tests/test_scorecard.py`, `sim/tests/test_run_record.py`, `regression/baseline_studies_1_3.json` | No — schema only. **The one commit that is not `--check`-clean** (§4.1) |
 | 5 | Radio-layer gate: `UEConfig.join`, `JoinAwareBufferView`, `HarqProcessPool.flush_ue`, RLF-edge → reestablish trigger, re-arm on reconnect, `JoinEventRecord`-shaped event log emission. **M18 `pending` → `ok`** | `sim/config.py`, `sim/driver.py`, `sim/join.py`, `sim/harq.py`, `config/metric_panel.yml`, `sim/tests/test_join_gate.py` (new) — plus, beyond the original plan: `sim/run_record.py` (`from_summary` needed to read the new key), `sim/tests/test_run_record.py` (a commit-4 fixture assumption this commit invalidated), `regression/baseline_studies_1_3.json` (re-captured) | No — opt-in, `UEConfig.join=None` default |
 | 6 | Application-layer gate: traffic-admission suppression (warm/cold only), handshake `Message` pair through the real buffer/scheduler/HARQ path. **M19 `pending` → `proxy`** | `sim/driver.py`, `sim/join.py`, `sim/traffic.py`, `config/metric_panel.yml`, `sim/tests/test_join_handshake.py` (new) — plus `sim/tests/test_join_gate.py` (a commit-5 test's own documented limitation is superseded, updated not left stale) | No — same opt-in gate as commit 5 |
-| 7 | Per-UE scheduler context reset: `SchedulerContextReset.reset_ue()` (duck-typed, additive), implemented in `two_tier.py` only; sim-side per-UE re-inits in `BsrModel`/`UlAccessModel`/`UeLcp` | `scheduler/interfaces.py`, `scheduler/two_tier.py`, `sim/bsr.py`, `sim/ul_access.py`, `sim/ue_lcp.py`, `sim/tests/test_join_reset.py` (new) | No — only invoked on a join-event transition; no effect without one |
+| 7 | Per-UE scheduler context reset: `SchedulerContextReset.reset_ue()` (duck-typed, additive), implemented in `two_tier.py` only; sim-side per-UE re-inits in `BsrModel`/`UlAccessModel`/`UeLcp`; `sim/driver.py`'s own path-dependent scope selection (mac / full / the IDLE-fallback correction) | `scheduler/interfaces.py`, `scheduler/two_tier.py`, `sim/bsr.py`, `sim/ul_access.py`, `sim/ue_lcp.py`, `sim/driver.py`, `sim/tests/test_join_reset.py` (new) | No — only invoked on a join-event's radio-reconnection edge; no effect without one |
 | 8 | Acceptance-criterion demo — **GT-6.3 only** (D0b), two fade-duration variants straddling `t310+t311=5.0s` (GT-6.3a short fade / true reestablish path; GT-6.3b literal 10 s fade / IDLE-fallback path), × TwoTier and PF, `record_timeseries=True`, `isolation_check` scorecard helper. **Also updates `README.md` §5's G9 row** (§0) — qualified, not a bare flip to "Yes" | `sim/tests/test_wpjoin_rlf_recovery.py` (new; scenario built in-line, not `sim/scenarios/*.yml`), `README.md` (§5 G9 row only) | Yes, scoped to this test file's own runs — stays outside the 22-record corpus entirely |
 
 ### Why this order
@@ -1256,6 +1256,129 @@ queue view, not something BSR reports.
    never produced one) — the path-keyed breakdown design (§5) checked
    against real data for the first time on the warm path specifically.
 
+### Commit 7 — landed
+
+`scheduler/interfaces.py` (`SchedulerContextReset`, additive, not part of
+`Scheduler`), `scheduler/two_tier.py` (`TwoTier.reset_ue`), `sim/bsr.py`/
+`sim/ul_access.py`/`sim/ue_lcp.py` (matching `reset_ue` methods), `sim/
+driver.py` (the scope-selection logic — mac / full / the IDLE-fallback
+correction — wired to the same `radio_connected_this_slot` edge commit 5
+already re-arms RLF detection on), `sim/tests/test_join_reset.py` (new,
+18 tests).
+
+**One real bug found and fixed, caught by a test that encoded my own
+stated design intent, not by re-reading the code:** `_demand_smooth`'s
+reset was written into the shared (both-scopes) per-flow loop instead of
+the `"full"`-only section below it — directly contradicting this same
+commit's own docstring, which places `_demand_smooth` in the `"full"`
+paragraph and never mentions it under `"mac"`. `test_reset_ue_mac_scope_
+retains_the_fairness_ledger` asserted the documented intent directly and
+failed against the first implementation. Fixed by moving the `pop()`
+call into the `"full"`-only loop.
+
+**Answering the pre-commit checklist explicitly:**
+
+1. *Confirm what makes this commit different; is a scheduler-file change
+   genuinely unavoidable?* **Yes — checked by asking what a masking-only
+   design would actually have to do, not by assuming a scheduler change
+   was needed because the plan said so.** Every prior "zero scheduler
+   changes" WP achieved its effect by wrapping the `BufferView`/`SlotView`
+   passed INTO `allocate()` (`HarqAwareBufferView`, `JoinAwareBufferView`)
+   — the scheduler's own code never had to cooperate, because masking
+   backlog to zero is externally observable and externally sufficient.
+   Resetting `TwoTier`'s OWN per-UE dicts (`_virtual_q`, `_demand_bps`,
+   `_snr_avg`, ...) has no such external lever: they are private instance
+   attributes read and written entirely inside `allocate()`'s own body.
+   The only ways to change them from outside are (a) reach into private
+   attributes directly — worse coupling than a method, not less, and
+   exactly the kind of undocumented dependency this codebase avoids
+   elsewhere — or (b) call `configure()` again, already rejected (D7/§1.9)
+   since it resets every OTHER UE's state too, violating "neighbours
+   unaffected." A new, additive, duck-typed method is the only remaining
+   option, and it preserves the actual invariant every prior WP's "zero
+   scheduler changes" line was protecting: `Scheduler.configure()`/
+   `allocate()`'s signature and algorithm are untouched, and every
+   scheduler that doesn't implement `reset_ue` (PF, gradient, RoundRobin)
+   continues to conform and behave identically, checked directly
+   (`test_other_schedulers_do_not_implement_reset_ue`), not assumed.
+2. *Restate the path-dependent reset scope; state the falsifiable form.*
+   **Restated, with the one correction found while building it, not
+   just re-copied from §1.9.** `"mac"` (true reestablishment, no IDLE
+   fallback): retains `_virtual_q`/`_demand_bps`/`_targets_bps`/`_gbr_
+   penalty`/`_snr_avg`/`_arr_hist`/`_del_hist`/`_demand_smooth` (the
+   fairness ledger — real hardware keeps the UE's context across
+   reestablishment, so this is owed state, not residue); resets `_buf_
+   est`/`_buf_hist`/`_served_this_slot`/the UL shadow bucket (state tied
+   to the now-stale pre-outage BSR/MAC reporting cycle). `"full"` (cold
+   attach, or a reestablishment that itself timed out and fell back
+   through `JoinPhase.IDLE`): resets everything the `"mac"` case
+   retains too, mirroring exactly what `configure()` initialises fresh
+   for one flow. **The correction**: `JoinState.active_path` never
+   changes from `"reestablish"` even when `t311`/`t301` expires and the
+   cycle falls back to a full re-attach via `IDLE` — using `active_path`
+   alone to pick scope would have wrongly given a failed-then-restarted
+   reestablishment the lighter `"mac"` treatment. Fixed by tracking
+   `join_used_idle_fallback` (set the instant `JoinPhase.IDLE` is
+   entered, cleared at each new event's own trigger) and consulting
+   both signals together. **The falsifiable form**: too broad (`"mac"`
+   scope wrongly clearing the fairness ledger) would show the recovering
+   UE losing its legitimately-accumulated GBR deficit/priority right
+   when reestablishment is supposed to be fast *because* context is
+   retained — a real regression in the wrong direction, observable as
+   the recovering UE's catch-up priority silently vanishing. Too narrow
+   (`"full"` scope failing to clear it) would show EXACTLY GT-6.2's own
+   named failure mode — a "new" UE inheriting a ghost SNR EWMA, demand
+   belief, or GBR priority from before it existed, the scheduler-side
+   analogue of a "ghost RNTI." Both directions are now covered by direct
+   tests (`test_reset_ue_mac_scope_retains_the_fairness_ledger` /
+   `test_reset_ue_full_scope_clears_the_fairness_ledger_too`), not just
+   asserted in a docstring.
+3. *Predict the drift, both forms; is `_r_avg` or `_virtual_q`/
+   `committed_this_slot` affected?* **`_r_avg` (PF/gradient): untouched,
+   confirmed by construction, not just by D8's decay argument** — PF and
+   `GradientScheduler` implement no `reset_ue` at all
+   (`getattr(scheduler_cls(), "reset_ue", None) is None`, checked
+   directly for all three non-`TwoTier` arms), so `sim/driver.py`'s
+   `getattr(scheduler, "reset_ue", None)` guard finds nothing to call —
+   D8's arithmetic argument was never actually exercised by this commit,
+   only documented as the REASON no method was written there. **`_virtual_
+   q`: in scope, and affected only for `"full"`** — retained exactly for
+   `"mac"`, cleared to `0.0` for `"full"`, both confirmed by direct
+   assertion. **`committed_this_slot`: NOT affected, and not "in scope"
+   in any meaningful sense** — it is a plain local variable, recreated
+   fresh (`defaultdict(int)`) inside `allocate()`'s own body every single
+   call, never a persistent instance attribute at all; there is nothing
+   for a UE-keyed reset to act on between calls, so drawing it into the
+   same sentence as `_virtual_q` would blur a real distinction rather than
+   observe one. Both forms of the drift claim hold: no corpus scenario
+   sets `UEConfig.join` (true), and structurally, `getattr(scheduler,
+   "reset_ue", None)` is only ever even CALLED at a `radio_connected_
+   this_slot` edge that cannot fire without a `JoinState` existing for
+   that UE in the first place — `regression_corpus.py --check`: clean,
+   zero mismatches, no `--capture` needed (the same "nothing to move" as
+   commit 6, not commit 5's own re-baseline).
+4. *Is the reset scope what GT-6.2's criterion actually needs, not just
+   convenient?* **Yes — the harder, more nuanced split was kept rather
+   than defaulting to "reset everything, it's simpler."** GT-6.2/6.3's
+   own wording ("no residual pathology... stale deficit/VQ state" /
+   "floor/VQ/deficit reset correctness across re-establishment") names
+   exactly `_virtual_q`-shaped state, not merely "any scheduler field" —
+   the design targets that state specifically for `"full"`, while
+   deliberately NOT clearing it for `"mac"`, because clearing it
+   universally would be the CONVENIENT choice (one code path, no
+   scope argument) and the wrong one: it would erase the very
+   entitlement retention that makes real reestablishment "clean" rather
+   than a disguised full re-attach. The `_arr_hist`/`_del_hist` re-seed
+   (current cumulative, not empty) exists for the same reason — the
+   convenient choice (clear to empty) would silently introduce a
+   different observable artifact (a clamp-to-zero window) that would
+   itself look exactly like the residual pathology the criterion is
+   watching for, just from the opposite direction. Whether `"mac"`'s
+   specific retention choice is the CORRECT one (as opposed to merely a
+   principled one) is what commit 8's GT-6.3 demo actually tests, not
+   something this commit can settle by itself — the switch exists
+   precisely so that question stays answerable, per D7.
+
 ---
 
 ## 5. `config/metric_panel.yml` additions
@@ -1457,7 +1580,7 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commits 1–6 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+**Commits 1–7 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
 `sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
 diagnostic-only; deterministic scripted fade in `sim/channel.py`, with
 the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s;
@@ -1470,8 +1593,13 @@ run, two real bugs found and fixed in the process; the application-layer
 gate — traffic-admission suppression + a real UL/DL handshake `Message`
 pair, M19 `pending` → `proxy`, a UE now able to complete a full join
 event and cycle through a second one for real, zero regression-corpus
-drift this time). Commits 7–8 not yet started. Two scope questions
-that would otherwise be
+drift this time; the per-UE scheduler context reset — the only WP-Join
+commit, and the only WP since WP0, to touch a scheduler file, because
+masking cannot reset an object's own private state the way it can hide
+backlog; `TwoTier.reset_ue` with a path-dependent mac/full scope,
+including a correction for reestablishment attempts that themselves
+fall back to a full re-attach; zero regression-corpus drift). Commit 8
+not yet started. Two scope questions that would otherwise be
 `[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
 Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)
 will be added after commit 8 lands, following `docs/wp5-plan.md`/`docs/
