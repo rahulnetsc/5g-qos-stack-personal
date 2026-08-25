@@ -138,25 +138,41 @@ def test_flush_ue_does_not_touch_another_ue():
 # -- end-to-end: the real path vs. commit 4's synthetic fixtures ------------
 
 
-def _gated_scenario(fade_windows, horizon_slots=8000):
+def _gated_scenario(fade_windows, horizon_slots=8000, handshake=False):
+    """``handshake=False`` (default) preserves every existing caller's
+    behaviour exactly -- no UEConfig.join.handshake_ul_qfi/dl_qfi, so a
+    UE parks in APP_HANDSHAKE forever, same as commit 5. ``handshake=
+    True`` (WP-Join commit 6) additionally declares the two dedicated
+    handshake flows and wires their qfis, letting an event actually
+    complete."""
+    join_kwargs = {}
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=2_000_000,
+                   pdb_ms=50, traffic_kind="deterministic",
+                   traffic_params={"period_ms": 5.0, "bytes_per_period": 1000}),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=2_000_000,
+                   pdb_ms=50, traffic_kind="deterministic",
+                   traffic_params={"period_ms": 5.0, "bytes_per_period": 1000}),
+    ]
+    if handshake:
+        join_kwargs = {"handshake_ul_qfi": 90, "handshake_dl_qfi": 91}
+        flows += [
+            FlowConfig(ue_id=1, qfi=90, direction="UL", flow_class="PF", pdb_ms=1000,
+                       traffic_kind="poisson", traffic_params={"rate_bps": 0.0}),
+            FlowConfig(ue_id=1, qfi=91, direction="DL", flow_class="PF", pdb_ms=1000,
+                       traffic_kind="poisson", traffic_params={"rate_bps": 0.0}),
+        ]
     return ScenarioConfig(
         name="wpjoin_gate_test", horizon_slots=horizon_slots,
         carrier=CarrierConfig(bandwidth_hz=20_000_000, numerology=1),
         ues=[
             UEConfig(
                 ue_id=1, mean_snr_db=20.0, coherence_slots=1000,
-                scripted_fade=fade_windows, join=JoinConfig(),
+                scripted_fade=fade_windows, join=JoinConfig(**join_kwargs),
             ),
             UEConfig(ue_id=2, mean_snr_db=20.0, coherence_slots=1000),  # ungated neighbour
         ],
-        flows=[
-            FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=2_000_000,
-                       pdb_ms=50, traffic_kind="deterministic",
-                       traffic_params={"period_ms": 5.0, "bytes_per_period": 1000}),
-            FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=2_000_000,
-                       pdb_ms=50, traffic_kind="deterministic",
-                       traffic_params={"period_ms": 5.0, "bytes_per_period": 1000}),
-        ],
+        flows=flows,
     )
 
 
@@ -220,17 +236,17 @@ def test_reconnection_rearms_detection_for_a_genuinely_new_degradation():
     no-op once RLF_DECLARED, so two declarations are only possible with a
     real re-arm in between.
 
-    Documents a real, current limitation found while writing this test:
-    the UE never reaches CONNECTED again within this commit alone (no
-    commit-6 handshake to complete it), so it sits parked in APP_HANDSHAKE
-    when the second fade hits. rlf.step() still runs there (APP_HANDSHAKE
-    IS an rrc_connected phase) and the re-armed detector genuinely
-    re-declares -- rlf_declared_count proves this -- but sim/join.py's own
-    FSM only reacts to rlf_declared_this_slot from JoinPhase.CONNECTED, so
-    this second declaration does not yet start a second join_events entry.
-    That is commit 6's problem to unstick (a completed handshake returns
-    the UE to CONNECTED, able to cycle again), not a bug in re-arming
-    itself.
+    Updated for WP-Join commit 6 (docs/wp-join-plan.md "Commit 6 --
+    landed", review point 1): at commit 5, this test recorded a real,
+    then-current limitation -- the UE never reached CONNECTED again
+    within that commit alone (no handshake to complete it), so it sat
+    parked in APP_HANDSHAKE when the second fade hit, and only
+    rlf_declared_count (not join_events) proved re-arm worked. Commit 6's
+    handshake completion unsticks exactly that: with handshake_ul_qfi/
+    dl_qfi configured, the first event completes, the UE returns to
+    CONNECTED, and the second scripted fade now produces a genuine SECOND
+    join_events entry -- the FSM correctly routes a second RLF once the
+    first fully completes, not just re-detects it.
     """
     sc = _gated_scenario(
         (
@@ -238,10 +254,19 @@ def test_reconnection_rearms_detection_for_a_genuinely_new_degradation():
             ScriptedFadeWindow(start_slot=12000, end_slot=17000, extra_loss_db=30.0),
         ),
         horizon_slots=25000,
+        handshake=True,
     )
     summary = run(sc, RoundRobin())
     assert summary["rlf_declared_count"] == 2
-    assert len(summary["join_events"]) == 1  # see docstring above
+    assert len(summary["join_events"]) == 2
+    for event in summary["join_events"]:
+        assert event["path"] == "reestablish"
+        assert event["attached_slot"] is not None
+        assert event["handshake_rtt_ms"] is not None
+    # The two events are genuinely independent -- second trigger/rf_restore
+    # strictly after the first event's own attachment.
+    first, second = summary["join_events"]
+    assert second["trigger_slot"] > first["attached_slot"]
 
 
 # -- opt-in inertness: the falsifiable claim, both forms --------------------

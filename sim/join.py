@@ -18,6 +18,16 @@ HarqAwareBufferView`` does, needing no import to do it); the FSM/sampler
 above this point in the file remains exactly what commit 1 landed,
 unmodified.
 
+**WP-Join commit 6** adds the application-layer gate: ``sim/driver.py``
+suppresses traffic admission (source gate) while ``JoinState.app_running``
+is False, and injects/tracks the real UL/DL handshake ``Message`` pair
+(``JoinConfig.handshake_ul_qfi``/``handshake_dl_qfi`` above) once a UE
+enters ``JoinPhase.APP_HANDSHAKE``, finally passing ``handshake_complete``
+into ``step()`` for real. `sim/join.py` itself is unmodified except for
+those four new, all-optional ``JoinConfig`` fields -- the FSM's own
+``step()`` logic already handled ``handshake_complete`` correctly since
+commit 1; it simply never received ``True`` until now.
+
 **Ground truth, cited exactly** (``docs/wp-join-plan.md`` sec2):
 ``calibration-logs/twotier_startup_gnb.log:17``'s startup banner --
 ``t300 400, t301 400, t311 3000, t319 400`` (ms) -- the only line in the
@@ -185,6 +195,27 @@ class JoinConfig:
     # see module docstring. Not imported from sim/rlf.py on purpose.
     rlf_snr_floor_db: float = -5.0
 
+    # WP-Join commit 6 (docs/wp-join-plan.md sec1.7/D8): the app handshake
+    # is modelled as REAL traffic -- a UL request / DL response Message
+    # pair traversing the ordinary buffer -> scheduler -> HARQ path, using
+    # WP7's existing message ledger -- not a sampled delay. GT-6.1's own
+    # pass line ("handshake round-trip p95 <= 1s UNDER LOAD") is itself a
+    # load-dependent measurement; sampling it would make the criterion a
+    # tautology. Both qfis MUST already exist in the scenario's own
+    # FlowConfig list (pre-registered like every other flow, D1's "fixed
+    # roster" -- sim/join.py does not synthesize flows), each direction-
+    # correct (UL for handshake_ul_qfi, DL for handshake_dl_qfi) and
+    # distinct from every other flow's qfi on this UE. None (default,
+    # either) means this UE's handshake never completes -- exactly commit
+    # 5's own behaviour, preserved for any scenario that predates this
+    # commit's wiring. Payload sizes are deterministic (no ground truth
+    # for real byte sizes; drawing them would also risk perturbing the
+    # shared traffic rng for no benefit -- sec1.7).
+    handshake_ul_qfi: int | None = None
+    handshake_dl_qfi: int | None = None
+    handshake_request_bytes: int = 64
+    handshake_response_bytes: int = 64
+
     def __post_init__(self) -> None:
         if self.initial_state not in ("connected", "powered_off"):
             raise ValueError(f"initial_state must be 'connected' or 'powered_off' (got {self.initial_state!r})")
@@ -205,6 +236,12 @@ class JoinConfig:
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} must be >= 0 (got {getattr(self, name)})")
+        if (self.handshake_ul_qfi is None) != (self.handshake_dl_qfi is None):
+            raise ValueError("handshake_ul_qfi and handshake_dl_qfi must be set together, or neither")
+        if self.handshake_ul_qfi is not None and self.handshake_ul_qfi == self.handshake_dl_qfi:
+            raise ValueError("handshake_ul_qfi and handshake_dl_qfi must be distinct (one flow per direction)")
+        if self.handshake_request_bytes <= 0 or self.handshake_response_bytes <= 0:
+            raise ValueError("handshake_request_bytes/handshake_response_bytes must be > 0")
 
 
 @dataclass

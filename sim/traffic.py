@@ -135,8 +135,25 @@ class TrafficModel:
         state.delivered_since_adapt = 0
         state.offered_since_adapt = 0
 
-    def generate(self, slot_index: int) -> list[tuple[int, int, int]]:
-        """Generate arrivals for this slot. Returns list of (ue_id, qfi, bytes)."""
+    def generate(
+        self, slot_index: int, suppressed_ues: frozenset[int] = frozenset()
+    ) -> list[tuple[int, int, int]]:
+        """Generate arrivals for this slot. Returns list of (ue_id, qfi, bytes).
+
+        ``suppressed_ues`` (WP-Join commit 6, docs/wp-join-plan.md sec1.4
+        D5): a UE in here has its app off/restarting (warm/cold join
+        paths only -- the reestablish path never suppresses, since the
+        robot's own sensors don't stop). ``_gen(cfg, ...)`` -- the only
+        thing that draws from ``self.rng`` -- still runs unconditionally
+        for every flow regardless of suppression; only the RESULT is
+        discarded (never enqueued, never counted) for a suppressed UE.
+        Generate-then-drop, never skip-generation: skipping the call
+        itself would shift every OTHER flow's draw order the moment any
+        UE opts into join/RLF gating, the same shared-rng hazard
+        CLAUDE.md's independent-seed-stream rule exists to prevent
+        (docs/wp5-plan.md's own harq_rng history). Empty (default)
+        reproduces today's behaviour exactly for every existing caller.
+        """
         now_s = slot_index * self.slot_duration_s
         arrivals: list[tuple[int, int, int]] = []
         for state in self.flows:
@@ -152,20 +169,23 @@ class TrafficModel:
                     trigger_slot = int(cfg.aggressor_trigger_ms / 1000.0 / self.slot_duration_s)
                     if slot_index >= trigger_slot:
                         byts = int(byts * cfg.aggressor_multiplier)
-                if byts > 0:
-                    message = None
-                    if self.ledger is not None:
-                        message = Message(
-                            id=self.ledger.new_id(),
-                            ue_id=cfg.ue_id,
-                            qfi=cfg.qfi,
-                            size_bytes=byts,
-                            generation_ts_s=a.ts_s,
-                            role=a.role,
-                            frame_id=a.frame_id,
-                        )
-                    self.buffers.enqueue(cfg.ue_id, cfg.qfi, byts, a.ts_s, message=message)
-                    arrivals.append((cfg.ue_id, cfg.qfi, byts))
+                if byts <= 0:
+                    continue
+                if cfg.ue_id in suppressed_ues:
+                    continue
+                message = None
+                if self.ledger is not None:
+                    message = Message(
+                        id=self.ledger.new_id(),
+                        ue_id=cfg.ue_id,
+                        qfi=cfg.qfi,
+                        size_bytes=byts,
+                        generation_ts_s=a.ts_s,
+                        role=a.role,
+                        frame_id=a.frame_id,
+                    )
+                self.buffers.enqueue(cfg.ue_id, cfg.qfi, byts, a.ts_s, message=message)
+                arrivals.append((cfg.ue_id, cfg.qfi, byts))
         return arrivals
 
     def _gen(

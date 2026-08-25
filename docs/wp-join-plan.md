@@ -642,7 +642,7 @@ than silently skipped.
 | 3 | Scripted fade in `sim/channel.py` (§1.5) — `UEConfig.scripted_fade`, deterministic override (not a mean-shift) while a window is active | `sim/config.py`, `sim/channel.py`, `sim/tests/test_channel.py`, `sim/tests/test_wpjoin_fade_boundary.py` (new — cross-module GT-6.3 boundary characterization) | No — opt-in, `()` default preserves today's behavior exactly |
 | 4 | Panel/schema: M18/M19 at `status: pending`, `JoinEventRecord`/`RunRecord.join_events`, `Scorecard` stubs returning pending on every existing record, `defaults.slo_green_dwell_s` (`[OPEN]`, D-new below) | `config/metric_panel.yml`, `sim/run_record.py`, `sim/scorecard.py`, `sim/tests/test_scorecard.py`, `sim/tests/test_run_record.py`, `regression/baseline_studies_1_3.json` | No — schema only. **The one commit that is not `--check`-clean** (§4.1) |
 | 5 | Radio-layer gate: `UEConfig.join`, `JoinAwareBufferView`, `HarqProcessPool.flush_ue`, RLF-edge → reestablish trigger, re-arm on reconnect, `JoinEventRecord`-shaped event log emission. **M18 `pending` → `ok`** | `sim/config.py`, `sim/driver.py`, `sim/join.py`, `sim/harq.py`, `config/metric_panel.yml`, `sim/tests/test_join_gate.py` (new) — plus, beyond the original plan: `sim/run_record.py` (`from_summary` needed to read the new key), `sim/tests/test_run_record.py` (a commit-4 fixture assumption this commit invalidated), `regression/baseline_studies_1_3.json` (re-captured) | No — opt-in, `UEConfig.join=None` default |
-| 6 | Application-layer gate: traffic-admission suppression (warm/cold only), handshake `Message` pair through the real buffer/scheduler/HARQ path. **M19 `pending` → `proxy`** | `sim/driver.py`, `sim/join.py`, `sim/traffic.py`, `config/metric_panel.yml`, `sim/tests/test_join_handshake.py` (new) | No — same opt-in gate as commit 5 |
+| 6 | Application-layer gate: traffic-admission suppression (warm/cold only), handshake `Message` pair through the real buffer/scheduler/HARQ path. **M19 `pending` → `proxy`** | `sim/driver.py`, `sim/join.py`, `sim/traffic.py`, `config/metric_panel.yml`, `sim/tests/test_join_handshake.py` (new) — plus `sim/tests/test_join_gate.py` (a commit-5 test's own documented limitation is superseded, updated not left stale) | No — same opt-in gate as commit 5 |
 | 7 | Per-UE scheduler context reset: `SchedulerContextReset.reset_ue()` (duck-typed, additive), implemented in `two_tier.py` only; sim-side per-UE re-inits in `BsrModel`/`UlAccessModel`/`UeLcp` | `scheduler/interfaces.py`, `scheduler/two_tier.py`, `sim/bsr.py`, `sim/ul_access.py`, `sim/ue_lcp.py`, `sim/tests/test_join_reset.py` (new) | No — only invoked on a join-event transition; no effect without one |
 | 8 | Acceptance-criterion demo — **GT-6.3 only** (D0b), two fade-duration variants straddling `t310+t311=5.0s` (GT-6.3a short fade / true reestablish path; GT-6.3b literal 10 s fade / IDLE-fallback path), × TwoTier and PF, `record_timeseries=True`, `isolation_check` scorecard helper. **Also updates `README.md` §5's G9 row** (§0) — qualified, not a bare flip to "Yes" | `sim/tests/test_wpjoin_rlf_recovery.py` (new; scenario built in-line, not `sim/scenarios/*.yml`), `README.md` (§5 G9 row only) | Yes, scoped to this test file's own runs — stays outside the 22-record corpus entirely |
 
@@ -1160,6 +1160,102 @@ through a second real event — not a defect in re-arming, a scope
 boundary of this commit alone, recorded in `sim/tests/test_join_gate.py`
 itself so it can't be mistaken for an oversight later.
 
+### Commit 6 — landed
+
+`sim/join.py` (`JoinConfig.handshake_ul_qfi`/`handshake_dl_qfi`/
+`handshake_request_bytes`/`handshake_response_bytes`, all optional — the
+FSM's own `step()` was already correct since commit 1, it simply never
+received `handshake_complete=True` until now), `sim/traffic.py`
+(`TrafficModel.generate()` gains `suppressed_ues`), `sim/driver.py` (the
+source gate before `traffic.generate()`; UL-request injection on
+entering `APP_HANDSHAKE`; the handshake-progression check after
+`scheduler.allocate()`/`traffic.observe_delivery()`), `config/metric_
+panel.yml` (M19 `pending` → `proxy`), `sim/tests/test_join_handshake.py`
+(new, 11 tests) — plus `sim/tests/test_join_gate.py` (commit 5's own
+re-arm test, updated per review point 1, not left describing a
+superseded limitation).
+
+**One real bug found and fixed while verifying end-to-end, the same
+discipline as commit 5's two:** the handshake UL request's first
+attempt enqueued straight into `BufferModel` via `buffers.enqueue(...)`
+without also crediting `per_flow_arrived` — invisible to `bsr.
+on_arrivals()`, so `bytes_reported` never left zero and no scheduler
+ever granted it; the UE sat in `APP_HANDSHAKE` forever, indistinguishable
+from commit 5's own default (no-handshake-configured) behaviour, silently.
+Caught immediately by point 1's own end-to-end check (`attached_slot`
+stayed `None` in a scenario that clearly declared handshake qfis), fixed
+by crediting `per_flow_arrived[(ue_id, handshake_ul_qfi)]` at injection
+time — the same arrival-visibility path organic traffic already uses,
+consumed later in the SAME slot by `bsr.on_arrivals()`. The DL response
+needs no equivalent fix: a DL flow's `bytes_reported` is the gNB's own
+queue view, not something BSR reports.
+
+**Answering the pre-commit checklist explicitly:**
+
+1. *Confirm the FSM routes a second RLF correctly once the first
+   completes; update the commit-5 test rather than leave it describing a
+   superseded limitation.* **Confirmed, end-to-end, and the test
+   updated, not just the code.** With `handshake_ul_qfi`/`dl_qfi`
+   configured, the same two-fade scenario commit 5 used now produces
+   **two** complete `join_events`, both `path=="reestablish"`, both with
+   real `attached_slot`/`handshake_rtt_ms` (~3.5ms and ~4.5ms on the
+   scripted scenario), and the second event's `trigger_slot` strictly
+   after the first's `attached_slot` — a genuinely independent second
+   cycle, not just a second detection. `sim/tests/test_join_gate.py::
+   test_reconnection_rearms_detection_for_a_genuinely_new_degradation`
+   is rewritten to assert exactly this, replacing the commit-5 assertion
+   (`len(join_events) == 1`, with a docstring explaining why) that this
+   commit supersedes.
+2. *Confirm the app handshake lands as real traffic, not a sampled
+   delay.* **Confirmed by construction and by what would have gone
+   wrong otherwise.** `JoinConfig` gained four fields (two qfis, two
+   deterministic byte sizes) and zero delay-distribution parameters for
+   the handshake itself; the UL request and DL response are ordinary
+   `Message`-tagged (`role="handshake"`) enqueues that ride the exact
+   same `buffers` → `scheduler.allocate()` → HARQ path every other flow
+   uses, with `handshake_rtt_ms` measured from the actual delivery
+   timestamps, not drawn. This is the one place in the whole join path
+   where a delay draw would have looked consistent with every other
+   phase's sampler (D2/D3) and been the wrong choice — GT-6.1's own pass
+   line ("handshake round-trip p95 ≤ 1s **under load**") is a claim about
+   how the message competes for PRBs against everything else in the
+   scenario, which only holds if it's genuinely scheduled, not assumed.
+   The one bug found (point above) was itself evidence the traffic path
+   is real: a sampled delay could never have silently failed to reach
+   the scheduler in the first place.
+3. *Predict the drift; flag anything moving for an unrelated structural
+   reason.* **Same two forms as commit 5, and — unlike commit 5 — no
+   re-capture was needed at all this time, which is itself worth stating
+   plainly rather than assuming it would carry over.** "No corpus
+   scenario sets `UEConfig.join`" (true) and, structurally, "nothing is
+   ever suppressed and no handshake ever fires" — `suppressed_ues` is
+   built from `join_states.items()` (empty for every corpus UE, same as
+   commit 5), and `JoinConfig.handshake_ul_qfi` defaults to `None` for
+   every UE that doesn't explicitly set it, so the UL-injection and
+   progression-check blocks are structurally unreached. `regression_
+   corpus.py --check` — clean, **zero mismatches, no `--capture` needed**
+   — a genuine difference from commit 5's own re-capture (there, `summary
+   ["join_events"]`'s TOP-LEVEL SHAPE changed for every record,
+   unconditionally; here, only the CONTENTS of an individual event dict
+   could change, and no corpus record has one at all). Confirmed
+   directly via `sim/tests/test_join_handshake.py::
+   test_no_ue_config_join_at_all_reproduces_pre_commit6_behaviour_
+   exactly` and the RNG-order test
+   (`test_suppression_does_not_perturb_the_shared_rng_draw_order`,
+   comparing a suppressed and unsuppressed model's OTHER flow byte-for-
+   byte, not just asserting "it still runs").
+4. *Confirm M18's warm-path breakdown against a real event.* **Confirmed
+   — the first real, FULLY completed event of any kind in this WP.**
+   `sim/tests/test_join_handshake.py::test_m18_reports_a_real_completed_
+   warm_path_event_not_just_synthetic_ones` runs an actual `app_restart`
+   scenario end-to-end and checks `Scorecard().score(rec)["M18"]`
+   reports `n_never_completed == 0` (a real completion, unlike commit
+   5's reestablish-only, permanently-incomplete case) with
+   `p50_ms == p95_ms == max_ms` (a single real event, not a synthetic
+   fixture) and no `"reestablish"` key in `by_path` at all (this run
+   never produced one) — the path-keyed breakdown design (§5) checked
+   against real data for the first time on the warm path specifically.
+
 ---
 
 ## 5. `config/metric_panel.yml` additions
@@ -1361,7 +1457,7 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commits 1–5 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+**Commits 1–6 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
 `sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
 diagnostic-only; deterministic scripted fade in `sim/channel.py`, with
 the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s;
@@ -1370,8 +1466,11 @@ re-captured with exactly the predicted 22-record structural diff and
 zero numeric drift; the radio-layer gate — `JoinAwareBufferView` composed
 over `HarqAwareBufferView`, HARQ-pool flush, RLF re-arm on reconnect,
 M18 `pending` → `ok` — verified end-to-end against a real scripted-fade
-run, two real bugs found and fixed in the process). Commits 6–8 not yet
-started. Two scope questions
+run, two real bugs found and fixed in the process; the application-layer
+gate — traffic-admission suppression + a real UL/DL handshake `Message`
+pair, M19 `pending` → `proxy`, a UE now able to complete a full join
+event and cycle through a second one for real, zero regression-corpus
+drift this time). Commits 7–8 not yet started. Two scope questions
 that would otherwise be
 `[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
 Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)

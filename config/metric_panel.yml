@@ -369,18 +369,29 @@ metrics:
     guarantees: [G9, G3]
     unit: ms
     direction: lower_better
-    status: pending
+    status: proxy
     requires: >
       WP-Join (join event log) + record_timeseries=True; an exact
       per-message SLO evaluation reusing WP7's message ledger is a
       follow-on commit, not this one
     note: >
       Added WP-Join commit 4 (not at WP0 -- see the comment above this
-      entry). proxy, staying proxy: "green" is judged from head-of-line
+      entry); promoted commit 6. "green" is judged from head-of-line
       delay against each flow's own pdb_ms only, not a full GFBR
-      contract check -- a deliberate simplification, not an oversight.
-      -> proxy at commit 6 (docs/wp-join-plan.md sec4), once a real
-      scenario with record_timeseries=True can populate join_events.
+      contract check -- a deliberate simplification, not an oversight;
+      stays proxy for that reason, not because the mechanism is
+      incomplete. Finding, recorded rather than silently acted on: this
+      metric's own computation needed nothing from commit 6 specifically
+      -- for the reestablish path (app_running never drops), trigger_ts_s/
+      rf_restore_ts_s plus record_timeseries=True were already sufficient
+      after commit 5 alone to compute a real value. Promotion was still
+      held to commit 6, deliberately, to keep it bundled with its
+      originally-planned commit rather than slipping it in early --
+      the exact precedent CLAUDE.md records for M04 and WP7 ("fixing M04
+      exactly is close to free but was kept out of every WP7 commit on
+      purpose, since bundling a refinement... into an unrelated commit's
+      diff defeats the attribution the one-fidelity-change-per-commit
+      rule exists for").
 
 # Statistical policy (docs/p5g-sim-plan.md sec 7 / sec 5.3): the rule of
 # three. Demonstrating a miss rate <= eps at 95% confidence with zero

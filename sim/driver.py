@@ -9,7 +9,7 @@ from .config import ScenarioConfig
 from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
 from .join import JoinAwareBufferView, JoinPhase, init_join_rng_streams, init_join_state, rrc_connected
 from .join import step as join_step
-from .messages import FrameLedger, MessageLedger, message_latency_percentiles_ms
+from .messages import FrameLedger, Message, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
 from .resource import ResourceGrid
 from .rlf import RlfDetectorConfig, RlfDetectorState
@@ -202,13 +202,34 @@ def run(
     # event is currently in progress for that UE.
     join_active_event: dict[int, dict] = {}
     join_events: list[dict] = []
+    # WP-Join commit 6 (docs/wp-join-plan.md sec1.7/D8): the app handshake
+    # -- real traffic, a UL request / DL response Message pair, tracked
+    # per UE while in progress. join_handshake_complete_this_slot is
+    # consumed (popped) by THIS slot's join.step() call but only ever set
+    # at the end of a PREVIOUS slot once that slot's own deliveries are
+    # known -- the same one-slot lag sec1.8 already accepts for the
+    # source gate, for the same reason (delivery outcome isn't known
+    # until after scheduler.allocate() runs, which is after join.step()).
+    join_handshake_state: dict[int, str] = {}  # "awaiting_ul" | "awaiting_dl"
+    join_handshake_ul_sent_ts_s: dict[int, float] = {}
+    join_handshake_complete_this_slot: dict[int, bool] = {}
 
     for slot_index in range(scenario.horizon_slots):
         ue_lcp.refill(grid.slot_duration_s)
         now_s = slot_index * grid.slot_duration_s
 
+        # WP-Join commit 6: the source gate. A UE whose app is off/
+        # restarting (warm/cold paths only -- see JoinState.app_running)
+        # has its traffic admission suppressed this slot; reestablish
+        # never appears here since app_running stays True throughout
+        # that path. Read from LAST slot's join_states (join.step() for
+        # THIS slot hasn't run yet -- it happens after channel.update()
+        # below), the same lag the radio gate already accepts.
+        suppressed_ues = frozenset(
+            ue_id for ue_id, js in join_states.items() if not js.app_running
+        )
         per_flow_arrived: dict[tuple[int, int], int] = defaultdict(int)
-        for ue_id, qfi, byts in traffic.generate(slot_index):
+        for ue_id, qfi, byts in traffic.generate(slot_index, suppressed_ues=suppressed_ues):
             metrics.record_arrival(ue_id, qfi, byts)
             per_flow_arrived[(ue_id, qfi)] += byts
 
@@ -251,13 +272,12 @@ def run(
                 join_state, join_configs[ue.ue_id], join_rngs, slot_index, grid.slot_duration_s,
                 rlf_declared_this_slot=rlf_declared_this_slot,
                 snr_db=channel.get_snr_db(ue.ue_id),
-                # handshake_complete stays False every slot until WP-Join
-                # commit 6 wires the real app-handshake message pair --
-                # every event this commit produces therefore stays
-                # "in progress" (attached_slot=None) for the rest of the
-                # run, a known, documented limitation of this commit
-                # alone (docs/wp-join-plan.md "Commit 5 -- landed").
-                handshake_complete=False,
+                # WP-Join commit 6: real signal, set at the end of a
+                # PREVIOUS slot once that slot's own DL handshake-response
+                # delivery was confirmed (see the handshake-progression
+                # block after scheduler.allocate() below) -- popped so it
+                # only ever fires the one slot it's meant for.
+                handshake_complete=join_handshake_complete_this_slot.pop(ue.ue_id, False),
             )
             if was_connected and not rrc_connected(join_state.phase):
                 # Just entered a radio-gated state this slot -- flush
@@ -303,6 +323,36 @@ def run(
                         active_event["timer_expiries"][phase_name] = (
                             active_event["timer_expiries"].get(phase_name, 0) + 1
                         )
+                if jres.phase_changed and join_state.phase is JoinPhase.APP_HANDSHAKE:
+                    # WP-Join commit 6: the app handshake, injected as
+                    # REAL traffic (sec1.7/D8) -- a UL request Message
+                    # traversing the ordinary buffer/scheduler/HARQ path,
+                    # not a sampled delay. jcfg.handshake_ul_qfi is None
+                    # (default) reproduces commit 5's exact behaviour --
+                    # the UE waits here forever, same as before this
+                    # commit landed for any scenario that doesn't opt in.
+                    jcfg = join_configs[ue.ue_id]
+                    if jcfg.handshake_ul_qfi is not None:
+                        handshake_msg = Message(
+                            id=message_ledger.new_id(), ue_id=ue.ue_id, qfi=jcfg.handshake_ul_qfi,
+                            size_bytes=jcfg.handshake_request_bytes, generation_ts_s=now_s,
+                            role="handshake",
+                        )
+                        buffers.enqueue(
+                            ue.ue_id, jcfg.handshake_ul_qfi, jcfg.handshake_request_bytes,
+                            now_s, message=handshake_msg,
+                        )
+                        # Must also count as an "arrival" for THIS slot's
+                        # bsr.on_arrivals() call (below, later in this same
+                        # slot) to ever see it -- a UL flow's bytes_queued
+                        # alone does nothing; every scheduler's eligibility
+                        # gate reads bytes_reported, which only BsrModel
+                        # sets, only on an arrival event (CLAUDE.md's
+                        # standing UL-backlog invariant). DL needs no such
+                        # step -- the gNB's own queue view IS bytes_queued.
+                        per_flow_arrived[(ue.ue_id, jcfg.handshake_ul_qfi)] += jcfg.handshake_request_bytes
+                        join_handshake_state[ue.ue_id] = "awaiting_ul"
+                        join_handshake_ul_sent_ts_s[ue.ue_id] = now_s
                 if jres.phase_changed and join_state.phase is JoinPhase.CONNECTED:
                     active_event["attached_slot"] = slot_index
                     active_event["attached_ts_s"] = slot_index * grid.slot_duration_s
@@ -591,6 +641,38 @@ def run(
         # Close the loop for rate-adaptive sources: their offered load
         # responds to what they actually got.
         traffic.observe_delivery(per_flow_delivered)
+
+        # WP-Join commit 6: handshake progression. Must run here, AFTER
+        # this slot's deliveries are fully known (scheduler.allocate()
+        # already ran) -- checked via per_flow_delivered, already
+        # computed this slot at zero extra cost, on the assumption a
+        # small (deterministic-size) handshake message delivers whole in
+        # the one slot any of its bytes deliver at all (true for any
+        # grant sized above a few dozen bytes). Setting join_handshake_
+        # complete_this_slot here means it's consumed by join.step() on
+        # the NEXT slot, not this one -- the same one-slot lag as the
+        # source gate, for the same reason (sec1.8).
+        for hs_ue_id, hs_state in list(join_handshake_state.items()):
+            hs_cfg = join_configs[hs_ue_id]
+            if hs_state == "awaiting_ul" and per_flow_delivered.get((hs_ue_id, hs_cfg.handshake_ul_qfi), 0) > 0:
+                response_msg = Message(
+                    id=message_ledger.new_id(), ue_id=hs_ue_id, qfi=hs_cfg.handshake_dl_qfi,
+                    size_bytes=hs_cfg.handshake_response_bytes, generation_ts_s=now_s,
+                    role="handshake",
+                )
+                buffers.enqueue(
+                    hs_ue_id, hs_cfg.handshake_dl_qfi, hs_cfg.handshake_response_bytes,
+                    now_s, message=response_msg,
+                )
+                join_handshake_state[hs_ue_id] = "awaiting_dl"
+            elif hs_state == "awaiting_dl" and per_flow_delivered.get((hs_ue_id, hs_cfg.handshake_dl_qfi), 0) > 0:
+                active_event = join_active_event.get(hs_ue_id)
+                if active_event is not None:
+                    active_event["handshake_rtt_ms"] = (
+                        (now_s - join_handshake_ul_sent_ts_s[hs_ue_id]) * 1000.0
+                    )
+                join_handshake_complete_this_slot[hs_ue_id] = True
+                del join_handshake_state[hs_ue_id]
 
         per_flow_dropped: dict[tuple[int, int], int] = defaultdict(int)
         for ue_id, qfi in buffers.keys():
