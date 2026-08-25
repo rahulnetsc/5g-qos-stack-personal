@@ -156,7 +156,7 @@ that the number is certifiable — certifiable numbers still require real RF.
 | G6 | BG traffic never impairs fleet | Non-GBR containment, per-class accounting | WP0 metric panel | Yes |
 | G7 | One misbehaving UE contained | MFBR clamp, per-flow accounting | Phase 2 (scheduler logic) | Yes |
 | G8 | Equal entitlement, continuously | Per-1s Jain (already flagged as new in `p5g-sim-plan.md` §7) | WP0 | Yes |
-| G9 | Fast join / re-join | Join/RLF state machine — landed (`sim/join.py`, `sim/rlf.py`, `docs/wp-join-plan.md`) | WP-Join | **Mechanism/metrics: yes. Ratified verdict: no** — blocked on `T_live` (§8, still `[OPEN]`) and the guarantee test plan's own provisional (▷-marked) thresholds; GT-6.1/6.2's 50-cycle/10-cycle campaigns deferred to WP9 |
+| G9 | Fast join / re-join | Join/RLF state machine — landed (`sim/join.py`, `sim/rlf.py`, `docs/wp-join-plan.md`) | WP-Join | **Mechanism/metrics: yes. Ratified verdict: no** — blocked on `T_live` (§8, `[OPEN: HARDWARE]`) and the guarantee test plan's own provisional (▷-marked) thresholds; GT-6.1/6.2's 50-cycle/10-cycle campaigns deferred to WP9 |
 | G10 | Admissible fleet size | N-sweep (this is what simulation buys that hardware can't — `p5g-sim-plan.md` §2) | Phase 3 | Yes |
 | G11 | Holds for a shift, reproducibly | Long-run soak, communication service availability metric (new, §6) | WP0 metric panel, WP7 | Yes |
 | G12 | Ordered degradation under overload | First-violation-order metric (already in panel) | Phase 3 | Yes |
@@ -339,17 +339,37 @@ they survive it:
 
 ## 8. Open decisions
 
+**Triage pass (Phase 1 → Phase 2 boundary):** every `[OPEN]` item below
+now carries a category tag so §10's Phase 3 exit criterion ("every
+`[OPEN]` item either closed or explicitly carried to the hardware
+campaign") is checkable by grep, not aspirational. Four items closed
+outright this pass (their substance was already settled by a landed WP
+or an already-made decision — flipped to `[RESOLVED]` with a citation of
+what actually closed them, not just the tag). Four more items that were
+one hypothesis wearing four separate bullets are merged into one
+`[OPEN: WP9]` cluster below. Tags in use: `[OPEN: WP9]` (needs a WP9
+characterization sweep), `[OPEN: PHASE2]` (resolves when the scheduler is
+rewritten fresh from OAI source, not by any sweep), `[OPEN: HARDWARE]`
+(needs a real deployment measurement or data this repo doesn't have),
+`[OPEN: DECISION]` (needs a call from the project owner, not more data).
+**This vocabulary is open-ended** — if a future item doesn't fit one of
+these five, add a new tag rather than forcing it into an existing one.
+
 - `[RESOLVED]` WP-Join's RACH/RLF depth: calibrated delay distribution
   (§6), confirmed before WP-Join commit 1 landed, not contention-based
   simulation.
-- `[OPEN]` `T_live` (MEC liveness timeout) — assumed 2 s in the guarantee
-  docs; both `p5g-sim-plan.md` and the guarantee test plan flag this as
-  unconfirmed. Calibrates every G3/G9 pass line.
-- `[OPEN]` The uplink capacity constant (`p5g-sim-plan.md` §4.2) — resolve
-  against GT-3.2's ceiling re-measurement, or sweep it as an axis.
-- `[OPEN]` InF sub-scenario (SL/DL/SH/DH/HH — corrected below) for the
-  headline configuration — deployment-dependent, sweep in WP6 rather than
-  picking blind.
+- `[OPEN: HARDWARE]` `T_live` (MEC liveness timeout) — assumed 2 s in the
+  guarantee docs; both `p5g-sim-plan.md` and the guarantee test plan flag
+  this as unconfirmed. Calibrates every G3/G9 pass line. No calibration
+  source anywhere in this repo gives a real value — needs an actual MEC
+  liveness measurement, not a sweep.
+- `[OPEN: DECISION]` The uplink capacity constant (`p5g-sim-plan.md`
+  §4.2) — resolve against GT-3.2's ceiling re-measurement, or sweep it as
+  an axis. Your call which path.
+- `[OPEN: WP9]` InF sub-scenario (SL/DL/SH/DH/HH — corrected below) for
+  the headline configuration — deployment-dependent, sweep in WP9 rather
+  than picking blind. (WP6 fixed the sub-scenario *naming* below, not
+  this choice — still open.)
 - `[RESOLVED]` **This document previously named the InF sub-scenarios
   "SL/DL/SH/HH," omitting InF-DH — verified wrong against TR 38.901 Table
   7.2-4 while scoping WP6 (`docs/wp6-plan.md` §0), not just suspected.**
@@ -367,24 +387,26 @@ they survive it:
   "(SL/DL/SH/HH)" is left as-is per this document's own policy of not
   editing that file (§0) — its four-item text is now known-stale in the
   same category as `p5g-sim-plan.md`'s original WP ordering.
-- `[OPEN]` Survival-time threshold N (`p5g-sim-plan.md` §7) — start at 3,
-  report H6 as a function of N.
-- `[OPEN]` **WP3 exposed a UL scheduling deadlock that only WP4 can properly
-  close.** Every scheduler's UL eligibility gate (`bytes_reported > 0`) is
+- `[OPEN: WP9]` Survival-time threshold N (`p5g-sim-plan.md` §7) — start
+  at 3, report H6 as a function of N.
+- `[RESOLVED]` **WP3 exposed a UL scheduling deadlock that only WP4 could
+  properly close — closed by WP4, commit `fa8232b` ("WIP WP4").** Every
+  scheduler's UL eligibility gate (`bytes_reported > 0`) is
   refreshed only by a grant, and a grant requires the gate to already be
   open -- a deadlock for any flow whose real backlog goes from empty back
   to non-empty (most bursty UL traffic here), not just a one-time cold
   start. Real 5G breaks this with a Scheduling Request on PUCCH, a
-  control-channel signal needing no existing grant (WP4). Until WP4 lands,
-  `sim/bsr.py::BsrModel.broadcast()` reports a flow's true backlog directly
-  whenever its per-LCG estimate is exactly 0 -- a stopgap that is
-  load-bearing for every scenario's basic UL throughput today, not
-  a corner case. It does not defeat the crumb-collapse mechanism itself
-  (a nonzero estimate capped to 0 by `B` still gates correctly). See
-  `design-docs/scheduler-study.md` §5.1 for detail. **WP4 should treat
-  properly retiring this stopgap as part of its acceptance criteria, not
-  an optional cleanup.**
-- `[OPEN]` **The load-inversion calibration target's full source data, and
+  control-channel signal needing no existing grant (WP4). Before WP4,
+  `sim/bsr.py::BsrModel.broadcast()` reported a flow's true backlog
+  directly whenever its per-LCG estimate was exactly 0 -- a stopgap that
+  was load-bearing for every scenario's basic UL throughput at the time,
+  not a corner case. It did not defeat the crumb-collapse mechanism
+  itself (a nonzero estimate capped to 0 by `B` still gated correctly).
+  See `design-docs/scheduler-study.md` §5.1 for detail. **Confirmed
+  retired, not just superseded**: WP4's real SR path
+  (`sim/ul_access.py::UlAccessModel`) replaced this stopgap, and CLAUDE.md
+  carries a standing invariant against reintroducing it.
+- `[OPEN: HARDWARE]` **The load-inversion calibration target's full source data, and
   what it does and doesn't support.** `p5g-sim-plan.md` §11's 67.25ms/
   12.98ms headline traces to `oai-branches/Sweep_Orig_vs_TwoTier.xlsx` (see
   §7 for the no-differentiation finding) — found sitting untracked in the
@@ -404,7 +426,7 @@ they survive it:
   uptick, with a scheduler crossover in the middle (§7) — not a specific
   millisecond value at either endpoint, and not a scheduler-differentiation
   signal, since the source itself says there isn't one at this N.
-- `[OPEN]` H5 (`p5g-sim-plan.md` line 338, "two-tier degrades as
+- `[OPEN: WP9]` H5 (`p5g-sim-plan.md` line 338, "two-tier degrades as
   flows-per-LCG grows") is not demonstrable on any current scenario. WP3's
   default 5QI→LCG mapping (`scheduler/flow.py::FIVE_QI_LCG`) deliberately
   separates QoS classes into different LCGs, matching real deployment
@@ -415,7 +437,7 @@ they survive it:
   scenario (two same-class UL flows forced onto one `lcg` via an explicit
   override) before H5 can be confirmed, refuted, or ruled inconclusive in
   Phase 3.
-- `[OPEN]` **`FIVE_QI_LCG` (`scheduler/flow.py`) is an invented mapping with
+- `[OPEN: HARDWARE/DECISION]` **`FIVE_QI_LCG` (`scheduler/flow.py`) is an invented mapping with
   nothing to validate it against.** LCG assignment isn't 3GPP-standardised
   as a function of 5QI — a real deployment configures it per-logical-channel
   via RRC, an operator/gNB policy choice — and no OAI source or spec table
@@ -430,7 +452,15 @@ they survive it:
   available) or an explicit decision to sweep the mapping itself as a WP9
   axis rather than treating it as fixed ground truth. Recorded nowhere
   before this.
-- `[OPEN]` **WP3's crumb fraction falls well short of the charter's
+- `[OPEN: WP9]` **The UL-access-chain dominance cluster** — four findings
+  below that are one investigation for WP9, not four, per the framing
+  each already converges on: "the uplink access chain dominates outcomes
+  at low load and for small messages, more than the scheduling policy
+  layered on top of it does." Treat Facets 1-4 as one hypothesis to test
+  directly in WP9's wider sweep, not as four separately-filed items that
+  happen to rhyme.
+
+  **Facet 1 — WP3's crumb fraction falls well short of the charter's
   acceptance bar.** Measured on `factory_robots_scenario` @ 1.0× with
   TwoTier: grants ≤150 bytes ("crumb") are **0.09%** of UL grants, against
   the hardware measurement's ~48-52% — roughly 500x off, not the "within a
@@ -463,7 +493,7 @@ they survive it:
   organic `sched_ul_bytes`-outracing-`estimated_ul_buffer` collapse WP3
   identified — a partial, directionally-correct but not closing
   confirmation, not a resolution.
-- `[OPEN]` **The load-inversion calibration target (§7/§11) does not
+  **Facet 2 — the load-inversion calibration target (§7/§11) does not
   appear in this simulator, at any calibration tried.** `scripts/
   scheduler_study.py::study_ul_access_chain` (WP4) sweeps offered load
   (45-145%, matching the real sweep) against `sr_period_slots` on two
@@ -486,7 +516,7 @@ they survive it:
   whether the cliff itself is realistic (a genuine capacity-ceiling
   effect) or an artefact of these scenarios' traffic/capacity shape is
   open, and is the natural next question for WP9's wider sweep.
-- `[OPEN]` **`study_ul_access_chain`'s TwoTier arm never exercises SPS, so
+- `[OPEN: WP9]` **`study_ul_access_chain`'s TwoTier arm never exercises SPS, so
   its flat curve above isn't evidence of an active anti-inversion
   mechanism.** The study's flows are `flow_class="PF"`
   (`scripts/scheduler_study.py`), which fails `_is_sps_eligible`'s
@@ -503,7 +533,7 @@ they survive it:
   free of any SPS reference (`grep -rn "SPS" sim/baselines/*.py` — no
   hits), so the negative result's overall conclusion (no load-inversion
   found) is unaffected.
-- `[OPEN]` **WP4 exposed a pre-existing PF fairness weakness: identical
+- `[OPEN: DECISION]` **WP4 exposed a pre-existing PF fairness weakness: identical
   scores tie-break by flow iteration order, not randomly or by any
   fairness-relevant tiebreaker.** `sim/baselines/pf.py`'s ranking sorts by
   `bits_per_rb / max(1.0, r_avg)`; many simultaneously-cold UEs with
@@ -518,7 +548,7 @@ they survive it:
   fixed — Phase 1 (§4) forbids scheduler logic changes in this WP, and
   the weakness is `pf.py`'s, not `ul_access.py`'s. Flagged for whoever
   next touches `pf.py`, not for WP4 to resolve.
-- `[OPEN]` **The single largest-magnitude movement in WP4's regression
+- `[OPEN: WP9]` **The single largest-magnitude movement in WP4's regression
   diff is on non-GBR UL flows (`qfi8`/`qfi9`, PF-class), not the GBR
   flows WP4 targeted.** 135 of the 1706 mismatches, with deltas up to
   **+264ms** and several flows pegged at a ~300ms ceiling. This is the
@@ -528,7 +558,7 @@ they survive it:
   considerably larger than that item's framing implies on its own;
   re-read the two together, with this number in mind, before WP9
   characterizes either finding further.
-- `[OPEN]` **Delay-class UL flows moved the opposite direction from GBR
+- `[OPEN: WP9]` **Delay-class UL flows moved the opposite direction from GBR
   UL flows under the same WP4 change, and this isn't understood yet.**
   In `sensor_dense_scenario`'s PDCCH-limited case, Delay-class UL flows'
   (`qfi1`) p95/p98/p99 latency proxies moved *down* in ~80% of
@@ -538,7 +568,7 @@ they survive it:
   landing — worth understanding why the same UL access-chain change
   helps one flow class and hurts another before WP9 treats either result
   as representative of what SR does in general.
-- `[OPEN]` **RTSP/TCP UL/DL coupling (§6) is deliberately unbuilt in WP7.**
+- `[OPEN: DECISION]` **RTSP/TCP UL/DL coupling (§6) is deliberately unbuilt in WP7.**
   Three candidate abstractions were analysed — cross-wiring the existing
   `adaptive` AIMD source's backoff signal from a paired video flow's DL
   delivery, a minimal windowed-RTT model, and a fixed offered-rate
@@ -552,9 +582,10 @@ they survive it:
   T9 are unanswerable until this is built.** See `docs/wp7-plan.md`'s
   Decision #2 for the full three-option writeup — a future revisit should
   start from that analysis, not redo it.
-- `[OPEN]` **`FlowConfig.phase_jitter_ms` (WP7 commit 9, `sim/cycle_
-  clock.py`'s sync_group mechanism) defaults to 0.0 — no ground truth for a
-  nonzero value.** A `sync_group`'s members are meant to model per-robot
+- `[RESOLVED]` **`FlowConfig.phase_jitter_ms` (WP7 commit 9, `976f09d`,
+  `sim/cycle_clock.py`'s sync_group mechanism) defaults to 0.0 — no ground
+  truth for a nonzero value, and that's the closed decision, not an open
+  question.** A `sync_group`'s members are meant to model per-robot
   processing-time variance around a shared production-cycle tick, but
   nothing on disk (no spec, no `oai-branches/` source) gives a real number
   for how much that varies. Defaulting to 0.0 (no jitter, deterministic
@@ -562,11 +593,14 @@ they survive it:
   this WP added (`periodic_control`'s `jitter_sigma_ms`, `xr_video`'s
   jitter both also default to off) — a scenario author who wants realistic
   variance must set a nonzero value explicitly, rather than inheriting an
-  invented constant silently. Revisit if/when a scenario actually needs
-  correlated-burst jitter to be non-degenerate.
-- `[OPEN]` **WP5's combining-gain composition stacks three uncalibrated
-  constructs into one modelled retransmission success probability.**
-  Scoping WP5 (`docs/wp5-plan.md` Decision 1), the new per-attempt
+  invented constant silently. Reopen only if/when a scenario actually
+  needs correlated-burst jitter to be non-degenerate.
+- `[RESOLVED]` **WP5's combining-gain composition stacks three uncalibrated
+  constructs into one modelled retransmission success probability — closed
+  by WP5 commit 2/6, `c669f96` (`bler_for_mcs_with_combining`, per
+  `docs/wp5-plan.md` Decision 1b: "compose with today's `bler_for_mcs`;
+  `bler_sigmoid` is not reintroduced").** Scoping WP5 (`docs/wp5-plan.md`
+  Decision 1), the new per-attempt
   combining gain composes with `scheduler/link.py`'s already-shipped
   `bler_for_mcs` as `bler_for_mcs(threshold, true_snr_db +
   combining_gain_db(retx_count))`. Each of the three pieces is already
@@ -583,7 +617,7 @@ they survive it:
   one of the three is ever recalibrated — recalibrating one in isolation
   changes the composed probability in a way none of the three docstrings
   alone would reveal.
-- `[OPEN]` **WP5 commit 4a's per-flow HARQ masking is defeated,
+- `[OPEN: PHASE2]` **WP5 commit 4a's per-flow HARQ masking is defeated,
   non-destructively, by `scheduler/two_tier.py::_allocate_sps`'s
   UE-level backlog pooling — measured at 3,628 occurrences across 13 of
   22 regression-corpus cases, all `TwoTier`, on commit 4a (DL only).
@@ -617,9 +651,9 @@ they survive it:
   for Phase 2 — **whoever rewrites `two_tier.py`/`reservation.py` fresh
   from OAI source must not reintroduce a backlog-pooling grant path that
   makes this counter nonzero again.**
-- `[OPEN]` **WP5 commit 4b: HARQ retry can make UL delivery *worse*, not
-  better, for cold-start-heavy traffic — a real result, not a defect,
-  and directly connected to WP4's own open findings below.** Measured on
+- **Facet 3 (UL-access-chain dominance cluster, above) — WP5 commit 4b:
+  HARQ retry can make UL delivery *worse*, not better, for cold-start-
+  heavy traffic — a real result, not a defect.** Measured on
   `sensor_dense_scenario` (`ProportionalFair`):
 
   | `harq_round_max` / `k2_slots` | mean delivery |
@@ -629,8 +663,8 @@ they survive it:
   | `k2_slots=1` (default is 2 — shorter retry gap) | 0.667 |
 
   **Mechanism:** commit 4a's full masking (a FIFO-correctness requirement
-  — see that commit's own `[OPEN]` entry above and `docs/wp5-plan.md`
-  commit 4a — not a modeling choice) blocks a retrying flow from
+  — see that commit's own `[OPEN: PHASE2]` entry above and `docs/
+  wp5-plan.md` commit 4a — not a modeling choice) blocks a retrying flow from
   receiving *any* new grant, including a fresh SR-triggered cold-start
   grant, for the whole retry cycle (`k2_slots` × however many retries it
   takes). For traffic dominated by small, one-shot-completion messages —
@@ -651,21 +685,18 @@ they survive it:
   (`FIVE_QI_LCG`, `sr_period_slots`). That `k2_slots=1` recovers delivery
   is recorded as the sensitivity **WP9 should sweep**, not a new default.
 
-  **Read together with two already-open items, as one hypothesis, not
-  three unrelated ones**: this finding, WP4's load-inversion negative
-  result (§8, "the hypothesised high-to-low curve" never appearing), and
-  WP3/WP4's crumb-fraction shortfall (§8, still ~10x short of hardware's
-  48-52% even after WP4's SR-floor fix — commit 4b's own measurement on
-  `factory_robots_scenario`/`TwoTier`@1.0× moved it again, 4.4503% →
-  4.9558% (corrected post-WP5-end-of-WP-review; see CLAUDE.md's known
-  issues), mean crumb size 146.03 → 134.44 bytes, same direction as
-  WP4's own move, still far short) all look like facets of one thing:
-  **the uplink access chain dominates outcomes at low load and for small
-  messages, more than the scheduling policy layered on top of it does.**
-  Worth stating as an explicit hypothesis for WP9 to test directly across
-  its full sweep, rather than three separately-filed items that happen to
-  rhyme.
-- `[OPEN]` **WP5 commit 6: OLLA's round-count MCS ratchet
+  **This is Facet 3 of the UL-access-chain dominance cluster above, read
+  together with Facets 1 (crumb fraction) and 2 (load-inversion absent),
+  not a separate item**: commit 4b's own re-measurement of Facet 1 moved
+  it again, 4.4503% → 4.9558% crumb fraction (corrected post-WP5-end-of-
+  WP-review; see CLAUDE.md's known issues), mean crumb size 146.03 →
+  134.44 bytes, same direction as WP4's own move, still far short of
+  hardware. All three (plus Facet 4 below) look like facets of one
+  thing: **the uplink access chain dominates outcomes at low load and
+  for small messages, more than the scheduling policy layered on top of
+  it does.** WP9 should test this hypothesis directly across its full
+  sweep, not as four separately-filed items that happen to rhyme.
+- `[OPEN: PHASE2]` **WP5 commit 6: OLLA's round-count MCS ratchet
   (`get_mcs_from_bler`) is ported bug-for-bug and unit-tested, but doesn't
   reach grant sizing — it's landed dormant, the same way WP1's `sim/
   power.py` was.** This simulator has no persistent per-UE MCS anywhere
@@ -699,8 +730,11 @@ they survive it:
   genuine interaction worth naming as such, rather than three items
   (this one, WP4's load-inversion result, the crumb-fraction shortfall)
   that only rhyme. Full method in `docs/wp5-plan.md` commit 6.
-- `[OPEN]` **WP6: correlated multi-UE blockage and AGV mobility are
-  deliberately not built.** `p5g-sim-plan.md` §9's WP6 file list names
+- `[RESOLVED]` **WP6: correlated multi-UE blockage and AGV mobility are
+  deliberately not built — closed by the WP6 plan, `docs/wp6-plan.md`
+  Decision 7 (scoped in commit `7648475`, before any WP6 code landed,
+  unrevisited since WP6's own end-of-WP review `eccdb72`).**
+  `p5g-sim-plan.md` §9's WP6 file list names
   `sim/mobility.py` as "New, optional... so blockage correlates across UEs
   sharing an aisle." Decided not to build it (`docs/wp6-plan.md`
   Decision 7): no guarantee in §5's G1-G12 traceability table names
@@ -710,9 +744,10 @@ they survive it:
   branch ("revisit only if a specific GT/T test fails and \[mobility\] is
   the diagnosed cause"). Not an oversight — recorded here so the spec's
   file list doesn't silently imply otherwise.
-- `[OPEN]` **WP6 commit 4: blockage x HARQ retry interaction confirmed —
-  a single flow's residual HARQ loss under long blockage exceeds WP5's
-  entire prior corpus, and the mechanism is narrower than first assumed.**
+- **Facet 4 (UL-access-chain dominance cluster, above) — WP6 commit 4:
+  blockage x HARQ retry interaction confirmed — a single flow's residual
+  HARQ loss under long blockage exceeds WP5's entire prior corpus, and
+  the mechanism is narrower than first assumed.**
   `Allocation.snr_used_db` freezes a TB's MCS threshold at its original
   grant and reuses it unchanged across every retry (`sim/harq.py::
   HarqProcess.snr_used_db`) — a fresh grant issued *while already blocked*
@@ -736,10 +771,9 @@ they survive it:
   Demonstrated in `sim/tests/test_wp6_blockage_harq_interaction.py`, kept
   deliberately outside the regression corpus (`docs/wp6-plan.md` §4: a
   multi-configuration hypothesis test, not a fixed-baseline scenario).
-  **Read together with WP5's own "uplink access chain dominates at low
-  load" hypothesis cluster** (this document's WP4/WP5 items above) as a
-  candidate fourth facet of the same underlying story, per WP9's wider
-  sweep — not chased further here.
+  **This is Facet 4 of the UL-access-chain dominance cluster above** —
+  the fourth facet of the same underlying story, per WP9's wider sweep —
+  not chased further here.
 - `[RESOLVED]` Branch strategy: fresh rebuild off `main`, stale branches
   not merged (§2, §3).
 - `[RESOLVED]` Phase ordering: simulator fidelity fully before either
@@ -789,8 +823,8 @@ they survive it:
   RoundRobin's `dl_prb_utilization` stay bit-for-bit identical across the
   same sweep — confirming this is PF's shared-rate design, not a TwoTier
   Tier-1 boundary leak. The other unpredicted, larger-magnitude movements
-  (non-GBR UL flows, Delay-class UL flows) are their own `[OPEN]` items
-  above.
+  (non-GBR UL flows, Delay-class UL flows) are their own `[OPEN: WP9]`
+  items above.
 
 ---
 
@@ -836,4 +870,15 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 (confirmed, refuted, or inconclusive-with-reason), guarantee traceability
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
-campaign.
+campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage:
+**15 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
+UL-access-chain dominance cluster counted once; 2 `[OPEN: PHASE2]`; 2
+`[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/
+DECISION]`) plus whatever new items Phase 2/3 add using the same
+open-ended tag vocabulary (§8 preamble). "Closed" means flipped to
+`[RESOLVED]` with a citation of what closed it; "carried to the hardware
+campaign" means still tagged `[OPEN: HARDWARE]` (or the hardware half of
+a dual tag) at this gate — `[OPEN: WP9]`/`[OPEN: PHASE2]`/`[OPEN:
+DECISION]` items must resolve some other way (a completed sweep, the
+Phase 2 rewrite landing, or an owner decision) before this gate, not
+default into "carried to hardware."

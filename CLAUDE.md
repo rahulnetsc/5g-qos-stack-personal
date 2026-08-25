@@ -32,9 +32,9 @@ bare `python` invocation that works.
   BSR delay/loss/quantisation at all; `BsrModel` is the only writer of a
   UL flow's `bytes_reported`/`estimated_ul_buffer_per_lcg`.
 - `sim/run_record.py`, `sim/scorecard.py` — WP0 (+ WP3 for M02, WP7 for
-  M01/M03/M05/M06/M14/M15/M17). The scoring layer. `scorecard.py` must not
-  import `sim/driver.py` or `sim/config.py`; it consumes `RunRecord` only,
-  so it can score records from any producer.
+  M01/M03/M05/M06/M14/M15/M17, WP-Join for M18/M19). The scoring layer.
+  `scorecard.py` must not import `sim/driver.py` or `sim/config.py`; it
+  consumes `RunRecord` only, so it can score records from any producer.
 - `sim/messages.py` — WP7. `Message`/`MessageCompletion`/`MessageLedger`
   (per-message identity and completion bookkeeping) and
   `FrameCompletion`/`FrameLedger` (grouping sibling PDU-set fragments by
@@ -54,14 +54,27 @@ bare `python` invocation that works.
   (default `None` preserves pre-WP6 behaviour exactly); wired into
   `sim/channel.py`, not `driver.py`.
 - `sim/rlf.py` — WP6. Sync-loss (RLF) *detection* only (`n310`-armed
-  `t310` dwell, `n311`-gated cancel) — dormant, matching `sim/power.py`'s
-  landing pattern. Recovery timing (`t311`/`t300`/`t301`/`t319`) is
-  WP-Join's, not this file's — see invariants below for the exact
-  interface WP-Join consumes.
-- `config/metric_panel.yml` — the pre-registered metric panel. See rules below.
-- `scheduler/` — `two_tier.py`, `tier1.py`, `link.py`, `flow.py`.
-  `flow.py::FlowConfig.lcg` self-resolves from 5QI via `__post_init__` — see
-  invariants below.
+  `t310` dwell, `n311`-gated cancel). The module's own code is still pure
+  (no simulator/scheduler imports) and detection-only, but it is **no
+  longer dormant**: WP-Join commit 2 wires `step()` into `driver.py`'s
+  slot loop unconditionally, per UE per slot. Recovery timing (`t311`/
+  `t300`/`t301`/`t319`) is implemented in `sim/join.py`, not this file —
+  see invariants below for the exact interface WP-Join consumes.
+- `sim/join.py` — WP-Join. Per-UE join/re-join/RLF-recovery FSM
+  (`JoinConfig`/`JoinState`/`JoinRngStreams`) plus `JoinAwareBufferView`,
+  composed outermost over `HarqAwareBufferView` in `driver.py`, gating a
+  UE out of scheduling with zero scheduler-interface change. Consumes
+  `sim/rlf.py`'s `RlfStepResult.rlf_declared_this_slot` edge event; does
+  not extend `rlf.py`'s state machine itself — see invariants below.
+- `config/metric_panel.yml` — the pre-registered metric panel. See rules
+  below, including WP-Join's M18/M19 (the panel's first additions since
+  WP0 pre-registration).
+- `scheduler/` — `two_tier.py`, `tier1.py`, `link.py`, `flow.py`,
+  `interfaces.py`. `flow.py::FlowConfig.lcg` self-resolves from 5QI via
+  `__post_init__` — see invariants below. `interfaces.py`'s
+  `SchedulerContextReset` Protocol (WP-Join commit 7) is implemented only
+  by `two_tier.py` (`reset_ue(ue_id, scope, buffers)`) — the one
+  scheduler-file change in this WP, and the only one since WP0.
 - `sim/baselines/` — PF, RoundRobin, Gradient. The Phase 1 comparison arms.
 - `oai-branches/{two-tier,reservation}/` — read-only verified OAI C source.
   Ground truth for Phase 2. Same filenames in both dirs with *different*
@@ -210,7 +223,13 @@ scenario can have zero of one and many of the other. WP6 commit 4's own
 demo hit exactly this confusion first-hand: checked `harq_exhausted_count`
 after adding blockage, saw 0 in every arm, briefly read that as a
 refutation of the whole mechanism — the real signal was always in
-`bytes_harq_lost` (`docs/wp6-plan.md` commit 4).
+`bytes_harq_lost` (`docs/wp6-plan.md` commit 4). A third disposition
+exists beyond "delivered" and "retry-exhausted": `HarqProcessPool.
+flush_ue()` (WP-Join) frees every busy HARQ process for a UE on a
+radio-gated transition, bypassing `drain()`/`discard_harq_loss()`
+entirely — the bytes stay in `BufferModel` and are re-granted later, so
+this isn't a third loss category, just a third exit from "pending" that
+neither counter above observes.
 
 **A TB's `Allocation.snr_used_db` (the MCS-pick-time SNR) freezes at its
 ORIGINAL grant and is reused unchanged across every retry — this makes
@@ -237,20 +256,61 @@ and a clean, non-overlapping separation at `cqi_delay_slots=8` (5200-
 time-varying-channel interaction with HARQ is weak or absent, check
 `cqi_delay_slots` first.
 
-**`sim/rlf.py`'s `RlfDetectorState`/`RlfStepResult` is WP-Join's
+**`sim/rlf.py`'s `RlfDetectorState`/`RlfStepResult` is `sim/join.py`'s
 contract — consume it, don't extend the state machine inside `sim/
 rlf.py` itself.** It exposes exactly three things: `sync_state` (the
 level — `IN_SYNC`/`T310_RUNNING`/`RLF_DECLARED`), `RlfStepResult.
 rlf_declared_this_slot` (an edge-triggered event, true for the one slot
 RLF is declared — react to this, don't poll the level and re-derive the
 edge), and `rlf_declared_at_slot` (timestamp). `step()` never un-declares
-RLF once reached — re-arming after a real reattach belongs to WP-Join (a
-fresh `RlfDetectorState`, or a reset method WP-Join adds when it needs
-one), not something to build into this module speculatively. `t311`/
-`t300`/`t301`/`t319` (the recovery-side timers, also real values in
-`calibration-logs/twotier_startup_gnb.log:17`) are deliberately out of
-`sim/rlf.py`'s scope — WP-Join's own timers, not a missing piece here
+RLF once reached; re-arming after a real reattach is `sim/join.py`'s job,
+confirmed landed: `driver.py` constructs a fresh `RlfDetectorState()` per
+UE exactly at `jres.radio_connected_this_slot`. `t311`/`t300`/`t301`/
+`t319` (the recovery-side timers, also real values in `calibration-logs/
+twotier_startup_gnb.log:17`) are implemented in `sim/join.py`, not
+`sim/rlf.py` — deliberately out of the detector's scope
 (`docs/wp6-plan.md` Decision 4).
+
+**Radio-layer gating composes by wrapping `BufferView`, never by
+changing scheduler code — the pattern to follow for any future
+"hide this UE/flow from scheduling" mechanism.** `JoinAwareBufferView`
+(`sim/join.py`) is composed outermost over `HarqAwareBufferView`
+(`sim/harq.py`) in `driver.py`, masking a radio- or app-gated UE's
+backlog to zero with no changes to `scheduler/two_tier.py`,
+`sim/baselines/*.py`, or the `BufferView` protocol's call sites. This
+works specifically because backlog is externally observable state a
+scheduler reads *through* an interface — see the next invariant for the
+one kind of state this pattern cannot reach.
+
+**A scheduler's own private per-UE instance state (`TwoTier`'s
+`_virtual_q`, `_demand_bps`, `_snr_avg`, etc.) has no external lever —
+masking `BufferView` cannot reset it, and that's why
+`SchedulerContextReset` exists.** WP-Join commit 7 needed to clear a
+UE's fairness/urgency bookkeeping across a re-join, and the
+`BufferView`-wrapping pattern above genuinely cannot reach it (it's
+never read through the interface scheduler.allocate() receives). The
+fix — `scheduler/interfaces.py::SchedulerContextReset`,
+`two_tier.py::reset_ue(ue_id, scope, buffers)` — is the one scheduler
+file change in this branch since WP0's "zero scheduler changes" rule,
+and it is not a precedent for further scheduler edits; it was the
+narrowest change that could reach genuinely private state. Reset scope
+is path-dependent: `"mac"` (RRC reestablishment) keeps the fairness
+ledger, `"full"` (cold attach or an IDLE fallback) clears everything.
+Note `JoinState.active_path` never flips from `"reestablish"` even when
+a cycle falls back through `JoinPhase.IDLE` — a separate
+`join_used_idle_fallback` flag tracks that, so scope selection doesn't
+silently read the wrong path.
+
+**TwoTier loses real HARQ bytes under a collapsing channel; PF does
+not — a genuine scheduler-differentiating behavior, not a bug in
+either.** Under WP-Join's scripted SNR fade (`sim/channel.py`), TwoTier's
+urgency-driven ranking keeps attempting grants to a UE whose channel is
+actively degrading, producing real `bytes_harq_lost` (~37,500–38,242
+bytes across the GT-6.3 demo's arms); PF's achievable-rate-sensitive
+ranking backs off sooner and shows 0 bytes lost in every arm. Reproduces
+even in the pre-existing `harq_masked_flow_double_grant_count` baseline
+(877, unrelated to join/RLF) — this is a standing property of the two
+rankings, not something WP-Join introduced.
 
 **Every new independent random draw needs its own seed stream — do not
 share an RNG across two different draws.** Precedent: `cqi_seed =
@@ -263,9 +323,11 @@ mechanism change. Fixed with independent `harq_rng_dl`/`harq_rng_ul`
 on the same principle (`los_seed`/`shadow_fading_seed`/`blockage_seed`,
 `scenario.seed ^ 0x105105` / `^ 0x5FADE5` / `^ 0x424C4F4B`) — no violation
 found that time, a clean instance of following the rule rather than a
-second bug. When adding any new stochastic mechanism, give it its own
-XOR'd seed rather than reusing an existing RNG object, even one that
-looks unrelated to what you're adding.
+second bug. WP-Join added three more on the same principle
+(`join_cold_seed`/`join_reest_seed`/`join_warm_seed`, `sim/join.py`) — a
+third clean instance. When adding any new stochastic mechanism, give it
+its own XOR'd seed rather than reusing an existing RNG object, even one
+that looks unrelated to what you're adding.
 
 **Spec/hardware-derived numeric tables get transcribed from the actual
 source text, never reconstructed from memory or re-derived by formula —
@@ -286,6 +348,10 @@ spec-derived table (BSR, path loss, or otherwise), re-verify against the
 real source, not by re-deriving it.
 
 ## Rules for the WP0 machinery
+
+**M18/M19 (WP-Join) are the panel's first additions since WP0
+pre-registration** — the rules below still apply to them unchanged; the
+panel isn't a fixed WP0 artifact, it's append-only under the same rules.
 
 **`config/metric_panel.yml` is pre-registered.** Adding a metric is fine.
 Removing one, or changing a definition to something that happens to separate
@@ -380,6 +446,19 @@ for every WP, not an opportunistic one.
   decision. Workaround until then: scale `traffic_params["avg_bytes"]`
   directly for an `xr_video` aggressor instead of using
   `aggressor_multiplier`.
+- M19's `hol_delay <= pdb_ms` pass check is blind to a flow being
+  catastrophically PDB-violated via continuous drops: `sim/buffer.py::
+  expire()` keeps evicting the queue head before it can age past
+  `pdb_ms`, so a flow that never delivers anything can still read as
+  "green." Recorded as a `caveats:` entry on M19's panel row rather than
+  fixed (WP-Join commit 8) — a distinct mechanism change, not a
+  metric-definition tweak.
+- `sim/traffic.py`'s `adaptive` source kind is distorted by WP-Join
+  commit 6's `suppressed_ues` gate: the AIMD backoff logic it uses isn't
+  aware a UE can be source-gated mid-cycle, so a suppressed then
+  un-suppressed `adaptive` flow's rate state may not reflect what real
+  AIMD would do across that gap. Flagged in `docs/wp-join-plan.md` §6
+  item 5; no scenario currently combines the two, so untested.
 
 ## Style
 
