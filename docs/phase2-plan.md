@@ -419,36 +419,57 @@ on LCG-aggregate quantities — matching `ia_p5g`'s `vq_ul[UE][LCG]`
 exactly, the real gNB's own granularity (confirmed by §2: DL's VQ is
 genuinely per-LCID because the gNB owns DL RLC buffers, but UL's is
 per-LCG because the gNB only ever sees aggregate BSR — the asymmetry is
-real, not an oversight to smooth over). A separate, sim-only bookkeeping
-step drains bytes per flow purely for `BufferModel`/scoring purposes,
-using proportional-to-reported-backlog arithmetic (today's
-`_occupancy_split` logic, stripped of its feedback into ranking).
+real, not an oversight to smooth over).
 
-**Binding requirement on implementation** (stated by the user): this
-bookkeeping split must be **structurally** unable to reach the
-scheduler, not conventionally separate by docstring or code review
-discipline — the same "consume, don't extend" enforcement
-`sim/join.py`'s relationship to `sim/rlf.py` already demonstrates (a
-type-signature-level guarantee, not a documentation promise). Concretely:
-the bookkeeping-split function/module must not be imported by, or have
-its output passed into, anything reachable from `Scheduler.allocate()`'s
-call graph — verified by an explicit test asserting no such import edge
-exists (mirroring `docs/wp-join-plan.md`'s own verification that
-`sim/join.py` does not import `sim/rlf.py` at all, checked via the type
-signature rather than a docstring claim).
+**Correction, found scoping reservation commit 1 — the paragraph
+originally here described a *new* sim-only bookkeeping step needing to
+be built (proportional-to-reported-backlog arithmetic, stripped-down
+`_occupancy_split`). That was wrong: it already exists.** `sim/ue_lcp.py`
+is a real UE-side PBR-token-bucket LCP simulation — exactly the "more
+faithful, more code" alternative considered below, except it turns out
+to already be built, already tested, and already used by every existing
+scheduler (PF, RoundRobin, Gradient, and TwoTier's own `ue_grant=True`
+fallback path). A UL grant that follows the existing convention —
+`Allocation(qfi=-1, direction="UL", ue_grant=True, bytes_capacity=<whole
+TB>)` (`sim/baselines/_mac.py:60-72`) — never computes a per-flow split
+itself; `sim/driver.py:613` calls `ue_lcp.fill(...)` entirely outside any
+scheduler's code once the grant is emitted. So D1's requirement is met
+with **zero new code**: `reservation.py` (and, later, the rewritten
+`two_tier.py`) just needs to conform to the same `ue_grant=True`
+convention every other scheduler already uses, not build a new
+bookkeeping mechanism.
 
-**Why the alternatives were rejected** (record both, per the user's
-instruction): a full UE-side PBR-token-bucket LCP simulation (mirroring
-the real `nr_ue_get_sdu`, `nr_ue_scheduler.c:2702-2820`) would be more
-faithful to how the split is actually produced on real hardware, but is
-materially more code for a mechanism that — per `README.md`'s own H5
-finding — no current scenario exercises at all (`FIVE_QI_LCG` separates
-QoS classes into different LCGs, so no scenario has >1 UL flow sharing
-one LCG today). Punting entirely on a single-flow-per-LCG assumption was
-also rejected: that assumption is *exactly* what makes H5 untestable in
-the first place (`README.md` §8) — building Phase 2 around it would
-entrench the gap rather than leave it open for the H5 follow-up scenario
-`README.md` already calls for.
+**Binding requirement on implementation** (stated by the user, still
+holds, now enforced by an existing rather than a new boundary): this
+split must be **structurally** unable to reach the scheduler, not
+conventionally separate by docstring or code review discipline — the
+same "consume, don't extend" enforcement `sim/join.py`'s relationship to
+`sim/rlf.py` already demonstrates. This is already true today: every
+`scheduler/*.py` file's imports were checked directly, and none imports
+anything from `sim` — `scheduler/` depends only on stdlib, `cvxpy`/
+`numpy`, and itself (`two_tier.py`'s own docstring already claims this).
+`sim/ue_lcp.py` lives in `sim/`, so as long as `reservation.py` never
+imports it or reimplements its own version, this requirement is met by
+the existing package boundary, not by anything `reservation.py` itself
+has to enforce. A durable, package-wide test (walk every file under
+`scheduler/`, assert none contains `import sim`/`from sim`) makes this
+checkable going forward rather than an assumption re-verified by
+re-reading imports each commit — see reservation commit 1's checklist.
+
+**Why the alternatives were rejected, as originally framed** (record
+both, since the framing shaped the original decision even though it
+turned out to be based on an incomplete picture of what already
+exists): a full UE-side PBR-token-bucket LCP simulation was framed as
+"more faithful to how the split is actually produced on real hardware,
+but materially more code" — true of building one from scratch, false of
+reusing `sim/ue_lcp.py`, which the framing didn't know existed at the
+time. Punting entirely on a single-flow-per-LCG assumption was rejected
+because that assumption is *exactly* what makes `README.md`'s H5 finding
+untestable in the first place (`README.md` §8) — building Phase 2 around
+it would entrench the gap rather than leave it open for the H5 follow-up
+scenario `README.md` already calls for. That reasoning still stands; only
+the "more code" premise for the rejected first alternative needed
+correcting.
 
 ### D2 — OLLA activation (user decision, obtained directly)
 
@@ -526,7 +547,7 @@ argument `docs/wp-join-plan.md` commit 1 used for `sim/join.py`)
 
 | # | Commit | Predicted `--check` impact |
 |---|---|---|
-| 1 | Skeleton: `Scheduler` protocol conformance, per-UE/per-LCG state dataclasses, bare PF coefficient ranking, no follower budget (unbounded grant), DL-then-UL per-slot order. Port-map: `## Phase 2 — reservation` section opened. | Inert — zero call sites in any registered scenario/study. |
+| 1 | Skeleton: `Scheduler` protocol conformance, per-UE/per-LCG state dataclasses, bare PF coefficient ranking, no follower budget (unbounded grant), UL-then-DL per-slot order (corrected — this row previously said DL-then-UL, which contradicted this document's own §2.2 citation of `gNB_scheduler.c:246,251`; caught scoping this commit). Port-map: `## Phase 2 — reservation` section opened. | Inert — zero call sites in any registered scenario/study. |
 | 2 | Four-tier (DL) / five-tier (UL) sort — two distinct comparators, not one shared. Property test: ordering matches port-map table on constructed multi-UE fixtures, including the `sched_inactive`-last UL tier and its absence on DL. | Inert. |
 | 3 | GBR/BE byte split + deficit accumulate/cap/spread, both directions. | Inert. |
 | 4 | Follower budget, both directions, their two distinct formulas (UL: `bwpSize`/`min_grant_prb`; DL: `max_rbSize`/hardcoded `5`). **Automated property test: `n_followers=0` degenerates to unconstrained budget** — the acceptance criterion, checked directly, not eyeballed. | Inert. |
