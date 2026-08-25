@@ -63,10 +63,13 @@ reattach is WP-Join's responsibility (constructing a fresh
 ``RlfDetectorState``, or a reset method WP-Join adds when it needs one),
 not something this module invents without a consumer.
 
-DORMANT: not wired into ``sim/driver.py``, ``sim/config.py``, or any
-scheduler -- this commit is the state-transition analogue of ``sim/
-power.py`` (WP1) and ``sim/olla.py`` (WP5 commit 6)'s dormant landing.
-Pure functions/dataclasses only -- no simulator or scheduler imports.
+Landed DORMANT (this commit): not yet wired into ``sim/driver.py``,
+``sim/config.py``, or any scheduler -- the state-transition analogue of
+``sim/power.py`` (WP1) and ``sim/olla.py`` (WP5 commit 6)'s dormant
+landing. **WP-Join commit 2 (docs/wp-join-plan.md) wires ``step()`` into
+``sim/driver.py``'s slot loop, unconditionally, per UE per slot** -- this
+module's own code is unmodified since (still pure functions/dataclasses,
+no simulator or scheduler imports); only its caller changed.
 """
 
 from __future__ import annotations

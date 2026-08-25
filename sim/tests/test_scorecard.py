@@ -72,15 +72,16 @@ def test_caveats_travel_with_the_value_for_registered_metrics_only():
     (registered in config/metric_panel.yml) and must carry that caveat
     regardless of status; every other metric must get an empty list, not
     an omitted attribute (same "never silently omit" discipline as a
-    pending row)."""
+    pending row). M19 also carries its own registered caveat since
+    WP-Join commit 8 (the hol-delay-vs-continuous-PDB-drops finding)."""
     rec, _ = _record()
     sc = Scorecard()
     results = sc.score(rec)
-    for mid in ("M01", "M02", "M14", "M15"):
+    for mid in ("M01", "M02", "M14", "M15", "M19"):
         assert results[mid].caveats, f"{mid} should carry its registered caveat"
         assert all(isinstance(c, str) and c for c in results[mid].caveats)
     for mid, res in results.items():
-        if mid not in ("M01", "M02", "M14", "M15"):
+        if mid not in ("M01", "M02", "M14", "M15", "M19"):
             assert res.caveats == []
 
 

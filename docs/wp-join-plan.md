@@ -684,6 +684,117 @@ opt-in; until a scenario sets `UEConfig.join`, every existing metric is
 computed by exactly the simulator that existed before this WP, not a
 join-blind approximation of a more-real one.
 
+### Ranked falsifiable predictions
+
+**Written retroactively, at commit 8, and flagged as its own finding
+(§8 below): this section is cited by number from §0/§1.7/§5 (`Prediction
+2`/`3`/`4`) throughout this document, but the numbered list itself was
+never actually committed until now** — an end-of-WP review gap, the same
+species as WP3's own M02 denominator bug and WP-Join's own per-commit
+finds, caught by the same standing discipline, not hidden once found.
+Scored here against the real 8-commit result, not left as a bare list.
+
+1. **(High) M18 `rejoin_interruption_time`, reestablish arm** — flips
+   `pending` → `ok` at commit 5 and reports the true-reestablishment
+   path's RF-restore-to-attached figure comfortably inside GT-6.3's 10s
+   line. **Confirmed for GT-6.3a exactly** (`rf_restore_to_attached_p95_ms
+   = 83ms`, commit 8's demo). **Refined, not simply confirmed, for
+   GT-6.3b**: the prediction assumed this figure would always be
+   measurable for "the reestablish arm"; the IDLE-fallback variant shows
+   it can be `None` instead — CELL_SEARCH's own SNR-restoration detection
+   never fires when `t311` expires first, so there is no RF-restore
+   instant to measure from at all, a sharper finding than "over 10s."
+2. **(High) M02 `pdb_violation_rate`, reestablish arm specifically** —
+   confirmed directly: `bytes_dropped_pdb` for UE1's main flow reached
+   ~65% of `bytes_arrived` in commit 8's demo (both fade arms), against
+   zero in baseline — the traffic-admission asymmetry (D5: reestablish
+   never suppresses the source) working exactly as designed.
+3. **(High) M18 cold-attach arm — a lower bound, not a validated
+   result, by roughly an order of magnitude** — **not exercised by this
+   WP's own numbers.** D0b (user-confirmed) scoped commit 8's acceptance
+   demo to GT-6.3 only; no commit ran a full cold-attach scenario through
+   a real scheduler with M18 scored against it. The qualitative claim
+   still holds by construction (every phase `sim/join.py` models for the
+   cold path sums to well under 1s at default delay parameters — sec1.7),
+   but that is a design-time argument, not a re-confirmed measurement —
+   recorded here as genuinely untested, not quietly marked "confirmed."
+4. **(Moderate) M01/M08, undisturbed UE — never worse, not necessarily
+   identical, and NOT always better** — **partially confirmed.** UE2's
+   throughput was strictly *better* under `TwoTier` in both fade arms
+   (masked UE1 frees PRBs TwoTier's own Tier-1 redistributes) — but bit-
+   for-bit *identical* across all three arms under PF, not better at all.
+   The "never worse" half of the prediction held for both schedulers; the
+   "will be better" half was specific to `TwoTier` and wrong for PF, where
+   UE2's own demand was already fully served regardless of UE1's state (a
+   ceiling effect the original prediction didn't anticipate).
+5. **(Low, the riskiest, and the one that most needed a real demo to
+   check) A transient neighbour delay bump concentrated at the rejoin
+   instant, from either PF's `_r_avg` decay-floor or TwoTier's own
+   `_virtual_q` catch-up debt** — **confirmed for `TwoTier`, on the
+   `"mac"`-scope arm specifically, and NOT on the `"full"`-scope arm** —
+   UE2's own p99 delay rose from 10.5ms (baseline) to 12.5ms (GT-6.3a,
+   `"mac"` retains UE1's virtual-queue deficit, so it legitimately
+   outranks UE2 the instant it reconnects) and back to 10.5ms (GT-6.3b,
+   `"full"` clears that deficit to zero — nothing to catch up on, no
+   bump). `sim/tests/test_wpjoin_rlf_recovery.py::
+   test_two_tier_shows_a_transient_neighbour_delay_bump_only_on_the_
+   mac_scope_arm` asserts this directly rather than averaging it away.
+   PF showed no such bump in the same runs (UE2's p99 stayed exactly
+   6.0ms across all three arms) — `_r_avg`'s own decay-floor risk (D8)
+   was not observed to bite here, at this scenario's scale.
+6. **(Moderate) M03/M14 — M03 shows G9's consequence, M18 shows only its
+   duration** — **confirmed for M03, missed for M14's own magnitude.**
+   UE1's own max liveness gap (M03) rose from ~14-21ms (baseline) to
+   ~3,077-10,005ms (the two fade arms) — a dramatic, unambiguous
+   demonstration of exactly what the prediction described. M14
+   (communication service availability), by contrast, barely moved at
+   all (0.9996-0.9990 against a baseline of 1.0), not the "sharp drop"
+   the prediction's phrasing implied — a single outage interval is
+   diluted to near-invisibility inside M14's own aggregate-fraction
+   definition once thousands of ordinary 5ms intervals are counted
+   alongside it, the same shape of blind spot M09's own docstring already
+   names for whole-run aggregates ("known to mask short-timescale
+   oscillation"). M03, not M14, is the metric this WP's own outage is
+   actually visible in — worth stating exactly, not left as "M14 also
+   shows it."
+7. **(Low, WP6-crumb-fraction-shaped) `harq_masked_flow_double_grant_
+   count`/`bytes_harq_lost`** — **the "exactly zero" framing itself was
+   wrong, found by actually running the demo, not by re-deriving it.**
+   `harq_masked_flow_double_grant_count` is NONZERO in `TwoTier`'s own
+   BASELINE arm (877, no fade, no join event ever firing) — a pre-
+   existing WP5-level diagnostic (this counter's own docstring: "counted,
+   not enforced"), unrelated to WP-Join. What WP-Join's `flush_ue` (commit
+   5) actually needed to show was *no increase* from the radio gate
+   specifically — confirmed: 724 (GT-6.3a) and 600 (GT-6.3b), both below
+   the 877 baseline, since a masked UE is granted less often overall, not
+   more. `bytes_harq_lost` for UE1's own flow, by contrast, is a genuine,
+   unanticipated, scheduler-differentiating finding: 0 in baseline, but
+   ~37,500-38,242 bytes under `TwoTier`'s two fade arms, against a
+   *flat 0 in every arm under PF* — `TwoTier`'s own urgency-driven ranking
+   keeps attempting grants to a UE whose true SNR is already collapsing
+   (before `n310`+`t310`'s ~4,010-slot detection window elapses), where
+   `PF`'s own achievable-rate-sensitive ranking backs off sooner. Neither
+   was predicted; both are real and worth a future WP's attention if
+   `TwoTier`'s own HARQ behavior during a channel collapse becomes a
+   question, not this one's to resolve further.
+8. **(High, the load-bearing inertness claim) Every metric on all 22
+   regression records, across all 8 commits — numerically unchanged,
+   bit-for-bit, except the two schema commits' own predicted structural
+   diffs** — **confirmed at every single commit, not just claimed once at
+   the start.** Commits 1/2/3/6/7/8: zero mismatches. Commit 4: exactly
+   22 structural (`join_events: MISSING in baseline -> None`) mismatches,
+   predicted exactly before capturing. Commit 5: exactly 22 structural
+   (`join_events: None -> []`) mismatches, for a reason unrelated to
+   gating, also predicted before capturing. No commit in this WP ever
+   produced an unpredicted regression-corpus delta.
+
+**Metrics predicted inert even at commit 8, checked, not merely
+assumed:** M04 (explicitly declined, §3 D11), M05/M06/M17 (no `xr_video`
+flow in this demo), M07 (a count, too coarse to move on a 2-UE scenario),
+M12 (freed CCEs redistributed — the aggregate is roughly conserved), M13
+(needs an ascending-load sequence, not a single demo), M16 (needs a
+caller-named UL/DL flow pair this demo never supplies).
+
 ### Commit 1 — landed
 
 `sim/join.py` (new: `JoinPhase`, `JoinEvent`, `JoinConfig`, `JoinRngStreams`/
@@ -1379,6 +1490,113 @@ call into the `"full"`-only loop.
    something this commit can settle by itself — the switch exists
    precisely so that question stays answerable, per D7.
 
+### Commit 8 — landed (last commit in this WP)
+
+`sim/tests/test_wpjoin_rlf_recovery.py` (new, 7 tests: 2 GT-6.3a/GT-6.3b
+correctness checks each, parametrized over `TwoTier`/`ProportionalFair`;
+one isolation check, parametrized; one `TwoTier`-specific transient-bump
+check), `README.md` (§5's G9 row, §4's phasing-table entry, both `[OPEN]`
+sign-off items resolved to `[RESOLVED]`, the `contention.log` phantom-path
+citation corrected), `config/metric_panel.yml` (an M19 `caveats:` entry —
+see below), `sim/rlf.py` (a stale docstring claim fixed — §8).
+
+**Two real findings surfaced while building the demo, both fixed or
+recorded before the demo could produce a meaningful number, not
+smoothed over:**
+
+1. **The handshake flow's PDB must be sized independently of the fade
+   duration, or the event can never complete at all.** `sim/join.py`'s
+   `RRC_ESTABLISH`/`PDU_SESSION`/`CELL_SEARCH`→`REESTABLISH` completion is
+   not itself SNR-gated (only `CELL_SEARCH`'s own restoration check is)
+   — so on the IDLE-fallback path (GT-6.3b), a UE can "logically" reach
+   `APP_HANDSHAKE` while the scripted fade is still physically active.
+   Any real grant attempted there fails outright (`draw_harq_outcome` at
+   the true, still-collapsed SNR), so the handshake message just waits,
+   undelivered — and at this repo's other tests' own default
+   `pdb_ms=1000`, that wait exceeds the PDB and the message is silently
+   dropped before the event can ever complete (confirmed directly:
+   `bytes_dropped=64`, the whole 64-byte message, at that default).
+   Fixed by giving the demo's handshake flows a generous, deliberately
+   scenario-specific PDB (20s) — a scenario-authoring choice, not a
+   mechanism change; `sim/join.py`/`sim/driver.py` are unmodified.
+2. **M19's own "green" definition has a sharper blind spot than its
+   already-documented one.** `sim/buffer.py`'s `expire()` continuously
+   evicts a queue's head once it turns `pdb_ms` old — so a flow being
+   catastrophically PDB-violated (65% of `bytes_arrived` dropped, UE1's
+   own main flow in this demo) can still show `ts_hol_delay_s` never
+   exceeding `pdb_ms` at all, because the head is never allowed to age
+   past the point `expire()` removes it. M19 reported `0.0ms` recovery
+   time for a flow that was, by M02's own measure, catastrophically
+   unrecovered. Not fixed here (a distinct mechanism change — folding
+   PDB-violation RATE, not head-of-line age alone, into "green" — is its
+   own commit); recorded as a new `caveats:` entry on M19's panel row
+   instead, per that field's own stated purpose ("a limitation of the
+   simulator mechanism a metric is computed from").
+
+**Answering the pre-commit checklist explicitly:**
+
+1. *Confirm the demo's two variants sit on the right sides of commit 3's
+   boundary, stated in the demo itself.* **Confirmed, and stated as
+   module-level constants with an assertion, not just a comment:**
+   `GT63A_FADE_SLOTS = 6_000` (3.0s, `assert ... <
+   REESTABLISH_BOUNDARY_SLOTS`) and `GT63B_FADE_SLOTS = 20_000` (10.0s,
+   the test plan's own literal duration, `assert ... > 2 *
+   REESTABLISH_BOUNDARY_SLOTS - 500`) sit in the test file's own module
+   docstring and constants, not only in §6's flag. Confirmed by
+   execution, not just arithmetic: GT-6.3a's `timer_expiries == {}` (true
+   reestablishment, no expiry) and GT-6.3b's `timer_expiries ==
+   {"cell_search": 1}` (t311 expired, IDLE fallback) on every one of the
+   4 parametrized runs (2 schedulers × 2 variants).
+2. *README's G9 row must land qualified, not a bare flip to "Yes."*
+   **Confirmed word-for-word before landing**: "**Mechanism/metrics: yes.
+   Ratified verdict: no** — blocked on `T_live` (§8, still `[OPEN]`) and
+   the guarantee test plan's own provisional (▷-marked) thresholds;
+   GT-6.1/6.2's 50-cycle/10-cycle campaigns deferred to WP9" — matching
+   §0's own wording exactly, not a paraphrase drifted at the point of
+   editing the actual file. The surrounding prose (the paragraph
+   previously reading "G9 is the one guarantee this simulator currently
+   cannot address at all") is also updated, not left contradicting the
+   row above it — and, found while touching this section, README's own
+   phasing-table "Pending" status for WP-Join, the top-of-file "Phase 1
+   nearly complete" status line, and both standing `[OPEN]` sign-off
+   items (§6, §8) were all still stale after 7 landed commits; all four
+   resolved in this same edit rather than left for a future, unrelated
+   commit to notice.
+3. *Predict the drift: does the demo join the 22-record corpus?* **Stays
+   outside, for WP6 commit 4's own three reasons plus one WP-Join-
+   specific fourth — restated in the test file's own module docstring,
+   not only here.** (1) The corpus is one fixed run per (scenario,
+   scheduler); this demo's whole point is comparing the SAME base
+   scenario at multiple fade-duration settings. (2) The scenario is
+   deliberately extreme (2 UEs, a 30dB scripted fade, opt-in `JoinConfig`)
+   to make one mechanism legible, not a realistic workload to anchor
+   future comparisons. (3) Joining the corpus would add this scenario's
+   own join/RLF timing noise to every future WP's `--check` diff,
+   against the corpus's own attribution purpose. (4, new) M19 requires
+   `record_timeseries=True`, which the 22-record corpus deliberately
+   carries for none of its records at all — adding it here would change
+   what the corpus format has to support, for a demo that doesn't need
+   to live there. `regression_corpus.py --check` — clean, zero
+   mismatches, confirming no corpus scenario was touched.
+4. *M18/M19 against the actual run, not synthetic fixtures.* **Both
+   computed from real `RunRecord`s in every one of the 4 correctness
+   tests, no hand-built `JoinEventRecord` anywhere in this file.** M18
+   shows the reestablish path exactly as GT-6.3a/6.3b's own mechanics
+   produce it (`rf_restore_to_attached_p95_ms = 83ms` for the true-
+   reestablish arm; `None` — not a fabricated number — for the IDLE-
+   fallback arm, since there is no RF-restore instant to measure from
+   there at all). M19 lands `proxy` on both arms, as designed — and its
+   own real-number blind spot (finding 2 above) was found specifically
+   BECAUSE this demo, unlike commit 6's own warm-path check, exercises a
+   flow with real, heavy PDB violation.
+
+Ranked-prediction scoring (§4's own list, reconstructed and scored this
+commit — see the finding at the top of that section): 5 of 8 predictions
+confirmed as stated; 3 refined or partially missed (predictions 1's
+IDLE-fallback nuance, 4's PF-specific miss on "will be better", 6's M14-
+magnitude miss, 7's "exactly zero" framing correction) — recorded there,
+not smoothed into "mostly right."
+
 ---
 
 ## 5. `config/metric_panel.yml` additions
@@ -1580,27 +1798,104 @@ with the improvement's sign and magnitude reported.
 
 ## 7. Status
 
-**Commits 1–7 of 8 landed** (`sim/join.py` dormant FSM + delay sampler;
+**All 8 commits landed.** `sim/join.py` dormant FSM + delay sampler;
 `sim/rlf.py::step()` wired into `driver.py`'s slot loop, unconditional,
 diagnostic-only; deterministic scripted fade in `sim/channel.py`, with
-the GT-6.3a/6.3b boundary now pinned exactly at 10,010 slots/5.005s;
-M18/M19 + `RunRecord.join_events` schema, regression baseline
-re-captured with exactly the predicted 22-record structural diff and
-zero numeric drift; the radio-layer gate — `JoinAwareBufferView` composed
-over `HarqAwareBufferView`, HARQ-pool flush, RLF re-arm on reconnect,
-M18 `pending` → `ok` — verified end-to-end against a real scripted-fade
-run, two real bugs found and fixed in the process; the application-layer
-gate — traffic-admission suppression + a real UL/DL handshake `Message`
-pair, M19 `pending` → `proxy`, a UE now able to complete a full join
-event and cycle through a second one for real, zero regression-corpus
-drift this time; the per-UE scheduler context reset — the only WP-Join
-commit, and the only WP since WP0, to touch a scheduler file, because
-masking cannot reset an object's own private state the way it can hide
-backlog; `TwoTier.reset_ue` with a path-dependent mac/full scope,
-including a correction for reestablishment attempts that themselves
-fall back to a full re-attach; zero regression-corpus drift). Commit 8
-not yet started. Two scope questions that would otherwise be
-`[OPEN]` here were put to the user and are recorded resolved at D0a/D0b.
-Section 8 (end-of-WP judgment-calls review, per CLAUDE.md's standing step)
-will be added after commit 8 lands, following `docs/wp5-plan.md`/`docs/
-wp6-plan.md`'s own precedent.
+the GT-6.3a/6.3b boundary pinned exactly at 10,010 slots/5.005s; M18/M19
++ `RunRecord.join_events` schema; the radio-layer gate —
+`JoinAwareBufferView` composed over `HarqAwareBufferView`, HARQ-pool
+flush, RLF re-arm on reconnect, M18 `pending` → `ok`; the application-
+layer gate — traffic-admission suppression + a real UL/DL handshake
+`Message` pair, M19 `pending` → `proxy`; the per-UE scheduler context
+reset — the only WP-Join commit, and the only WP since WP0, to touch a
+scheduler file, `TwoTier.reset_ue` with a path-dependent mac/full scope;
+and the GT-6.3 acceptance-criterion demo, closing the WP. Every commit's
+`regression_corpus.py --check` outcome matched what was predicted before
+writing its code (clean, or the exact structural diff predicted for
+commits 4/5) — no commit in this WP produced an unpredicted corpus
+delta. Two scope questions that would otherwise be `[OPEN]` here were put
+to the user and are recorded resolved at D0a/D0b. `README.md` §5's G9
+row, §4's phasing table, and both standing `[OPEN]` sign-off items are
+updated to reflect the WP's completion (commit 8).
+
+## 8. End-of-WP judgment-calls review
+
+Per CLAUDE.md's standing step: reread the cumulative diff (`0778fde`
+through this commit, all 8 code commits plus the plan doc) looking for
+undocumented decisions or silent bugs, the same pass that caught WP3's
+M02 denominator bug, WP5's and WP6's own end-of-WP findings, and — within
+this WP — the several per-commit bugs each "Commit N — landed" section
+above already records. Two real findings, both fixed in this review, not
+deferred silently; several checked and confirmed as not findings.
+
+**Finding 1 (moderate): `sim/rlf.py`'s own module docstring still said
+"DORMANT: not wired into `sim/driver.py`..." — false since commit 2.**
+The module's actual code is correctly unmodified (still pure functions/
+dataclasses, no simulator imports — the "consume, don't extend" boundary
+held throughout this WP), but its own docstring had gone stale the
+moment commit 2 wired `step()` into the slot loop, and stayed that way
+through 6 more commits without anyone reading that specific file's own
+opening lines again. Fixed: the docstring now states plainly that it
+landed dormant *at that commit* and names WP-Join commit 2 as what wired
+it, without touching a single line of the module's actual logic.
+
+**Finding 2 (moderate): this document's own "Ranked falsifiable
+predictions" section did not exist until this commit, despite being
+cited by number (`Prediction 2`/`3`/`4`) from §0, §1.7, and §5 since the
+plan was first written.** A genuine planning-document gap, not a code
+bug — the numbered citations were added while drafting the original
+plan (echoing the two design agents' own ranked-prediction lists from
+the design phase) but the list itself was never transcribed into the
+committed file. Found only because commit 8's own end-of-WP review
+re-read the document as a whole rather than commit-by-commit. Fixed:
+the list is now written out in full (§4, before "Commit 1 — landed"),
+using the original design agents' 8 predictions, and scored against
+what commits 1–8 actually produced — 5 of 8 confirmed as stated, 3
+refined or partially missed, none silently marked "confirmed" without
+being checked against a real run.
+
+**Checked and NOT a finding: `harq_masked_flow_double_grant_count`
+being nonzero in commit 8's own baseline arm (877, `TwoTier`, no fade,
+no join event ever firing).** This could look like WP-Join's radio gate
+leaking a defect into an ordinary run. It doesn't — the counter is a
+pre-existing WP5-level diagnostic (its own docstring: "counted, not
+enforced," a defensive guard around occasional HARQ-mask/grant races
+unrelated to join/RLF), and it fires identically whether or not
+`UEConfig.join` is even set. What WP-Join's own `flush_ue` (commit 5)
+needed to show — no *increase* from the radio gate specifically — holds:
+724 (GT-6.3a) and 600 (GT-6.3b) both sit *below* the 877 baseline, since
+a masked UE is granted less often overall, not more.
+
+**Checked and NOT a finding: `TwoTier` losing real HARQ bytes
+(`bytes_harq_lost`, ~37,500-38,242) during the fade arms while `PF`
+shows a flat zero in the same runs.** Read as a possible WP-Join-
+introduced asymmetry between the two schedulers at first glance. It
+isn't one: both schedulers see the identical scripted fade and the
+identical, unconditional `rlf.step()` wiring (commit 2); the difference
+is entirely pre-existing scheduler behavior — `TwoTier`'s own urgency-
+driven ranking keeps attempting grants to a UE whose true SNR is already
+collapsing during the ~4,010-slot window before `n310`+`t310` even
+declares RLF, where `PF`'s achievable-rate-sensitive ranking backs off
+sooner. Nothing in this WP's own commits touches either scheduler's
+grant-eligibility ranking logic (`two_tier.py`'s only change, commit 7's
+`reset_ue`, is invoked strictly after reconnection, never during the
+outage itself). Recorded in §4's prediction 7 as a real, unanticipated,
+scheduler-differentiating finding — but not a WP-Join defect, and not
+fixed here.
+
+**Checked and NOT a finding: the M19 handshake/warm-path numbers (commit
+6) showing `0.0ms` recovery time, while commit 8's own demo shows the
+identical `0.0ms` value for a catastrophically-violated flow.** These
+look like the same bug reported twice. They are the same MECHANISM
+(M19's hol-delay-vs-continuous-expiry blind spot, §5's M19 `caveats:`
+entry, added this commit) surfacing in two different scenarios — commit
+6's warm-path demo happened not to exercise a flow with heavy PDB
+violation at all (the radio never drops for that path), so the blind
+spot was present but invisible there; commit 8's own reestablish demo is
+what first made it observable. One finding, recorded once, at the
+commit that actually surfaced it — not two.
+
+**Final state after both fixes**: `pytest sim/tests -q` — 401 passed,
+1 xfailed (unchanged from commit 8's own landing); `regression_corpus.py
+--check` — clean, zero mismatches (the docstring fix touches no code
+path `--check` can see; the predictions section is prose only).

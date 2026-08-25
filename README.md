@@ -1,7 +1,7 @@
 # feat/high-fidelity-sim — a realistic 5G QoS simulator, and the two-tier-vs-reservation regime map
 
-**Status:** Phase 1 nearly complete — WP0, WP1, WP3, WP4, WP7, WP5, and WP6
-landed (§4); only WP-Join remains before Phase 2 (both schedulers) begins.
+**Status:** Phase 1 complete — WP0, WP1, WP3, WP4, WP7, WP5, WP6, and
+WP-Join landed (§4); Phase 2 (both schedulers) begins next.
 This branch is a rebuild, not a patch — nothing in `scheduler/` or `sim/`
 from `main` is assumed correct or reused as-is.
 **Branch:** `feat/high-fidelity-sim`, forked from `main`.
@@ -116,7 +116,7 @@ WP7→WP5→WP6→WP8→WP9` given §2's rebuild decision.
 | 5 | WP7 | Factory traffic generators, correlated bursts, XR video model | `p5g-sim-plan.md` §9, extended per §6 below (UAV/MAVLink heterogeneous cadence, RTSP/TCP coupling) | Done — 9 commits (message-ledger plumbing; M01/M15 true latency; base factory generators + MAVLink multi-role `periodic_control`; M03; `xr_video` generator; `FrameLedger` + M05/M06; M17; M14; `cycle_clock`/`sync_group` + aggressor knobs); RTSP/TCP UL/DL coupling deliberately unbuilt (§8) |
 | 6 | WP5 | HARQ: N processes/UE/direction, k1/k2, RTT, per-attempt combining gain, max-retx residual loss | `p5g-sim-plan.md` §9; combining-gain formula reused from `feat/harq-bler-retx` (§3) | Done — 6 commits (0, 1, 2, 3, 4a, 4b, 6 — gap at 5 is the charter's own numbering); binary-delivery switch dominates pre/post-4a drift (§8); OLLA bug #1 landed dormant, bug #2 blocked on WP1 activation (§8) |
 | 7 | WP6 | Channel: TR 38.901 InF path loss + two-state Markov blockage | `p5g-sim-plan.md` §9, extended per §6 below (sync-loss threshold feeding WP-Join) | Done — 4 commits (InF path loss + LOS probability, two-state Markov blockage, sync-loss detection landed dormant per sign-off, blockage×HARQ acceptance-criterion demo); InF sub-scenario naming corrected against spec text (§8); mobility/correlated blockage deliberately deferred (§8) |
-| 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all | Pending |
+| 8 | **WP-Join** *(new)* | Join / re-join / RLF-recovery state machine | §6 below — not in `p5g-sim-plan.md` at all | Done — 8 commits (`docs/wp-join-plan.md`): dormant FSM + delay sampler, `sim/rlf.py` wiring (unconditional, diagnostic-only), a deterministic scripted fade (the GT-6.3a/6.3b boundary confirmed exactly at 10,010 slots/5.005s), the M18/M19 metric schema, the radio-layer gate, the application-layer gate with a real handshake `Message` pair, the per-UE scheduler context reset (the only WP-Join commit, and the only WP since WP0, to touch a scheduler file), and a GT-6.3 acceptance-criterion demo. G9's ratified verdict still blocked on `T_live`/provisional thresholds (§5); GT-6.1/6.2 cycle campaigns deferred to WP9 |
 
 ### Phase 2 — both schedulers, written fresh against verified OAI source
 
@@ -156,15 +156,24 @@ that the number is certifiable — certifiable numbers still require real RF.
 | G6 | BG traffic never impairs fleet | Non-GBR containment, per-class accounting | WP0 metric panel | Yes |
 | G7 | One misbehaving UE contained | MFBR clamp, per-flow accounting | Phase 2 (scheduler logic) | Yes |
 | G8 | Equal entitlement, continuously | Per-1s Jain (already flagged as new in `p5g-sim-plan.md` §7) | WP0 | Yes |
-| G9 | Fast join / re-join | **Join/RLF state machine — does not exist yet** | **WP-Join** | **No, until WP-Join lands** |
+| G9 | Fast join / re-join | Join/RLF state machine — landed (`sim/join.py`, `sim/rlf.py`, `docs/wp-join-plan.md`) | WP-Join | **Mechanism/metrics: yes. Ratified verdict: no** — blocked on `T_live` (§8, still `[OPEN]`) and the guarantee test plan's own provisional (▷-marked) thresholds; GT-6.1/6.2's 50-cycle/10-cycle campaigns deferred to WP9 |
 | G10 | Admissible fleet size | N-sweep (this is what simulation buys that hardware can't — `p5g-sim-plan.md` §2) | Phase 3 | Yes |
 | G11 | Holds for a shift, reproducibly | Long-run soak, communication service availability metric (new, §6) | WP0 metric panel, WP7 | Yes |
 | G12 | Ordered degradation under overload | First-violation-order metric (already in panel) | Phase 3 | Yes |
 
-**G9 is the one guarantee this simulator currently cannot address at all**,
-not just imprecisely — there is no concept anywhere in `sim/` of a UE
-joining, leaving, or losing sync mid-run. This is why WP-Join is a named
-work package rather than a line item under WP6 or WP7.
+**WP-Join landed the join/re-join/RLF-recovery mechanism this row now
+describes** (8 commits: dormant FSM + delay sampler, `sim/rlf.py` wiring,
+a scripted deterministic fade, the M18/M19 metric schema, the radio-layer
+gate, the application-layer gate with real handshake traffic, the per-UE
+scheduler context reset, and a GT-6.3 acceptance-criterion demo —
+`docs/wp-join-plan.md`). G9 is no longer unanswerable in principle: a
+real scripted-fade run produces real `rejoin_interruption_time` (M18) and
+`slo_recovery_time` (M19) numbers for the reestablish path, both
+comfortably inside the guarantee test plan's own (provisional) targets in
+the demo built for it. What is **not** yet delivered is a *ratified*
+verdict — `T_live` and the test plan's own ▷-marked thresholds are both
+still open (§8), and GT-6.1/6.2's own repeated-cycle campaigns are WP9's
+job, not this WP's.
 
 ---
 
@@ -194,18 +203,22 @@ guarantee-document review.
   blockage model discounts delivered bits continuously; real RLF is a
   discrete state transition (channel below a sync floor for long enough
   that the UE declares link failure) that feeds into WP-Join. Calibration
-  anchor: `contention.log`'s startup banner gives the actual OAI timer
-  constants — `t300 400, t301 400, t310 2000, n310 10, t311 3000, n311 1,
-  t319 400` (ms/counts) — real values from the deployed gNB config, not
-  invented ones.
-- **`[OPEN]`** WP-Join's attach/RACH/reestablishment timing should be a
+  anchor: `calibration-logs/twotier_startup_gnb.log:17`'s startup banner
+  gives the actual OAI timer constants — `t300 400, t301 400, t310 2000,
+  n310 10, t311 3000, n311 1, t319 400` (ms/counts) — real values from the
+  deployed gNB config, not invented ones. (Corrected citation, WP-Join
+  commit 8: this was previously misnamed `contention.log`, a phantom path
+  from an old layout diagram never actually committed — see
+  `calibration-logs/README.md`.)
+- **`[RESOLVED]`** WP-Join's attach/RACH/reestablishment timing is a
   **calibrated delay distribution keyed to the timers above**, not a
-  contention-based RACH simulation (preamble collision probability etc.).
-  Full RACH contention is PHY-layer fidelity the simulator's own
-  non-goals correctly exclude, and no G9/GT-6/T8 pass criterion needs it —
-  they need realistic *timing*, not realistic *contention resolution*.
-  This needs your sign-off before WP-Join is built, since it's a scope
-  boundary, not an implementation detail.
+  contention-based RACH simulation (preamble collision probability etc.) —
+  confirmed by sign-off before WP-Join commit 1 landed. Full RACH
+  contention is PHY-layer fidelity the simulator's own non-goals correctly
+  exclude, and no G9/GT-6/T8 pass criterion needs it — they need realistic
+  *timing*, not realistic *contention resolution*. Delays are drawn as
+  `floor + Exponential(mean_excess)`, with a draw beyond the cited ceiling
+  a real timer-expiry event (`sim/join.py`, `docs/wp-join-plan.md` D2/D3).
 
 **Metrics (extend WP0's panel):**
 - **Communication service availability** (TS 22.104): fraction of transfer
@@ -326,9 +339,9 @@ they survive it:
 
 ## 8. Open decisions
 
-- `[OPEN]` WP-Join's RACH/RLF depth: calibrated delay distribution
-  (recommended, §6) vs. contention-based simulation. **Needs confirmation
-  before WP-Join is built.**
+- `[RESOLVED]` WP-Join's RACH/RLF depth: calibrated delay distribution
+  (§6), confirmed before WP-Join commit 1 landed, not contention-based
+  simulation.
 - `[OPEN]` `T_live` (MEC liveness timeout) — assumed 2 s in the guarantee
   docs; both `p5g-sim-plan.md` and the guarantee test plan flag this as
   unconfirmed. Calibrates every G3/G9 pass line.

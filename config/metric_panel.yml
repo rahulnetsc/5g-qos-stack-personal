@@ -392,6 +392,20 @@ metrics:
       purpose, since bundling a refinement... into an unrelated commit's
       diff defeats the attribution the one-fidelity-change-per-commit
       rule exists for").
+    caveats:
+      - >
+        WP-Join commit 8's own GT-6.3 acceptance demo found a sharper,
+        concrete instance of the proxy gap above: sim/buffer.py's
+        expire() continuously evicts the head of a queue once it turns
+        pdb_ms old, so a flow being MASSIVELY PDB-violated (65% of bytes
+        dropped, in the demo's own reestablish arm) can still show
+        ts_hol_delay_s never exceeding pdb_ms at all -- the queue head is
+        never allowed to age past the point expire() removes it, so this
+        metric's "green" test reads the same as a flow with zero
+        violations. Not fixed here (a distinct mechanism change, out of
+        this commit's scope): a true fix needs the PDB-violation rate
+        itself (M02-style), not head-of-line age alone, folded into the
+        "green" definition.
 
 # Statistical policy (docs/p5g-sim-plan.md sec 7 / sec 5.3): the rule of
 # three. Demonstrating a miss rate <= eps at 95% confidence with zero
