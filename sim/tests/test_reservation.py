@@ -30,6 +30,17 @@ scheduler/reservation.py is still not added to scheduler/__init__.py's
 exports in this commit, so there is no code path by which anything
 reaches `Reservation` during a driver.run() call, or via `import
 scheduler`, regardless of scenario.
+
+Commit 4a (this commit) wires commit 3's guaranteed_bytes/be_bytes into
+grant sizing as the nr_find_nb_rb-equivalent target
+(gNB_scheduler_ulsch.c:2492-2512 / _dlsch.c:1003-1019), via the new pure
+functions `_ul_grant_target`/`_dl_grant_target`. Also lands
+`_ul_gbr_bytes_slot` (a MAX-not-sum, non-deduped, unfloored per-slot GBR
+rate, gNB_scheduler_ulsch.c:2304-2316) and its own separate MFBR-keyed
+gate `_ul_has_pending_gbr` (:38-67) -- a different field from
+`has_gbr`/`ul_has_unfulfilled_gbr`. 25th prediction in the lineage:
+still fully inert on `regression_corpus.py --check` (nothing imports
+this module).
 """
 
 import inspect
@@ -39,7 +50,7 @@ import pytest
 
 from scheduler.flow import FlowConfig
 from scheduler.interfaces import Allocation
-from scheduler.reservation import Reservation
+from scheduler.reservation import Reservation, _dl_grant_target, _ul_grant_target
 
 
 # -- lightweight, Protocol-conforming fakes (no sim/ dependency needed --
@@ -854,3 +865,239 @@ def test_no_eligible_flow_reports_the_c_s_own_9999_sentinel():
 
     _, remaining, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
     assert remaining == 9999
+
+
+# -- 4a. wire guaranteed_bytes/be_bytes into grant sizing -----------------
+
+
+def test_ul_target_above_backlog_grants_more_prbs_than_backlog_alone():
+    """D1: the target sizes PRBs, not delivered bytes. Uses a real GFBR
+    magnitude (obligation=500, max_burst=1000), not a token one --
+    at obligation=1/target=2 both target and backlog round to a single
+    PRB regardless of MCS, and the assertion would pass against an
+    unmodified backlog-only implementation too.
+
+    estimated_ul_buffer_per_lcg (the ungated per-LCG estimate the
+    deficit loop reads) is set HIGH and bytes_reported (the crumb-gated
+    view grant sizing otherwise uses) LOW, via explicit separate
+    _FakeBuffers overrides rather than both defaulting from the same
+    bytes_queued -- the real crumb-collapse scenario D1 exists for
+    (WP3/WP4), not an artificial coincidence of one field standing in
+    for the other."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(
+            ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+            gfbr_bps=8_000_000.0, pdb_ms=100.0,
+        )
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(
+        1, 1, bytes_queued=5000, bytes_reported=100,
+        estimated_ul_buffer_per_lcg=5000,
+    )
+
+    for _ in range(300):  # saturate the deficit at its window cap (100000)
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0  # post-grant state
+    # 401 slots since the grant (odd -> non-whole-ms age): remaining PDB
+    # floors to 0, rem_slots floors to 1, target caps at max_burst=1000
+    # -- deterministic regardless of estimated_ul_buffer_per_lcg's value
+    # (obligation/deficit/target/max_burst never read it; only the
+    # overflow->be_bytes step below does).
+    has_gbr, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=401)
+    assert guaranteed == 1000  # confirms the deficit actually reached the cap
+    assert be == 5000 - 1000  # overflow beyond the target, from the high estimate
+
+    backlog_bytes = buffers.state(1, 1).bytes_reported
+    assert backlog_bytes == 100
+
+    target = _ul_grant_target(
+        backlog_bytes=backlog_bytes, guaranteed_bytes=guaranteed, be_bytes=be,
+        has_gbr=has_gbr, gbr_bytes_slot=0, has_srb=False, srb_lcg0_estimate=0,
+    )
+    assert target == guaranteed + be  # the backlog floor is a no-op here
+
+    bits_per_rb = 240  # representative; the assertion below must hold at any value
+    prbs_needed_target = -(-(target * 8) // bits_per_rb)
+    prbs_needed_backlog = -(-(backlog_bytes * 8) // bits_per_rb)
+    assert prbs_needed_target > prbs_needed_backlog
+
+
+def test_target_below_backlog_leaves_sizing_unchanged():
+    """The B-floor branch (`if target < backlog: target = backlog`) is
+    structurally unreachable from _allocate_direction on any single-
+    flow-per-LCG scenario -- guaranteed_bytes/be_bytes derive from the
+    *ungated* estimated_ul_buffer_per_lcg, so per LCG
+    guaranteed+be == max(lcg_estimate, target) >= lcg_estimate, while
+    backlog_bytes sums the *gated* bytes_reported, and
+    bytes_reported <= estimated_ul_buffer_per_lcg by construction (WP3)
+    -- so guaranteed+be >= backlog_bytes already holds there (see
+    scheduler/reservation.py's module docstring). Tested directly
+    through the pure function with ints that deliberately violate that
+    invariant, not via a constructed scenario -- no such scenario exists
+    in this repo without the shared-LCG trick the next test uses for a
+    different branch.
+
+    has_gbr=True with gbr_bytes_slot=0 is deliberate: the gbr_bytes_slot
+    term must no-op because of its own `> 0` guard, not because has_gbr
+    happens to be False -- otherwise this would pass for the wrong
+    reason."""
+    ul_target = _ul_grant_target(
+        backlog_bytes=500, guaranteed_bytes=10, be_bytes=20,
+        has_gbr=True, gbr_bytes_slot=0, has_srb=False, srb_lcg0_estimate=0,
+    )
+    assert ul_target == 500  # backlog floor wins, not guaranteed+be=30
+
+    dl_target = _dl_grant_target(
+        backlog_bytes=500, guaranteed_bytes=10, be_bytes=20,
+        has_srb=False, srb1_srb2_bytes=0,
+    )
+    assert dl_target == 500 + 12  # DL floor is backlog + oh
+
+
+def test_ul_gbr_bytes_slot_raises_target_above_guaranteed_plus_be():
+    """gbr_bytes_slot can only ever exceed guaranteed+be via the shared-
+    LCG dedup asymmetry: _ul_gbr_and_pdb's deficit loop processes only
+    the first flow found per LCG (seen_lcgs), while _ul_gbr_bytes_slot's
+    loop is non-deduped. In any single-flow-per-LCG scenario,
+    target >= obligation >= gbr_bytes_slot always -- mathematically
+    unreachable any other way (module docstring).
+
+    Flow A (first, small GFBR) must carry the MFBR: _ul_has_pending_gbr
+    dedups per LCG too, so it only ever checks the first-found flow's
+    mfbr_bps -- putting MFBR on B instead would leave the gate
+    permanently closed regardless of B's GFBR."""
+    sched = Reservation()
+    flow_a = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000.0, mfbr_bps=1.0, pdb_ms=100.0, lcg=0,
+    )
+    flow_b = FlowConfig(
+        ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, mfbr_bps=0.0, pdb_ms=100.0, lcg=0,
+    )
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+    buffers.set(1, 2, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+
+    for _ in range(300):  # saturate A's deficit (the only flow the dedup sees)
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    has_gbr, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=401)
+    assert guaranteed + be == 50  # A alone, backlog-dominated; B invisible here
+
+    gbr_bytes_slot = sched._ul_gbr_bytes_slot(1, buffers)
+    assert gbr_bytes_slot == 500  # B's rate, unfloored -- A's own contributes 0
+
+    target = _ul_grant_target(
+        backlog_bytes=50, guaranteed_bytes=guaranteed, be_bytes=be,
+        has_gbr=has_gbr, gbr_bytes_slot=gbr_bytes_slot,
+        has_srb=False, srb_lcg0_estimate=0,
+    )
+    assert target == gbr_bytes_slot
+    assert target > guaranteed + be
+
+
+def test_ul_gbr_bytes_slot_is_zero_without_any_mfbr_configured():
+    """Guards the has_pending_gbr gate itself: without it, a future
+    refactor that only remembers the GFBR/dedup half of gbr_bytes_slot
+    could silently make it live on every scenario, since no scenario
+    configures mfbr_bps today (docs/oai-port-map.md row 23). Same
+    shared-LCG A/B construction as the previous test but neither flow
+    sets mfbr_bps."""
+    sched = Reservation()
+    flow_a = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000.0, mfbr_bps=0.0, pdb_ms=100.0, lcg=0,
+    )
+    flow_b = FlowConfig(
+        ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, mfbr_bps=0.0, pdb_ms=100.0, lcg=0,
+    )
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+    buffers.set(1, 2, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+
+    assert sched._ul_has_pending_gbr(1, buffers) is False
+    assert sched._ul_gbr_bytes_slot(1, buffers) == 0  # despite B's large GFBR
+
+
+def test_dl_grant_target_includes_fixed_overhead_ul_does_not():
+    """DL's oh=12 (3*4 + (ta_apply?2:0), no TA model) applies at both
+    branches -- the guaranteed+be path and the backlog-floor path -- and
+    UL has no equivalent term at all (gNB_scheduler_ulsch.c:2492-2512
+    has no `oh`)."""
+    ul_a = _ul_grant_target(
+        backlog_bytes=10, guaranteed_bytes=100, be_bytes=50,
+        has_gbr=True, gbr_bytes_slot=0, has_srb=False, srb_lcg0_estimate=0,
+    )
+    dl_a = _dl_grant_target(
+        backlog_bytes=10, guaranteed_bytes=100, be_bytes=50,
+        has_srb=False, srb1_srb2_bytes=0,
+    )
+    assert dl_a == ul_a + 12  # guaranteed+be path (150 vs 162)
+
+    ul_b = _ul_grant_target(
+        backlog_bytes=500, guaranteed_bytes=10, be_bytes=20,
+        has_gbr=True, gbr_bytes_slot=0, has_srb=False, srb_lcg0_estimate=0,
+    )
+    dl_b = _dl_grant_target(
+        backlog_bytes=500, guaranteed_bytes=10, be_bytes=20,
+        has_srb=False, srb1_srb2_bytes=0,
+    )
+    assert dl_b == ul_b + 12  # backlog-floor path (500 vs 512)
+
+
+def test_has_srb_cap_is_correct_but_structurally_unreachable():
+    """has_srb is hardcoded False in _allocate_direction (module
+    docstring) -- this path never executes today. Tested directly
+    through the pure functions with has_srb forced True to confirm the
+    cap logic itself is correct, same treatment
+    test_has_srb_cannot_be_exercised_and_is_recorded_as_such gives the
+    sort tier."""
+    ul_target = _ul_grant_target(
+        backlog_bytes=10, guaranteed_bytes=1000, be_bytes=500,
+        has_gbr=True, gbr_bytes_slot=0, has_srb=True, srb_lcg0_estimate=20,
+    )
+    assert ul_target == 20  # capped to max(1, srb_lcg0_estimate), below 1500
+
+    dl_target = _dl_grant_target(
+        backlog_bytes=10, guaranteed_bytes=1000, be_bytes=500,
+        has_srb=True, srb1_srb2_bytes=5,
+    )
+    assert dl_target == 5 + 12  # capped to srb1_srb2_bytes + oh
+
+
+def test_sub_one_byte_gbr_floors_to_one_in_deficit_loop_and_zero_in_gbr_bytes_slot():
+    """gfbr_bps small enough that gfbr_bps/8/slots_per_sec < 1: the
+    deficit loop's obligation floors to 1 (max(1,...),
+    gNB_scheduler_ulsch.c:2254), but gbr_bytes_slot has no such floor
+    and returns 0 for the same flow -- the bug-for-bug divergence
+    (:2304-2316)."""
+    sched = Reservation()
+    # 100 bytes/sec: (100/8)/2000 = 0.00625 -- well under 1 byte/slot.
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+        gfbr_bps=100.0, mfbr_bps=1.0, pdb_ms=100.0, lcg=0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+
+    has_gbr, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert has_gbr is True
+    assert guaranteed == 1  # obligation floored to 1
+
+    gbr_bytes_slot = sched._ul_gbr_bytes_slot(1, buffers)
+    assert gbr_bytes_slot == 0  # no floor -- confirms the bug-for-bug gap
+
+    target = _ul_grant_target(
+        backlog_bytes=50, guaranteed_bytes=guaranteed, be_bytes=be,
+        has_gbr=has_gbr, gbr_bytes_slot=gbr_bytes_slot,
+        has_srb=False, srb_lcg0_estimate=0,
+    )
+    assert target == guaranteed + be  # gbr_bytes_slot=0 correctly no-ops (>0 gate)

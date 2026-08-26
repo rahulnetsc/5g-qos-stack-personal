@@ -70,6 +70,61 @@ to whole milliseconds before subtracting it, which matters because
 ``pdb_ms`` feeds a comparator tier -- see the truncation note above the
 constants and ``docs/oai-port-map.md`` row 24.
 
+Commit 4a wires commit 3's ``guaranteed_bytes``/``be_bytes`` (previously
+computed and discarded) into grant *sizing* as the
+``nr_find_nb_rb``-equivalent target
+(``gNB_scheduler_ulsch.c:2492-2512``/``_dlsch.c:1003-1019``), replacing
+the prior backlog-only sizing (identical in mechanism to
+``sim/baselines/pf.py``'s own). Three decisions, made with the user
+before writing this commit:
+
+- The target sizes PRBs, not delivered bytes: ``prbs_needed =
+  ceil(target*8/bits_per_rb)``, but ``tbs_bytes`` stays
+  ``min(ue_backlog, capacity)`` -- the C grants PRBs for bytes not yet
+  in the buffer when a deficit-carrying GBR flow pushes the target
+  above real backlog; ported on the resource the scheduler controls,
+  without manufacturing delivered bytes. Visible effect is PRB
+  consumption (M11), not throughput.
+- DL's ``oh = 3*4 + (ta_apply ? 2 : 0)`` is a flat ``12`` here -- no TA
+  model exists (see the C's own "Fix me" comment: RLC doesn't report a
+  PDU count). UL has no equivalent overhead term -- a real asymmetry.
+- ``has_srb``'s control-only cap (``min(target, LCG0 estimate)`` UL,
+  ``min(target, SRB1+SRB2+oh)`` DL) is built structurally, cited, but
+  is a permanent no-op, since ``has_srb`` is hardcoded ``False`` -- the
+  same treatment commit 2 gave the ``has_srb`` sort tier.
+
+``gbr_bytes_slot`` (``:2304-2316``) is ported bug-for-bug: a MAX over
+LCGs (not a sum), and it lacks the ``if (_obl < 1) _obl = 1`` floor the
+deficit loop applies fifty-ish lines earlier in the same function
+(``:2254``). Its whole loop is additionally gated on
+``sched_ctrl->has_pending_gbr`` (``:2305``), set by a *separate*
+per-LCG-deduped scan, ``update_ul_qos_priority`` (``:38-67``), keyed on
+``c->gbr_ul_max > 0`` -- **MFBR**, not GFBR, and a different field from
+``has_gbr``/``ul_has_unfulfilled_gbr``. Because that gate's own scan
+dedups per LCG (breaks on the first matching LCID), whichever flow is
+first in a shared LCG is the one whose ``mfbr_bps`` decides whether the
+gate opens at all. Net effect: ``gbr_bytes_slot`` is inert on every
+scenario in this repo today for two independent reasons -- no scenario
+configures a nonzero ``mfbr_bps`` (row 23), and every scenario is
+single-flow-per-LCG, so the shared-LCG dedup-vs-non-dedup asymmetry
+that would let ``gbr_bytes_slot`` exceed ``guaranteed_bytes+be_bytes``
+never arises either (single-LCG: ``target >= obligation >=
+gbr_bytes_slot`` always, since ``gbr_bytes_slot`` is the same per-slot
+rate as ``obligation`` minus only the ``max(1,...)`` floor).
+
+A third unreachable branch, same category: ``if (ul_target < B)
+ul_target = B`` (the "B is a floor" line) never fires on any
+single-flow-per-LCG scenario either. ``guaranteed_bytes``/``be_bytes``
+derive from the *ungated* ``estimated_ul_buffer_per_lcg``, so per LCG
+``guaranteed+be == max(lcg_estimate, target) >= lcg_estimate``; ``B``
+sums the *gated* ``bytes_reported``, and ``bytes_reported <=
+estimated_ul_buffer_per_lcg`` by construction (WP3). So
+``guaranteed+be >= B`` already, before this line runs, on any UE where
+each LCG has exactly one flow. Reachable only in the shared-LCG case,
+where ``ue_backlog`` sums ``bytes_reported`` once per *flow*
+(double-counting a shared LCG's identical report) while the deficit
+loop counts that LCG's estimate once.
+
 Still explicitly deferred to later commits: the follower budget that caps
 a UE's grant to protect UEs ranked behind it (commit 4), the deficit
 *drain* bug-for-bug (commit 5), the real two-pass SRB/DRB DL LCP
@@ -135,6 +190,68 @@ _PDB_FALLBACK_MS = 300
 # wraps, so the modulo would be a no-op at best and would silently
 # convert a long idle gap into a small one at worst.
 
+# gNB_scheduler_dlsch.c's own comment, quoted directly: "Fix me: currently,
+# the RLC does not give us the total number of PDUs awaiting. Therefore,
+# for the time being, we put a fixed overhead of 12 (for 4 PDUs) and
+# optionally + 2 for TA." No TA model exists in this simulator (ta_apply
+# is always False here), so this is always the flat 12, never 14. UL's
+# grant-sizing target (gNB_scheduler_ulsch.c:2492-2512) has no equivalent
+# overhead term at all -- a real asymmetry, not an omission.
+_DL_LCP_FIXED_OVERHEAD_BYTES = 12
+
+
+def _ul_grant_target(
+    backlog_bytes: int,
+    guaranteed_bytes: int,
+    be_bytes: int,
+    has_gbr: bool,
+    gbr_bytes_slot: int,
+    has_srb: bool,
+    srb_lcg0_estimate: int,
+) -> int:
+    """UL's ``nr_find_nb_rb``-equivalent sizing target
+    (``gNB_scheduler_ulsch.c:2492-2512``). Pure function -- see the
+    module docstring's commit-4a section for the three ground-truth
+    decisions this encodes (target sizes PRBs not delivered bytes;
+    ``gbr_bytes_slot``'s MAX-not-sum; ``has_srb``'s permanent no-op) and
+    for why the ``backlog_bytes`` floor branch below is itself
+    structurally unreachable from ``_allocate_direction`` today.
+    """
+    target = guaranteed_bytes + be_bytes
+    if target < backlog_bytes:
+        target = backlog_bytes
+    if has_gbr and gbr_bytes_slot > 0 and target < gbr_bytes_slot:
+        target = gbr_bytes_slot
+    if has_srb:  # permanent no-op -- has_srb is hardcoded False
+        srb_target = max(1, srb_lcg0_estimate)
+        if srb_target < target:
+            target = srb_target
+    return target
+
+
+def _dl_grant_target(
+    backlog_bytes: int,
+    guaranteed_bytes: int,
+    be_bytes: int,
+    has_srb: bool,
+    srb1_srb2_bytes: int,
+) -> int:
+    """DL's ``nr_find_nb_rb``-equivalent sizing target
+    (``gNB_scheduler_dlsch.c:1003-1019``). ``backlog_bytes`` here is
+    ``num_total_bytes`` -- for DL, ``bytes_reported == bytes_queued``
+    always (``interfaces.py``), so the existing ``ue_backlog`` variable
+    already *is* this quantity; no new plumbing needed.
+    """
+    oh = _DL_LCP_FIXED_OVERHEAD_BYTES
+    target = guaranteed_bytes + be_bytes + oh
+    if target < backlog_bytes + oh:
+        target = backlog_bytes + oh
+    if has_srb:  # permanent no-op -- has_srb is hardcoded False
+        floor_target = srb1_srb2_bytes + oh
+        if floor_target < target:
+            target = floor_target
+    return target
+
 
 @dataclass
 class _UeState:
@@ -195,6 +312,13 @@ class _Candidate:
     # int ms, not float: the C's own type, and load-bearing -- see the
     # truncation note at the top of this module.
     pdb_ms: int = 9999
+    # Commit 4a: guaranteed_bytes/be_bytes were computed by commit 3 but
+    # discarded until now. gbr_bytes_slot/srb_lcg0_estimate are UL-only
+    # (0 on DL) -- see module docstring's commit-4a section.
+    guaranteed_bytes: int = 0
+    be_bytes: int = 0
+    gbr_bytes_slot: int = 0
+    srb_lcg0_estimate: int = 0
 
 
 class Reservation:
@@ -301,19 +425,29 @@ class Reservation:
             # a correction to commit 2, see docs/oai-port-map.md rows
             # 18/19 for the full note on why HOL delay was the wrong
             # proxy for this specific field).
+            # Commit 4a: guaranteed_bytes/be_bytes are now consumed (grant
+            # sizing, below), not discarded. gbr_bytes_slot/lcg0 estimate
+            # are UL-only quantities feeding the same sizing target.
             if direction == "UL":
-                has_gbr, pdb_ms, _guaranteed, _be = self._ul_gbr_and_pdb(
+                has_gbr, pdb_ms, guaranteed_bytes, be_bytes = self._ul_gbr_and_pdb(
                     ue_id, buffers, slot.slot_index
                 )
+                gbr_bytes_slot = self._ul_gbr_bytes_slot(ue_id, buffers)
+                srb_lcg0_estimate = self._ul_lcg0_estimate(ue_id, buffers)
             else:
-                has_gbr, pdb_ms, _guaranteed, _be = self._dl_gbr_and_pdb(
+                has_gbr, pdb_ms, guaranteed_bytes, be_bytes = self._dl_gbr_and_pdb(
                     ue_id, buffers, slot.slot_index
                 )
+                gbr_bytes_slot = 0
+                srb_lcg0_estimate = 0
 
             candidates.append(
                 _Candidate(
                     ue_id, flows, bits_per_rb, bler, snr, coef,
                     has_srb=has_srb, has_gbr=has_gbr, pdb_ms=pdb_ms,
+                    guaranteed_bytes=guaranteed_bytes, be_bytes=be_bytes,
+                    gbr_bytes_slot=gbr_bytes_slot,
+                    srb_lcg0_estimate=srb_lcg0_estimate,
                 )
             )
 
@@ -338,7 +472,21 @@ class Reservation:
             )
             if ue_backlog <= 0:
                 continue
-            prbs_needed = -(-(ue_backlog * 8) // c.bits_per_rb)  # ceil div
+            # Commit 4a: size PRBs off the guaranteed+be target, not
+            # backlog alone (gNB_scheduler_ulsch.c:2492-2512 /
+            # _dlsch.c:1003-1019) -- D1: this sizes the PRB *resource*,
+            # not delivered bytes; tbs_bytes below stays backlog-capped.
+            if direction == "UL":
+                target = _ul_grant_target(
+                    ue_backlog, c.guaranteed_bytes, c.be_bytes, c.has_gbr,
+                    c.gbr_bytes_slot, c.has_srb, c.srb_lcg0_estimate,
+                )
+            else:
+                target = _dl_grant_target(
+                    ue_backlog, c.guaranteed_bytes, c.be_bytes,
+                    c.has_srb, srb1_srb2_bytes=0,
+                )
+            prbs_needed = -(-(target * 8) // c.bits_per_rb)  # ceil div
             # No follower budget yet (commit 4) -- unbounded by anything
             # but this slot's own remaining PRBs.
             prbs_used = min(prbs_left, max(1, prbs_needed))
@@ -468,6 +616,68 @@ class Reservation:
                 be_bytes += overflow
 
         return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes
+
+    def _ul_has_pending_gbr(self, ue_id: int, buffers: BufferView) -> bool:
+        """The gate on ``_ul_gbr_bytes_slot``'s whole loop
+        (``gNB_scheduler_ulsch.c:2305``), itself set by
+        ``update_ul_qos_priority`` (``:38-67``). A *separate* per-LCG
+        first-match dedup from ``_ul_gbr_and_pdb``'s ``seen_lcgs`` --
+        same shape, different loop, different field -- gated on
+        ``mfbr_bps > 0`` (``c->gbr_ul_max``), **not** ``gfbr_bps``. No
+        current scenario configures a nonzero ``mfbr_bps``
+        (``docs/oai-port-map.md`` row 23), so this is always ``False``
+        today -- confirmed by its own test, not assumed.
+        """
+        seen_lcgs: set[int] = set()
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            seen_lcgs.add(f.lcg)
+            if f.mfbr_bps > 0:
+                return True
+        return False
+
+    def _ul_gbr_bytes_slot(self, ue_id: int, buffers: BufferView) -> int:
+        """``gNB_scheduler_ulsch.c:2304-2316``. Structurally separate
+        from ``_ul_gbr_and_pdb``'s per-LCG deficit loop: gated on
+        ``_ul_has_pending_gbr`` (above), then iterates *every*
+        qualifying UL flow with **no** ``seen_lcgs`` dedup (unlike the
+        deficit loop's first-flow-wins-a-shared-LCG break) and takes
+        the running **MAX**, not a sum. The per-slot rate itself also
+        omits the deficit loop's ``max(1, ...)`` floor (``:2254``) --
+        both divergences are bug-for-bug, confirmed by reading the
+        exact ranges directly, not incidental simplifications.
+        """
+        if not self._ul_has_pending_gbr(ue_id, buffers):
+            return 0
+        slots_per_sec = 1.0 / self.slot_duration_s
+        gbr_bytes_slot = 0
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL":
+                continue
+            if f.flow_class != "GBR" or f.gfbr_bps <= 0:
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            # :2313 -- NOT floored at 1, unlike the deficit loop's `_obl`.
+            floor = int((f.gfbr_bps / 8.0) / slots_per_sec)
+            if floor > gbr_bytes_slot:
+                gbr_bytes_slot = floor
+        return gbr_bytes_slot
+
+    def _ul_lcg0_estimate(self, ue_id: int, buffers: BufferView) -> int:
+        """``gNB_scheduler_ulsch.c:2504``: the ``has_srb`` control-only
+        cap reads LCG0's raw per-LCG estimate. Permanently unreachable
+        in this simulator -- ``has_srb`` is hardcoded ``False`` (module
+        docstring) -- built for structural/citation completeness only,
+        the same treatment the ``has_srb`` sort tier already gets.
+        """
+        for f in self._flows:
+            if f.ue_id == ue_id and f.direction == "UL" and f.lcg == 0:
+                return buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
+        return 0
 
     def _dl_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
