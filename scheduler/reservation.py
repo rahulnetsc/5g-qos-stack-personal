@@ -38,15 +38,37 @@ silently approximated:
   scheduler, not a sort-tier-commit-sized change -- its own future
   commit if ever taken up.
 
-So this commit's actual behavioral effect is narrower than "5/4 tiers"
-suggests: only the (coarse, commit-3/5-pending-real-substance) GBR flag
-sits ahead of the coefficient tiebreak in practice today.
+Commit 3 (this commit) replaces the coarse GBR proxy with the real thing:
+per-LCG (UL) / per-flow (DL) deficit accumulate/cap/target-spread/
+overflow-to-BE, verified element-for-element against
+``gNB_scheduler_ulsch.c:2251-2278`` / ``gNB_scheduler_dlsch.c:377-409``.
+``has_gbr`` now means "this UE has an active unfulfilled deficit," not
+"has a GBR flow with any backlog." This does NOT move either
+comparator's tier position -- ``_ul_rank_key``/``_dl_rank_key`` are
+untouched by this commit; only the *content* feeding their GBR slot
+changed. Also fixes a real bug found scoping this commit: commit 2's
+``pdb_ms`` used HOL delay as a stand-in for "remaining PDB," but ground
+truth's ``ul_best_remaining_pdb_ms``/``dl_best_remaining_pdb_ms`` is
+time-since-last-grant, a different quantity -- see
+``docs/oai-port-map.md`` rows 18/19 for the full correction note.
+
+What commit 3 deliberately does NOT do: wire ``guaranteed_bytes``/
+``be_bytes`` into grant *sizing* (ground truth's own ``ul_target``/
+``dl_target``, ``gNB_scheduler_ulsch.c:2496``/``_dlsch.c:1009``) -- grant
+sizing stays backlog-based, same as every other scheduler in this repo,
+pending a future commit (see ``docs/phase2-plan.md``'s reservation
+checklist). Nor does it build the UL-only "silence detection" deficit
+reset (``gNB_scheduler_ulsch.c:2286-2296``) or the post-grant deficit
+*drain* (the already-known bug-for-bug full-``tb_size``-credit
+mechanism, commit 5) -- last-grant-slot *stamping* lands here (needed to
+fix the ``pdb_ms`` bug above), but *decrementing* the deficit on a grant
+is a different field, cleanly separable, and stays commit 5's job.
 
 Still explicitly deferred to later commits: the follower budget that caps
-a UE's grant to protect UEs ranked behind it (commit 4), the GBR/
-best-effort deficit split and its UL bug-for-bug drain (commit 3/5), the
-real two-pass SRB/DRB DL LCP (commit 6, replacing ``_dl_fill``'s
-placeholder below), and MCS selection via OLLA (commit 8/9).
+a UE's grant to protect UEs ranked behind it (commit 4), the deficit
+*drain* bug-for-bug (commit 5), the real two-pass SRB/DRB DL LCP
+(commit 6, replacing ``_dl_fill``'s placeholder below), and MCS
+selection via OLLA (commit 8/9).
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -92,10 +114,37 @@ class _UeState:
     callback, so (matching every existing scheduler's identical
     constraint) this is updated at grant time from an *expected*-delivery
     estimate (``tbs_bytes * (1 - bler)``), not a later confirmed outcome.
+
+    Commit 3: GBR deficit + last-grant-slot tracking, keyed by LCG on UL
+    (matching ground truth's own per-LCG granularity) and by qfi on DL
+    (matching ground truth's own per-LCID granularity) -- see
+    docs/phase2-plan.md sec2.2's DL/UL granularity asymmetry. Last-grant-
+    slot stamping feeds the "remaining PDB" computation (the commit-2
+    pdb_ms fix); deficit *draining* on a grant is commit 5's job, a
+    different field the C happens to update in the same code block.
     """
 
     dl_thr_bytes_per_slot: float = 0.0
     ul_thr_bytes_per_slot: float = 0.0
+    ul_lcg_deficit_bytes: dict[int, int] = field(default_factory=dict)
+    ul_lcg_last_grant_slot: dict[int, int] = field(default_factory=dict)
+    dl_flow_deficit_bytes: dict[int, int] = field(default_factory=dict)
+    dl_flow_last_grant_slot: dict[int, int] = field(default_factory=dict)
+
+
+# Deficit accumulation gating differs between directions -- a real
+# asymmetry, not shared code. UL's outer per-LCG loop
+# (gNB_scheduler_ulsch.c:2230) gates the WHOLE block -- obligation,
+# deficit accumulate/cap, and target -- on
+# estimated_ul_buffer_per_lcg > 0: a UL LCG's deficit FREEZES the moment
+# its per-LCG estimate reads 0. DL's block (gNB_scheduler_dlsch.c:377-410)
+# accumulates the deficit and updates has_unfulfilled_gbr UNCONDITIONALLY
+# for every GBR-configured LCID (:381-388) -- only the target/overflow
+# sub-step is gated on `bytes_in_buffer > 0` (:391). So a DL GBR flow's
+# deficit keeps growing through silence; a UL one does not. Verified by
+# reading both exact ranges directly, not assumed from the charter's
+# "identical formula" summary (true for the arithmetic; false for when
+# it runs).
 
 
 @dataclass
@@ -162,7 +211,6 @@ class Reservation:
         direction: str,
     ) -> list[Allocation]:
         symbols = slot.ul_symbols if direction == "UL" else slot.dl_symbols
-        now_s = slot.slot_index * self.slot_duration_s
 
         ue_flows: dict[int, list[FlowConfig]] = {}
         for f in self._flows:
@@ -210,31 +258,23 @@ class Reservation:
             # a documented permanent no-op.
             has_srb = False
 
-            # has_gbr: coarse placeholder -- "any GBR-class flow has
-            # reported backlog", not the C's real unfulfilled-deficit
-            # tracking (gNB_scheduler_ulsch.c:2336 / _dlsch.c:838, set
-            # inside the per-LCG/per-LC deficit loop commit 3/5 builds).
-            # Replacing this with the real computation is commit 3/5's
-            # job; this tier's POSITION in the sort doesn't move.
-            has_gbr = any(
-                f.flow_class == "GBR"
-                and buffers.state(f.ue_id, f.qfi).bytes_reported > 0
-                for f in flows
-            )
-
-            # pdb_ms: remaining PDB, minimum across this UE's backlogged
-            # flows in this direction -- fully real, no gap
-            # (gNB_scheduler_ulsch.c's ul_best_remaining_pdb_ms /
-            # gNB_scheduler_dlsch.c's dl_best_remaining_pdb_ms, "most
-            # urgent active" framing).
-            pdb_ms = min(
-                (
-                    f.pdb_ms - buffers.hol_delay_s(f.ue_id, f.qfi, now_s) * 1000.0
-                    for f in flows
-                    if buffers.state(f.ue_id, f.qfi).bytes_reported > 0
-                ),
-                default=float("inf"),
-            )
+            # has_gbr / pdb_ms: real GBR deficit accumulate/cap/target-
+            # spread/overflow-to-BE (gNB_scheduler_ulsch.c:2251-2278 /
+            # _dlsch.c:377-409), replacing commit 2's coarse "any GBR
+            # flow has backlog" placeholder -- has_gbr now means "has an
+            # active unfulfilled deficit." pdb_ms is now the C's actual
+            # "remaining PDB" (time since last grant, not HOL delay --
+            # a correction to commit 2, see docs/oai-port-map.md rows
+            # 18/19 for the full note on why HOL delay was the wrong
+            # proxy for this specific field).
+            if direction == "UL":
+                has_gbr, pdb_ms, _guaranteed, _be = self._ul_gbr_and_pdb(
+                    ue_id, buffers, slot.slot_index
+                )
+            else:
+                has_gbr, pdb_ms, _guaranteed, _be = self._dl_gbr_and_pdb(
+                    ue_id, buffers, slot.slot_index
+                )
 
             candidates.append(
                 _Candidate(
@@ -278,8 +318,16 @@ class Reservation:
             state = self._ue_state[c.ue_id]
             if direction == "UL":
                 state.ul_thr_bytes_per_slot += _THR_EWMA_ALPHA * expected_bytes
+                # Last-grant-slot stamping (commit 3, fixes commit 2's
+                # pdb_ms proxy) -- NOT the deficit *drain*/decrement,
+                # which is a different field and stays commit 5's job
+                # (gNB_scheduler_ulsch.c:2761-ish, post_process_ulsch).
+                for f in c.flows:
+                    state.ul_lcg_last_grant_slot[f.lcg] = slot.slot_index
             else:
                 state.dl_thr_bytes_per_slot += _THR_EWMA_ALPHA * expected_bytes
+                for f in c.flows:
+                    state.dl_flow_last_grant_slot[f.qfi] = slot.slot_index
 
             out.extend(
                 self._emit_grant(
@@ -288,6 +336,152 @@ class Reservation:
                 )
             )
         return out
+
+    def _ul_gbr_and_pdb(
+        self, ue_id: int, buffers: BufferView, slot_index: int,
+    ) -> tuple[bool, float, int, int]:
+        """UL GBR deficit accumulate/cap/target-spread/overflow-to-BE
+        (gNB_scheduler_ulsch.c:2229-2284), plus the remaining-PDB
+        computation the same per-LCG loop drives (:2239-2249). Returns
+        ``(has_gbr, remaining_pdb_ms, guaranteed_bytes, be_bytes)`` --
+        the last two are real (fidelity-checkable), but NOT yet consumed
+        by grant sizing (see module docstring / docs/phase2-plan.md).
+
+        Gated per-LCG on ``estimated_ul_buffer_per_lcg > 0`` (:2230) --
+        NOT on ``bytes_reported`` (the crumb-collapsed view eligibility
+        elsewhere uses) -- matching the C exactly: a UL LCG's deficit
+        freezes the moment its per-LCG estimate reads 0, whether or not
+        the UE itself is a candidate this slot. Iterates ``self._flows``
+        directly (every one of this UE's UL flows), not the pre-filtered
+        eligible subset passed into the candidate loop, so a
+        currently-crumb-collapsed LCG still gets evaluated here.
+
+        Per-LCG, first-flow-found wins a shared LCG (matching the C's
+        own ``lc_config`` linear-scan-then-``break``, :2232-2234,2282) --
+        dormant/unexercised today, the same H5 scenario gap
+        ``README.md`` sec8 already names for BSR aliasing.
+        """
+        state = self._ue_state[ue_id]
+        slots_per_sec = 1.0 / self.slot_duration_s
+
+        seen_lcgs: set[int] = set()
+        has_gbr = False
+        best_remaining_pdb = float("inf")
+        guaranteed_bytes = 0
+        be_bytes = 0
+
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+                continue
+            lcg_estimate = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
+            if lcg_estimate <= 0:
+                continue
+            seen_lcgs.add(f.lcg)
+
+            last_grant = state.ul_lcg_last_grant_slot.get(f.lcg)
+            if last_grant is None:
+                remaining_pdb = f.pdb_ms
+            else:
+                slots_since = slot_index - last_grant
+                remaining_pdb = max(
+                    0.0, f.pdb_ms - slots_since * self.slot_duration_s * 1000.0
+                )
+            best_remaining_pdb = min(best_remaining_pdb, remaining_pdb)
+
+            if f.flow_class != "GBR" or f.gfbr_bps <= 0:
+                be_bytes += lcg_estimate  # non-GBR LCG: entire buffer is BE
+                continue
+
+            obligation = max(1, int((f.gfbr_bps / 8.0) / slots_per_sec))
+            deficit = state.ul_lcg_deficit_bytes.get(f.lcg, 0) + obligation
+            window = obligation * (f.pdb_ms * slots_per_sec / 1000.0)
+            deficit = min(deficit, window)
+            state.ul_lcg_deficit_bytes[f.lcg] = deficit
+            if deficit > 0:
+                has_gbr = True
+
+            rem_slots = max(1.0, remaining_pdb * slots_per_sec / 1000.0)
+            target = max(obligation, (deficit + obligation) / rem_slots)
+            max_burst = obligation * 2
+            if f.mfbr_bps > 0:
+                max_burst = max(max_burst, int((f.mfbr_bps / 8.0) / slots_per_sec) * 2)
+            target = min(target, max_burst)
+
+            guaranteed_bytes += int(target)
+            overflow = lcg_estimate - target
+            if overflow > 0:
+                be_bytes += int(overflow)
+
+        return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes
+
+    def _dl_gbr_and_pdb(
+        self, ue_id: int, buffers: BufferView, slot_index: int,
+    ) -> tuple[bool, float, int, int]:
+        """DL GBR deficit accumulate/cap/target-spread/overflow-to-BE
+        (gNB_scheduler_dlsch.c:377-409), plus remaining-PDB (:358-367).
+        Returns ``(has_gbr, remaining_pdb_ms, guaranteed_bytes,
+        be_bytes)`` -- same not-yet-sizing-consumed caveat as UL's.
+
+        Deficit accumulation and ``has_unfulfilled_gbr`` are UNCONDITIONAL
+        for every GBR-configured flow (:381-388) -- unlike UL, this does
+        NOT gate on current buffer occupancy, so a DL GBR flow's deficit
+        keeps growing through silence. Only the target/overflow sub-step
+        gates on ``bytes_queued > 0`` (:391). A real asymmetry, verified
+        by reading both exact ranges directly -- see this module's
+        top-of-file note.
+        """
+        state = self._ue_state[ue_id]
+        slots_per_sec = 1.0 / self.slot_duration_s
+
+        has_gbr = False
+        best_remaining_pdb = float("inf")
+        guaranteed_bytes = 0
+        be_bytes = 0
+
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "DL":
+                continue
+            bytes_queued = buffers.state(f.ue_id, f.qfi).bytes_queued
+
+            last_grant = state.dl_flow_last_grant_slot.get(f.qfi)
+            if last_grant is None:
+                remaining_pdb = f.pdb_ms
+            else:
+                slots_since = slot_index - last_grant
+                remaining_pdb = max(
+                    0.0, f.pdb_ms - slots_since * self.slot_duration_s * 1000.0
+                )
+            if bytes_queued > 0:
+                best_remaining_pdb = min(best_remaining_pdb, remaining_pdb)
+
+            if f.flow_class != "GBR" or f.gfbr_bps <= 0:
+                be_bytes += bytes_queued  # non-GBR: entire buffer is BE
+                continue
+
+            obligation = max(1, int((f.gfbr_bps / 8.0) / slots_per_sec))
+            deficit = state.dl_flow_deficit_bytes.get(f.qfi, 0) + obligation
+            window = obligation * (f.pdb_ms * slots_per_sec / 1000.0)
+            deficit = min(deficit, window)
+            state.dl_flow_deficit_bytes[f.qfi] = deficit
+            if deficit > 0:
+                has_gbr = True
+
+            if bytes_queued <= 0:
+                continue  # accumulation is unconditional; target is not
+
+            rem_slots = max(1.0, remaining_pdb * slots_per_sec / 1000.0)
+            target = max(obligation, (deficit + obligation) / rem_slots)
+            max_burst = obligation * 2
+            if f.mfbr_bps > 0:
+                max_burst = max(max_burst, int((f.mfbr_bps / 8.0) / slots_per_sec) * 2)
+            target = min(target, max_burst)
+
+            guaranteed_bytes += int(target)
+            overflow = bytes_queued - target
+            if overflow > 0:
+                be_bytes += int(overflow)
+
+        return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes
 
     def _rank_key(self, candidate: _Candidate, direction: str) -> tuple:
         """Dispatch to the direction's own comparator. UL and DL are

@@ -806,6 +806,29 @@ these five, add a new tag rather than forcing it into an existing one.
   Recommendation: leave unbuilt — no current guarantee/hypothesis in
   this repo depends on SRB-tier differentiation, and real SRB traffic
   modeling is a materially larger undertaking than this WP's scope.
+- `[OPEN: PHASE2]` **Reservation's UL-only "silence detection" deficit
+  reset (`gNB_scheduler_ulsch.c:2286-2296`) is not built — found in the
+  same source range as commit 3's GBR/BE split, not one of that
+  commit's four named elements.** If a UE goes silent (`B==0`) while
+  carrying a pending GBR obligation for longer than its best pending
+  PDB, every one of its LCGs' deficit resets to 0 — a starvation-guard
+  against a permanently-inflated deficit from an app that stopped
+  sending. No DL equivalent appears in `gNB_scheduler_dlsch.c` (plausible:
+  it's gated on `B`, a UL-only BSR-collapse concept — DL's own deficit
+  accumulates unconditionally regardless of buffer state, so it has no
+  analogous runaway-deficit risk from silence in the first place; see
+  the has_gbr/pdb port-map rows for that asymmetry). **Not built**:
+  land the four named elements first (done, commit 3); revisit this as
+  its own commit if a scenario's deficit behavior during a long UL
+  silence turns out to matter.
+- `[OPEN: PHASE2]` **Reservation's grant-sizing target
+  (`ul_target`/`dl_target = guaranteed_bytes + be_bytes`,
+  `gNB_scheduler_ulsch.c:2496`/`_dlsch.c:1009`) is computed by commit 3
+  but not yet consumed — grant sizing stays backlog-based.** Tracked as
+  `docs/phase2-plan.md`'s reservation checklist item 4a (alongside
+  commit 4's follower budget, which also needs a demand estimate), not
+  left as a bare flag here — see that document for the actual
+  commit-sequencing decision.
 - `[RESOLVED]` **WP6: correlated multi-UE blockage and AGV mobility are
   deliberately not built — closed by the WP6 plan, `docs/wp6-plan.md`
   Decision 7 (scoped in commit `7648475`, before any WP6 code landed,
@@ -947,8 +970,8 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage:
-**17 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
-UL-access-chain dominance cluster counted once; 4 `[OPEN: PHASE2]`; 2
+**19 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
+UL-access-chain dominance cluster counted once; 6 `[OPEN: PHASE2]`; 2
 `[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/
 DECISION]`) plus whatever new items Phase 2/3 add using the same
 open-ended tag vocabulary (§8 preamble). "Closed" means flipped to

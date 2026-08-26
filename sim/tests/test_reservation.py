@@ -1,4 +1,4 @@
-"""Phase 2, reservation commits 1-2: scheduler/reservation.py.
+"""Phase 2, reservation commits 1-3: scheduler/reservation.py.
 
 Commit 1: Scheduler protocol conformance, per-UE throughput EWMA, the
 bare PF coefficient as the only ranking criterion, no follower budget
@@ -10,11 +10,20 @@ simulator can actually source (GBR, coarse; PDB, real). `has_srb` and
 new [OPEN: PHASE2] entries) -- see scheduler/reservation.py's module
 docstring for the full explanation of why.
 
+Commit 3: the real GBR/BE byte split -- deficit accumulate/cap/target-
+spread/overflow-to-BE, both directions, replacing commit 2's coarse
+`has_gbr` proxy without moving either comparator's tier position. Also
+fixes a bug found scoping this commit: commit 2's `pdb_ms` used HOL
+delay as a stand-in for "remaining PDB," which is actually time-since-
+last-grant -- a different quantity. See scheduler/reservation.py's
+module docstring and docs/oai-port-map.md rows 18/19 for the full
+correction note.
+
 See docs/phase2-plan.md sec4 and docs/oai-port-map.md's "Phase 2 --
 reservation" section for the full mechanism/citation detail.
 
 Predicted, before writing any code: fully clean `regression_corpus.py
---check` -- the 22nd such prediction in the WP5/WP6/WP-Join/Phase-2
+--check` -- the 23rd such prediction in the WP5/WP6/WP-Join/Phase-2
 lineage, and the strongest form of it (not just "no scenario references
 the new field," but "nothing imports this module at all"):
 scheduler/reservation.py is still not added to scheduler/__init__.py's
@@ -59,10 +68,22 @@ class _FakeBuffers:
     def __init__(self) -> None:
         self._states: dict[tuple[int, int], _FakeBufferState] = {}
 
-    def set(self, ue_id: int, qfi: int, bytes_queued: int, bytes_reported: int | None = None) -> None:
+    def set(
+        self,
+        ue_id: int,
+        qfi: int,
+        bytes_queued: int,
+        bytes_reported: int | None = None,
+        estimated_ul_buffer_per_lcg: int | None = None,
+    ) -> None:
         self._states[(ue_id, qfi)] = _FakeBufferState(
             bytes_queued=bytes_queued,
             bytes_reported=bytes_queued if bytes_reported is None else bytes_reported,
+            estimated_ul_buffer_per_lcg=(
+                bytes_queued
+                if estimated_ul_buffer_per_lcg is None
+                else estimated_ul_buffer_per_lcg
+            ),
         )
 
     def state(self, ue_id: int, qfi: int) -> _FakeBufferState:
@@ -461,3 +482,213 @@ def test_ul_and_dl_rank_keys_stay_independently_sourced_not_deduped():
         "DL genuinely has no sched_inactive tier -- its CODE (not "
         "explanatory prose) must never grow a branch for one"
     )
+
+
+# -- commit 3: GBR/BE byte split + deficit accumulate/cap/spread --------
+# gNB_scheduler_ulsch.c:2251-2278 / gNB_scheduler_dlsch.c:377-409.
+# slot_duration_s=0.0005 throughout -> slots_per_sec=2000, slot_ms=0.5.
+
+
+def test_ul_obligation_floors_at_one_byte():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    has_gbr, _, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 1  # floored, not 0 (or negative)
+    assert has_gbr is True
+
+
+def test_ul_deficit_caps_at_one_pdb_window():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    # obligation=1 (floored); window = 1 * (100ms / 0.5ms) = 200.
+    for _ in range(300):
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 200
+
+
+def test_ul_target_capped_at_2x_obligation_floor_without_mfbr():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    for _ in range(300):  # saturate deficit at the window (200)
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    # 199 slots since the grant -> 0.5ms remaining PDB -> rem_slots=1 ->
+    # uncapped target would be (200+1)/1=201, but no mfbr_bps is set, so
+    # max_burst floors at obligation*2=2.
+    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=199)
+    assert guaranteed == 2
+
+
+def test_ul_target_can_exceed_the_floor_when_mfbr_is_configured():
+    sched = Reservation()
+    flows = [
+        FlowConfig(
+            ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+            gfbr_bps=1.0, mfbr_bps=2_000_000.0, pdb_ms=100.0,
+        )
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    for _ in range(300):
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    # max_burst from mfbr_bps=2_000_000: (2_000_000/8)/2000 * 2 = 250 --
+    # well above the uncapped target (201), so it must NOT clip here,
+    # unlike the no-mfbr case above where the same setup clipped to 2.
+    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=199)
+    assert guaranteed == 201
+
+
+def test_ul_overflow_beyond_target_credited_to_be():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    # LCG estimate (6000) far exceeds any obligation/target this slot.
+    buffers.set(1, 1, bytes_queued=6000)
+
+    _, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert guaranteed == 1  # obligation floor, first slot
+    assert be == 6000 - 1
+
+
+def test_ul_has_gbr_requires_a_real_gfbr_not_just_the_flow_class_label():
+    """Commit 2's coarse placeholder checked only flow_class=='GBR'.
+    The real mechanism additionally requires gbr_ul_guaranteed > 0
+    (gNB_scheduler_ulsch.c:2251) -- a GBR-labelled flow with no
+    configured GFBR accrues no obligation and must not set has_gbr."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=0.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    has_gbr, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert has_gbr is False
+    assert guaranteed == 0
+    assert be == 6000  # entire buffer falls through to best-effort
+
+
+def test_ul_deficit_freezes_when_the_per_lcg_estimate_is_zero():
+    """Gated on estimated_ul_buffer_per_lcg, not bytes_reported -- a
+    crumb-collapsed LCG's deficit must not accumulate, matching
+    gNB_scheduler_ulsch.c:2230's own continue-gate."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=0, estimated_ul_buffer_per_lcg=0)
+
+    for _ in range(5):
+        has_gbr, _, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert 0 not in sched._ue_state[1].ul_lcg_deficit_bytes
+    assert has_gbr is False
+
+
+def test_ul_pdb_ms_uses_time_since_last_grant_not_hol_delay():
+    """The commit-2 correction: remaining PDB is time-since-last-grant
+    (gNB_scheduler_ulsch.c:2239-2249), not HOL delay -- the fake's
+    hol_delay_s stays 0 throughout, so only the corrected proxy can
+    show this shrinking."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    _, pdb_never_granted, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert pdb_never_granted == pytest.approx(100.0)
+
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    _, pdb_after_40_slots, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=40)
+    assert pdb_after_40_slots == pytest.approx(80.0)  # 40*0.5ms=20ms elapsed
+
+
+def test_dl_deficit_accumulates_through_silence_unlike_ul():
+    """The real DL/UL asymmetry found scoping this commit:
+    gNB_scheduler_dlsch.c:381-388 accumulates deficit and sets
+    has_unfulfilled_gbr UNCONDITIONALLY for a GBR-configured LCID --
+    only the target sub-step gates on bytes_in_buffer>0 (:391). UL's
+    outer loop gates the WHOLE block on estimated_ul_buffer_per_lcg>0
+    (see test_ul_deficit_freezes_when_the_per_lcg_estimate_is_zero,
+    its direct contrast)."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=0)  # empty buffer -- "silence"
+
+    has_gbr = False
+    for _ in range(5):
+        has_gbr, _, _, _ = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    assert sched._ue_state[1].dl_flow_deficit_bytes[1] == 5  # kept growing
+    assert has_gbr is True  # even though the buffer is empty throughout
+
+
+def test_dl_target_not_computed_while_buffer_is_empty():
+    """The other half of the same asymmetry: accumulation is
+    unconditional, but guaranteed/be bookkeeping still requires
+    bytes_queued>0 (gNB_scheduler_dlsch.c:391)."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=0)
+
+    _, _, guaranteed, be = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    assert guaranteed == 0
+    assert be == 0
+
+
+def test_dl_has_gbr_requires_a_real_gfbr_not_just_the_flow_class_label():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=0.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    has_gbr, _, guaranteed, be = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    assert has_gbr is False
+    assert guaranteed == 0
+    assert be == 6000
+
+
+def test_dl_pdb_ms_uses_time_since_last_grant_not_hol_delay():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    _, pdb_never_granted, _, _ = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    assert pdb_never_granted == pytest.approx(100.0)
+
+    sched._ue_state[1].dl_flow_last_grant_slot[1] = 0
+    _, pdb_after_40_slots, _, _ = sched._dl_gbr_and_pdb(1, buffers, slot_index=40)
+    assert pdb_after_40_slots == pytest.approx(80.0)
+
+
+def test_dl_overflow_beyond_target_credited_to_be():
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+
+    _, _, guaranteed, be = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    assert guaranteed == 1
+    assert be == 6000 - 1

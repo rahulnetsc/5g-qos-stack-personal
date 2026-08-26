@@ -77,6 +77,14 @@ class FlowConfig:
     flow_class: Literal["PF", "GBR", "Delay"] = "PF"
     pdb_ms: float = 100.0
     gfbr_bps: float = 0.0
+    # Maximum flow bit rate (MFBR), 3GPP QoS-profile convention: the
+    # reservation scheduler's GBR-deficit target-spread caps at 2x a
+    # per-slot burst derived from this (gNB_scheduler_{ul,dl}sch.c's
+    # gbr_{ul,dl}_max, Phase 2 commit 3). 0 = "not configured" -- the
+    # cap then falls back to its own floor (2x the per-slot obligation
+    # derived from gfbr_bps), matching the C's behaviour when a QoS
+    # profile has no MFBR set, not an invented default.
+    mfbr_bps: float = 0.0
     # Scheduling priority, 3GPP 5QI convention: lower value = higher priority.
     # Used to tier SPS reservations and the MAC logical-channel multiplexer.
     # Default is a single neutral level; set per-flow once the workload is
