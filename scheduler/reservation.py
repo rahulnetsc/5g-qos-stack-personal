@@ -64,6 +64,12 @@ mechanism, commit 5) -- last-grant-slot *stamping* lands here (needed to
 fix the ``pdb_ms`` bug above), but *decrementing* the deficit on a grant
 is a different field, cleanly separable, and stays commit 5's job.
 
+Commit 3a corrects commit 3's arithmetic *type* (not its quantities):
+the C computes this whole block in integers and truncates the grant age
+to whole milliseconds before subtracting it, which matters because
+``pdb_ms`` feeds a comparator tier -- see the truncation note above the
+constants and ``docs/oai-port-map.md`` row 24.
+
 Still explicitly deferred to later commits: the follower budget that caps
 a UE's grant to protect UEs ranked behind it (commit 4), the deficit
 *drain* bug-for-bug (commit 5), the real two-pass SRB/DRB DL LCP
@@ -102,6 +108,32 @@ _PF_COEF_HYPOTHETICAL_SYMBOLS = 10
 # gNB_scheduler_ulsch.c:2083-2087, gNB_scheduler_dlsch.c:750-752:
 # thr_ue = (1-a)*thr_ue + a*current_bytes, a=0.01, units bytes (not bits).
 _THR_EWMA_ALPHA = 0.01
+
+# gNB_scheduler_ulsch.c:2236, gNB_scheduler_dlsch.c:353: an unconfigured
+# or zero PDB in the QoS profile falls back to 300 ms, not to 0. Both
+# directions use the identical literal. Unreachable from any current
+# scenario (`FlowConfig.pdb_ms` defaults to 100.0 and sim/config_loader.py
+# :84 defaults the same), but ported because the guard is one line and its
+# absence would silently produce remaining_pdb=0 -- the maximum-urgency
+# value -- for exactly the case the C treats as least urgent.
+_PDB_FALLBACK_MS = 300
+
+# The C computes every deficit quantity in integer arithmetic, and
+# truncates the grant age to whole milliseconds before subtracting it
+# (`_rem_pdb = _pdb - (int)_age`, gNB_scheduler_ulsch.c:2245;
+# `remaining_pdb = pdb - (int)age_ms`, gNB_scheduler_dlsch.c:365). This
+# is not incidental: `pdb_ms` feeds a comparator TIER, so int-millisecond
+# granularity makes two UEs within the same millisecond TIE at that tier
+# and fall through to the PF coefficient. A float port resolves them at
+# the PDB tier instead -- a different grant order, on the corpus's own
+# numerology (1, 0.5 ms slots), whenever the slot count since a grant is
+# odd. Ported as written; see docs/oai-port-map.md row 24.
+#
+# NOT ported: the C's SFN-wrap modulo on the slot difference
+# (`(now - last + 1024*spf) % (1024*spf)`, :2243-2244 / :361-363). This
+# simulator's `slot_index` is monotonic for the whole run and never
+# wraps, so the modulo would be a no-op at best and would silently
+# convert a long idle gap into a small one at worst.
 
 
 @dataclass
@@ -160,7 +192,9 @@ class _Candidate:
     # pending commit 3/5's real deficit tracking; pdb_ms is fully real.
     has_srb: bool = False
     has_gbr: bool = False
-    pdb_ms: float = float("inf")
+    # int ms, not float: the C's own type, and load-bearing -- see the
+    # truncation note at the top of this module.
+    pdb_ms: int = 9999
 
 
 class Reservation:
@@ -339,7 +373,7 @@ class Reservation:
 
     def _ul_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
-    ) -> tuple[bool, float, int, int]:
+    ) -> tuple[bool, int, int, int]:
         """UL GBR deficit accumulate/cap/target-spread/overflow-to-BE
         (gNB_scheduler_ulsch.c:2229-2284), plus the remaining-PDB
         computation the same per-LCG loop drives (:2239-2249). Returns
@@ -363,10 +397,14 @@ class Reservation:
         """
         state = self._ue_state[ue_id]
         slots_per_sec = 1.0 / self.slot_duration_s
+        slot_ms = self.slot_duration_s * 1000.0
 
         seen_lcgs: set[int] = set()
         has_gbr = False
-        best_remaining_pdb = float("inf")
+        # gNB_scheduler_ulsch.c:2223 seeds this at 9999, not at an
+        # infinity -- ordering-equivalent for any real PDB, ported as the
+        # literal so the "no eligible LCG" value is the C's own.
+        best_remaining_pdb = 9999
         guaranteed_bytes = 0
         be_bytes = 0
 
@@ -378,45 +416,62 @@ class Reservation:
                 continue
             seen_lcgs.add(f.lcg)
 
+            # :2236 -- int ms, with the 300 ms fallback for an
+            # unconfigured PDB.
+            pdb_ms = int(f.pdb_ms) if f.pdb_ms > 0 else _PDB_FALLBACK_MS
+
             last_grant = state.ul_lcg_last_grant_slot.get(f.lcg)
             if last_grant is None:
-                remaining_pdb = f.pdb_ms
+                remaining_pdb = pdb_ms
             else:
-                slots_since = slot_index - last_grant
-                remaining_pdb = max(
-                    0.0, f.pdb_ms - slots_since * self.slot_duration_s * 1000.0
-                )
+                # :2243-2245 -- age truncated to whole ms BEFORE the
+                # subtraction, clamped at 0.
+                age_ms = (slot_index - last_grant) * slot_ms
+                remaining_pdb = max(0, pdb_ms - int(age_ms))
             best_remaining_pdb = min(best_remaining_pdb, remaining_pdb)
 
             if f.flow_class != "GBR" or f.gfbr_bps <= 0:
                 be_bytes += lcg_estimate  # non-GBR LCG: entire buffer is BE
                 continue
 
+            # :2253-2270 -- integer arithmetic throughout, matching the C's
+            # own int locals and int `ul_lcg_deficit_bytes[]` array.
             obligation = max(1, int((f.gfbr_bps / 8.0) / slots_per_sec))
             deficit = state.ul_lcg_deficit_bytes.get(f.lcg, 0) + obligation
-            window = obligation * (f.pdb_ms * slots_per_sec / 1000.0)
+            # :2257 -- the RATIO is truncated, then multiplied (not the
+            # product). Dormant at every real numerology, where an integer
+            # pdb_ms over a 0.5/0.25 ms slot always divides evenly.
+            window = obligation * int(pdb_ms / slot_ms)
             deficit = min(deficit, window)
             state.ul_lcg_deficit_bytes[f.lcg] = deficit
             if deficit > 0:
                 has_gbr = True
 
-            rem_slots = max(1.0, remaining_pdb * slots_per_sec / 1000.0)
-            target = max(obligation, (deficit + obligation) / rem_slots)
-            max_burst = obligation * 2
-            if f.mfbr_bps > 0:
-                max_burst = max(max_burst, int((f.mfbr_bps / 8.0) / slots_per_sec) * 2)
-            target = min(target, max_burst)
+            rem_slots = int(remaining_pdb / slot_ms)
+            if rem_slots < 1:
+                rem_slots = 1
+            target = (deficit + obligation) // rem_slots
+            if target < obligation:
+                target = obligation
+            # :2268 -- computed unconditionally; an unset MFBR yields 0,
+            # which the floor below then raises to 2x obligation. The C has
+            # no "is MFBR configured" branch and neither does this.
+            max_burst = int((f.mfbr_bps / 8.0) / slots_per_sec) * 2
+            if max_burst < obligation * 2:
+                max_burst = obligation * 2
+            if target > max_burst:
+                target = max_burst
 
-            guaranteed_bytes += int(target)
+            guaranteed_bytes += target
             overflow = lcg_estimate - target
             if overflow > 0:
-                be_bytes += int(overflow)
+                be_bytes += overflow
 
         return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes
 
     def _dl_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
-    ) -> tuple[bool, float, int, int]:
+    ) -> tuple[bool, int, int, int]:
         """DL GBR deficit accumulate/cap/target-spread/overflow-to-BE
         (gNB_scheduler_dlsch.c:377-409), plus remaining-PDB (:358-367).
         Returns ``(has_gbr, remaining_pdb_ms, guaranteed_bytes,
@@ -432,9 +487,11 @@ class Reservation:
         """
         state = self._ue_state[ue_id]
         slots_per_sec = 1.0 / self.slot_duration_s
+        slot_ms = self.slot_duration_s * 1000.0
 
         has_gbr = False
-        best_remaining_pdb = float("inf")
+        # gNB_scheduler_dlsch.c:330 -- 9999, same as UL's own seed.
+        best_remaining_pdb = 9999
         guaranteed_bytes = 0
         be_bytes = 0
 
@@ -443,14 +500,16 @@ class Reservation:
                 continue
             bytes_queued = buffers.state(f.ue_id, f.qfi).bytes_queued
 
+            # :353 -- int ms, 300 ms fallback, identical to UL's.
+            pdb_ms = int(f.pdb_ms) if f.pdb_ms > 0 else _PDB_FALLBACK_MS
+
             last_grant = state.dl_flow_last_grant_slot.get(f.qfi)
             if last_grant is None:
-                remaining_pdb = f.pdb_ms
+                remaining_pdb = pdb_ms
             else:
-                slots_since = slot_index - last_grant
-                remaining_pdb = max(
-                    0.0, f.pdb_ms - slots_since * self.slot_duration_s * 1000.0
-                )
+                # :363-366 -- same whole-ms age truncation as UL's.
+                age_ms = (slot_index - last_grant) * slot_ms
+                remaining_pdb = max(0, pdb_ms - int(age_ms))
             if bytes_queued > 0:
                 best_remaining_pdb = min(best_remaining_pdb, remaining_pdb)
 
@@ -458,9 +517,12 @@ class Reservation:
                 be_bytes += bytes_queued  # non-GBR: entire buffer is BE
                 continue
 
+            # :379-399 -- integer throughout, and truncating at exactly the
+            # same four sites as UL's block (verified line by line: the
+            # window truncates the ratio, not the product, on both sides).
             obligation = max(1, int((f.gfbr_bps / 8.0) / slots_per_sec))
             deficit = state.dl_flow_deficit_bytes.get(f.qfi, 0) + obligation
-            window = obligation * (f.pdb_ms * slots_per_sec / 1000.0)
+            window = obligation * int(pdb_ms / slot_ms)
             deficit = min(deficit, window)
             state.dl_flow_deficit_bytes[f.qfi] = deficit
             if deficit > 0:
@@ -469,17 +531,22 @@ class Reservation:
             if bytes_queued <= 0:
                 continue  # accumulation is unconditional; target is not
 
-            rem_slots = max(1.0, remaining_pdb * slots_per_sec / 1000.0)
-            target = max(obligation, (deficit + obligation) / rem_slots)
-            max_burst = obligation * 2
-            if f.mfbr_bps > 0:
-                max_burst = max(max_burst, int((f.mfbr_bps / 8.0) / slots_per_sec) * 2)
-            target = min(target, max_burst)
+            rem_slots = int(remaining_pdb / slot_ms)
+            if rem_slots < 1:
+                rem_slots = 1
+            target = (deficit + obligation) // rem_slots
+            if target < obligation:
+                target = obligation
+            max_burst = int((f.mfbr_bps / 8.0) / slots_per_sec) * 2
+            if max_burst < obligation * 2:
+                max_burst = obligation * 2
+            if target > max_burst:
+                target = max_burst
 
-            guaranteed_bytes += int(target)
+            guaranteed_bytes += target
             overflow = bytes_queued - target
             if overflow > 0:
-                be_bytes += int(overflow)
+                be_bytes += overflow
 
         return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes
 

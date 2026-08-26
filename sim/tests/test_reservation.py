@@ -524,10 +524,17 @@ def test_ul_target_capped_at_2x_obligation_floor_without_mfbr():
     for _ in range(300):  # saturate deficit at the window (200)
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
     sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
-    # 199 slots since the grant -> 0.5ms remaining PDB -> rem_slots=1 ->
-    # uncapped target would be (200+1)/1=201, but no mfbr_bps is set, so
-    # max_burst floors at obligation*2=2.
-    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=199)
+    # 200 slots since the grant -> age 100ms -> remaining PDB 0 ->
+    # rem_slots floors to 1 -> uncapped target would be (200+1)/1=201, but
+    # no mfbr_bps is set, so max_burst floors at obligation*2=2.
+    #
+    # This was slot 199 before the integer-arithmetic correction, chosen
+    # for a 0.5ms remaining PDB. Under the C's actual truncation a 199-slot
+    # age is 99.5ms -> int() -> 99ms -> 1ms remaining -> rem_slots=2, which
+    # no longer exercises the rem_slots<1 floor this pair is about. The cap
+    # clipped to 2 either way here, so only the companion test below caught
+    # it -- see that test's own note.
+    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=200)
     assert guaranteed == 2
 
 
@@ -549,7 +556,14 @@ def test_ul_target_can_exceed_the_floor_when_mfbr_is_configured():
     # max_burst from mfbr_bps=2_000_000: (2_000_000/8)/2000 * 2 = 250 --
     # well above the uncapped target (201), so it must NOT clip here,
     # unlike the no-mfbr case above where the same setup clipped to 2.
-    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=199)
+    #
+    # Slot 200, not 199: this is the one existing expectation the
+    # integer-arithmetic correction actually moved. At slot 199 the age is
+    # 99.5ms, which the C truncates to 99ms -> 1ms remaining ->
+    # rem_slots=2 -> target (200+1)//2 = 100, not 201. The float port
+    # divided by 1.0 and got 201. Kept as a deliberate record that the
+    # correction is behaviourally real rather than cosmetic.
+    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=200)
     assert guaranteed == 201
 
 
@@ -692,3 +706,151 @@ def test_dl_overflow_beyond_target_credited_to_be():
     _, _, guaranteed, be = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
     assert guaranteed == 1
     assert be == 6000 - 1
+
+
+# -- commit 3a: the C's integer arithmetic -------------------------------
+#
+# Every fixture above lands on a whole number of milliseconds, where the
+# float port and the C's truncating one agree exactly -- the same blind
+# spot that let commit 2's pdb_ms bug through (correct tests of a quantity
+# that happened to coincide at the sampled points). These use ODD slot
+# counts at 0.5 ms, where they do not.
+
+
+def test_ul_remaining_pdb_truncates_grant_age_to_whole_milliseconds():
+    """gNB_scheduler_ulsch.c:2245 -- `_rem_pdb = _pdb - (int)_age`. Three
+    slots at 0.5ms is an age of 1.5ms, which the C sees as 1ms, giving 99
+    remaining and NOT 98.5. Load-bearing because pdb_ms is a comparator
+    tier: int-ms granularity makes sub-millisecond differences tie there
+    and fall through to the PF coefficient."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+
+    _, remaining, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=3)
+    assert remaining == 99
+    assert isinstance(remaining, int)
+
+
+def test_dl_remaining_pdb_truncates_grant_age_to_whole_milliseconds():
+    """gNB_scheduler_dlsch.c:365 -- identical truncation to UL's."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    sched._ue_state[1].dl_flow_last_grant_slot[1] = 0
+
+    _, remaining, _, _ = sched._dl_gbr_and_pdb(1, buffers, slot_index=3)
+    assert remaining == 99
+    assert isinstance(remaining, int)
+
+
+def test_two_flows_inside_one_millisecond_tie_at_the_pdb_tier():
+    """The behavioural consequence, stated as its own test rather than
+    left implicit in the arithmetic: two UEs granted one slot apart (0.5ms)
+    can have EQUAL remaining PDB under the C's int-ms truncation, so the
+    PDB tier cannot separate them and the coefficient decides. Here the
+    ages are 4.0ms and 4.5ms, which both truncate to 4. A float port would
+    read 96.0 and 95.5, separate them at the PDB tier, and never reach the
+    coefficient."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0),
+        FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 11  # 9 slots -> 4.5ms
+    sched._ue_state[2].ul_lcg_last_grant_slot[0] = 12  # 8 slots -> 4.0ms
+
+    _, pdb_ue1, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=20)
+    _, pdb_ue2, _, _ = sched._ul_gbr_and_pdb(2, buffers, slot_index=20)
+    assert pdb_ue1 == pdb_ue2 == 96
+
+
+def test_rem_slots_truncation_shrinks_the_target():
+    """gNB_scheduler_ulsch.c:2263 -- `_rem_slots = (int)(_rem_pdb/_sms_ul)`,
+    truncated, then an INTEGER division of the deficit by it. At 1ms
+    remaining and 0.5ms slots that is 2 slots, so a saturated 200-byte
+    deficit spreads to (200+1)//2 = 100, not 201."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(
+            ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+            gfbr_bps=1.0, mfbr_bps=2_000_000.0, pdb_ms=100.0,
+        )
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    for _ in range(300):
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+
+    _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=199)
+    assert guaranteed == 100
+
+
+def test_window_truncates_the_ratio_not_the_product():
+    """gNB_scheduler_ulsch.c:2257 / _dlsch.c:383 -- `_obl * (int)(_pdb/slot_ms)`.
+    Unreachable at any real numerology (an integer pdb_ms over a 0.5 or
+    0.25 ms slot always divides evenly), so this uses a synthetic 0.3 ms
+    slot to exercise the ported truncation directly: 100/0.3 = 333.33 ->
+    333 slots, and an obligation of 2 (60000bps/8 = 7500 B/s over 3333.33
+    slots/s = 2.25, itself truncated) gives a 666-byte window, not
+    666.67 and not 667."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(
+            ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+            gfbr_bps=60_000.0, pdb_ms=100.0,
+        )
+    ]
+    sched.configure(flows, slot_duration_s=0.0003, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=999_999)
+
+    for _ in range(1000):
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 666
+
+
+def test_unconfigured_pdb_falls_back_to_300ms_not_zero():
+    """gNB_scheduler_ulsch.c:2236 / _dlsch.c:353 -- `pdb > 0 ? pdb : 300`.
+    Unreachable from any current scenario (FlowConfig and the config
+    loader both default to 100.0), but a missing guard would report 0 --
+    maximum urgency -- for exactly the case the C treats as least
+    urgent."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=0.0),
+        FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="PF", pdb_ms=0.0),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 2, bytes_queued=6000)
+
+    _, ul_pdb, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    _, dl_pdb, _, _ = sched._dl_gbr_and_pdb(2, buffers, slot_index=0)
+    assert ul_pdb == 300
+    assert dl_pdb == 300
+
+
+def test_no_eligible_flow_reports_the_c_s_own_9999_sentinel():
+    """gNB_scheduler_ulsch.c:2223 / _dlsch.c:330 seed the best-remaining
+    field at 9999, not at an infinity. Ordering-equivalent for any real
+    PDB, ported as the literal so the sentinel is the C's own."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()  # nothing queued -> no eligible LCG
+
+    _, remaining, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert remaining == 9999
