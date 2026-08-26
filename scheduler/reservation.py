@@ -125,11 +125,70 @@ where ``ue_backlog`` sums ``bytes_reported`` once per *flow*
 (double-counting a shared LCG's identical report) while the deficit
 loop counts that LCG's estimate once.
 
-Still explicitly deferred to later commits: the follower budget that caps
-a UE's grant to protect UEs ranked behind it (commit 4), the deficit
-*drain* bug-for-bug (commit 5), the real two-pass SRB/DRB DL LCP
-(commit 6, replacing ``_dl_fill``'s placeholder below), and MCS
-selection via OLLA (commit 8/9).
+Commit 4 lands the follower budget: a per-UE cap on granted PRBs so a
+saturating BE UE cannot zero a starved UE ranked behind it
+(``gNB_scheduler_ulsch.c:2414-2437``/``_dlsch.c:909-926``). Two
+findings from reading the exact source, not captured by
+``docs/phase2-plan.md``'s summary:
+
+- **UL and DL's budget bases are different KINDS of quantity, not just
+  a different ``min_rb`` source.** UL's base (``bi.bwpSize``, :2416) is
+  a per-UE STATIC width, unaffected by what earlier-ranked candidates
+  already consumed this slot (occupancy is tracked separately via a
+  ``rballoc_mask`` bitmap this simulator doesn't have). DL's base
+  (``max_rbSize``, :915-919) is a contiguous-free-RB SCAN from
+  ``rbStart`` -- it DOES shrink as earlier grants land in the same
+  slot. This simulator has no RB bitmap, just a decrementing
+  ``prbs_left`` counter, so the faithful mapping is UL base ->
+  ``slot.prb_count`` (the slot's fixed total pool), DL base ->
+  ``prbs_left`` (the actual remaining pool AT THAT CANDIDATE'S TURN in
+  the grant loop, not hoisted or captured once for the whole slot --
+  using a fixed value for DL would silently collapse this asymmetry
+  into UL's semantics).
+- **``needs_service`` is structurally always-``True`` in this port
+  today, both directions.** ``_allocate_direction``'s candidate list is
+  pre-filtered to ``bytes_reported > 0`` before a ``_Candidate`` is
+  ever built, so the backlog term dominates unconditionally, making
+  ``or has_srb``/``or has_gbr``/``or ta_apply`` currently unreachable
+  -- the same root cause as the existing ``do_sched``/liveness no-op (a
+  B=0-but-``do_sched``-True candidate, which the C's own gate admits,
+  never reaches our candidate list at all). Ported as the full formula
+  anyway (a real ``_Candidate.needs_service`` field), not hardcoded
+  ``True`` -- matching how ``has_srb``/``sched_inactive``/``ta_apply``
+  are already ported as full-but-inert expressions elsewhere in this
+  file. ``sched_inactive`` itself has no stored field anywhere in this
+  module (confirmed absent from ``_ul_rank_key``'s actual tuple, not
+  merely unused), so UL's ``max_rbSize`` init reduces in code to
+  ``has_srb ? min_rb : bwp_size``.
+
+DL's per-beam pre-check (``:877``, ``remainUEs``/``n_rb_sched``) is
+**not applicable** -- no beam modeling exists anywhere in
+``scheduler/``/``sim/`` (confirmed by grep). A different category from
+"dormant but ported": there is no signal here to port at all.
+
+``min_rb`` (UL's ``nrmac->min_grant_prb``) defaults to 5 --
+**a deliberate operator/experimenter choice for the calibration
+campaign** (set so no UE is starved of a grant and BSRs keep being
+reported), not a physical constant and not a coincidence with the
+config-parser's own ``defintval=5`` (``MACRLC_nr_paramdef.h:141`` in
+the full OAI checkout, not the vendored subset -- the vendored four
+``.c`` files have no assignment site for this at all). Corroborated
+empirically by 486/486 ``NPRB 5`` lines in
+``calibration-logs/twotier_startup_gnb.log``, whose own ``CMDLINE``
+cites the exact deployed conf (``ci-scripts/conf_files/
+gnb.sa.band78.106prb.rfsim.conf`` in that checkout) with no override
+present. That log is a two-tier run; applying the value to reservation
+is an inference (both branches read the same MACRLC-layer field), not
+a direct observation -- would be falsified by a reservation-specific
+config override not present in this checkout. DL's own ``min_rbSize=5``
+(``:850``) is a SEPARATE constant, numerically identical but not the
+same kind of quantity (source-fixed literal vs. operator choice) --
+never unified into one shared constant.
+
+Still explicitly deferred to later commits: the deficit *drain*
+bug-for-bug (commit 5), the real two-pass SRB/DRB DL LCP (commit 6,
+replacing ``_dl_fill``'s placeholder below), and MCS selection via
+OLLA (commit 8/9).
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -198,6 +257,73 @@ _PDB_FALLBACK_MS = 300
 # grant-sizing target (gNB_scheduler_ulsch.c:2492-2512) has no equivalent
 # overhead term at all -- a real asymmetry, not an omission.
 _DL_LCP_FIXED_OVERHEAD_BYTES = 12
+
+# gNB_scheduler_dlsch.c:850 -- DL's follower-budget floor is a bare C
+# literal, self-supplying (no config, no decision needed). Kept as its
+# own constant, never unified with `Reservation.min_rb` (UL's own
+# follower-budget floor, a configure() parameter defaulting to the same
+# number 5) -- the two are not the same KIND of quantity even though
+# they currently coincide numerically. See module docstring's commit-4
+# section for min_rb's full provenance.
+_DL_FOLLOWER_MIN_RB_SIZE = 5
+
+
+def _ul_follower_budget(
+    bwp_size: int, n_followers_need: int, min_rb: int, has_srb: bool,
+) -> int:
+    """UL's per-UE PRB cap (gNB_scheduler_ulsch.c:2414-2437). `bwp_size`
+    is a per-UE STATIC width in the C (unaffected by same-slot grants to
+    earlier-ranked candidates) -- callers must pass `slot.prb_count`,
+    never a running `prbs_left`, or this collapses into DL's semantics
+    (module docstring). `sched_inactive` has no stored field anywhere in
+    this module (always False, no-op) -- omitted from the `has_srb`
+    check below rather than passed as a separate always-False parameter.
+    """
+    max_rb_size = min_rb if has_srb else bwp_size
+    budget = bwp_size - n_followers_need * min_rb
+    if budget < min_rb:
+        budget = min_rb
+    if max_rb_size > budget:
+        max_rb_size = budget
+    return max_rb_size
+
+
+def _ul_needs_service(ue_backlog: int, has_srb: bool, has_gbr: bool) -> bool:
+    """gNB_scheduler_ulsch.c:2340-2341. Currently always True in this
+    port: ``_allocate_direction``'s candidate list is pre-filtered to
+    ``bytes_reported > 0`` before a candidate ever reaches this
+    function, so the backlog term alone already decides it every time
+    -- see module docstring's commit-4 section. The ``do_sched`` term
+    is dropped entirely (no stored field, matching the liveness/
+    sched_inactive no-op elsewhere in this module), not passed as an
+    always-False parameter.
+    """
+    return ue_backlog > 0 or has_srb or has_gbr
+
+
+def _dl_needs_service(ue_backlog: int, has_srb: bool) -> bool:
+    """gNB_scheduler_dlsch.c:840-842. No ``has_gbr`` term -- a real
+    asymmetry from UL, ported as measured. ``ta_apply``: permanent
+    no-op, no TA model -- dropped rather than passed as an always-False
+    parameter, same treatment as UL's ``do_sched`` above.
+    """
+    return ue_backlog > 0 or has_srb
+
+
+def _dl_follower_budget(
+    max_rb_size: int, n_followers_need: int, min_rb_size: int,
+) -> int:
+    """DL's per-UE PRB cap (gNB_scheduler_dlsch.c:909-926). `max_rb_size`
+    is the contiguous-free-RB SCAN result in the C -- callers must pass
+    the CURRENT `prbs_left` at this candidate's turn in the grant loop,
+    never a value captured once for the whole slot (module docstring).
+    """
+    budget = max_rb_size - n_followers_need * min_rb_size
+    if budget < min_rb_size:
+        budget = min_rb_size
+    if max_rb_size > budget:
+        max_rb_size = budget
+    return max_rb_size
 
 
 def _ul_grant_target(
@@ -319,6 +445,13 @@ class _Candidate:
     be_bytes: int = 0
     gbr_bytes_slot: int = 0
     srb_lcg0_estimate: int = 0
+    # Commit 4: real backlog (reused by both needs_service and the grant
+    # loop, computed once) and the full needs_service formula -- see
+    # module docstring's commit-4 section for why this is currently
+    # always True given the candidate pre-filter, and why it's ported
+    # as the real formula anyway.
+    ue_backlog: int = 0
+    needs_service: bool = True
 
 
 class Reservation:
@@ -331,15 +464,23 @@ class Reservation:
     def __init__(self) -> None:
         self._flows: list[FlowConfig] = []
         self._ue_state: dict[int, _UeState] = {}
+        self.min_rb: int = 5
 
     def configure(
         self,
         flows: list[FlowConfig],
         slot_duration_s: float,
         grid: GridView,
+        min_rb: int = 5,
     ) -> None:
+        # min_rb: UL's follower-budget floor (nrmac->min_grant_prb) --
+        # a deliberate operator/experimenter choice for the calibration
+        # campaign, not a physical constant. See module docstring's
+        # commit-4 section for the full provenance and why DL's own
+        # floor (_DL_FOLLOWER_MIN_RB_SIZE) is a separate constant.
         self._flows = list(flows)
         self.slot_duration_s = slot_duration_s
+        self.min_rb = min_rb
         self._ue_state = {f.ue_id: _UeState() for f in flows}
 
     def allocate(
@@ -441,6 +582,17 @@ class Reservation:
                 gbr_bytes_slot = 0
                 srb_lcg0_estimate = 0
 
+            # Commit 4: real backlog, computed once and reused by both
+            # needs_service (below) and the grant loop -- replaces that
+            # loop's own former `ue_backlog = sum(...)` recomputation.
+            ue_backlog = sum(
+                buffers.state(f.ue_id, f.qfi).bytes_reported for f in flows
+            )
+            if direction == "UL":
+                needs_service = _ul_needs_service(ue_backlog, has_srb, has_gbr)
+            else:
+                needs_service = _dl_needs_service(ue_backlog, has_srb)
+
             candidates.append(
                 _Candidate(
                     ue_id, flows, bits_per_rb, bler, snr, coef,
@@ -448,6 +600,7 @@ class Reservation:
                     guaranteed_bytes=guaranteed_bytes, be_bytes=be_bytes,
                     gbr_bytes_slot=gbr_bytes_slot,
                     srb_lcg0_estimate=srb_lcg0_estimate,
+                    ue_backlog=ue_backlog, needs_service=needs_service,
                 )
             )
 
@@ -456,10 +609,22 @@ class Reservation:
 
         candidates.sort(key=lambda c: self._rank_key(c, direction))
 
+        # Commit 4: n_followers_need, computed once for the whole sorted
+        # list (gNB_scheduler_ulsch.c:2424-2426 / _dlsch.c:911-913 --
+        # the C's own single pass, not recomputed per candidate). Index
+        # i holds the count of needs_service=True candidates STRICTLY
+        # AFTER i in this sorted order.
+        n_followers_after = [0] * len(candidates)
+        running = 0
+        for i in range(len(candidates) - 1, -1, -1):
+            n_followers_after[i] = running
+            if candidates[i].needs_service:
+                running += 1
+
         prbs_left = slot.prb_count
         cce_left = slot.pdcch_cce_budget
         out: list[Allocation] = []
-        for c in candidates:
+        for idx, c in enumerate(candidates):
             if prbs_left <= 0:
                 break
             cce_cost = cce_aggregation_level(c.snr_db)
@@ -467,11 +632,35 @@ class Reservation:
                 # Try lower-AL candidates further down the list.
                 continue
 
-            ue_backlog = sum(
-                buffers.state(f.ue_id, f.qfi).bytes_reported for f in c.flows
-            )
+            ue_backlog = c.ue_backlog
             if ue_backlog <= 0:
                 continue
+
+            # Commit 4: the follower budget -- caps this candidate's
+            # PRBs so a saturating BE UE cannot zero a starved UE ranked
+            # behind it. Called fresh HERE, per candidate, not hoisted
+            # above the loop: DL's base is `prbs_left` AT THIS
+            # CANDIDATE'S TURN (it shrinks as earlier candidates in this
+            # same slot consume PRBs, matching the C's contiguous-scan
+            # semantics), while UL's base is the slot-wide constant
+            # `slot.prb_count` (matching the C's per-UE-static bwpSize).
+            # Using the same base for both would collapse the asymmetry
+            # the module docstring's commit-4 section documents.
+            if direction == "UL":
+                max_rb_size = _ul_follower_budget(
+                    slot.prb_count, n_followers_after[idx], self.min_rb, c.has_srb,
+                )
+                min_rb_here = self.min_rb
+            else:
+                max_rb_size = _dl_follower_budget(
+                    prbs_left, n_followers_after[idx], _DL_FOLLOWER_MIN_RB_SIZE,
+                )
+                min_rb_here = _DL_FOLLOWER_MIN_RB_SIZE
+            if max_rb_size < min_rb_here:
+                # gNB_scheduler_ulsch.c:2437 / _dlsch.c:926 -- not enough
+                # budget left to grant this UE at all this slot.
+                continue
+
             # Commit 4a: size PRBs off the guaranteed+be target, not
             # backlog alone (gNB_scheduler_ulsch.c:2492-2512 /
             # _dlsch.c:1003-1019) -- D1: this sizes the PRB *resource*,
@@ -487,9 +676,7 @@ class Reservation:
                     c.has_srb, srb1_srb2_bytes=0,
                 )
             prbs_needed = -(-(target * 8) // c.bits_per_rb)  # ceil div
-            # No follower budget yet (commit 4) -- unbounded by anything
-            # but this slot's own remaining PRBs.
-            prbs_used = min(prbs_left, max(1, prbs_needed))
+            prbs_used = min(prbs_left, max_rb_size, max(1, prbs_needed))
             tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
             if tbs_bytes <= 0:
                 continue

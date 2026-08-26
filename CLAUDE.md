@@ -361,6 +361,22 @@ by table and page, not from memory. If a future change touches any
 spec-derived table (BSR, path loss, or otherwise), re-verify against the
 real source, not by re-deriving it.
 
+**The vendored `oai-branches/` subset is a convenience copy, not the
+evidence base.** When a constant looks sourceless from the vendored
+`.c` files alone, check the full OAI checkout
+(`~/Documents/artpark_projects/Oai_Ran_QoS_Supported_MultiDRB`) and
+`calibration-logs/`'s own referenced config files before treating it
+as unsourced or inventing a value. Found scoping Phase 2 reservation
+commit 4: `nrmac->min_grant_prb` (UL's follower-budget floor) looked
+sourceless from the four vendored `.c` files — no assignment site
+anywhere in them. The full checkout's `MACRLC_nr_paramdef.h` config-
+parser default, the exact deployed `.conf` `calibration-logs/
+twotier_startup_gnb.log`'s own `CMDLINE` cites, and 486/486 empirical
+`NPRB 5` lines in that log together confirmed the value as a deliberate
+deployment/operator choice for the calibration campaign (made so no UE
+is starved of a grant and BSRs keep being reported) — not a config
+default that happened to go unoverridden, and not an invented number.
+
 ## Rules for the WP0 machinery
 
 **M18/M19 (WP-Join) are the panel's first additions since WP0

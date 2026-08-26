@@ -50,7 +50,15 @@ import pytest
 
 from scheduler.flow import FlowConfig
 from scheduler.interfaces import Allocation
-from scheduler.reservation import Reservation, _dl_grant_target, _ul_grant_target
+from scheduler.reservation import (
+    Reservation,
+    _dl_follower_budget,
+    _dl_grant_target,
+    _dl_needs_service,
+    _ul_follower_budget,
+    _ul_grant_target,
+    _ul_needs_service,
+)
 
 
 # -- lightweight, Protocol-conforming fakes (no sim/ dependency needed --
@@ -163,8 +171,17 @@ def test_configure_then_allocate_runs_end_to_end_and_returns_allocations():
 
 def test_lower_accumulated_throughput_is_favored_when_prbs_are_scarce():
     """Two UEs, identical SNR and backlog, different pre-seeded thr_ue.
-    A tight PRB budget forces a choice -- the lower-thr_ue (higher
-    coefficient) UE must be the one granted."""
+    Commit 4 correction, found running this suite after landing the
+    follower budget: with 2 needy candidates, the budget now reserves
+    the trailing candidate's own min_rbSize share whenever total PRBs
+    allow it, so a "tight" budget no longer means the loser gets
+    NOTHING -- it means the loser gets only its protected minimum while
+    the winner (ranked first) gets the rest. This is the mechanism
+    working as designed (gNB_scheduler_dlsch.c:909-926's own "a
+    saturating BE UE cannot zero a starved UE behind it"), not a
+    regression in this test's own subject (throughput-EWMA ranking) --
+    so the assertion now checks WHO GETS MORE, not WHO IS THE ONLY ONE
+    granted."""
     sched = Reservation()
     flows = [
         FlowConfig(ue_id=1, qfi=1, direction="DL"),
@@ -181,12 +198,18 @@ def test_lower_accumulated_throughput_is_favored_when_prbs_are_scarce():
     buffers.set(2, 1, bytes_queued=6000)
     channel = _FakeChannel({1: 20.0, 2: 20.0})
 
-    # Few enough PRBs that only one UE's grant fits.
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+    # A single UE's full 6000-byte target needs 82 PRBs at this SNR;
+    # prb_count=100 gives the winner comfortable room to fully deliver
+    # while still leaving enough for the follower-budget-protected
+    # loser to get a real (nonzero, smaller) share -- an unambiguous
+    # "who got more" comparison at any prb_count above the 5-PRB DL
+    # floor, not a hand-tuned coincidence.
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=100, pdcch_cce_budget=48)
     out = sched.allocate(slot, buffers, channel)
 
-    granted_ues = {a.ue_id for a in out}
-    assert granted_ues == {1}, "the lower-thr_ue UE must be favored, not the higher one"
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2}, "both UEs should be served -- the follower budget protects UE2's share too"
+    assert by_ue[1].prbs > by_ue[2].prbs, "the lower-thr_ue UE must get the larger share, not the higher one"
 
 
 def test_pf_coefficient_formula_matches_hand_computation():
@@ -328,7 +351,9 @@ def test_gbr_tier_beats_the_coefficient_tiebreak_ul():
         FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF"),
         FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1_000_000),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    # min_rb=0: predates commit 4's follower-budget floor; prb_count=2
+    # below is deliberate scarcity for the tier test, not the floor.
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid(), min_rb=0)
     # UE1 (non-GBR) has the BETTER coefficient (low thr -> high coef).
     sched._ue_state[1].ul_thr_bytes_per_slot = 1.0
     sched._ue_state[2].ul_thr_bytes_per_slot = 100000.0
@@ -358,11 +383,18 @@ def test_gbr_tier_beats_the_coefficient_tiebreak_dl():
     buffers.set(1, 1, bytes_queued=6000)
     buffers.set(2, 1, bytes_queued=6000)
     channel = _FakeChannel({1: 20.0, 2: 20.0})
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+    # prb_count=100, not 2: commit 4's follower budget (module docstring)
+    # means "scarce PRBs" no longer excludes the loser outright -- it
+    # protects a minimum share for whichever candidate needs_service and
+    # isn't ranked first. So the assertion checks who gets MORE, not who
+    # is the ONLY one granted (see test_lower_accumulated_throughput_...
+    # above for the same correction, with the full reasoning).
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=100, pdcch_cce_budget=48)
 
     out = sched.allocate(slot, buffers, channel)
-    granted_ues = {a.ue_id for a in out}
-    assert granted_ues == {2}
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2}
+    assert by_ue[2].prbs > by_ue[1].prbs, "the GBR-flagged UE must get the larger share despite the worse coefficient"
 
 
 def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_ul():
@@ -371,7 +403,9 @@ def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_ul():
         FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=200.0),
         FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="PF", pdb_ms=10.0),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    # min_rb=0: predates commit 4's follower-budget floor; prb_count=2
+    # below is deliberate scarcity for the tier test, not the floor.
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid(), min_rb=0)
     # UE1 (loose PDB) has the BETTER coefficient.
     sched._ue_state[1].ul_thr_bytes_per_slot = 1.0
     sched._ue_state[2].ul_thr_bytes_per_slot = 100000.0
@@ -401,11 +435,14 @@ def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_dl():
     buffers.set(1, 1, bytes_queued=6000)
     buffers.set(2, 1, bytes_queued=6000)
     channel = _FakeChannel({1: 20.0, 2: 20.0})
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+    # prb_count=100, not 2 -- see test_gbr_tier_beats_the_coefficient_
+    # tiebreak_dl above for the follower-budget correction this needs.
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=100, pdcch_cce_budget=48)
 
     out = sched.allocate(slot, buffers, channel)
-    granted_ues = {a.ue_id for a in out}
-    assert granted_ues == {2}
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2}
+    assert by_ue[2].prbs > by_ue[1].prbs, "the tighter-PDB UE must get the larger share despite the worse coefficient"
 
 
 def test_coefficient_remains_the_final_tiebreak_when_gbr_and_pdb_are_equal_dl():
@@ -425,11 +462,14 @@ def test_coefficient_remains_the_final_tiebreak_when_gbr_and_pdb_are_equal_dl():
     buffers.set(1, 1, bytes_queued=6000)
     buffers.set(2, 1, bytes_queued=6000)
     channel = _FakeChannel({1: 20.0, 2: 20.0})
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+    # prb_count=100, not 2 -- see test_gbr_tier_beats_the_coefficient_
+    # tiebreak_dl above for the follower-budget correction this needs.
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=100, pdcch_cce_budget=48)
 
     out = sched.allocate(slot, buffers, channel)
-    granted_ues = {a.ue_id for a in out}
-    assert granted_ues == {1}
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2}
+    assert by_ue[1].prbs > by_ue[2].prbs
 
 
 def test_has_srb_cannot_be_exercised_and_is_recorded_as_such():
@@ -460,11 +500,14 @@ def test_has_srb_cannot_be_exercised_and_is_recorded_as_such():
     buffers.set(1, 9, bytes_queued=6000)
     buffers.set(2, 1, bytes_queued=6000)
     channel = _FakeChannel({1: 20.0, 2: 20.0})
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+    # prb_count=100, not 2 -- see test_gbr_tier_beats_the_coefficient_
+    # tiebreak_dl above for the follower-budget correction this needs.
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=100, pdcch_cce_budget=48)
 
     out = sched.allocate(slot, buffers, channel)
-    granted_ues = {a.ue_id for a in out}
-    assert granted_ues == {1}, "lcg==0 must not be treated as has_srb"
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2}
+    assert by_ue[1].prbs > by_ue[2].prbs, "lcg==0 must not be treated as has_srb"
 
 
 def test_ul_and_dl_rank_keys_stay_independently_sourced_not_deduped():
@@ -1117,3 +1160,184 @@ def test_sub_one_byte_gbr_floors_to_one_in_deficit_loop_and_zero_in_gbr_bytes_sl
         has_srb=False, srb_lcg0_estimate=0,
     )
     assert target == guaranteed + be  # gbr_bytes_slot=0 correctly no-ops (>0 gate)
+
+
+# -- 4. the follower budget -----------------------------------------------
+
+
+def test_follower_budget_degenerates_to_unconstrained_at_zero_followers():
+    """The acceptance criterion, corrected scoping (module docstring's
+    commit-4 section, and the doc corrections landing alongside it):
+    at n_followers_need=0 the follower-budget CLAMP is a provable
+    no-op -- algebraically, budget=base and base<=base always, so
+    `max_rb_size > budget` never holds, regardless of min_rb/base. This
+    is NOT a claim that all of Reservation collapses to PF: the sort
+    tiers and 4a's target-based sizing are untouched by this mechanism
+    and remain real differences from PF whenever a GBR deficit is
+    active. has_srb=True is deliberately excluded here -- that branch
+    already forces min_rb regardless of n_followers, a different
+    no-op covered by its own test below."""
+    for bwp_size, min_rb in [(50, 5), (1, 1), (1000, 7), (5, 5)]:
+        assert _ul_follower_budget(bwp_size, 0, min_rb, has_srb=False) == bwp_size
+    for max_rb_size, min_rb_size in [(50, 5), (1, 1), (1000, 7), (5, 5)]:
+        assert _dl_follower_budget(max_rb_size, 0, min_rb_size) == max_rb_size
+
+
+def test_follower_budget_lowers_max_rb_size_when_followers_need_protecting():
+    """needs_service is tautologically True for every candidate today
+    (module docstring's commit-4 finding), so n_followers_need is
+    driven purely by the COUNT of trailing candidates in this port, not
+    by the predicate -- this test varies that count, not what
+    needs_service evaluates to. It cannot exercise the predicate
+    itself; the next test does that directly."""
+    assert _ul_follower_budget(50, 3, 5, has_srb=False) == 50 - 3 * 5
+    assert _ul_follower_budget(50, 3, 5, has_srb=False) < 50
+    assert _dl_follower_budget(50, 3, 5) == 50 - 3 * 5
+    assert _dl_follower_budget(50, 3, 5) < 50
+
+
+def test_follower_budget_floors_at_min_rb_never_below():
+    """A large enough n_followers_need would drive budget negative
+    without the floor -- gNB_scheduler_ulsch.c:2429 / _dlsch.c:922."""
+    assert _ul_follower_budget(10, 5, 5, has_srb=False) == 5  # 10-25=-15 -> floored
+    assert _dl_follower_budget(10, 5, 5) == 5
+
+
+def test_dl_post_budget_skip_when_remaining_capacity_below_min_rbsize():
+    """gNB_scheduler_dlsch.c:926 -- a candidate whose follower-budget-
+    capped share falls below min_rbSize gets NO grant at all this slot,
+    not a smaller one. 2 UEs, prb_count=6: UE1 (ranked first,
+    n_followers_need=1) is capped to budget=6-1*5=1, floored to
+    min_rbSize=5 -- so UE1 actually gets 5, leaving prbs_left=1 for
+    UE2, which is below min_rbSize=5 and must be skipped entirely."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=6, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1}, "UE2's protected share (1 PRB) is below min_rbSize=5 -- must get nothing, not a tiny grant"
+    assert by_ue[1].prbs == 5
+
+
+def test_ul_max_rb_size_init_uses_min_rb_when_has_srb_forced():
+    """UL's max_rbSize init, (sched_inactive||has_srb)?min_rb:bwp_size
+    (gNB_scheduler_ulsch.c:2421), is structurally unreachable in
+    _allocate_direction today -- has_srb is hardcoded False (module
+    docstring). Tested directly with has_srb forced True to confirm
+    the branch itself is correct. sched_inactive has no stored field
+    anywhere in this module (always False, no-op) -- there is no
+    separate parameter for it to force."""
+    assert _ul_follower_budget(1000, 0, 5, has_srb=True) == 5
+    # Confirm it's really the has_srb branch deciding this, not the
+    # follower-budget clamp (which would be a no-op here regardless,
+    # per the n_followers_need=0 degeneracy test above) --
+    # has_srb=False with identical inputs must NOT clip to min_rb.
+    assert _ul_follower_budget(1000, 0, 5, has_srb=False) == 1000
+
+
+def test_needs_service_non_backlog_terms_are_currently_unreachable():
+    """_allocate_direction's candidate list is pre-filtered to
+    bytes_reported>0, so needs_service's `or has_srb`/`or has_gbr` (UL)
+    /`or has_srb` (DL) terms can never be the deciding factor today --
+    the backlog term alone already makes it True for every candidate
+    that reaches this function. Tested directly with backlog=0 forced
+    (a state _allocate_direction can never actually supply) so a future
+    refactor that drops these terms fails a test instead of silently
+    doing nothing observable, the same treatment 4a's test 7 gave the
+    gbr_bytes_slot MFBR gate."""
+    assert _ul_needs_service(0, has_srb=False, has_gbr=True) is True
+    assert _ul_needs_service(0, has_srb=True, has_gbr=False) is True
+    assert _ul_needs_service(0, has_srb=False, has_gbr=False) is False
+    assert _dl_needs_service(0, has_srb=True) is True
+    assert _dl_needs_service(0, has_srb=False) is False
+
+
+def test_follower_budget_visibly_protects_trailing_ues_from_a_saturating_leader():
+    """3-UE UL scenario: a saturating leader (60000-byte backlog, needs
+    ~817 PRBs against a 50-PRB pool) ranked first, two modest trailing
+    UEs (200 bytes each, ~3 PRBs). Without the follower budget the
+    leader would consume the entire slot every time, starving both
+    followers -- gNB_scheduler_ulsch.c's own "a saturating BE UE cannot
+    zero a starved UE behind it," the mechanism's whole reason to
+    exist. With it, the leader is capped (n_followers_need=2 protects
+    2*min_rb=10 PRBs), leaving room for both to be served this slot."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="PF"),
+        FlowConfig(ue_id=3, qfi=1, direction="UL", flow_class="PF"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].ul_thr_bytes_per_slot = 1.0      # leader: best coef
+    sched._ue_state[2].ul_thr_bytes_per_slot = 10.0     # 2nd
+    sched._ue_state[3].ul_thr_bytes_per_slot = 1000.0   # 3rd: worst coef
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=60000)  # far exceeds any realistic PRB budget
+    buffers.set(2, 1, bytes_queued=200)    # modest -- needs ~3 PRBs
+    buffers.set(3, 1, bytes_queued=200)    # modest -- needs ~3 PRBs
+    channel = _FakeChannel({1: 20.0, 2: 20.0, 3: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2, 3}, "the follower budget must leave room for both trailing UEs"
+    assert by_ue[1].prbs <= 40, "the leader must be capped: bwp_size(50) - 2 followers*min_rb(5) = 40"
+    assert by_ue[2].prbs > 0 and by_ue[3].prbs > 0
+
+
+def test_dl_follower_budget_base_reflects_prbs_already_consumed_this_slot():
+    """Finding 1's observable consequence, guarding the exact bug
+    flagged when this commit was planned: DL's follower-budget base
+    must be the CURRENT prbs_left at each candidate's turn, not a
+    value computed once for the whole slot. 3 UEs, not 2 -- a 2-UE
+    fixture can't distinguish this, since the last candidate's own
+    n_followers_need is always 0 regardless of which base it receives,
+    so the bug is only observable through a MIDDLE candidate that
+    itself still has a follower to protect.
+
+    Hand-worked, both ways: CORRECT -- UE1 takes 40 (of 50), leaving
+    prbs_left=10; UE2's base is 10 (not 50), budget=10-1*5=5, so UE2 is
+    capped to 5 even though it could use 8; prbs_left=5 remains, UE3
+    gets 3 (of the 3 it needs). WRONG (base hoisted to the original 50
+    for every candidate) -- UE2's budget would compute as 50-1*5=45,
+    letting it take its full 8-PRB need instead of 5; prbs_left would
+    then drop to 2, below min_rbSize=5, and UE3 would be skipped
+    entirely. The two implementations produce different, checkable
+    outcomes for UE2 and UE3, not just a vague "smaller" comparison."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=3, qfi=1, direction="DL", flow_class="PF"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 10.0
+    sched._ue_state[3].dl_thr_bytes_per_slot = 1000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=60000)  # leader: far exceeds any budget
+    buffers.set(2, 1, bytes_queued=550)    # needs 8 PRBs if unconstrained
+    buffers.set(3, 1, bytes_queued=200)    # needs 3 PRBs if unconstrained
+    channel = _FakeChannel({1: 20.0, 2: 20.0, 3: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    by_ue = {a.ue_id: a for a in out}
+    assert set(by_ue) == {1, 2, 3}, "UE3 is only starved if UE2's base is wrongly hoisted to the slot's original pool"
+    assert by_ue[1].prbs == 40, "leader capped to bwp_size(50) - 2 followers*min_rbSize(5)"
+    assert by_ue[2].prbs == 5, "UE2's base must be the CURRENT prbs_left (10) at its turn: 10 - 1*5 = 5, not 50 - 1*5 = 45"
+    assert by_ue[3].prbs == 3

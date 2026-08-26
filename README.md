@@ -924,6 +924,21 @@ these five, add a new tag rather than forcing it into an existing one.
   Tier-1 boundary leak. The other unpredicted, larger-magnitude movements
   (non-GBR UL flows, Delay-class UL flows) are their own `[OPEN: WP9]`
   items above.
+- `[OPEN: WP9]` **`min_rb=5` (reservation commit 4's follower budget) was
+  chosen to prevent grant starvation and keep the SR/BSR chain reporting,
+  not derived from any physical constant — and the follower budget's
+  boundary is exactly where that choice matters.** `budget = bwpSize −
+  n_followers_need×min_rb` (`docs/oai-port-map.md` row 27), so the regime
+  boundary this whole project exists to locate — the point where the
+  follower reservation begins to bind on the leader UE — is set by the
+  *product* `n_followers_need × min_rb`. A value picked specifically to
+  avoid starvation may sit on the safe side of that very boundary. WP9's
+  sweep must vary `min_rb` rather than inherit the deployed value, and
+  any regime-map claim made at `min_rb=5` alone is conditioned on a
+  starvation-suppressing setting, not a generic one. Cross-reference:
+  this is the configuration-side view of the same mechanism the
+  UL-access-chain dominance cluster above (Facets 1-4) already
+  investigates from the traffic/timing side.
 
 ---
 
@@ -960,9 +975,17 @@ order of magnitude (the branch's only real calibration target, per
 `p5g-sim-plan.md` §11).
 
 **Phase 2 exit criteria:** both schedulers pass the acceptance criteria in
-§4's table above; `n_followers=0` reservation reduces to plain PF
-(retroactively explains the historical N=2 tie); two-tier's UL floor fires
-and disarms correctly under the fruitless-counter logic.
+§4's table above; at `n_followers=0` reservation's follower-budget clamp
+is a provable no-op, matching PF's own unconstrained PRB sizing —
+**corrected scoping, found planning reservation commit 4** (`docs/
+phase2-plan.md` §2.2): not a claim that all of `Reservation` collapses
+to `PF`, since its sort tiers and target-based sizing (commit 4a) remain
+real differences whenever a GBR deficit is active. Plausibly still part
+of why the historical N=2 hardware measurement (§7) found no
+differentiation, since the follower budget is the one deliberate
+structural difference from a bare PF-style scheduler that specifically
+needs 2+ needy followers to activate; two-tier's UL floor fires and
+disarms correctly under the fruitless-counter logic.
 
 **Phase 3 exit criteria:** WP9's grid complete, regime-selection discipline
 satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
