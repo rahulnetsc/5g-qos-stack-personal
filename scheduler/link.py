@@ -91,6 +91,33 @@ def bits_per_prb(snr_db: float, symbols: int = 14) -> tuple[int, float]:
     return int(se * 12 * symbols), bler
 
 
+def bits_per_prb_for_mcs(mcs_index: int, symbols: int = 14) -> tuple[int, float]:
+    """Return (bits_per_PRB_for_given_symbols, expected_BLER) for an
+    EXPLICIT MCS index into ``_MCS_TABLE``, bypassing the SNR walk --
+    the Phase 2 D2(b) counterpart of ``bits_per_prb``, for a caller that
+    already holds a persistent per-UE MCS index (``mcs_index_for_snr``,
+    ``reservation.py``'s ``_UeState.ul_mcs_index``/``dl_mcs_index``)
+    rather than an instantaneous SNR reading. Ground truth
+    (``gNB_scheduler_dlsch.c:812-824``/``_ulsch.c:2203-2213``) always
+    derives ``Qm``/``R`` from ``selected_mcs`` this way, never re-picks
+    an MCS from SNR at the sizing step.
+
+    ``mcs_index`` is clamped into ``[0, len(_MCS_TABLE) - 1]`` -- a
+    persisted index is always in range by construction today, but a
+    caller composing this from a not-yet-live OLLA offset (Phase 2 D2(b))
+    should not be able to index out of bounds if that changes.
+
+    Unlike ``bits_per_prb``, there is no "below the lowest threshold"
+    case here -- every row index is a valid, transmittable MCS by
+    definition; that untransmittable-SNR cutoff only exists in the
+    SNR-to-row walk (``_mcs_row_for_snr`` returning ``None``), not in
+    the table itself.
+    """
+    idx = max(0, min(len(_MCS_TABLE) - 1, mcs_index))
+    _, se, bler = _MCS_TABLE[idx]
+    return int(se * 12 * symbols), bler
+
+
 def mcs_threshold_for_snr(snr_db: float) -> float:
     """Return the SNR threshold of the MCS that ``bits_per_prb`` would pick
     for ``snr_db``. This is the "picked MCS's operating point": at this SNR

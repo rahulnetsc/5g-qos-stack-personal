@@ -1596,6 +1596,46 @@ def test_mcs_index_for_snr_matches_the_row_walk():
             assert link._MCS_TABLE[idx] == row
 
 
+def test_bits_per_prb_for_mcs_matches_the_table_row_directly():
+    """Commit 9's new bits_per_prb_for_mcs indexes _MCS_TABLE directly --
+    no SNR walk involved -- so it must reproduce each row's own
+    (se, bler) exactly at every valid index, and for every symbol count,
+    not just the default 14."""
+    from scheduler import link
+
+    for idx, (_, se, bler) in enumerate(link._MCS_TABLE):
+        for symbols in (1, 10, 14):
+            bits, got_bler = link.bits_per_prb_for_mcs(idx, symbols=symbols)
+            assert bits == int(se * 12 * symbols)
+            assert got_bler == bler
+
+
+def test_bits_per_prb_for_mcs_matches_bits_per_prb_via_mcs_index_for_snr():
+    """The equivalence commit 9's prediction rests on: with _OLLA_OFFSET
+    pinned at 0, bits_per_prb_for_mcs(mcs_index_for_snr(snr), symbols)
+    must equal bits_per_prb(snr, symbols) exactly, for any in-range SNR
+    -- this is WHY commit 9 doesn't move any existing coefficient/grant-
+    size assertion despite changing which function computes them."""
+    from scheduler import link
+
+    for snr in [-2.0, 0.0, 10.0, 16.0, 25.0, 31.0, 40.0]:
+        for symbols in (10, 14):
+            direct = link.bits_per_prb(snr, symbols=symbols)
+            via_index = link.bits_per_prb_for_mcs(
+                link.mcs_index_for_snr(snr), symbols=symbols
+            )
+            assert direct == via_index
+
+
+def test_bits_per_prb_for_mcs_clamps_out_of_range_index():
+    from scheduler import link
+
+    low = link.bits_per_prb_for_mcs(-5, symbols=14)
+    high = link.bits_per_prb_for_mcs(999, symbols=14)
+    assert low == link.bits_per_prb_for_mcs(0, symbols=14)
+    assert high == link.bits_per_prb_for_mcs(len(link._MCS_TABLE) - 1, symbols=14)
+
+
 def test_mcs_index_for_snr_floors_at_zero_below_lowest_threshold():
     from scheduler import link
 
@@ -1606,7 +1646,12 @@ def test_ul_and_dl_mcs_index_persisted_at_candidate_build_time():
     """Matches the C's own per-candidate timing
     (gNB_scheduler_ulsch.c:2192, inside the per-UE ranking loop, before
     the qsort) -- computed for every candidate considered this slot,
-    not just the eventual winner, and independently per UE/direction."""
+    not just the eventual winner, and independently per UE/direction.
+    Also exercises commit 9's _OLLA_OFFSET: this assertion is unchanged
+    from commit 8 (mcs_index_for_snr(snr) with no added offset), which
+    is the point -- module docstring's commit-9 section proves the
+    offset is 0, and this is that proof holding for a real candidate
+    build, not just in isolation."""
     from scheduler.link import mcs_index_for_snr
 
     sched = Reservation()
@@ -1627,15 +1672,14 @@ def test_ul_and_dl_mcs_index_persisted_at_candidate_build_time():
     assert sched._ue_state[2].dl_mcs_index == mcs_index_for_snr(25.0)
 
 
-def test_mcs_index_persisted_but_not_yet_consumed_by_grant_sizing():
-    """Commit 8's own doubly-inert claim, verified directly rather than
-    just asserted: pre-seeding the persisted MCS index with a nonsense
-    value before allocate() must not change what's actually granted --
-    grant sizing still reads bits_per_rb/bler straight from
-    bits_per_prb. Also confirms the field is recomputed fresh every
-    slot (overwriting the pre-seeded nonsense), not read-then-preserved
-    -- commit 9's OLLA ratchet is what makes this field a real input
-    rather than pure output."""
+def test_mcs_index_recomputed_fresh_every_slot_not_read_then_preserved():
+    """The persisted MCS index is recomputed from mcs_index_for_snr(snr)
+    at the top of every candidate-build pass, before it's used for
+    sizing this same slot -- pre-seeding it with a nonsense value before
+    allocate() must not survive into the grant. This was true at commit
+    8 too (nothing consumed it yet, so pre-seeding trivially couldn't
+    matter); commit 9 makes it a live claim about a value grant sizing
+    now actually reads, not just an inert field."""
     def make_scheduler():
         sched = Reservation()
         flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
@@ -1657,3 +1701,39 @@ def test_mcs_index_persisted_but_not_yet_consumed_by_grant_sizing():
     assert [(a.prbs, a.bytes_capacity) for a in out_clean] == \
         [(a.prbs, a.bytes_capacity) for a in out_corrupted]
     assert sched_corrupted._ue_state[1].ul_mcs_index != 999
+
+
+def test_grant_sizing_now_reads_the_persisted_mcs_index():
+    """Commit 9 (D2(b)): grant sizing switches from recomputing
+    bits_per_prb(snr, symbols) independently to reading
+    bits_per_prb_for_mcs(mcs_index, symbols) -- the persisted field
+    commit 8 built but nothing read. Verified directly, the same
+    standard commit 8's corrupted-index test met: monkeypatch
+    bits_per_prb_for_mcs to a rate _MCS_TABLE could never produce at
+    this SNR and confirm the emitted grant reflects it -- a black-box
+    comparison of granted bytes alone can't distinguish the two data
+    paths, since _OLLA_OFFSET == 0 makes them numerically identical
+    today (module docstring's commit-9 section)."""
+    import scheduler.reservation as resv_mod
+
+    def fake_bits_per_prb_for_mcs(mcs_index, symbols):
+        return 4800, 0.0  # _MCS_TABLE's real rows never reach this high
+
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1_000_000)
+    channel = _FakeChannel({1: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+
+    real = resv_mod.bits_per_prb_for_mcs
+    resv_mod.bits_per_prb_for_mcs = fake_bits_per_prb_for_mcs
+    try:
+        out = sched.allocate(slot, buffers, channel)
+    finally:
+        resv_mod.bits_per_prb_for_mcs = real
+
+    assert len(out) == 1
+    expected_bytes = (out[0].prbs * 4800) // 8
+    assert out[0].bytes_capacity == expected_bytes

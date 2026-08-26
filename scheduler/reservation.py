@@ -317,22 +317,86 @@ is needed here.
 Computed at candidate-build time, matching the C's own timing
 (``gNB_scheduler_ulsch.c:2192``, inside the per-UE ranking loop, before
 the ``qsort`` -- for every candidate considered this slot, not just the
-eventual winner) -- but **not yet consumed by anything**: grant sizing
-still reads ``bits_per_rb``/``bler`` directly from ``bits_per_prb``,
-unchanged. This makes the commit **doubly inert**, and the two reasons
-are independent, not restatements of each other: (1) nothing imports
-``Reservation`` yet (the standing reason, same as every prior commit in
-this lineage); (2) the stored ``ul_mcs_index``/``dl_mcs_index`` value
-is written but never read by anything in this module. Reason (2)
-expires at commit 9 -- OLLA's ratchet is what starts reading (as the
-prior state to update) and writing (the ratcheted result) this same
-field. Scoring commit 9's own prediction later must not credit it with
-falsifying "nothing imports Reservation" (reason 1, still true then) --
-what commit 9 actually changes is reason 2 alone.
+eventual winner). At commit 8 this was **not yet consumed by anything**:
+grant sizing still read ``bits_per_rb``/``bler`` directly from
+``bits_per_prb``, unchanged, making that commit doubly inert for two
+independent reasons -- (1) nothing imports ``Reservation`` yet (the
+standing reason, same as every prior commit in this lineage), (2) the
+stored ``ul_mcs_index``/``dl_mcs_index`` value was written but never
+read by anything in this module.
 
-Still explicitly deferred: OLLA's own ratchet (commit 9), which swaps
-the static lookup above for ``sim/olla.py``'s ``OllaState``/
-``update_mcs_from_bler`` at this exact call site.
+Commit 9 (D2(b)) removes reason (2) alone, not reason (1) -- scoring its
+prediction must credit exactly that, not "nothing imports Reservation"
+(still true). Grant sizing (both the PF-coefficient's hypothetical TBS
+and the real grant's TBS -- ground truth's ``selected_mcs`` feeds both,
+port-map row 15) now reads ``bits_per_prb_for_mcs(mcs_index, symbols)``
+instead of recomputing ``bits_per_prb(snr, symbols)`` independently.
+
+**OLLA's own ratchet is NOT wired in, and this is a considered
+disposition, not a placeholder for a future commit to fill in.** Ground
+truth's ``get_mcs_from_bler`` (``gNB_scheduler_primitives.c:785-822``,
+byte-identical across both branches, ``sim/olla.py``'s own citation)
+ratchets ``bler_stats->mcs`` by +-1 per ``BLER_UPDATE_FRAME`` (10-frame,
+100ms) window, driven by ``NR_mac_dir_stats_t.rounds[0]``/``[1]`` --
+new-tx and first-retry grant counts, incremented at grant-finalization
+time (``gNB_scheduler_dlsch.c:1203`` / ``_ulsch.c:2756``, inside
+``post_process_dlsch`` / the PUSCH PDU build -- NOT a separate ACK/NACK
+feedback loop). In ground truth this is the SAME component that issues
+both new-tx and retry grants (``pf_dl``/``pf_ul``), so both counts are
+directly observable to it. That symmetry doesn't hold here: WP5 Decision
+4 made retransmission scheduling an "orthogonal driver-level model, zero
+required scheduler changes" -- retry grants are issued entirely by
+``sim/driver.py``'s own HARQ seam and never reach ``Scheduler.
+allocate()`` at all. Already confirmed directly, not assumed, by this
+module's own commit-5 finding above: "every grant ``allocate()`` emits
+is [round 0] ... retransmissions never reach the candidate-building/
+grant-sizing code at all." So round-1 (retry) telemetry is structurally
+unobservable here -- an architectural consequence specific to this
+port's driver/scheduler split, not a missing ``Scheduler``-protocol hook
+of the do_sched/TA kind (that class of gap is a signal ranking needs but
+nothing supplies; this one is a grant class that never reaches this
+component to begin with).
+
+Given that, the ratchet's offset from ``mcs_index_for_snr``'s
+instantaneous pick is PROVABLY zero, not merely initialized at zero:
+``update_mcs_from_bler`` called with a round-counter pair that never
+increments has ``num_dl_sched`` permanently 0, so the ``num_dl_sched <=
+3`` branch fires every ``BLER_UPDATE_FRAME`` window and clamps at
+``min_mcs`` immediately (``max(old_mcs - 1, min_mcs) == min_mcs`` from
+the very first update, since ``old_mcs == min_mcs`` already) -- ``mcs``
+never leaves ``min_mcs``, so offset ``= mcs - min_mcs == 0``
+unconditionally, forever. Since that result is fully determined without
+ever executing the function, this commit does not call ``sim/olla.py``'s
+``OllaState``/``OllaRoundCounters``/``update_mcs_from_bler`` at all --
+there is no live call site for them, and building one anyway would add a
+``sim`` import this package explicitly rules out for itself two
+paragraphs below ("never on ``sim``"). ``_OLLA_OFFSET`` below is the
+constant `0`, cited to this reasoning; see ``sim/olla.py`` for the
+reference implementation this offset would use if retry telemetry ever
+reached ``allocate()``.
+
+**The ``sim``/``scheduler`` boundary question for OLLA is DEFERRED, not
+resolved, by that same fact.** Three ways to wire a live
+``update_mcs_from_bler`` call were considered and all rejected as
+premature: importing ``sim.olla`` directly (breaks this file's own
+"never on ``sim``" boundary, which is load-bearing for a different
+reason -- the UL intra-TB split, two paragraphs below -- weakening it
+here weakens that citation too); duplicating the primitives into
+``scheduler/link.py`` (takes on the exact two-copies drift risk this
+codebase warns against elsewhere, for a function that cannot execute);
+moving ``sim/olla.py`` into ``scheduler/`` (a diff spanning CLAUDE.md/
+README.md/``docs/wp5-plan.md``/``docs/oai-port-map.md`` to relocate a
+module nothing calls). It becomes a real decision only once retry
+telemetry reaches ``allocate()`` -- there is no call site to justify one
+answer over another before then. README.md sec8 [OPEN: WP9].
+
+**Sharing note for two-tier's own future OLLA commit**: this dormancy is
+a consequence of WP5 Decision 4 (driver-owned retransmission), not of
+reservation's scheduling policy, so it applies identically to two-tier's
+own future MCS-selection commit. Both arms must land the identical
+offset-pinned-at-zero disposition, or a two-tier-vs-reservation
+comparison would measure "one arm has OLLA, one doesn't" rather than a
+real scheduling difference.
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -350,7 +414,21 @@ from dataclasses import dataclass, field
 
 from .flow import FlowConfig
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
-from .link import bits_per_prb, cce_aggregation_level, mcs_index_for_snr
+from .link import (
+    bits_per_prb,
+    bits_per_prb_for_mcs,
+    cce_aggregation_level,
+    mcs_index_for_snr,
+)
+
+# Commit 9 (D2(b)): OLLA's ratchet offset from mcs_index_for_snr's
+# instantaneous pick -- provably 0 given this scheduler's available
+# inputs, not a placeholder. See the module docstring's commit-9 section
+# for the full derivation (num_dl_sched permanently 0 -> the C's own
+# "num_dl_sched <= 3" branch fires every window -> clamped at min_mcs
+# from the first update) and for why sim/olla.py's OllaState/
+# OllaRoundCounters/update_mcs_from_bler have no live call site here.
+_OLLA_OFFSET = 0
 
 # gNB_scheduler_ulsch.c:2205-2213, gNB_scheduler_dlsch.c:814-821: the PF
 # coefficient's `tbs` is a hypothetical grant at a hardcoded rbSize=1 and a
@@ -691,23 +769,44 @@ class Reservation:
                 state.dl_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
 
             snr = channel.get_reported_snr_db(ue_id)
-            bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
-            if bits_per_rb <= 0:
+            # Below-lowest-MCS-threshold viability gate -- a sim-only
+            # concept (real 3GPP MCS 0 is always transmittable; this
+            # crude staircase's floor threshold is not). Deliberately
+            # still keyed on the raw SNR walk (bits_per_prb), not the
+            # persisted MCS index below: mcs_index_for_snr floors at 0
+            # rather than returning "no viable MCS" (commit 8's own
+            # documented convention for a persisted field), so routing
+            # this gate through it would silently make an
+            # arbitrarily-low-SNR UE look transmittable. Found scoping
+            # this commit, not previously an issue since grant sizing
+            # didn't yet consume the persisted index.
+            if bits_per_prb(snr, symbols=symbols)[0] <= 0:
                 continue
 
-            # Commit 8 (D2(a)): persist this candidate's MCS index --
-            # gNB_scheduler_ulsch.c:2192's own per-candidate timing,
-            # before the sort. Not yet consumed (module docstring's
-            # commit-8 section) -- grant sizing above still reads
-            # bits_per_rb/bler directly, unaffected by this line.
+            # Commit 9 (D2(b)): the persisted MCS index now feeds grant
+            # sizing -- module docstring's commit-9 section. _OLLA_OFFSET
+            # is provably 0 given this scheduler's available inputs, not
+            # merely defaulted; mcs_index_for_snr(snr) alone still drives
+            # the result, matching commit 8's own value exactly.
+            mcs_index = mcs_index_for_snr(snr) + _OLLA_OFFSET
             if direction == "UL":
-                state.ul_mcs_index = mcs_index_for_snr(snr)
+                state.ul_mcs_index = mcs_index
             else:
-                state.dl_mcs_index = mcs_index_for_snr(snr)
+                state.dl_mcs_index = mcs_index
+
+            # gNB_scheduler_ulsch.c:2203-2213 / _dlsch.c:812-824: Qm/R
+            # (here, bits_per_rb/bler) derive from selected_mcs, not a
+            # fresh SNR pick -- ground truth's own call site, closing
+            # port-map row 15's flagged temporary substitution.
+            bits_per_rb, bler = bits_per_prb_for_mcs(mcs_index, symbols=symbols)
 
             # gNB_scheduler_ulsch.c:2205-2213,2301-2302 /
             # _dlsch.c:814-824: coef = hypothetical_1rb_tbs / max(thr, 1.0).
-            hyp_bits, _ = bits_per_prb(snr, symbols=_PF_COEF_HYPOTHETICAL_SYMBOLS)
+            # Same selected_mcs feeds this hypothetical TBS too (ground
+            # truth uses one Qm/R pick for both) -- port-map row 15.
+            hyp_bits, _ = bits_per_prb_for_mcs(
+                mcs_index, symbols=_PF_COEF_HYPOTHETICAL_SYMBOLS
+            )
             hyp_tbs_bytes = hyp_bits // 8
             thr = (
                 state.ul_thr_bytes_per_slot

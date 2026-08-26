@@ -709,29 +709,69 @@ these five, add a new tag rather than forcing it into an existing one.
   for small messages, more than the scheduling policy layered on top of
   it does.** WP9 should test this hypothesis directly across its full
   sweep, not as four separately-filed items that happen to rhyme.
-- `[OPEN: PHASE2]` **WP5 commit 6: OLLA's round-count MCS ratchet
-  (`get_mcs_from_bler`) is ported bug-for-bug and unit-tested, but doesn't
-  reach grant sizing — it's landed dormant, the same way WP1's `sim/
-  power.py` was.** This simulator has no persistent per-UE MCS anywhere
-  grant sizing reads (link adaptation here is entirely stateless: a
-  function of instantaneous, possibly-CQI-delayed SNR). Real hardware's
-  `get_mcs_from_bler` output reaches exactly one call site — it directly
-  becomes the grant's MCS before TBS sizing. The only route to feed a
-  ratcheted value in without touching scheduler code is wrapping
-  `ChannelModel.get_reported_snr_db()` (matching the pattern already used
-  for HARQ's `HarqAwareBufferView`/`ReducedSlotView`) — but every current
-  scheduler calls that same method for things that have nothing to do
-  with MCS selection: PF's ranking, `TwoTier`'s `_r_avg`, Tier-1's
-  capacity estimates. Wrapping it would feed OLLA's ratcheted value into
-  every one of those unrelated reads too, silently distorting scheduler
-  behaviour that no test checks and no metric attributes to OLLA — not a
-  fidelity trade-off, a different mechanism wearing OLLA's name. **Not
-  built**: activation belongs in Phase 2's fresh scheduler rewrite, where
-  MCS selection can live at the one call site it actually needs to.
-  `sim/olla.py` is ready for that — pure functions/dataclasses, unit-
-  tested against the C's exact -1/+1 asymmetry (`docs/wp5-plan.md`
-  commit 6) — Phase 2 needs to design the per-UE manager/wiring, not
-  re-derive the ratchet itself.
+- `[OPEN: WP9]` **Reservation's OLLA ratchet is wired to a real
+  per-candidate call site (commits 8/9) but the offset it would apply is
+  provably 0 — a different, newly-found blocker than the one this entry
+  originally described, not the same one persisting.** The original
+  concern (below, kept for history) was that this simulator's link
+  adaptation was entirely stateless and the only zero-scheduler-change
+  route to feed a ratcheted MCS in — wrapping
+  `ChannelModel.get_reported_snr_db()` — would pollute every other reader
+  of that method. Phase 2's reservation scheduler resolved exactly that:
+  commit 8 gave the ratchet a genuine per-UE-per-direction home
+  (`_UeState.ul_mcs_index`/`dl_mcs_index`, scheduler-internal, not a
+  `ChannelView` wrapper), and commit 9 wired grant sizing to read it
+  (`scheduler/link.py::bits_per_prb_for_mcs`), closing `docs/
+  oai-port-map.md` row 15's flagged temporary substitution. **The blocker
+  that remains is upstream of wiring: `get_mcs_from_bler`'s trigger
+  (`NR_mac_dir_stats_t.rounds[0]`/`[1]`, new-tx/first-retry grant counts)
+  is incremented in ground truth at grant-finalization time, by the SAME
+  component that issues both new-tx and retry grants
+  (`gNB_scheduler_dlsch.c:1203`/`_ulsch.c:2756`, inside
+  `post_process_dlsch`/the PUSCH PDU build).** In this simulator that
+  symmetry doesn't hold: WP5 Decision 4 made retransmission scheduling an
+  "orthogonal driver-level model, zero required scheduler changes" — retry
+  grants are issued entirely by `sim/driver.py`'s HARQ seam and never
+  reach `Scheduler.allocate()` (`scheduler/reservation.py:204-213`'s own
+  commit-5 finding: "every grant `allocate()` emits is round 0 ...
+  retransmissions never reach the candidate-building/grant-sizing code at
+  all"). Round-1 telemetry is therefore structurally unobservable to any
+  scheduler in this codebase, not just reservation's — a consequence of
+  the driver/scheduler HARQ split, not a missing `Scheduler`-protocol
+  hook of the `do_sched`/TA kind (that class of gap is a signal ranking
+  needs but nothing supplies; this one is a grant class that never
+  reaches the scheduler component to begin with). Reservation's
+  `_OLLA_OFFSET` is pinned at the literal `0`, cited to this reasoning,
+  rather than calling `sim/olla.py`'s `update_mcs_from_bler` against
+  counters that can only ever read 0 — the result is identical either way
+  (provably: `num_dl_sched` permanently 0 forces the C's own
+  `num_dl_sched <= 3` branch every `BLER_UPDATE_FRAME` window, clamped at
+  `min_mcs` from the first update), so no call site exists to justify
+  choosing between importing `sim.olla` into `scheduler/` (breaks
+  `reservation.py`'s own "never on `sim`" boundary), duplicating the
+  primitives into `scheduler/link.py` (drift risk for code that cannot
+  execute), or relocating `sim/olla.py` into `scheduler/` (a diff
+  spanning this file, CLAUDE.md, `docs/wp5-plan.md`, and `docs/
+  oai-port-map.md` to move a module nothing calls). **That `sim`/
+  `scheduler` boundary question is deferred, not resolved** — it becomes
+  live only if retry telemetry ever reaches `allocate()`, e.g. via a
+  `Scheduler`-protocol extension analogous to `SchedulerContextReset`.
+  **Two-tier's own future OLLA commit hits the identical wall**: this is
+  a property of WP5 Decision 4, not of reservation's scheduling policy,
+  so whatever disposition eventually unblocks this must land identically
+  on both arms, or a two-tier-vs-reservation comparison would measure
+  "one arm has OLLA, one doesn't" rather than a real scheduling
+  difference.
+
+  **Original concern, for history — resolved by commits 8/9's design, not
+  by this new blocker's absence:** real hardware's `get_mcs_from_bler`
+  output reaches exactly one call site per direction — it directly
+  becomes the grant's MCS before TBS sizing, and reservation's own
+  candidate-build/grant-sizing call sites now mirror that (port-map row
+  15). `sim/olla.py` remains ready as the reference implementation
+  (pure functions/dataclasses, unit-tested against the C's exact -1/+1
+  asymmetry, `docs/wp5-plan.md` commit 6) for whichever scheduler package
+  eventually gets a live call site for it.
 
   **The compounding-vs-coincidence test designed while scoping this
   commit couldn't run with OLLA dormant — recorded here so it isn't lost
