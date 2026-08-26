@@ -905,24 +905,40 @@ def test_ul_target_above_backlog_grants_more_prbs_than_backlog_alone():
     # floors to 0, rem_slots floors to 1, target caps at max_burst=1000
     # -- deterministic regardless of estimated_ul_buffer_per_lcg's value
     # (obligation/deficit/target/max_burst never read it; only the
-    # overflow->be_bytes step below does).
+    # overflow->be_bytes step below does). Confirmed independently first,
+    # via the pure functions, before checking the real wiring below --
+    # if this part disagrees with the end-to-end result, that's two
+    # different findings, not one.
     has_gbr, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=401)
     assert guaranteed == 1000  # confirms the deficit actually reached the cap
     assert be == 5000 - 1000  # overflow beyond the target, from the high estimate
-
     backlog_bytes = buffers.state(1, 1).bytes_reported
     assert backlog_bytes == 100
-
     target = _ul_grant_target(
         backlog_bytes=backlog_bytes, guaranteed_bytes=guaranteed, be_bytes=be,
         has_gbr=has_gbr, gbr_bytes_slot=0, has_srb=False, srb_lcg0_estimate=0,
     )
     assert target == guaranteed + be  # the backlog floor is a no-op here
 
-    bits_per_rb = 240  # representative; the assertion below must hold at any value
-    prbs_needed_target = -(-(target * 8) // bits_per_rb)
-    prbs_needed_backlog = -(-(backlog_bytes * 8) // bits_per_rb)
-    assert prbs_needed_target > prbs_needed_backlog
+    # Now the real wiring: call allocate() itself and read the actual
+    # emitted grant's `prbs`, rather than re-deriving ceil(bytes*8/bpr)
+    # by hand from `target` a second time. That comparison would be
+    # tautological once `target > backlog_bytes` is already established
+    # above (ceil division is monotonic in the numerator for any
+    # positive bits_per_rb) and would not catch a wiring regression --
+    # e.g. _allocate_direction reverting to `ue_backlog` for
+    # `prbs_needed` while `_ul_grant_target` itself stayed correct.
+    from scheduler.link import bits_per_prb
+
+    slot = _FakeSlot(slot_index=401, dl_symbols=0, ul_symbols=14, prb_count=273)
+    channel = _FakeChannel({1: 20.0})
+    allocations = sched.allocate(slot, buffers, channel)
+    assert len(allocations) == 1
+    granted_prbs = allocations[0].prbs
+
+    bpr, _ = bits_per_prb(20.0, symbols=14)
+    prbs_needed_backlog_only = -(-(backlog_bytes * 8) // bpr)
+    assert granted_prbs > prbs_needed_backlog_only
 
 
 def test_target_below_backlog_leaves_sizing_unchanged():
