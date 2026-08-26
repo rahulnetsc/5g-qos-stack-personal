@@ -1572,3 +1572,88 @@ def test_dl_fill_excludes_flows_that_get_zero_bytes():
     fills = sched._dl_fill([flow_a, flow_b], tbs_bytes=735, buffers=buffers)
     assert fills == [(1, 735)]
     assert 2 not in dict(fills)
+
+
+# -- 7. min_rb wiring -- doc-only, no code, no new tests -------------------
+
+
+# -- 8. persistent per-UE MCS index (D2(a)) --------------------------------
+
+
+def test_mcs_index_for_snr_matches_the_row_walk():
+    """scheduler/link.py's new mcs_index_for_snr must derive from the
+    SAME staircase walk _mcs_row_for_snr already uses, not a second,
+    independent one -- checked directly against the row's own position
+    in _MCS_TABLE, not just trusted from the refactor."""
+    from scheduler import link
+
+    for snr in [-5.0, -2.0, 0.0, 10.0, 16.0, 31.0, 40.0]:
+        idx = link.mcs_index_for_snr(snr)
+        row = link._mcs_row_for_snr(snr)
+        if row is None:
+            assert idx == 0  # floors, unlike the row-based lookup's None
+        else:
+            assert link._MCS_TABLE[idx] == row
+
+
+def test_mcs_index_for_snr_floors_at_zero_below_lowest_threshold():
+    from scheduler import link
+
+    assert link.mcs_index_for_snr(-100.0) == 0
+
+
+def test_ul_and_dl_mcs_index_persisted_at_candidate_build_time():
+    """Matches the C's own per-candidate timing
+    (gNB_scheduler_ulsch.c:2192, inside the per-UE ranking loop, before
+    the qsort) -- computed for every candidate considered this slot,
+    not just the eventual winner, and independently per UE/direction."""
+    from scheduler.link import mcs_index_for_snr
+
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=2000)
+    buffers.set(2, 1, bytes_queued=2000)
+    channel = _FakeChannel({1: 16.0, 2: 25.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+
+    sched.allocate(slot, buffers, channel)
+
+    assert sched._ue_state[1].ul_mcs_index == mcs_index_for_snr(16.0)
+    assert sched._ue_state[2].dl_mcs_index == mcs_index_for_snr(25.0)
+
+
+def test_mcs_index_persisted_but_not_yet_consumed_by_grant_sizing():
+    """Commit 8's own doubly-inert claim, verified directly rather than
+    just asserted: pre-seeding the persisted MCS index with a nonsense
+    value before allocate() must not change what's actually granted --
+    grant sizing still reads bits_per_rb/bler straight from
+    bits_per_prb. Also confirms the field is recomputed fresh every
+    slot (overwriting the pre-seeded nonsense), not read-then-preserved
+    -- commit 9's OLLA ratchet is what makes this field a real input
+    rather than pure output."""
+    def make_scheduler():
+        sched = Reservation()
+        flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
+        sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+        return sched
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=2000)
+    channel = _FakeChannel({1: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+
+    sched_clean = make_scheduler()
+    out_clean = sched_clean.allocate(slot, buffers, channel)
+
+    sched_corrupted = make_scheduler()
+    sched_corrupted._ue_state[1].ul_mcs_index = 999  # nonsense, pre-seeded
+    out_corrupted = sched_corrupted.allocate(slot, buffers, channel)
+
+    assert [(a.prbs, a.bytes_capacity) for a in out_clean] == \
+        [(a.prbs, a.bytes_capacity) for a in out_corrupted]
+    assert sched_corrupted._ue_state[1].ul_mcs_index != 999

@@ -30,17 +30,51 @@ _MCS_TABLE = [
 ]
 
 
-def _mcs_row_for_snr(snr_db: float) -> tuple[float, float, float] | None:
-    """Return the (threshold, se, bler) row of _MCS_TABLE the scheduler
-    would pick at ``snr_db``, walking the staircase from the bottom. None
-    if snr_db is below the lowest threshold (no viable MCS)."""
-    row = None
-    for entry in _MCS_TABLE:
+def _mcs_index_for_snr(snr_db: float) -> int | None:
+    """Return the index into ``_MCS_TABLE`` the scheduler would pick at
+    ``snr_db``, walking the staircase from the bottom. None if ``snr_db``
+    is below the lowest threshold (no viable MCS).
+
+    The one staircase-walk implementation -- ``_mcs_row_for_snr`` and
+    the public ``mcs_index_for_snr`` (Phase 2 D2(a), a persistent
+    per-UE MCS index) both derive from this rather than each walking
+    ``_MCS_TABLE`` a second, independent time. Two functions
+    independently walking one table is how they drift.
+    """
+    idx = None
+    for i, entry in enumerate(_MCS_TABLE):
         if snr_db >= entry[0]:
-            row = entry
+            idx = i
         else:
             break
-    return row
+    return idx
+
+
+def _mcs_row_for_snr(snr_db: float) -> tuple[float, float, float] | None:
+    """Return the (threshold, se, bler) row of _MCS_TABLE the scheduler
+    would pick at ``snr_db`` -- see ``_mcs_index_for_snr`` for the walk.
+    None if ``snr_db`` is below the lowest threshold (no viable MCS)."""
+    idx = _mcs_index_for_snr(snr_db)
+    return None if idx is None else _MCS_TABLE[idx]
+
+
+def mcs_index_for_snr(snr_db: float) -> int:
+    """Public: the MCS index (0-based position in ``_MCS_TABLE``) the
+    scheduler would pick at ``snr_db`` -- for a persistent per-UE MCS
+    index (Phase 2 D2(a), ``scheduler/reservation.py``'s commit-8
+    section; ``sim/olla.py``'s ``MCS_INDEX_COUNT=12`` already matches
+    this table's size, built against it from the start).
+
+    Returns ``0`` (the floor), not ``None``, when ``snr_db`` is below
+    the lowest threshold -- matching ``sim/olla.py::init_olla_state``'s
+    own floor-at-``min_mcs`` convention. A persisted per-UE MCS index
+    must always be a concrete, assignable int; unlike ``bits_per_prb``
+    (where zero bits/PRB is itself a valid "untransmittable" answer) or
+    ``snr_to_prb_floor`` (which deliberately raises), there is no
+    "index -1" that would mean anything to a consumer of this value.
+    """
+    idx = _mcs_index_for_snr(snr_db)
+    return 0 if idx is None else idx
 
 
 def bits_per_prb(snr_db: float, symbols: int = 14) -> tuple[int, float]:

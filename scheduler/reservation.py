@@ -301,8 +301,38 @@ the cited lines:
   consequence; the discriminating test below is what currently guards
   it.
 
-Still explicitly deferred to later commits: MCS selection via OLLA
-(commit 8/9).
+Commit 8 (D2(a), ``docs/phase2-plan.md``) lands a real per-UE-per-
+direction MCS-selection call site -- link adaptation has had no
+persistent home anywhere in this scheduler until now (every prior
+commit re-derives ``bits_per_rb``/``bler`` fresh from instantaneous SNR
+every slot, nothing stored). Uses the existing static staircase
+(``scheduler/link.py``'s new ``mcs_index_for_snr``, built as a thin
+wrapper sharing ``_mcs_row_for_snr``'s one staircase-walk implementation
+rather than a second, independent walk of ``_MCS_TABLE`` -- checked
+before writing it, not assumed). ``sim/olla.py``'s own
+``MCS_INDEX_COUNT = 12`` already matches this table's size exactly --
+built against it from the start (WP5), so no table-size reconciliation
+is needed here.
+
+Computed at candidate-build time, matching the C's own timing
+(``gNB_scheduler_ulsch.c:2192``, inside the per-UE ranking loop, before
+the ``qsort`` -- for every candidate considered this slot, not just the
+eventual winner) -- but **not yet consumed by anything**: grant sizing
+still reads ``bits_per_rb``/``bler`` directly from ``bits_per_prb``,
+unchanged. This makes the commit **doubly inert**, and the two reasons
+are independent, not restatements of each other: (1) nothing imports
+``Reservation`` yet (the standing reason, same as every prior commit in
+this lineage); (2) the stored ``ul_mcs_index``/``dl_mcs_index`` value
+is written but never read by anything in this module. Reason (2)
+expires at commit 9 -- OLLA's ratchet is what starts reading (as the
+prior state to update) and writing (the ratcheted result) this same
+field. Scoring commit 9's own prediction later must not credit it with
+falsifying "nothing imports Reservation" (reason 1, still true then) --
+what commit 9 actually changes is reason 2 alone.
+
+Still explicitly deferred: OLLA's own ratchet (commit 9), which swaps
+the static lookup above for ``sim/olla.py``'s ``OllaState``/
+``update_mcs_from_bler`` at this exact call site.
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -320,7 +350,7 @@ from dataclasses import dataclass, field
 
 from .flow import FlowConfig
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
-from .link import bits_per_prb, cce_aggregation_level
+from .link import bits_per_prb, cce_aggregation_level, mcs_index_for_snr
 
 # gNB_scheduler_ulsch.c:2205-2213, gNB_scheduler_dlsch.c:814-821: the PF
 # coefficient's `tbs` is a hypothetical grant at a hardcoded rbSize=1 and a
@@ -519,6 +549,17 @@ class _UeState:
     ul_lcg_last_grant_slot: dict[int, int] = field(default_factory=dict)
     dl_flow_deficit_bytes: dict[int, int] = field(default_factory=dict)
     dl_flow_last_grant_slot: dict[int, int] = field(default_factory=dict)
+    # Commit 8 (D2(a)): a persistent per-UE-per-direction MCS index --
+    # link adaptation has no stored home anywhere in this scheduler
+    # before this. Computed at candidate-build time (matching the C's
+    # own timing, gNB_scheduler_ulsch.c:2192, inside the per-UE loop
+    # before the qsort -- for every candidate, not just the eventual
+    # winner) from the SAME instantaneous SNR bits_per_rb/bler already
+    # use. NOT yet read by anything -- grant sizing still calls
+    # bits_per_prb directly, unchanged. Provably inert this commit;
+    # commit 9's OLLA ratchet is what starts reading and updating this.
+    ul_mcs_index: int = 0
+    dl_mcs_index: int = 0
 
 
 # Deficit accumulation gating differs between directions -- a real
@@ -653,6 +694,16 @@ class Reservation:
             bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
             if bits_per_rb <= 0:
                 continue
+
+            # Commit 8 (D2(a)): persist this candidate's MCS index --
+            # gNB_scheduler_ulsch.c:2192's own per-candidate timing,
+            # before the sort. Not yet consumed (module docstring's
+            # commit-8 section) -- grant sizing above still reads
+            # bits_per_rb/bler directly, unaffected by this line.
+            if direction == "UL":
+                state.ul_mcs_index = mcs_index_for_snr(snr)
+            else:
+                state.dl_mcs_index = mcs_index_for_snr(snr)
 
             # gNB_scheduler_ulsch.c:2205-2213,2301-2302 /
             # _dlsch.c:814-824: coef = hypothetical_1rb_tbs / max(thr, 1.0).
