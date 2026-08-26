@@ -582,7 +582,7 @@ argument `docs/wp-join-plan.md` commit 1 used for `sim/join.py`)
 | 4a | **Landed.** Wired `guaranteed_bytes + be_bytes` (commit 3's own output, previously computed but unconsumed) into grant *sizing* as the `nr_find_nb_rb`-equivalent target (`_ul_grant_target`/`_dl_grant_target`, pure functions; `gNB_scheduler_ulsch.c:2492-2512`/`_dlsch.c:1003-1019`), replacing backlog-only sizing. Also landed `gbr_bytes_slot` (`:2304-2316`, a MAX-not-sum, non-deduped, unfloored per-slot rate) and its own separate MFBR-keyed gate `_ul_has_pending_gbr` (`:38-67`) — found scoping this commit, not in the original plan text: `gbr_bytes_slot`'s whole loop is gated on `has_pending_gbr`, itself set by a *third*, independently-per-LCG-deduped scan keyed on `mfbr_bps` (MFBR), not `gfbr_bps`. D1/D2/D3 (§3) implemented as decided. See `docs/oai-port-map.md` rows 25/26 for full citations and the three structurally-unreachable sub-mechanisms this commit ports anyway (`gbr_bytes_slot`'s two independent dormancy reasons, the `B`-floor branch, and the permanent `has_srb` no-op) — each tested directly through the pure functions, not via a constructed scenario. | Inert — confirmed (25th prediction). |
 | 5 | **Landed.** Deficit-drain: UL bug-for-bug (full `tb_size` credited per active LCG, comment vs. code quoted verbatim in `docs/oai-port-map.md` row 29); DL's genuinely-correct per-LC drain by actual delivered bytes (row 30) — confirmed directly against source, not inherited from this table. Also folds in two found-scoping-this-commit corrections to commit 3's own stamping, in opposite directions: UL was under-stamping/under-draining (iterated `c.flows`, gated on the crumb-gated `bytes_reported` view, instead of `self._flows` gated on the true `estimated_ul_buffer_per_lcg`); DL was over-stamping (iterated all of `c.flows` instead of only the flows `_dl_fill` actually gave bytes to). DL's stamp fix is live on `scenario_config_6.yml`'s UE 10 (two DL flows) once commit 10 wires this scheduler in — not purely hypothetical. | Inert — confirmed (27th prediction). |
 | 6 | **Landed.** Real two-pass DL LCP (`docs/oai-port-map.md` row 31), replacing commit 1's priority-sorted placeholder (row 17). Confirmed genuinely two-pass (unlike two-tier's own single-pass-despite-comment DL LCP) but NOT priority-ordered within the DRB pass — "existing lc_config order," confirmed by reading the loop directly (the only `qsort` in the file is the inter-UE comparator). SRB pass recorded not-applicable (no SRB data model to gate on at all). `scheduler/flow.py`'s `FIVE_QI_PRIORITY` docstring corrected to scope its reordering-fragility rationale to UL only; `README.md` sec8 records the DL consequence. | Inert — confirmed (28th prediction). |
-| 7 | `min_rb`/`min_grant_prb` wired as a fixed scheduler-config scalar. | Inert. |
+| 7 | **Landed by commit 4, confirmed doc-only here.** Re-read every `min_rb`/`min_grant_prb`/`min_rbSize` use site in both directions and diffed against what commit 4 (and commit 6) already ported: the follower-budget formula and the post-budget skip's `available_rb<min_rb` clause are both fully ported (`docs/oai-port-map.md` row 27/28). The skip's OTHER clause (`rbStart+min_rb>bwpSize`) is **provably redundant**, not merely unmodeled — the `available_rb` scan's own loop bound guarantees `rbStart+available_rb<=bwpSize` always, so `available_rb>=min_rb` already implies the first clause is false; commit 4's single-clause port is complete, not approximate. Two real gaps found and corrected in row 27: UL's own per-beam pre-check (`:2376`, never previously flagged — DL's twin at `:877` was already in row 28) and the missing citation for it. `min_rb`'s remaining use sites (`nr_find_nb_rb`'s PRB-search bound, `nr_ue_max_mcs_min_rb`'s power-shrink input) are independently out of scope already — the former is the real TBS-table search this whole codebase substitutes with `scheduler/link.py`'s staircase everywhere (D2's own decision), the latter is WP1's already-dormant `sim/power.py::shrink_to_power_budget`. No code change. | **A different kind of inert than every prior commit**: not "nothing imports Reservation" (still separately true) but "no code changed at all" — the 29th prediction is trivially inert, not scored against the usual mechanism. |
 | 8 | MCS-selection call site (static staircase) — shared groundwork for D2. | Inert. |
 | 9 | OLLA activation follow-on (D2b) — includes the compounding-vs-coincidence test (D2, item ii). | Inert (still no scenario references this scheduler). |
 | 10 | Wire into `scripts/scheduler_study.py` as a new arm; **capture new baseline records** (`study1`'s 4 `overload_mult` cases at minimum; extend to `study2`/`study3` if meaningful) — net-new `"…/Reservation"` keys in `baseline_studies_1_3.json`. | Net-new addition, not a re-baseline — does not trigger the "don't `--capture` to silence a diff" rule. |
@@ -674,7 +674,7 @@ promote any of them as a side effect of this work.
 
 ## 7. Status
 
-Reservation commits 1, 2, 3, 3a, 4a, 4, 5 and 6 landed; two-tier not
+Reservation commits 1, 2, 3, 3a, 4a, 4, 5, 6 and 7 landed; two-tier not
 started. Two user decisions (D1, D2) obtained directly and recorded
 above before any code, matching `docs/wp-join-plan.md`'s D0a/D0b
 precedent. Sequencing (D4): reservation first, two-tier second.
@@ -690,11 +690,15 @@ post-grant deficit drain (rows 29/30), plus two corrections to commit
 stamped, DL over-stamped). Commit 6 lands the real two-pass DL LCP
 (row 31), replacing commit 1's priority-sorted placeholder (row 17) —
 DL fill order turns out to be declaration order, not priority, a rule
-the placeholder never had. Next: commit 7 (`min_rb`/`min_grant_prb`
-wired as a fixed scheduler-config scalar — largely done already, since
-commit 4 had to pull the UL half of this forward; check what's
-actually left before assuming the full scope of the original checklist
-item still applies).
+the placeholder never had. Commit 7 turned out to be **doc-only**: every
+`min_rb`/`min_grant_prb`/`min_rbSize` use site in both directions was
+re-read and diffed against commits 4/6 — the follower budget and the
+post-budget skip's live clause were already fully ported, the skip's
+other clause is provably redundant (not merely unmodeled), and the two
+real gaps found (UL's own beam pre-check, never previously flagged; the
+missing redundancy proof) are now recorded in row 27. No code changed.
+Next: commit 8 (a real per-UE-per-direction MCS-selection call site,
+D2(a) — the shared groundwork for OLLA activation).
 
 **Commit 6, like commit 5, is not another "mostly dead" commit.** Its
 core effect — draining the invented priority sort and using the real
