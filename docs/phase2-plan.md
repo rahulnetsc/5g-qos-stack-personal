@@ -580,7 +580,7 @@ argument `docs/wp-join-plan.md` commit 1 used for `sim/join.py`)
 | 4 | **Landed.** Follower budget, both directions, their two genuinely different bases (UL: fixed `slot.prb_count`/`min_rb`, a deliberate operator-choice constant defaulting to 5, cited to the calibration campaign — not the config-parser default it numerically coincides with; DL: the *current* `prbs_left` at each candidate's turn/hardcoded `min_rbSize=5`). `needs_service` ported as the real formula (`_ul_needs_service`/`_dl_needs_service`) though structurally always-`True` today given the candidate pre-filter. **Automated property test: `n_followers=0` degenerates to unconstrained budget** — the acceptance criterion, checked directly, not eyeballed, and corrected in scope (§2.2, §7) from an earlier "reservation reduces to plain PF" overclaim. Port-map rows 27/28. | Inert — confirmed (26th prediction). |
 | 3a | **Correction commit, added after commit 3 landed — its own commit, not an amendment, following the precedent commit 3 itself set for commit 2's `pdb_ms` bug.** Commit 3 ported the deficit block's right quantities in the wrong *type*: float ms where the C is integer throughout (grant age truncated to whole ms before subtraction, `window` truncating the ratio, `rem_slots` truncated then floored at 1, `target` an integer division, deficit stored as int). Load-bearing rather than cosmetic: `pdb_ms` is a comparator tier, so int-ms granularity makes UEs within one millisecond tie there and fall through to the PF coefficient — live on the corpus's own numerology for any odd slot count since a grant. Also lands the `pdb > 0 ? pdb : 300` fallback and the `9999` best-remaining sentinel, both found in the same read. **Checked and found symmetric across UL/DL** (all four truncation sites identical, including that both truncate the window's ratio not its product) — one shared port-map row 24, not a fifth asymmetry. Moved one existing commit-3 expectation (201 → 100), kept as evidence the correction is behavioural. | Inert — same "nothing imports it" claim as commits 1-3; the arithmetic change is *not* itself neutral and will move grant order once commit 10 wires the scheduler in. |
 | 4a | **Landed.** Wired `guaranteed_bytes + be_bytes` (commit 3's own output, previously computed but unconsumed) into grant *sizing* as the `nr_find_nb_rb`-equivalent target (`_ul_grant_target`/`_dl_grant_target`, pure functions; `gNB_scheduler_ulsch.c:2492-2512`/`_dlsch.c:1003-1019`), replacing backlog-only sizing. Also landed `gbr_bytes_slot` (`:2304-2316`, a MAX-not-sum, non-deduped, unfloored per-slot rate) and its own separate MFBR-keyed gate `_ul_has_pending_gbr` (`:38-67`) — found scoping this commit, not in the original plan text: `gbr_bytes_slot`'s whole loop is gated on `has_pending_gbr`, itself set by a *third*, independently-per-LCG-deduped scan keyed on `mfbr_bps` (MFBR), not `gfbr_bps`. D1/D2/D3 (§3) implemented as decided. See `docs/oai-port-map.md` rows 25/26 for full citations and the three structurally-unreachable sub-mechanisms this commit ports anyway (`gbr_bytes_slot`'s two independent dormancy reasons, the `B`-floor branch, and the permanent `has_srb` no-op) — each tested directly through the pure functions, not via a constructed scenario. | Inert — confirmed (25th prediction). |
-| 5 | Deficit-drain: UL bug-for-bug (full `tb_size` credited per active LCG); DL's genuinely-correct per-LC drain. Test asserts both behaviors explicitly, including that DL is *not* given UL's shortcut. | Inert. |
+| 5 | **Landed.** Deficit-drain: UL bug-for-bug (full `tb_size` credited per active LCG, comment vs. code quoted verbatim in `docs/oai-port-map.md` row 29); DL's genuinely-correct per-LC drain by actual delivered bytes (row 30) — confirmed directly against source, not inherited from this table. Also folds in two found-scoping-this-commit corrections to commit 3's own stamping, in opposite directions: UL was under-stamping/under-draining (iterated `c.flows`, gated on the crumb-gated `bytes_reported` view, instead of `self._flows` gated on the true `estimated_ul_buffer_per_lcg`); DL was over-stamping (iterated all of `c.flows` instead of only the flows `_dl_fill` actually gave bytes to). DL's stamp fix is live on `scenario_config_6.yml`'s UE 10 (two DL flows) once commit 10 wires this scheduler in — not purely hypothetical. | Inert — confirmed (27th prediction). |
 | 6 | Two-pass DL LCP (real SRB-pass-then-DRB-pass). | Inert. |
 | 7 | `min_rb`/`min_grant_prb` wired as a fixed scheduler-config scalar. | Inert. |
 | 8 | MCS-selection call site (static staircase) — shared groundwork for D2. | Inert. |
@@ -674,18 +674,35 @@ promote any of them as a side effect of this work.
 
 ## 7. Status
 
-Reservation commits 1, 2, 3, 3a, 4a and 4 landed; two-tier not started.
-Two user decisions (D1, D2) obtained directly and recorded above before
-any code, matching `docs/wp-join-plan.md`'s D0a/D0b precedent.
-Sequencing (D4): reservation first, two-tier second.
+Reservation commits 1, 2, 3, 3a, 4a, 4 and 5 landed; two-tier not
+started. Two user decisions (D1, D2) obtained directly and recorded
+above before any code, matching `docs/wp-join-plan.md`'s D0a/D0b
+precedent. Sequencing (D4): reservation first, two-tier second.
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/
 `be_bytes` fed grant sizing (`docs/oai-port-map.md` rows 25/26) before
 commit 4's follower budget capped it (rows 27/28), avoiding the
 "correct cap on the wrong quantity" failure shape commit 2's `pdb_ms`
-bug and commit 3's float-vs-int one both had. Next: commit 5 (deficit
-drain, bug-for-bug on UL).
+bug and commit 3's float-vs-int one both had. Commit 5 lands the
+post-grant deficit drain (rows 29/30), plus two corrections to commit
+3's own stamping found scoping it, in opposite directions (UL under-
+stamped, DL over-stamped — full detail in the port-map rows and the
+scoping-honesty note below). Next: commit 6 (the real two-pass SRB/DRB
+DL LCP).
+
+**Commit 5 is not another instance of "mostly dead code," and stating
+it that way would misrepresent it.** Unlike 4/4a's novel sub-mechanisms
+(`gbr_bytes_slot`, the B-floor, the follower-budget `has_srb` init),
+commit 5's *core* mechanism — draining a GBR flow's deficit by the
+bytes just granted — is live for any ordinary single-flow-per-LCG(UL)/
+per-flow(DL) GBR scenario already in this repo (e.g.
+`scenario_config_6.yml`'s UE 10 has a GBR UL flow). Only two specific,
+found-and-fixed **edge-case** bugs in commit 3's stamping are dormant
+or partially so — see below. The running "more dead than live per
+commit" observation does not extend cleanly to this one; it should not
+be repeated by default without checking each future commit the same
+way, not assumed to continue.
 
 **Scoping honesty — recomputed from the current row set, not
 hand-patched onto 4a's tally.** Every commit since 3 has widened this
@@ -697,8 +714,8 @@ categories, kept separate per instruction — merging them into one
 number would hide which kind of gap each is:
 
 **Dormant but ported** (real code, faithfully built and tested,
-currently unreachable given this repo's scenarios/signals) — **ten
-branches across five causes**:
+currently unreachable given this repo's scenarios/signals) — **twelve
+branches across six causes**:
 - *Cause A — no SRB/RRC-signaling traffic model (`has_srb` always
   `False`), five branches*: the sort tier in both comparators (row 18,
   row 19); both control-only caps from 4a (row 25, row 26); UL's
@@ -718,23 +735,43 @@ branches across five causes**:
 - *Cause D — `gbr_bytes_slot`'s own two independent dormancy reasons,
   one branch* (row 25): no scenario configures `mfbr_bps`, and every
   scenario is single-flow-per-LCG.
-- *Cause E — the shared-LCG construction no scenario produces, one
-  branch*: the `if (ul_target < B)` floor (row 25).
+- *Cause E — the shared-LCG construction no scenario produces, two
+  branches*: the `if (ul_target < B)` floor (row 25); UL's deficit-
+  drain/stamp fix, new in commit 5 (row 29) — under-stamping/under-
+  draining an LCG with a real estimate but a crumb-gated zero report
+  is, structurally, the same shared-LCG gap H5 exists to close.
+- *Cause F — no scenario configures two or more GBR-class DL flows on
+  one UE, one branch, new in commit 5*: the DRAIN half of DL's stamp
+  fix (row 30). **Not the same branch as the STAMP half** — see below,
+  the stamp half is not dormant.
 
 **Not applicable** (a different category — there is no signal here to
 port at all, not a signal this port carries but can't currently
-trigger) — **one item, new in commit 4**: DL's per-beam pre-check
-(row 28) — no beam modeling exists anywhere in `scheduler/`/`sim/`.
+trigger) — **one item**: DL's per-beam pre-check (row 28) — no beam
+modeling exists anywhere in `scheduler/`/`sim/`.
 
-Only two of the five dormancy causes are unlocked, even partially, by
+**Live, not dormant — worth stating separately since it cuts against
+this section's usual direction.** DL's stamp fix (row 30) has a live
+half: `_dl_gbr_and_pdb` folds `remaining_pdb` into `best_remaining_pdb`
+for *every* DL flow of a UE regardless of `flow_class` (gated only on
+`bytes_queued > 0`), so the fix shifts PDB-tier sort order for any
+multi-DL-flow UE, GBR or not — `sim/scenarios/scenario_config_6.yml`'s
+UE 10 already has two DL flows (qfi 9, qfi 82). This bug would be live
+there the moment commit 10 wires this scheduler in, not a scenario this
+commit's own tests had to invent from nothing. Recorded here rather
+than folded into either count above, since it is neither dormant-but-
+ported nor not-applicable — it is simply real, on an existing scenario,
+today.
+
+Only two of the six dormancy causes are unlocked, even partially, by
 `README.md` §8's H5 follow-up scenario (two same-class UL flows forced
-onto one `lcg`): cause E fully (the B-floor branch needs nothing else),
-cause D partially (`gbr_bytes_slot` needs the shared-LCG construction
-**plus** a nonzero `mfbr_bps`, so H5 alone is necessary but not
-sufficient). Causes A, B, and C are unrelated to H5 entirely — they
-need a SRB/RRC traffic model, a `do_sched`-equivalent protocol signal,
-and a TA model respectively, none of which any scenario construction
-fixes.
+onto one `lcg`): cause E fully (both the B-floor branch and UL's drain
+fix need nothing else), cause D partially (`gbr_bytes_slot` needs the
+shared-LCG construction **plus** a nonzero `mfbr_bps`, so H5 alone is
+necessary but not sufficient). Causes A, B, C, and F are unrelated to
+H5 entirely — they need a SRB/RRC traffic model, a `do_sched`-
+equivalent protocol signal, a TA model, and a GBR-class multi-DL-flow
+scenario respectively, none of which the H5 construction fixes.
 
 This is a scoping fact, not a defect: each branch was ported faithfully,
 cited, and tested directly through the pure functions/methods rather

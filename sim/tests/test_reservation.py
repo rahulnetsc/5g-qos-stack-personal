@@ -1341,3 +1341,176 @@ def test_dl_follower_budget_base_reflects_prbs_already_consumed_this_slot():
     assert by_ue[1].prbs == 40, "leader capped to bwp_size(50) - 2 followers*min_rbSize(5)"
     assert by_ue[2].prbs == 5, "UE2's base must be the CURRENT prbs_left (10) at its turn: 10 - 1*5 = 5, not 50 - 1*5 = 45"
     assert by_ue[3].prbs == 3
+
+
+# -- 5. the post-grant deficit drain, bug-for-bug -------------------------
+
+
+def test_ul_deficit_drains_full_tb_size_per_active_lcg_including_crumb_gated_ones():
+    """gNB_scheduler_ulsch.c:2760-2777, comment vs code, quoted verbatim
+    in docs/oai-port-map.md row 29: "distribute tb_size drain
+    proportionally across active LCGs" -- the code does not divide; it
+    subtracts the FULL tb_size from every active LCG independently.
+
+    Also covers the found-and-fixed bug (module docstring's commit-5
+    section): the C's iteration gate is estimated_ul_buffer_per_lcg>0
+    (the true per-LCG BSR estimate), not bytes_reported>0 (the
+    crumb-gated view c.flows is filtered on) -- flow B here is
+    crumb-gated to a ZERO report but still has a real estimate, so it
+    must still be stamped and drained. Built with BOTH flows on the
+    divergent path (not one PF + one crumb-gated) so a wrong
+    implementation that only iterates c.flows would fail this test
+    outright, not pass it by accident."""
+    sched = Reservation()
+    flow_a = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, pdb_ms=100.0, lcg=0,
+    )
+    flow_b = FlowConfig(
+        ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, pdb_ms=100.0, lcg=1,
+    )
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=500, estimated_ul_buffer_per_lcg=500)
+    buffers.set(
+        1, 2, bytes_queued=5000, bytes_reported=0,
+        estimated_ul_buffer_per_lcg=5000,
+    )
+
+    for _ in range(300):  # saturate both LCGs' deficits
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    deficit_a_before = sched._ue_state[1].ul_lcg_deficit_bytes[0]
+    deficit_b_before = sched._ue_state[1].ul_lcg_deficit_bytes[1]
+    assert deficit_a_before > 0 and deficit_b_before > 0
+
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+    channel = _FakeChannel({1: 20.0})
+    out = sched.allocate(slot, buffers, channel)
+    assert len(out) == 1
+    tbs_granted = out[0].bytes_capacity
+    assert tbs_granted > 0
+
+    # Stamped: BOTH LCGs, including flow B's crumb-gated one (absent
+    # from the eligible-candidate flow list entirely -- bytes_reported=0).
+    assert sched._ue_state[1].ul_lcg_last_grant_slot[0] == slot.slot_index
+    assert sched._ue_state[1].ul_lcg_last_grant_slot[1] == slot.slot_index
+
+    # Drained: the FULL tb_size credited to EACH active LCG
+    # independently -- not split, not skipped for the crumb-gated one.
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == max(0, deficit_a_before - tbs_granted)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[1] == max(0, deficit_b_before - tbs_granted)
+
+
+def test_dl_deficit_drains_by_the_real_per_flow_delivered_bytes():
+    """gNB_scheduler_dlsch.c:1451-1460 -- "drain GBR deficit by bytes
+    actually delivered," and the code does exactly that (confirmed
+    directly, not assumed from the charter -- no bug on DL). Two flows
+    on one UE, sized so _dl_fill's placeholder greedy pass gives them
+    DIFFERENT amounts -- confirms each flow's deficit drains by its OWN
+    delivered bytes, not a shared UE-level amount (which would be the
+    UL bug, wrongly ported to DL)."""
+    sched = Reservation()
+    flow_a = FlowConfig(
+        ue_id=1, qfi=1, direction="DL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, pdb_ms=100.0, priority_level=10,
+    )
+    flow_b = FlowConfig(
+        ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, pdb_ms=100.0, priority_level=20,
+    )
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=300)   # higher priority -- filled first, in full
+    buffers.set(1, 2, bytes_queued=6000)  # lower priority -- absorbs the remainder
+
+    for _ in range(300):
+        sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    deficit_a_before = sched._ue_state[1].dl_flow_deficit_bytes[1]
+    deficit_b_before = sched._ue_state[1].dl_flow_deficit_bytes[2]
+    assert deficit_a_before > 0 and deficit_b_before > 0
+
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=10, pdcch_cce_budget=48)
+    channel = _FakeChannel({1: 20.0})
+    out = sched.allocate(slot, buffers, channel)
+    by_qfi_bytes = {a.qfi: a.bytes_capacity for a in out}
+    assert set(by_qfi_bytes) == {1, 2}
+    assert by_qfi_bytes[1] != by_qfi_bytes[2], "need a genuinely different split to prove per-flow draining, not a coincidence"
+
+    assert sched._ue_state[1].dl_flow_deficit_bytes[1] == max(0, deficit_a_before - by_qfi_bytes[1])
+    assert sched._ue_state[1].dl_flow_deficit_bytes[2] == max(0, deficit_b_before - by_qfi_bytes[2])
+
+
+def test_dl_stamp_and_drain_skip_flows_that_got_no_fill_bytes():
+    """Correction to commit 3, found scoping commit 5 (module
+    docstring): DL's stamp (dl_lcid_last_drain_slot) and drain are
+    gated on lcid_bytes>0 per LC in the C -- a flow _dl_fill's greedy
+    priority pass never reaches gets NEITHER. Commit 3's original stamp
+    iterated ALL of c.flows unconditionally; this is the first fixture
+    where that would have been observably wrong -- a lower-priority
+    flow entirely starved of bytes this slot must have its
+    last_grant_slot/deficit UNTOUCHED, not stamped as if it had just
+    been served (which would understate its true PDB urgency at the
+    comparator tier once commit 10 wires this in)."""
+    sched = Reservation()
+    flow_a = FlowConfig(
+        ue_id=1, qfi=1, direction="DL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, pdb_ms=100.0, priority_level=10,
+    )
+    flow_b = FlowConfig(
+        ue_id=1, qfi=2, direction="DL", flow_class="GBR",
+        gfbr_bps=8_000_000.0, pdb_ms=100.0, priority_level=20,
+    )
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)  # absorbs the entire grant
+    buffers.set(1, 2, bytes_queued=6000)  # gets nothing this slot
+
+    for _ in range(300):
+        sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    deficit_b_before = sched._ue_state[1].dl_flow_deficit_bytes[2]
+    assert deficit_b_before > 0
+
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=10, pdcch_cce_budget=48)
+    channel = _FakeChannel({1: 20.0})
+    out = sched.allocate(slot, buffers, channel)
+    granted_qfis = {a.qfi for a in out}
+    assert granted_qfis == {1}, "flow A's backlog alone absorbs the whole grant -- flow B must get nothing"
+
+    assert 2 not in sched._ue_state[1].dl_flow_last_grant_slot, "flow B got no bytes -- must not be stamped"
+    assert sched._ue_state[1].dl_flow_deficit_bytes[2] == deficit_b_before, "flow B's deficit must be untouched"
+
+
+def test_deficit_drain_floors_at_zero_both_directions():
+    """The C's own floor (`if (...) < 0: ... = 0`), both directions --
+    a grant larger than the outstanding deficit must not leave it
+    negative."""
+    sched = Reservation()
+    ul_flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", flow_class="GBR",
+        gfbr_bps=8_000.0, pdb_ms=100.0, lcg=0,
+    )
+    sched.configure([ul_flow], slot_duration_s=0.0005, grid=_grid())
+    ul_buffers = _FakeBuffers()
+    ul_buffers.set(1, 1, bytes_queued=6000, estimated_ul_buffer_per_lcg=6000)
+    sched._ul_gbr_and_pdb(1, ul_buffers, slot_index=0)  # small, first-call obligation
+    ul_deficit_before = sched._ue_state[1].ul_lcg_deficit_bytes[0]
+    assert 0 < ul_deficit_before < 100
+
+    sched._ul_drain_and_stamp(1, ul_buffers, slot_index=1, tbs_bytes=999_999)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 0
+
+    dl_sched = Reservation()
+    dl_flow = FlowConfig(
+        ue_id=1, qfi=1, direction="DL", flow_class="GBR",
+        gfbr_bps=8_000.0, pdb_ms=100.0,
+    )
+    dl_sched.configure([dl_flow], slot_duration_s=0.0005, grid=_grid())
+    dl_buffers = _FakeBuffers()
+    dl_buffers.set(1, 1, bytes_queued=6000)
+    dl_sched._dl_gbr_and_pdb(1, dl_buffers, slot_index=0)
+    dl_deficit_before = dl_sched._ue_state[1].dl_flow_deficit_bytes[1]
+    assert 0 < dl_deficit_before < 100
+
+    dl_sched._dl_drain_and_stamp([(1, 999_999)], ue_id=1, slot_index=1)
+    assert dl_sched._ue_state[1].dl_flow_deficit_bytes[1] == 0

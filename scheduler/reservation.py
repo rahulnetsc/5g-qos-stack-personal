@@ -185,10 +185,66 @@ config override not present in this checkout. DL's own ``min_rbSize=5``
 same kind of quantity (source-fixed literal vs. operator choice) --
 never unified into one shared constant.
 
-Still explicitly deferred to later commits: the deficit *drain*
-bug-for-bug (commit 5), the real two-pass SRB/DRB DL LCP (commit 6,
-replacing ``_dl_fill``'s placeholder below), and MCS selection via
-OLLA (commit 8/9).
+Commit 5 lands the post-grant deficit drain, both directions --
+genuinely different, not a shared mechanism with incidentally-matching
+arithmetic:
+
+- **UL is the already-known bug, confirmed directly, not inherited
+  from the charter.** Comment at ``gNB_scheduler_ulsch.c:2772``, quoted
+  verbatim: *"distribute tb_size drain proportionally across active
+  LCGs."* The code (``:2769-2775``) does not divide -- it subtracts
+  the FULL ``tb_size`` from every active LCG's deficit independently.
+  Ported bug-for-bug: the code, not the comment.
+- **DL is genuinely correct, confirmed directly** (``:1451-1460``) --
+  "drain GBR deficit by bytes actually delivered," and the code does
+  exactly that: each LC's deficit drains by the real, per-LC bytes
+  ``_dl_fill`` (this module's placeholder two-pass LCP, commit 6's job
+  to replace) actually gave it, never a shared or aggregate amount.
+  No comment/code mismatch here; not the UL shortcut, ported anyway.
+- **A found-and-fixed asymmetry in the OTHER direction from the known
+  one, in commit 3's own stamping, not the drain itself.** Both
+  directions' stamp+drain are gated identically (``if (cur_harq->round
+  == 0)`` UL, the ``else { /* initial transmission */ }`` branch DL --
+  a genuine symmetry, not an asymmetry, and a non-issue for this port:
+  every grant ``allocate()`` emits is that case, since retransmissions
+  never reach the candidate-building/grant-sizing code at all -- they
+  are serviced by the driver's own HARQ seam before ``scheduler.
+  allocate()`` is ever called, the same "confirmed not a porting gap"
+  finding ``docs/phase2-plan.md`` sec2.1 already records). But WITHIN
+  that shared gate, UL and DL are gated on genuinely different
+  conditions, and commit 3's existing stamp code got BOTH wrong, in
+  OPPOSITE directions:
+  - UL's true gate is ``estimated_ul_buffer_per_lcg > 0`` (every active
+    LCG, regardless of which one's report happened to trigger the
+    grant) -- commit 3's stamp iterated the candidate's ``c.flows``
+    instead, which is filtered to ``bytes_reported > 0`` (the
+    crumb-gated view) and is therefore a possibly-STRICT SUBSET of the
+    C's own set (``bytes_reported <= estimated_ul_buffer_per_lcg``
+    always, WP3). Net effect: UNDER-stamping/under-draining -- an LCG
+    with a real backlog but a crumb-gated zero report was silently
+    skipped.
+  - DL's true gate is ``lcid_bytes > 0`` (only the specific LC that
+    actually received bytes in THIS fill) -- commit 3's stamp iterated
+    ALL of ``c.flows`` unconditionally, a SUPERSET whenever ``_dl_fill``
+    doesn't reach every eligible flow. Net effect: OVER-stamping -- a
+    flow entirely starved of bytes this slot would have been stamped
+    as if freshly served.
+  Both corrected here, in the same commit as the drain itself, since
+  the C updates stamp and drain together in one conditional block off
+  one per-LCG/per-LC value (``tb_size`` UL, ``lcid_bytes`` DL) -- not
+  two separable changes. UL's fix is dormant on every current scenario
+  (needs a shared-LCG construction, the same H5 gap already flagged
+  elsewhere). **DL's is not purely hypothetical**: the DRAIN half needs
+  a GBR-class multi-DL-flow UE (no scenario has one), but the STAMP
+  half feeds ``best_remaining_pdb`` for *every* DL flow regardless of
+  GBR status -- ``sim/scenarios/scenario_config_6.yml``'s UE 10 already
+  has two DL flows (qfi 9, qfi 82), so this bug would be live there,
+  shifting PDB-tier sort order, the moment commit 10 wires this
+  scheduler in.
+
+Still explicitly deferred to later commits: the real two-pass SRB/DRB
+DL LCP (commit 6, replacing ``_dl_fill``'s placeholder below), and MCS
+selection via OLLA (commit 8/9).
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -685,23 +741,26 @@ class Reservation:
 
             expected_bytes = tbs_bytes * (1.0 - c.bler)
             state = self._ue_state[c.ue_id]
+            fills: list[tuple[int, int]] | None = None
             if direction == "UL":
                 state.ul_thr_bytes_per_slot += _THR_EWMA_ALPHA * expected_bytes
-                # Last-grant-slot stamping (commit 3, fixes commit 2's
-                # pdb_ms proxy) -- NOT the deficit *drain*/decrement,
-                # which is a different field and stays commit 5's job
-                # (gNB_scheduler_ulsch.c:2761-ish, post_process_ulsch).
-                for f in c.flows:
-                    state.ul_lcg_last_grant_slot[f.lcg] = slot.slot_index
+                # Commit 5: stamp + drain (gNB_scheduler_ulsch.c:2760-2777,
+                # cur_harq->round==0 -- see module docstring for why every
+                # grant this port emits is that case).
+                self._ul_drain_and_stamp(c.ue_id, buffers, slot.slot_index, tbs_bytes)
             else:
                 state.dl_thr_bytes_per_slot += _THR_EWMA_ALPHA * expected_bytes
-                for f in c.flows:
-                    state.dl_flow_last_grant_slot[f.qfi] = slot.slot_index
+                # fills computed once here (not inside _emit_grant) so the
+                # SAME per-flow breakdown drives both the drain/stamp and
+                # the emitted Allocations -- gNB_scheduler_dlsch.c's own
+                # lcid_bytes feeds both in one conditional block.
+                fills = self._dl_fill(c.flows, tbs_bytes, buffers)
+                self._dl_drain_and_stamp(fills, c.ue_id, slot.slot_index)
 
             out.extend(
                 self._emit_grant(
-                    c.ue_id, direction, prbs_used, tbs_bytes, c.flows,
-                    buffers, cce_cost, c.snr_db,
+                    c.ue_id, direction, prbs_used, tbs_bytes,
+                    cce_cost, c.snr_db, fills,
                 )
             )
         return out
@@ -866,6 +925,91 @@ class Reservation:
                 return buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
         return 0
 
+    def _ul_drain_and_stamp(
+        self, ue_id: int, buffers: BufferView, slot_index: int, tbs_bytes: int,
+    ) -> None:
+        """``gNB_scheduler_ulsch.c:2760-2777`` (``post_process_ulsch``,
+        gated ``cur_harq->round == 0`` -- every grant this port emits is
+        that case, since retransmissions are handled entirely by the
+        driver's own HARQ seam before ``allocate()`` is ever called;
+        see the module docstring's commit-5 section).
+
+        Comment at ``:2772``, quoted verbatim: *"distribute tb_size
+        drain proportionally across active LCGs."* The code does not
+        divide -- it subtracts the FULL ``tb_size`` from every active
+        LCG's deficit independently. Ported bug-for-bug: the code, not
+        the comment.
+
+        Iterates ``self._flows`` (matching ``_ul_gbr_bytes_slot``'s own
+        pattern), **not** the candidate's ``c.flows`` -- ``c.flows`` is
+        filtered to ``bytes_reported > 0`` (the crumb-gated view), but
+        the C's own iteration gate is ``estimated_ul_buffer_per_lcg > 0``
+        (the true per-LCG BSR estimate), and ``bytes_reported <=
+        estimated_ul_buffer_per_lcg`` always (WP3) -- so ``c.flows``
+        deduped by LCG is a possibly-STRICT subset of the C's own
+        iteration set. Found and fixed scoping this commit: an LCG with
+        a positive estimate but a crumb-gated zero report would
+        otherwise be silently skipped here -- under-stamped (a stale
+        ``last_grant_slot`` inflates that LCG's age, shrinking
+        ``remaining_pdb`` and raising its urgency at the PDB comparator
+        tier once commit 10 wires this scheduler in -- live ordering
+        behaviour, not just bookkeeping) and under-drained.
+        """
+        state = self._ue_state[ue_id]
+        seen_lcgs: set[int] = set()
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            seen_lcgs.add(f.lcg)
+            state.ul_lcg_last_grant_slot[f.lcg] = slot_index
+            deficit = state.ul_lcg_deficit_bytes.get(f.lcg, 0)
+            if deficit > 0:
+                state.ul_lcg_deficit_bytes[f.lcg] = max(0, deficit - tbs_bytes)
+
+    def _dl_drain_and_stamp(
+        self, fills: list[tuple[int, int]], ue_id: int, slot_index: int,
+    ) -> None:
+        """``gNB_scheduler_dlsch.c:1451-1460``, gated ``lcid_bytes > 0``
+        per LC. No comment/code mismatch on DL's side -- "drain GBR
+        deficit by bytes actually delivered," and the code does exactly
+        that (confirmed directly, not assumed from the charter).
+
+        ``fills`` (from ``_dl_fill``) already IS that per-flow
+        breakdown -- a flow with ``take == 0`` is never appended there.
+        Correction to commit 3, found scoping this commit: the existing
+        stamp iterated ALL of ``c.flows`` unconditionally, not just the
+        ones ``_dl_fill`` actually gave bytes to. What commit 3 did:
+        stamped every flow of a granted UE, every slot. What the C
+        does: stamps (and drains) only the specific LCID that received
+        nonzero bytes in *this* fill. Why no test caught it: every
+        scenario to date is single-flow-per-UE-per-direction, where
+        "the UE got a grant" and "this flow got bytes" trivially
+        coincide.
+
+        The DRAIN half of this fix is dormant on every current scenario
+        -- ``dl_flow_deficit_bytes`` only ever gets an entry for a
+        GBR-class flow, and no scenario configures a UE with two or
+        more GBR DL flows. But the STAMP half is **not** purely
+        hypothetical: ``_dl_gbr_and_pdb`` folds ``remaining_pdb`` into
+        ``best_remaining_pdb`` for *every* DL flow of a UE regardless of
+        ``flow_class`` (gated only on ``bytes_queued > 0``), reading
+        ``dl_flow_last_grant_slot`` per flow -- so a wrongly-over-stamped
+        flow's inflated "recently served" illusion feeds the PDB
+        comparator tier for any multi-DL-flow UE, GBR or not.
+        ``sim/scenarios/scenario_config_6.yml``'s UE 10 already has two
+        DL flows (qfi 9, PF; qfi 82, Delay-class) -- this bug would be
+        live there the moment commit 10 wires this scheduler in, not a
+        purely constructed-for-testing scenario.
+        """
+        state = self._ue_state[ue_id]
+        for qfi, byts in fills:
+            state.dl_flow_last_grant_slot[qfi] = slot_index
+            deficit = state.dl_flow_deficit_bytes.get(qfi, 0)
+            if deficit > 0:
+                state.dl_flow_deficit_bytes[qfi] = max(0, deficit - byts)
+
     def _dl_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
     ) -> tuple[bool, int, int, int]:
@@ -1017,10 +1161,9 @@ class Reservation:
         direction: str,
         prbs_used: int,
         tbs_bytes: int,
-        ue_flows: list[FlowConfig],
-        buffers: BufferView,
         cce_cost: int,
         snr_used_db: float,
+        fills: list[tuple[int, int]] | None,
     ) -> list[Allocation]:
         if direction == "UL":
             # The gNB sizes the block; the UE fills it (TS 38.321
@@ -1036,7 +1179,10 @@ class Reservation:
                 )
             ]
 
-        fills = self._dl_fill(ue_flows, tbs_bytes, buffers)
+        # Commit 5: fills is computed once by the caller (alongside the
+        # drain/stamp, which needs the exact same per-flow breakdown),
+        # not recomputed here.
+        assert fills is not None
         out: list[Allocation] = []
         for i, (qfi, byts) in enumerate(fills):
             out.append(
