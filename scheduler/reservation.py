@@ -242,9 +242,67 @@ arithmetic:
   shifting PDB-tier sort order, the moment commit 10 wires this
   scheduler in.
 
-Still explicitly deferred to later commits: the real two-pass SRB/DRB
-DL LCP (commit 6, replacing ``_dl_fill``'s placeholder below), and MCS
-selection via OLLA (commit 8/9).
+Commit 6 replaces ``_dl_fill``'s placeholder with the real two-pass
+SRB/DRB LCP (``gNB_scheduler_dlsch.c:1394-1463``). Findings beyond the
+charter, from reading the full range and its surroundings, not just
+the cited lines:
+
+- **Genuinely two-pass, confirmed directly** -- the only ``qsort`` in
+  this file is the inter-UE ``UE_sched`` comparator (``:847``); nothing
+  reorders ``lc_config``. Unlike two-tier's DL LCP (single-pass despite
+  its own header's "two-pass" comment), reservation's really is
+  two-pass.
+- **The DRB pass is NOT priority-sorted -- not in the charter.**
+  "Existing lc_config order" (the C's own comment) means static,
+  config-declared order. ``qc->priority`` feeds ``dl_best_priority``
+  but is never assigned into ``UE_sched`` (checked every assignment
+  directly, ``:834-841``) -- log-only (``:828``), zero scheduling
+  effect. The placeholder this commit replaces
+  (``sorted(ue_flows, key=(priority_level, -bytes_queued))``)
+  implemented a rule the real hardware doesn't have. Ported: drop the
+  sort, iterate in declared order.
+- **The SRB pass is uncodable, not just dormant.** Every other
+  ``has_srb`` no-op in this file has a real boolean (hardcoded
+  ``False``) to be false about; here there is nothing to gate a pass-0
+  filter on at all -- ``FlowConfig`` has no SRB representation.
+  Recorded as **not applicable** (same category as commit 4's DL beam
+  pre-check), not "dormant but ported."
+- **No PBR/token-bucket state involved -- confirmed.** No bucket/PBR
+  reference anywhere in the fill loop. ``sim/ue_lcp.py``'s own UL-only
+  filter (``if f.direction != "UL": continue``, ``:63``) confirms
+  ``FlowConfig.pbr_bps``/``bsd_ms``/``effective_pbr_bps()`` stay
+  UL-only constructs; no new plumbing needed here.
+- **Per-SDU MAC subheader overhead -- a quantified disagreement between
+  two landed commits, not just an abstraction limit.** The C applies
+  header overhead on BOTH sides of this mechanism: ``oh = 3*4`` at
+  sizing time (``:1003-1019``, ported in 4a as
+  ``_DL_LCP_FIXED_OVERHEAD_BYTES``) reserves headroom in the *target*
+  for headers before PRBs are requested; ``sizeof(
+  NR_MAC_SUBHEADER_LONG)`` per RLC chunk at fill time (this commit's
+  own range) actually spends that headroom on real per-SDU headers,
+  not payload. This port has the first (4a) but not the second (here)
+  -- so ``_dl_fill`` treats the entire granted TB as payload, silently
+  reclaiming the +12 bytes of header headroom 4a reserved and handing
+  it out as extra payload instead. Directional, not neutral: this
+  port's fill over-delivers relative to the C by roughly one MAC
+  subheader's worth per SDU (~3 bytes for the common single-chunk
+  case), always in the same direction -- never less. See
+  ``docs/oai-port-map.md`` row 31.
+- **Commit 5's hoist contract, verified to still hold.** The real fill
+  keeps the exact ``if take > 0: fills.append(...)`` convention the
+  placeholder already used -- a flow computing ``take == 0`` is never
+  appended, preserving "one entry per flow that got bytes" for commit
+  5's stamp/drain gating.
+- **``FIVE_QI_PRIORITY``'s own reordering-fragility rationale
+  (``scheduler/flow.py``) is UL-only, corrected there directly**: true
+  for ``sim/ue_lcp.py``'s real priority sort, false for reservation's
+  DL LCP -- a DL scenario's flow declaration order now silently IS the
+  fill order, unguarded, by design. ``README.md`` sec8 records the
+  consequence; the discriminating test below is what currently guards
+  it.
+
+Still explicitly deferred to later commits: MCS selection via OLLA
+(commit 8/9).
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -1199,21 +1257,43 @@ class Reservation:
     def _dl_fill(
         self, ue_flows: list[FlowConfig], tbs_bytes: int, buffers: BufferView
     ) -> list[tuple[int, int]]:
-        """Placeholder DL fill -- priority order, then backlog. NOT the
-        real two-pass SRB/DRB LCP (gNB_scheduler_dlsch.c:1394-1463);
-        that lands in commit 6. Deliberate, flagged placeholder -- see
-        docs/oai-port-map.md row 17.
+        """Real two-pass SRB/DRB LCP fill
+        (``gNB_scheduler_dlsch.c:1394-1463``), replacing commit 1's
+        priority-sorted placeholder -- see module docstring's commit-6
+        section for the full citation trail.
+
+        Pass 0 (SRB) is **not applicable** here, not merely dormant --
+        ``FlowConfig`` has no SRB representation to gate a filter on at
+        all (docs/oai-port-map.md row 31).
+
+        Pass 1 (DRB) fills every flow in **``ue_flows``'s own existing
+        order** -- confirmed directly, not assumed: no `sort`/`qsort`
+        touches ``lc_config`` anywhere in the C file (the only `qsort`
+        in it is the inter-UE comparator, ``:847``); the C's own
+        comment states DRBs drain "in existing lc_config order,
+        unchanged." ``priority_level`` plays NO role in DL fill order
+        -- do not sort by it here, unlike ``sim/ue_lcp.py``'s UL fill,
+        which genuinely does (``scheduler/flow.py``'s
+        ``FIVE_QI_PRIORITY`` docstring, corrected to scope that
+        rationale to UL only). ``ue_flows`` is the caller's ``c.flows``,
+        itself built by iterating ``self._flows`` and appending in
+        order -- plain list iteration + append preserves relative
+        order, so no re-sort is needed here; just don't add one.
+
+        Per-flow: ``take = min(backlog, remaining)``, appended only if
+        ``take > 0`` -- the exact convention the placeholder already
+        used, preserving commit 5's "one entry per flow that got
+        bytes" stamp/drain contract unchanged.
+
+        NOT ported: per-SDU MAC subheader overhead
+        (``sizeof(NR_MAC_SUBHEADER_LONG)`` per RLC chunk) -- see module
+        docstring's commit-6 section for the quantified, directional
+        (over-delivery) disagreement this creates with 4a's own
+        ``oh=12`` sizing headroom.
         """
-        order = sorted(
-            ue_flows,
-            key=lambda f: (
-                f.priority_level,
-                -buffers.state(f.ue_id, f.qfi).bytes_queued,
-            ),
-        )
         fills: list[tuple[int, int]] = []
         remaining = tbs_bytes
-        for f in order:
+        for f in ue_flows:  # existing declared order -- do NOT sort
             if remaining <= 0:
                 break
             backlog = buffers.state(f.ue_id, f.qfi).bytes_queued

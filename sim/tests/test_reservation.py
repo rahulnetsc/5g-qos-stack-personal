@@ -1514,3 +1514,61 @@ def test_deficit_drain_floors_at_zero_both_directions():
 
     dl_sched._dl_drain_and_stamp([(1, 999_999)], ue_id=1, slot_index=1)
     assert dl_sched._ue_state[1].dl_flow_deficit_bytes[1] == 0
+
+
+# -- 6. the real two-pass DL LCP -------------------------------------------
+
+
+def test_dl_fill_uses_declared_order_not_priority_order():
+    """gNB_scheduler_dlsch.c:1394-1463's own comment, confirmed by
+    reading the loop directly (no sort/qsort touches lc_config anywhere
+    in that file -- the only qsort is the inter-UE comparator): DRBs
+    fill in EXISTING DECLARED ORDER, not by priority_level. flow A is
+    declared FIRST but has the WORSE (higher-numeric) priority_level;
+    flow B is declared SECOND but has the BETTER one -- deliberately in
+    tension, since every existing multi-DL-flow fixture in this file
+    happens to have declaration order and priority order agree, which
+    would pass under either rule and prove nothing."""
+    sched = Reservation()
+    flow_a = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", priority_level=90)
+    flow_b = FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="PF", priority_level=10)
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+
+    # Verify, don't assume, that configure() preserves declared order --
+    # the fill's faithfulness depends entirely on it.
+    dl_qfis_in_order = [f.qfi for f in sched._flows if f.ue_id == 1 and f.direction == "DL"]
+    assert dl_qfis_in_order == [1, 2]
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=300)   # declared first, worse priority
+    buffers.set(1, 2, bytes_queued=6000)  # declared second, better priority
+
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=10, pdcch_cce_budget=48)
+    channel = _FakeChannel({1: 20.0})
+    out = sched.allocate(slot, buffers, channel)
+    by_qfi = {a.qfi: a.bytes_capacity for a in out}
+
+    # Declaration order (correct): flow A fills first and fully, flow B
+    # gets the remainder -- both present. Priority order (the old
+    # placeholder): flow B (better priority) would fill first, consuming
+    # the entire TB and leaving flow A with nothing.
+    assert set(by_qfi) == {1, 2}, "flow A must still get served -- priority order would starve it entirely"
+    assert by_qfi[1] == 300, "flow A (declared first) must be filled in full before flow B is touched"
+
+
+def test_dl_fill_excludes_flows_that_get_zero_bytes():
+    """Commit 5's hoist contract, re-verified for the real fill (not
+    just inherited from the placeholder): a flow computing take==0 must
+    be absent from `fills` entirely, not present with byts=0 --
+    _dl_drain_and_stamp/_emit_grant both depend on this."""
+    sched = Reservation()
+    flow_a = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF")
+    flow_b = FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="PF")
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)  # absorbs everything
+    buffers.set(1, 2, bytes_queued=6000)
+
+    fills = sched._dl_fill([flow_a, flow_b], tbs_bytes=735, buffers=buffers)
+    assert fills == [(1, 735)]
+    assert 2 not in dict(fills)

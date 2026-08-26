@@ -581,7 +581,7 @@ argument `docs/wp-join-plan.md` commit 1 used for `sim/join.py`)
 | 3a | **Correction commit, added after commit 3 landed — its own commit, not an amendment, following the precedent commit 3 itself set for commit 2's `pdb_ms` bug.** Commit 3 ported the deficit block's right quantities in the wrong *type*: float ms where the C is integer throughout (grant age truncated to whole ms before subtraction, `window` truncating the ratio, `rem_slots` truncated then floored at 1, `target` an integer division, deficit stored as int). Load-bearing rather than cosmetic: `pdb_ms` is a comparator tier, so int-ms granularity makes UEs within one millisecond tie there and fall through to the PF coefficient — live on the corpus's own numerology for any odd slot count since a grant. Also lands the `pdb > 0 ? pdb : 300` fallback and the `9999` best-remaining sentinel, both found in the same read. **Checked and found symmetric across UL/DL** (all four truncation sites identical, including that both truncate the window's ratio not its product) — one shared port-map row 24, not a fifth asymmetry. Moved one existing commit-3 expectation (201 → 100), kept as evidence the correction is behavioural. | Inert — same "nothing imports it" claim as commits 1-3; the arithmetic change is *not* itself neutral and will move grant order once commit 10 wires the scheduler in. |
 | 4a | **Landed.** Wired `guaranteed_bytes + be_bytes` (commit 3's own output, previously computed but unconsumed) into grant *sizing* as the `nr_find_nb_rb`-equivalent target (`_ul_grant_target`/`_dl_grant_target`, pure functions; `gNB_scheduler_ulsch.c:2492-2512`/`_dlsch.c:1003-1019`), replacing backlog-only sizing. Also landed `gbr_bytes_slot` (`:2304-2316`, a MAX-not-sum, non-deduped, unfloored per-slot rate) and its own separate MFBR-keyed gate `_ul_has_pending_gbr` (`:38-67`) — found scoping this commit, not in the original plan text: `gbr_bytes_slot`'s whole loop is gated on `has_pending_gbr`, itself set by a *third*, independently-per-LCG-deduped scan keyed on `mfbr_bps` (MFBR), not `gfbr_bps`. D1/D2/D3 (§3) implemented as decided. See `docs/oai-port-map.md` rows 25/26 for full citations and the three structurally-unreachable sub-mechanisms this commit ports anyway (`gbr_bytes_slot`'s two independent dormancy reasons, the `B`-floor branch, and the permanent `has_srb` no-op) — each tested directly through the pure functions, not via a constructed scenario. | Inert — confirmed (25th prediction). |
 | 5 | **Landed.** Deficit-drain: UL bug-for-bug (full `tb_size` credited per active LCG, comment vs. code quoted verbatim in `docs/oai-port-map.md` row 29); DL's genuinely-correct per-LC drain by actual delivered bytes (row 30) — confirmed directly against source, not inherited from this table. Also folds in two found-scoping-this-commit corrections to commit 3's own stamping, in opposite directions: UL was under-stamping/under-draining (iterated `c.flows`, gated on the crumb-gated `bytes_reported` view, instead of `self._flows` gated on the true `estimated_ul_buffer_per_lcg`); DL was over-stamping (iterated all of `c.flows` instead of only the flows `_dl_fill` actually gave bytes to). DL's stamp fix is live on `scenario_config_6.yml`'s UE 10 (two DL flows) once commit 10 wires this scheduler in — not purely hypothetical. | Inert — confirmed (27th prediction). |
-| 6 | Two-pass DL LCP (real SRB-pass-then-DRB-pass). | Inert. |
+| 6 | **Landed.** Real two-pass DL LCP (`docs/oai-port-map.md` row 31), replacing commit 1's priority-sorted placeholder (row 17). Confirmed genuinely two-pass (unlike two-tier's own single-pass-despite-comment DL LCP) but NOT priority-ordered within the DRB pass — "existing lc_config order," confirmed by reading the loop directly (the only `qsort` in the file is the inter-UE comparator). SRB pass recorded not-applicable (no SRB data model to gate on at all). `scheduler/flow.py`'s `FIVE_QI_PRIORITY` docstring corrected to scope its reordering-fragility rationale to UL only; `README.md` sec8 records the DL consequence. | Inert — confirmed (28th prediction). |
 | 7 | `min_rb`/`min_grant_prb` wired as a fixed scheduler-config scalar. | Inert. |
 | 8 | MCS-selection call site (static staircase) — shared groundwork for D2. | Inert. |
 | 9 | OLLA activation follow-on (D2b) — includes the compounding-vs-coincidence test (D2, item ii). | Inert (still no scenario references this scheduler). |
@@ -674,7 +674,7 @@ promote any of them as a side effect of this work.
 
 ## 7. Status
 
-Reservation commits 1, 2, 3, 3a, 4a, 4 and 5 landed; two-tier not
+Reservation commits 1, 2, 3, 3a, 4a, 4, 5 and 6 landed; two-tier not
 started. Two user decisions (D1, D2) obtained directly and recorded
 above before any code, matching `docs/wp-join-plan.md`'s D0a/D0b
 precedent. Sequencing (D4): reservation first, two-tier second.
@@ -687,9 +687,29 @@ commit 4's follower budget capped it (rows 27/28), avoiding the
 bug and commit 3's float-vs-int one both had. Commit 5 lands the
 post-grant deficit drain (rows 29/30), plus two corrections to commit
 3's own stamping found scoping it, in opposite directions (UL under-
-stamped, DL over-stamped — full detail in the port-map rows and the
-scoping-honesty note below). Next: commit 6 (the real two-pass SRB/DRB
-DL LCP).
+stamped, DL over-stamped). Commit 6 lands the real two-pass DL LCP
+(row 31), replacing commit 1's priority-sorted placeholder (row 17) —
+DL fill order turns out to be declaration order, not priority, a rule
+the placeholder never had. Next: commit 7 (`min_rb`/`min_grant_prb`
+wired as a fixed scheduler-config scalar — largely done already, since
+commit 4 had to pull the UL half of this forward; check what's
+actually left before assuming the full scope of the original checklist
+item still applies).
+
+**Commit 6, like commit 5, is not another "mostly dead" commit.** Its
+core effect — draining the invented priority sort and using the real
+declared-order fill instead — is fully live for any current or future
+multi-DL-flow scenario, not gated behind a scenario construction that
+doesn't exist. Its only dormant-category addition is the SRB pass,
+which is **not applicable** (no SRB data model to gate a filter on at
+all, same category as commit 4's DL beam pre-check) — bumping that
+tally from one item to two, not adding a new dead branch under a new
+cause. The MAC-subheader-overhead finding (row 31) is a real,
+always-present, quantified bias on every DL grant with actual payload
+(a directional over-delivery of roughly one subheader's worth per
+SDU) — worth tracking, but it is neither dormant nor not-applicable,
+so it is not counted in either tally below; it is simply a known,
+small, live divergence.
 
 **Commit 5 is not another instance of "mostly dead code," and stating
 it that way would misrepresent it.** Unlike 4/4a's novel sub-mechanisms

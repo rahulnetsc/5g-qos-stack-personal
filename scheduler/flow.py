@@ -14,11 +14,26 @@ from typing import Literal
 # Lower value = higher priority. Only the 5QIs these scenarios use are listed;
 # an unlisted 5QI falls back to DEFAULT_PRIORITY_LEVEL.
 #
-# This matters more than it looks. The MAC logical-channel multiplexer orders a
-# UE's flows by priority, and if two flows on one UE share a priority the sort
-# is decided by whatever order they happen to be listed in -- so a scenario
-# file reordering would silently change results. Deriving the priority from
-# the 5QI makes the order a property of the QoS profile instead.
+# This matters more than it looks -- for UPLINK. sim/ue_lcp.py's UE-side LCP
+# genuinely orders a UE's flows by priority_level (`sorted(ue_flows, key=
+# lambda f: f.priority_level)`), so if two flows on one UE share a priority
+# the sort is decided by whatever order they happen to be listed in -- a
+# scenario file reordering would silently change results there. Deriving the
+# priority from the 5QI makes that order a property of the QoS profile
+# instead, not scenario-declaration accident.
+#
+# SCOPING CORRECTION, found scoping Phase 2 reservation commit 6: the
+# original wording here said "the MAC logical-channel multiplexer" without
+# qualification, as if this applied to both directions. It does not.
+# scheduler/reservation.py's DL LCP fill (gNB_scheduler_dlsch.c:1394-1463,
+# confirmed by reading the loop directly -- no sort/qsort anywhere near
+# lc_config in that file) fills DRBs in existing declared order, NOT by
+# priority -- `qc->priority` there is a log-only field, never read by the
+# fill or the inter-UE comparator. So priority_level's declaration-order-
+# reordering fragility this comment warns about is real for UL and does NOT
+# exist for reservation's DL: a DL scenario's flow declaration order IS the
+# fill order, unguarded, by design. See docs/oai-port-map.md row 31 and
+# README.md sec8 for the standing consequence.
 FIVE_QI_PRIORITY: dict[int, int] = {
     1: 20,    # GBR, conversational voice
     2: 40,    # GBR, conversational video (live)

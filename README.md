@@ -939,6 +939,24 @@ these five, add a new tag rather than forcing it into an existing one.
   this is the configuration-side view of the same mechanism the
   UL-access-chain dominance cluster above (Facets 1-4) already
   investigates from the traffic/timing side.
+- `[RESOLVED, with a standing consequence]` **Reservation's DL LCP fill
+  (commit 6) is genuinely NOT priority-ordered — a UE's DL flow
+  declaration order in its scenario file now silently IS the fill
+  order.** Confirmed directly against source (`gNB_scheduler_dlsch.c`,
+  `docs/oai-port-map.md` row 31): unlike `sim/ue_lcp.py`'s UL fill,
+  which really does sort by `priority_level` (the case
+  `scheduler/flow.py`'s `FIVE_QI_PRIORITY` docstring's reordering-
+  fragility rationale was written for), DL drains DRBs in "existing
+  lc_config order" with no sort anywhere — `qc->priority` there is a
+  log-only field. This is not an open question about the mechanism
+  (confirmed, not a gap to close) but it is a standing fragility this
+  document should keep visible: a scenario author reordering a multi-
+  DL-flow UE's flow list changes real scheduling outcomes on the DL
+  side, silently, with nothing today enforcing or even flagging a
+  "declare in QoS-priority order" convention. `sim/tests/
+  test_reservation.py::test_dl_fill_uses_declared_order_not_priority_
+  order` is the only thing currently guarding this from silently
+  regressing back to a priority sort.
 
 ---
 
