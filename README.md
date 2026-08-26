@@ -939,6 +939,34 @@ these five, add a new tag rather than forcing it into an existing one.
   this is the configuration-side view of the same mechanism the
   UL-access-chain dominance cluster above (Facets 1-4) already
   investigates from the traffic/timing side.
+- `[OPEN: WP9]` **The follower budget's regime boundary is
+  `n_followers_need × min_rb` (previous item) — this entry is the
+  scenario-side input to that same product, checked while scoping
+  reservation commit 8.** `scripts/scheduler_study.py`'s Study 4
+  (`study_ul_access_chain`) runs on `_ul_access_study_scenario()`, whose
+  own docstring states it is "**a dedicated N=2-UE scenario... deliberately
+  mirroring the real hardware sweep's own methodology**"
+  (`oai-branches/Sweep_Orig_vs_TwoTier.xlsx`'s "Two-UE Admissible-Load
+  Sweep") — the identical N=2 setup §7 above already cites as the
+  hardware measurement that found no scheduler differentiation, by its
+  own author's own conclusion. At N=2, `n_followers_need` is at most 1
+  for any UE, structurally, regardless of `min_rb`'s value: if a future
+  commit extends Study 4 with a `Reservation` arm (a natural thing to
+  want, since it is the UL-access-chain study and the follower budget is
+  reservation's marquee UL mechanism), that arm would reproduce the
+  hardware's own null result in software, for the identical underlying
+  reason, not as a new finding. **Studies 1-3 are not N=2** — checked
+  directly: Study 1 (`factory_robots_scenario`, the checklist's own
+  minimum bar for reservation commit 10) is N=10, Study 2
+  (`sensor_dense_scenario`) is N=30, Study 3 (`latency_bound_scenario`)
+  is N=12 — so the confound is specific to Study 4, not general to every
+  study this repo runs. Not yet checked (a deeper, not-cheap-to-answer
+  question deliberately left for whoever scopes commit 10 or WP9's own
+  sweep): even at N=10/12/30, whether *instantaneous per-slot*
+  simultaneous-backlog counts are high enough to exercise
+  `n_followers_need > 0` meaningfully — total N alone is necessary, not
+  sufficient, and confirming it needs actually running the traffic
+  generators, not reading the scenario configs.
 - `[RESOLVED, with a standing consequence]` **Reservation's DL LCP fill
   (commit 6) is genuinely NOT priority-ordered — a UE's DL flow
   declaration order in its scenario file now silently IS the fill
