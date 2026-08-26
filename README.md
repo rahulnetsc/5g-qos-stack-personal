@@ -743,6 +743,69 @@ these five, add a new tag rather than forcing it into an existing one.
   genuine interaction worth naming as such, rather than three items
   (this one, WP4's load-inversion result, the crumb-fraction shortfall)
   that only rhyme. Full method in `docs/wp5-plan.md` commit 6.
+- `[OPEN: PHASE2]` **Reservation's "liveness" sort tiers — UL's tiers 2
+  (`liveness`) and 4 (`sched_inactive`-last), and DL's tier 2
+  (`liveness`, TA-pending) — all need a signal the `Scheduler` protocol
+  does not expose today, one root cause across both directions.** UL's
+  `liveness`/`sched_inactive` need a `do_sched`-equivalent: an
+  SR-or-inactivity trigger that schedules a UE despite zero real backlog
+  (`nr_UE_is_to_be_scheduled`, `gNB_scheduler_ulsch.c:2161-2165`).
+  `sim/ul_access.py`'s SR-report-floor mechanism is not a usable proxy for
+  it: verified it is invoked only when `bytes_queued > 0`
+  (`sim/bsr.py:381-392`'s own docstring, "while the flow actually has
+  data queued") — it exists to fix crumb-collapse-with-real-data, not to
+  represent a genuinely-empty UE being kept alive. **DL's `liveness` has
+  the identical problem for a different missing signal, found finishing
+  the same scoping pass**: `gNB_scheduler_dlsch.c:840` —
+  `UE_sched[numUE].liveness = sched_ctrl->ta_apply && !dl_has_srb;` — DL's
+  liveness is Timing-Advance-pending, and this simulator has no TA
+  modeling anywhere (`sim/`+`scheduler/` grepped for any TA/timing-advance
+  concept — nothing). Neither SR/inactivity-keepalive state nor TA state
+  reaches the `Scheduler` protocol today, for any scheduler. A UL flow
+  with truly zero backlog never becomes a scheduling candidate at all
+  today (this gap is currently unobservable — no scenario produces the
+  triggering condition on either side). **Not built in reservation commit
+  2**: the UL comparator lands 3 tiers (SRB → GBR → PDB/coef) instead of
+  the ground-truth 5, and DL lands 3 instead of 4, with the missing tiers
+  documented as a placeholder in `docs/oai-port-map.md`, not silently
+  dropped. **What would unblock it**: a real `do_sched`/TA-equivalent
+  signal sourced from `sim/ul_access.py::UlAccessModel`'s existing
+  SR-pending state (UL) or a new TA model (DL, doesn't exist at all),
+  threaded through `sim/driver.py` to a new `BufferStateView` field or
+  `BufferView`/`ChannelView` method — a cross-cutting `Scheduler`-protocol
+  change affecting every scheduler, not a reservation-specific one, and
+  therefore its own fidelity change in its own commit if taken up, not
+  folded into a sort-tier commit. Revisit if a future scenario ever needs
+  a zero-backlog UE to be schedulable, or TA to be modeled, at all.
+- `[OPEN: PHASE2]` **Reservation's `has_srb` tier — the TOP tier in
+  BOTH comparators — has no data source at all, for a more fundamental
+  reason than the liveness gap above: this simulator has no SRB/
+  RRC-signaling traffic model whatsoever, found in the same scoping
+  pass.** UL's `has_srb` requires LCG0 to hold data that is genuinely
+  SRB, explicitly excluding a DRB that happens to map to LCG0
+  (`gNB_scheduler_ulsch.c:2167-2177`, the `lcg0_is_drb` check); DL's
+  requires `rlc_status[1]`/`[2]` (LCID 1/2, the real SRB1/SRB2 identity)
+  to hold data (`gNB_scheduler_dlsch.c:830-831`). `scheduler/flow.py
+  ::FlowConfig` has no concept of an SRB flow at all — every `FlowConfig`
+  is a QFI-based DRB; `FIVE_QI_LCG`'s LCG0 mapping (QFI 1/3, voice/
+  gaming) is ordinary GBR *DRB* traffic sharing LCG0, which is exactly
+  the case the C's own `lcg0_is_drb` check excludes from `has_srb` — so
+  even a naive "LCG==0" heuristic would be a wrong port, not a merely
+  degraded one. **This is a different category of gap than the liveness
+  one above**: not a missing wire from already-existing simulator state,
+  but a missing traffic model entirely — no scenario, `FlowConfig`, or
+  generator anywhere represents RRC signaling. Building it is squarely
+  out of Phase 2's scope (both schedulers, not new traffic modeling), so
+  this isn't a "revisit when a scenario needs it" item the way the
+  liveness gap is; it's a standing, permanent limitation of this
+  simulator's traffic model. **Decided**: `has_srb` is implemented as a
+  real, structurally-complete comparator tier, hardcoded `False` for
+  every candidate — keeping the comparator's shape faithful (ready for a
+  hypothetical future SRB-modeling commit to supply the flag) without
+  inventing behavior around a concept this simulator doesn't have.
+  Recommendation: leave unbuilt — no current guarantee/hypothesis in
+  this repo depends on SRB-tier differentiation, and real SRB traffic
+  modeling is a materially larger undertaking than this WP's scope.
 - `[RESOLVED]` **WP6: correlated multi-UE blockage and AGV mobility are
   deliberately not built — closed by the WP6 plan, `docs/wp6-plan.md`
   Decision 7 (scoped in commit `7648475`, before any WP6 code landed,
@@ -884,8 +947,8 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage:
-**15 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
-UL-access-chain dominance cluster counted once; 2 `[OPEN: PHASE2]`; 2
+**17 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
+UL-access-chain dominance cluster counted once; 4 `[OPEN: PHASE2]`; 2
 `[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/
 DECISION]`) plus whatever new items Phase 2/3 add using the same
 open-ended tag vocabulary (§8 preamble). "Closed" means flipped to

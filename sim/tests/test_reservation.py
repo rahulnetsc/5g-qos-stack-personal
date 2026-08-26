@@ -1,19 +1,29 @@
-"""Phase 2, reservation commit 1: scheduler/reservation.py skeleton --
-Scheduler protocol conformance, per-UE throughput EWMA, the bare PF
-coefficient as the only ranking criterion, no follower budget (unbounded
-grant), UL-then-DL per-slot order. See docs/phase2-plan.md sec4 and
-docs/oai-port-map.md's "Phase 2 -- reservation" section (rows 14-17).
+"""Phase 2, reservation commits 1-2: scheduler/reservation.py.
+
+Commit 1: Scheduler protocol conformance, per-UE throughput EWMA, the
+bare PF coefficient as the only ranking criterion, no follower budget
+(unbounded grant), UL-then-DL per-slot order.
+
+Commit 2: sort tiers above the coefficient -- but only the tiers this
+simulator can actually source (GBR, coarse; PDB, real). `has_srb` and
+`liveness`/`sched_inactive` are documented no-ops (README.md sec8's two
+new [OPEN: PHASE2] entries) -- see scheduler/reservation.py's module
+docstring for the full explanation of why.
+
+See docs/phase2-plan.md sec4 and docs/oai-port-map.md's "Phase 2 --
+reservation" section for the full mechanism/citation detail.
 
 Predicted, before writing any code: fully clean `regression_corpus.py
---check` -- the 21st such prediction in the WP5/WP6/WP-Join/Phase-2
+--check` -- the 22nd such prediction in the WP5/WP6/WP-Join/Phase-2
 lineage, and the strongest form of it (not just "no scenario references
 the new field," but "nothing imports this module at all"):
-scheduler/reservation.py is not added to scheduler/__init__.py's exports
-in this commit, so there is no code path by which anything reaches
-`Reservation` during a driver.run() call, or via `import scheduler`,
-regardless of scenario.
+scheduler/reservation.py is still not added to scheduler/__init__.py's
+exports in this commit, so there is no code path by which anything
+reaches `Reservation` during a driver.run() call, or via `import
+scheduler`, regardless of scenario.
 """
 
+import inspect
 from dataclasses import dataclass
 
 import pytest
@@ -271,3 +281,183 @@ def test_scheduler_package_never_imports_sim():
             ):
                 offending.append(f"{path}: {line.strip()}")
     assert not offending, f"scheduler/ must never import sim/: {offending}"
+
+
+# -- commit 2: sort tiers -------------------------------------------------
+# One fixture per tier boundary, isolating tier ORDER from tier CONTENT:
+# every fixture below deliberately gives the "should lose" UE the BETTER
+# coefficient, so a wrong tier order (checking coef before the tier that
+# should decide) fails distinguishably from wrong tier content.
+
+
+def test_gbr_tier_beats_the_coefficient_tiebreak_ul():
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1_000_000),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    # UE1 (non-GBR) has the BETTER coefficient (low thr -> high coef).
+    sched._ue_state[1].ul_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].ul_thr_bytes_per_slot = 100000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=2, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    granted_ues = {a.ue_id for a in out}
+    assert granted_ues == {2}, "the GBR-flagged UE must win despite the worse coefficient"
+
+
+def test_gbr_tier_beats_the_coefficient_tiebreak_dl():
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    granted_ues = {a.ue_id for a in out}
+    assert granted_ues == {2}
+
+
+def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_ul():
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=200.0),
+        FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="PF", pdb_ms=10.0),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    # UE1 (loose PDB) has the BETTER coefficient.
+    sched._ue_state[1].ul_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].ul_thr_bytes_per_slot = 100000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=2, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    granted_ues = {a.ue_id for a in out}
+    assert granted_ues == {2}, "the tighter-PDB UE must win despite the worse coefficient"
+
+
+def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_dl():
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=200.0),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF", pdb_ms=10.0),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    granted_ues = {a.ue_id for a in out}
+    assert granted_ues == {2}
+
+
+def test_coefficient_remains_the_final_tiebreak_when_gbr_and_pdb_are_equal_dl():
+    """Re-asserts commit 1's own ranking test in commit 2's context --
+    confirms the new tiers didn't reorder anything ahead of the
+    coefficient by accident when GBR/PDB don't differentiate."""
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 10.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 1000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    granted_ues = {a.ue_id for a in out}
+    assert granted_ues == {1}
+
+
+def test_has_srb_cannot_be_exercised_and_is_recorded_as_such():
+    """No FlowConfig can represent SRB traffic (scheduler/flow.py has no
+    such concept), so has_srb is a hardcoded, permanent False -- not a
+    gap in this test file's coverage. Confirmed two ways: a source-level
+    check that the no-op is literal, not a heuristic, and a behavioral
+    check that an LCG0 flow (which a naive "LCG==0 means SRB" heuristic
+    would wrongly flag) is ranked purely by GBR/PDB/coef, never boosted."""
+    source = inspect.getsource(Reservation._allocate_direction)
+    assert "has_srb = False" in source
+
+    # Behavioral guard against a future "helpful" LCG==0-means-SRB
+    # heuristic: qfi=1 maps to lcg=0 (scheduler/flow.py::FIVE_QI_LCG) but
+    # must not outrank a plain qfi=9 (lcg=6) flow on tier grounds alone.
+    sched = Reservation()
+    flows = [
+        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF"),  # lcg=6
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),  # lcg=0
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    # UE2 (lcg=0) has the WORSE coefficient -- if has_srb were wrongly
+    # derived from lcg==0, UE2 would win anyway. It must not.
+    sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 9, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=2, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    granted_ues = {a.ue_id for a in out}
+    assert granted_ues == {1}, "lcg==0 must not be treated as has_srb"
+
+
+def test_ul_and_dl_rank_keys_stay_independently_sourced_not_deduped():
+    """Anti-dedup guard: _ul_rank_key and _dl_rank_key produce identical
+    tuples today (both are 3-of-N implementable tiers), which is exactly
+    the shape that invites a future refactor to collapse them into one
+    shared comparator "since they're the same anyway" -- silently erasing
+    the fact that they diverge the moment either gap (do_sched, or a
+    hypothetical TA/SRB model) is unblocked. Checking `is not` alone
+    would pass trivially even if one delegated to the other, so this
+    inspects each method's actual source instead."""
+    ul_source = inspect.getsource(Reservation._ul_rank_key)
+    dl_source = inspect.getsource(Reservation._dl_rank_key)
+
+    assert ul_source != dl_source, "the two comparators must remain textually distinct"
+    assert "gNB_scheduler_ulsch.c" in ul_source
+    assert "gNB_scheduler_dlsch.c" in dl_source
+    # UL's own explanatory prose is allowed (and expected) to say
+    # "sched_inactive" -- it's a documented, currently-dormant tier. What
+    # must never happen is the DL comparator's actual CODE BODY (not its
+    # explanatory docstring, which legitimately discusses the tier's
+    # absence) growing a functional sched_inactive branch -- checked on
+    # the code after the docstring, not the whole source text.
+    dl_code_body = dl_source.split('"""')[-1]
+    assert "sched_inactive" not in dl_code_body, (
+        "DL genuinely has no sched_inactive tier -- its CODE (not "
+        "explanatory prose) must never grow a branch for one"
+    )

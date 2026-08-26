@@ -7,15 +7,46 @@ each one landing a single mechanism from the vendored C source; see
 file:line correspondence and ``docs/phase2-plan.md`` sec4 for the full
 checklist.
 
-This commit (1) builds only: ``Scheduler`` protocol conformance, per-UE
-throughput state, and the bare PF coefficient as the only ranking
-criterion. Explicitly NOT here yet, each landing in its own later commit:
-sort tiers above the coefficient (SRB / liveness / GBR / UL's
-sched_inactive-last / PDB -- commit 2), the follower budget that caps a
-UE's grant to protect UEs ranked behind it (commit 4), the GBR/best-effort
-deficit split and its UL bug-for-bug drain (commit 3/5), the real two-pass
-SRB/DRB DL LCP (commit 6, replacing ``_dl_fill``'s placeholder below), and
-MCS selection via OLLA (commit 8/9).
+Commit 1 built: ``Scheduler`` protocol conformance, per-UE throughput
+state, and the bare PF coefficient as the only ranking criterion.
+
+Commit 2 (this commit) adds sort tiers ABOVE the coefficient -- but only
+the tiers this simulator can actually source. Ground truth is 5 tiers on
+UL (SRB -> liveness -> GBR -> sched_inactive-last -> PDB/coef) and 4 on
+DL (SRB -> liveness(TA) -> GBR -> PDB/coef; DL genuinely has no
+sched_inactive tier at all, confirmed absent by reading
+gNB_scheduler_dlsch.c's UEsched_t struct directly, not merely expressed
+differently). Two tiers are current no-ops, for two DIFFERENT reasons,
+both recorded as README.md sec8 [OPEN: PHASE2] entries rather than
+silently approximated:
+
+- ``has_srb`` (T1, top tier, BOTH directions): hardcoded False. This
+  simulator has no SRB/RRC-signaling traffic model at all --
+  ``scheduler/flow.py::FlowConfig`` only ever represents a QFI-based DRB,
+  and the LCG0-holds-a-GBR-DRB case (FIVE_QI_LCG's QFI 1/3 mapping) is
+  exactly what the C's own ``lcg0_is_drb`` check excludes from counting
+  as SRB -- so even an "LCG==0" heuristic would be a wrong port, not a
+  degraded one. A standing limitation, not a "revisit later" gap.
+- ``liveness``/``sched_inactive`` (UL tiers 2/4, DL tier 2): need a
+  ``do_sched``-equivalent (UL: SR-or-inactivity trigger for a
+  zero-backlog UE) or a TA-pending signal (DL) that the ``Scheduler``
+  protocol does not expose today. ``sim/ul_access.py``'s SR-report-floor
+  is not a usable proxy -- verified it only fires when
+  ``bytes_queued > 0`` (``sim/bsr.py:381-392``), i.e. for real backlog
+  the estimate under-reports, not for a genuinely-empty UE. Unblocking
+  this is a cross-cutting ``Scheduler``-protocol change affecting every
+  scheduler, not a sort-tier-commit-sized change -- its own future
+  commit if ever taken up.
+
+So this commit's actual behavioral effect is narrower than "5/4 tiers"
+suggests: only the (coarse, commit-3/5-pending-real-substance) GBR flag
+sits ahead of the coefficient tiebreak in practice today.
+
+Still explicitly deferred to later commits: the follower budget that caps
+a UE's grant to protect UEs ranked behind it (commit 4), the GBR/
+best-effort deficit split and its UL bug-for-bug drain (commit 3/5), the
+real two-pass SRB/DRB DL LCP (commit 6, replacing ``_dl_fill``'s
+placeholder below), and MCS selection via OLLA (commit 8/9).
 
 Like ``two_tier.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. That boundary is what makes the uplink
@@ -75,6 +106,12 @@ class _Candidate:
     bler: float
     snr_db: float
     coef: float
+    # Sort-tier fields (commit 2). has_srb is a permanent, hardcoded
+    # no-op (see module docstring); has_gbr is a coarse placeholder
+    # pending commit 3/5's real deficit tracking; pdb_ms is fully real.
+    has_srb: bool = False
+    has_gbr: bool = False
+    pdb_ms: float = float("inf")
 
 
 class Reservation:
@@ -125,6 +162,7 @@ class Reservation:
         direction: str,
     ) -> list[Allocation]:
         symbols = slot.ul_symbols if direction == "UL" else slot.dl_symbols
+        now_s = slot.slot_index * self.slot_duration_s
 
         ue_flows: dict[int, list[FlowConfig]] = {}
         for f in self._flows:
@@ -165,7 +203,45 @@ class Reservation:
                 else state.dl_thr_bytes_per_slot
             )
             coef = hyp_tbs_bytes / max(thr, 1.0)
-            candidates.append(_Candidate(ue_id, flows, bits_per_rb, bler, snr, coef))
+
+            # has_srb: hardcoded False -- no SRB/RRC-signaling traffic
+            # model exists in this simulator (README.md sec8
+            # [OPEN: PHASE2], module docstring above). Not a heuristic;
+            # a documented permanent no-op.
+            has_srb = False
+
+            # has_gbr: coarse placeholder -- "any GBR-class flow has
+            # reported backlog", not the C's real unfulfilled-deficit
+            # tracking (gNB_scheduler_ulsch.c:2336 / _dlsch.c:838, set
+            # inside the per-LCG/per-LC deficit loop commit 3/5 builds).
+            # Replacing this with the real computation is commit 3/5's
+            # job; this tier's POSITION in the sort doesn't move.
+            has_gbr = any(
+                f.flow_class == "GBR"
+                and buffers.state(f.ue_id, f.qfi).bytes_reported > 0
+                for f in flows
+            )
+
+            # pdb_ms: remaining PDB, minimum across this UE's backlogged
+            # flows in this direction -- fully real, no gap
+            # (gNB_scheduler_ulsch.c's ul_best_remaining_pdb_ms /
+            # gNB_scheduler_dlsch.c's dl_best_remaining_pdb_ms, "most
+            # urgent active" framing).
+            pdb_ms = min(
+                (
+                    f.pdb_ms - buffers.hol_delay_s(f.ue_id, f.qfi, now_s) * 1000.0
+                    for f in flows
+                    if buffers.state(f.ue_id, f.qfi).bytes_reported > 0
+                ),
+                default=float("inf"),
+            )
+
+            candidates.append(
+                _Candidate(
+                    ue_id, flows, bits_per_rb, bler, snr, coef,
+                    has_srb=has_srb, has_gbr=has_gbr, pdb_ms=pdb_ms,
+                )
+            )
 
         if not candidates:
             return []
@@ -214,12 +290,68 @@ class Reservation:
         return out
 
     def _rank_key(self, candidate: _Candidate, direction: str) -> tuple:
-        """Commit 1: the PF coefficient (descending) is the only tier.
-        Commits 2+ PREPEND tuple elements ahead of this one (SRB,
-        liveness, GBR, (UL only) sched_inactive-last, PDB) -- an addition
-        to the key, not a restructure of the sort itself.
+        """Dispatch to the direction's own comparator. UL and DL are
+        genuinely different tier structures in ground truth (5 vs. 4
+        tiers) -- see ``_ul_rank_key``/``_dl_rank_key``, kept as two
+        independently-sourced methods even where their output currently
+        coincides, never merged into one shared function.
         """
-        return (-candidate.coef,)
+        if direction == "UL":
+            return self._ul_rank_key(candidate)
+        return self._dl_rank_key(candidate)
+
+    def _ul_rank_key(self, c: _Candidate) -> tuple:
+        """UL ground truth: 5 tiers, SRB -> liveness -> GBR ->
+        sched_inactive-last -> PDB/coef (gNB_scheduler_ulsch.c:2010-2039).
+
+        T1 (has_srb) is a permanent no-op here -- no SRB/RRC traffic
+        model exists in this simulator (README.md sec8 [OPEN: PHASE2]).
+        T2/T4 (liveness/sched_inactive) are a DEFERRED no-op pending a
+        do_sched-equivalent signal (README.md sec8's other new entry).
+        Commit 1's own coefficient (-c.coef) remains the tuple's final
+        element, unchanged -- this method PREPENDS tiers ahead of it,
+        it does not restructure the sort.
+
+        Hedged, not asserted as fact: working through
+        gNB_scheduler_ulsch.c's own boolean relationship between T2
+        (liveness = sched_inactive && !ul_has_srb, :2339) and T4
+        (sched_inactive, :2332) by exhaustive case analysis suggests T4
+        may never produce a decisive comparator result in the real C
+        either -- whenever sched_inactive=True, either has_srb=True (T1
+        already resolves it) or liveness=True (T2 already resolves it
+        ahead of T4). This is my own reading of the C, not verified by
+        instrumenting it at runtime, and does not change what's ported:
+        T4 is implemented exactly as the C runs it (moot today anyway,
+        since sched_inactive itself is a deferred no-op).
+        """
+        return (
+            0 if c.has_srb else 1,
+            0 if c.has_gbr else 1,
+            c.pdb_ms,
+            -c.coef,
+        )
+
+    def _dl_rank_key(self, c: _Candidate) -> tuple:
+        """DL ground truth: 4 tiers, SRB -> liveness(TA) -> GBR ->
+        PDB/coef (gNB_scheduler_dlsch.c:692-715). DL's UEsched_t
+        (:681-690) has NO sched_inactive field at all -- confirmed
+        absent by reading the struct directly, not expressed
+        differently -- so there is no T4-equivalent tier on this side,
+        ever, regardless of the UL hedge above.
+
+        T1 (has_srb) and T2 (TA-pending liveness) are no-ops for the
+        same two reasons as UL's (README.md sec8), independently cited
+        here even though this tuple currently comes out the same shape
+        as ``_ul_rank_key``'s -- that is a data-availability coincidence
+        (both directions happen to have exactly one real tier -- GBR --
+        implementable today), not a decision to share a comparator.
+        """
+        return (
+            0 if c.has_srb else 1,
+            0 if c.has_gbr else 1,
+            c.pdb_ms,
+            -c.coef,
+        )
 
     def _emit_grant(
         self,
