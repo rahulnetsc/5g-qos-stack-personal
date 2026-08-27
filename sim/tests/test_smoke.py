@@ -14,12 +14,6 @@ from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
 from scheduler import TwoTier
 from scheduler import bler_for_mcs, grid_capacity_prbsym_per_sec, mcs_threshold_for_snr, solve_tier1
-from scheduler import (
-    estimate_demand_bps,
-    gbr_contract_bps,
-    gbr_maxmin_floors,
-    solve_maxmin_gbr_level,
-)
 
 
 def test_channel_stationary_variance():
@@ -400,38 +394,12 @@ def test_tier1_protects_gbr_under_overload():
     )
 
 
-def test_tier1_capacity_safety_factor_shaves_targets():
-    """A capacity_safety_factor < 1 shaves the LP's PRB budget symmetrically.
-    Under overload where the LP would otherwise saturate DL, the total of
-    per-flow targets must fall roughly in proportion."""
-    from sim.config import TDDConfig
-    grid = ResourceGrid(CarrierConfig(numerology=1, bandwidth_hz=10_000_000), TDDConfig())
-    flows = [
-        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF",
-                   traffic_kind="poisson",
-                   traffic_params={"rate_bps": 50_000_000}),
-        FlowConfig(ue_id=2, qfi=9, direction="DL", flow_class="PF",
-                   traffic_kind="poisson",
-                   traffic_params={"rate_bps": 50_000_000}),
-    ]
-    common = dict(
-        flows=flows,
-        snr_db_per_ue={1: 20.0, 2: 20.0},
-        grid=grid,
-        demand_bps={(1, 9): 50_000_000, (2, 9): 50_000_000},
-    )
-    t_full = solve_tier1(**common, capacity_safety_factor=1.0)
-    t_shaved = solve_tier1(**common, capacity_safety_factor=0.5)
-    total_full = sum(t_full.values())
-    total_shaved = sum(t_shaved.values())
-    # 0.5 factor should cut total rate by ~half (within ~5% for solver
-    # slack). The direction matters most: shaved < full, and specifically
-    # near half.
-    assert total_shaved < total_full * 0.6, (
-        f"safety_factor=0.5 should shave total ~half; got "
-        f"{total_shaved/1e6:.1f} Mbps vs {total_full/1e6:.1f} Mbps"
-    )
-    assert total_shaved > total_full * 0.4
+# test_tier1_capacity_safety_factor_shaves_targets deleted (Phase 2, two-
+# tier commit 2, docs/phase2-plan.md): capacity_safety_factor is no longer
+# a free, sweepable kwarg -- ground truth's IA_P5G_TIER1_OVERHEAD_FACTOR
+# is a fixed 0.80 constant, baked into tier1_capacity_prbslot_per_sec.
+# Nothing to sweep; see test_tier1_capacity_uses_the_fixed_overhead_factor
+# below for the mechanism's replacement coverage.
 
 
 def test_grid_capacity_helper():
@@ -442,6 +410,53 @@ def test_grid_capacity_helper():
     assert cap_dl > 0 and cap_ul > 0
     # DSUUU has 1 D + S(DL) symbols, vs 3 U + S(UL); UL > DL by symbol count
     assert cap_ul > cap_dl
+
+
+def test_tier1_capacity_uses_the_fixed_overhead_factor():
+    """tier1_capacity_prbslot_per_sec (Phase 2 commit 2) -- whole-slot
+    granularity, IA_P5G_TIER1_OVERHEAD_FACTOR=0.80 baked in fixed, not a
+    sweepable kwarg (docs/oai-port-map.md, the two-tier commit-2 rows).
+    "DSUUU" has exactly one whole D slot and zero whole U slots (the 3 U
+    slots are each mixed with the S slot's own UL share, but "U" itself
+    IS a whole slot -- only S is mixed) -- construct a pattern with a
+    known whole-slot count and check the fixed 0.80 factor lands exactly,
+    not merely "less than the unscaled value"."""
+    from scheduler import tier1_capacity_prbslot_per_sec
+    from sim.config import TDDConfig
+
+    grid = ResourceGrid(CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig(pattern="DU"))
+    cap_dl, cap_ul = tier1_capacity_prbslot_per_sec(grid)
+    slot_duration_s = grid.slot_duration_s
+    cycle_duration_s = 2 * slot_duration_s
+    expected_dl = grid.prb_count * (1 / cycle_duration_s) * 0.80
+    expected_ul = grid.prb_count * (1 / cycle_duration_s) * 0.80
+    assert cap_dl == pytest.approx(expected_dl)
+    assert cap_ul == pytest.approx(expected_ul)
+
+
+def test_tier1_capacity_excludes_mixed_slots_from_either_direction():
+    """A mixed (special) slot contributes to NEITHER direction's whole-
+    slot capacity count -- ia_p5g_compute_capacity's own
+    get_full_dl_slots_per_period/get_full_ul_slots_per_period, confirmed
+    against the full OAI checkout (config.c:313-347), not merely the
+    vendored subset. "DSU" has one whole D, one whole U, and one mixed S
+    slot that counts toward neither -- capacity should match a "DU"
+    pattern of the same slot duration exactly, not a "DSU"-sized cycle
+    with the S slot's own symbols folded in."""
+    from scheduler import tier1_capacity_prbslot_per_sec
+    from sim.config import TDDConfig
+
+    carrier = CarrierConfig(numerology=1, bandwidth_hz=20_000_000)
+    grid_dsu = ResourceGrid(carrier, TDDConfig(pattern="DSU", s_slot_split=(6, 2, 6)))
+    grid_du = ResourceGrid(carrier, TDDConfig(pattern="DU"))
+    cap_dl_dsu, cap_ul_dsu = tier1_capacity_prbslot_per_sec(grid_dsu)
+    cap_dl_du, cap_ul_du = tier1_capacity_prbslot_per_sec(grid_du)
+    # DSU's cycle is 3 slots long vs DU's 2 -- normalise to a per-slot rate
+    # before comparing, since the whole-slot COUNT (1 DL, 1 UL) is what
+    # should match, not the raw per-second rate over differently-sized
+    # cycles.
+    assert cap_dl_dsu * 3 == pytest.approx(cap_dl_du * 2)
+    assert cap_ul_dsu * 3 == pytest.approx(cap_ul_du * 2)
 
 
 def test_pdcch_budget_caps_dynamic_allocations():
@@ -507,138 +522,16 @@ def test_timeseries_default_off():
     assert "timeseries" not in summary
 
 
-def test_tier1_per_flow_penalty_shifts_allocation():
-    """A higher per-flow GBR penalty pulls LP allocation toward that flow.
-    Under partial infeasibility with a uniform penalty the poor-SNR GBR flow
-    is sacrificed; boosting its penalty reverses that."""
-    from sim.config import TDDConfig
-
-    grid = ResourceGrid(
-        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
-    )
-    flows = [
-        FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
-                   gfbr_bps=3_000_000, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 3_000_000}),
-        FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
-                   gfbr_bps=3_000_000, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 3_000_000}),
-    ]
-    demand = {(1, 2): 3_000_000, (2, 2): 3_000_000}
-    snr = {1: 22.0, 2: 8.0}  # flow 2 is the poor-SNR flow
-
-    uni = solve_tier1(flows, snr, grid, demand, gbr_slack_penalty=1e3)
-    boosted = solve_tier1(
-        flows, snr, grid, demand,
-        gbr_slack_penalty={(1, 2): 1e3, (2, 2): 1e5},
-    )
-    # Uniform penalty sacrifices the poor-SNR flow.
-    assert uni[(2, 2)] < uni[(1, 2)]
-    # Boosting flow 2's penalty pulls allocation back to it.
-    assert boosted[(2, 2)] > uni[(2, 2)] + 0.2e6
-
-
-def test_tier1_se_penalty_exponent_tilts_allocation():
-    """The SE-tilt exponent k scales each flow's GBR penalty by
-    (SE_i/SE_max)**k. With two GBR flows that cannot both be met, k>0
-    (efficiency-first) leaves the poor-SE flow sacrificed, while k<0
-    (RB-level parity) pulls allocation back toward it."""
-    from sim.config import TDDConfig
-
-    grid = ResourceGrid(
-        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
-    )
-    flows = [
-        FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
-                   gfbr_bps=3_000_000, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 3_000_000}),
-        FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
-                   gfbr_bps=3_000_000, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 3_000_000}),
-    ]
-    demand = {(1, 2): 3_000_000, (2, 2): 3_000_000}
-    snr = {1: 22.0, 2: 8.0}  # flow 2 is the poor-SE flow
-
-    base = solve_tier1(flows, snr, grid, demand, gbr_slack_penalty=1e3)
-    eff_first = solve_tier1(flows, snr, grid, demand,
-                            gbr_slack_penalty=1e3, se_penalty_exponent=2.0)
-    rb_parity = solve_tier1(flows, snr, grid, demand,
-                            gbr_slack_penalty=1e3, se_penalty_exponent=-2.0)
-
-    # k<0 (RB-level parity) gives the poor-SE flow materially more rate than
-    # k>0 (efficiency-first) does.
-    assert rb_parity[(2, 2)] > eff_first[(2, 2)] + 0.2e6
-    # k>0 does not rescue the poor-SE flow -- it is already the dump target.
-    assert eff_first[(2, 2)] <= base[(2, 2)] + 1.0
-    # k<0 strictly improves it over the untilted baseline.
-    assert rb_parity[(2, 2)] > base[(2, 2)] + 1.0
-
-
-def test_tier1_slice_floor_enforces_shares():
-    """A soft slice floor splits PRB capacity by the configured shares. Two
-    slices of equal-SNR PF flows: with no slicing the LP splits ~50/50; a
-    75/25 slice share shifts the allocation to ~75/25."""
-    from sim.config import TDDConfig
-
-    grid = ResourceGrid(
-        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
-    )
-    flows = [
-        FlowConfig(ue_id=u, qfi=9, direction="DL", flow_class="PF",
-                   slice_id=sid, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 50_000_000})
-        for u, sid in [(1, 1), (2, 1), (3, 2), (4, 2)]
-    ]
-    snr = {u: 20.0 for u in (1, 2, 3, 4)}
-    demand = {(f.ue_id, f.qfi): 50_000_000 for f in flows}
-    slice_of = {f.ue_id: f.slice_id for f in flows}
-
-    def slice_fraction(targets, sid):
-        total = sum(targets.values())
-        return sum(
-            v for (u, _q), v in targets.items() if slice_of[u] == sid
-        ) / total
-
-    base = solve_tier1(flows, snr, grid, demand)
-    sliced = solve_tier1(
-        flows, snr, grid, demand,
-        slice_shares={1: {"DL": 0.75}, 2: {"DL": 0.25}},
-    )
-    # Equal flows, no slicing -> the two slices split evenly.
-    assert abs(slice_fraction(base, 1) - 0.5) < 0.1
-    # A 75/25 share pulls slice 1 to ~three-quarters of the capacity.
-    assert slice_fraction(sliced, 1) > 0.65
-
-
-def test_tier1_slice_floor_allows_borrowing():
-    """The slice floor is a guarantee, not a cap: an under-utilised slice's
-    unused capacity is borrowed by a busy slice (work-conserving)."""
-    from sim.config import TDDConfig
-
-    grid = ResourceGrid(
-        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
-    )
-    # slice 1: heavy demand; slice 2: a single light flow.
-    flows = [
-        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF",
-                   slice_id=1, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 80_000_000}),
-        FlowConfig(ue_id=2, qfi=9, direction="DL", flow_class="PF",
-                   slice_id=2, traffic_kind="poisson",
-                   traffic_params={"rate_bps": 1_000_000}),
-    ]
-    snr = {1: 20.0, 2: 20.0}
-    demand = {(1, 9): 80_000_000, (2, 9): 1_000_000}
-    # 50/50 shares, but slice 2 only wants ~1 Mbps.
-    sliced = solve_tier1(
-        flows, snr, grid, demand,
-        slice_shares={1: {"DL": 0.5}, 2: {"DL": 0.5}},
-    )
-    total = sliced[(1, 9)] + sliced[(2, 9)]
-    # slice 1 borrows slice 2's idle half -> well above its own 50% share.
-    assert sliced[(1, 9)] / total > 0.6
-    # slice 2 still gets the little it asked for.
-    assert sliced[(2, 9)] > 0.5e6
+# test_tier1_per_flow_penalty_shifts_allocation,
+# test_tier1_se_penalty_exponent_tilts_allocation,
+# test_tier1_slice_floor_enforces_shares, test_tier1_slice_floor_allows_
+# borrowing all deleted (Phase 2, two-tier commit 2, docs/phase2-plan.md):
+# gbr_slack_penalty (per-flow dict)/se_penalty_exponent/slice_shares/
+# slice_slack_penalty have no ground-truth citation anywhere in
+# ia_p5g_scheduler.c -- confirmed absent, not merely unattested (every GBR
+# flow's slack column gets the SAME fixed IA_P5G_TIER1_GBR_PENALTY=1.0e3,
+# set once, never adjusted; no slicing mechanism exists in the C at all).
+# Permanent loss, no successor mechanism.
 
 
 def _two_gbr_partial_infeasible_scenario():
@@ -722,191 +615,70 @@ def test_pf_fairness_two_equal_ues():
     assert ratio > 0.8, f"PF unfair: ue1={t1} ue2={t2} ratio={ratio:.2f}"
 
 
-# --- Tier-1 max-min GBR stage (Finding 1: cell-edge starvation) -------------
+# --- Tier-1 max-min GBR stage: deleted (Phase 2, two-tier commit 2,
+# docs/phase2-plan.md) -- solve_maxmin_gbr_level/gbr_maxmin_floors/
+# gbr_contract_bps and everything that fed them are permanent loss.
+# ia_p5g_sca_solve (ia_p5g_scheduler.c:974-1103) is a SINGLE SCA outer
+# loop; no lexicographic two-phase structure, no separate max-min
+# pre-stage, no hard-floor override on top of the soft GFBR constraint --
+# confirmed absent by reading the C directly, not merely unattested.
 
 
-def _cell_edge_starvation_scenario():
-    """Four equal-GFBR GBR flows spread across the SNR range, on a carrier
-    that cannot carry them all -- the minimal reproduction of Finding 1.
-
-    The single-stage Tier-1 solve serves this set greedily by spectral
-    efficiency: the top two SNRs get 100% of GFBR, and the bottom two are
-    abandoned outright (targets ~2% and 0%). 6 Tier-1 solves over the
-    horizon.
-    """
-    from sim.config import TDDConfig
-
-    snrs = (24.0, 20.0, 16.0, 10.0)
-    gfbr = 6_000_000
-    return ScenarioConfig(
-        name="cell_edge_starvation",
-        horizon_slots=12000,
-        carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
-        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
-        ues=[
-            UEConfig(ue_id=i + 1, mean_snr_db=snr, coherence_slots=4000)
-            for i, snr in enumerate(snrs)
-        ],
-        flows=[
-            FlowConfig(ue_id=i + 1, qfi=2, direction="DL", flow_class="GBR",
-                       gfbr_bps=gfbr, pdb_ms=100, traffic_kind="poisson",
-                       traffic_params={"rate_bps": gfbr})
-            for i in range(len(snrs))
-        ],
-        seed=3,
-    )
+# --- Tier-1 numerical accuracy -----------------------------------------
 
 
-def _maxmin_inputs(scenario):
-    """(flows, snr_by_ue, demand_bps) for a scenario, as Tier-1 sees them."""
-    snr = {ue.ue_id: ue.mean_snr_db for ue in scenario.ues}
-    demand = {
-        (f.ue_id, f.qfi): estimate_demand_bps(f) for f in scenario.flows
-    }
-    return scenario.flows, snr, demand
+def test_tier1_pool_conservation_and_gbr_floor_on_overload():
+    """Tier-1 must serve the GBR floor and conserve the residual capacity
+    pool on `overload`, where the pool is small enough to hand-verify.
 
+    **Finding, made while rewriting this test, not assumed**: unlike the
+    deleted two-phase cvxpy form (a smooth convex solve with one interior
+    optimum), the SCA loop over a plain vertex LP does **not** converge to
+    the smooth weighted-log-utility split when two flows share one
+    capacity row at equal SE and neither dominates on weight alone --
+    `linprog` (vertex-optimal, matching GLPK's own simplex) puts the
+    *entire* residual pool on whichever of PF/Delay currently has the
+    larger `weight/(r_prev+eps)` coefficient, so successive iterations
+    toggle which flow gets everything; the damped average never settles
+    (`rel_change` stays near `_SCA_ALPHA` at every iteration this pair
+    competes, confirmed by tracing 30+ iterations directly, not merely
+    observed at 150). This is a genuine, previously-undocumented property
+    of `ia_p5g_sca_solve`'s own vertex-LP mechanism, not a bug introduced
+    by this port -- real hardware's GLPK-backed SCA loop has the
+    identical mathematical structure (a linear objective over a shared
+    capacity polytope) and would oscillate the same way for two DL flows
+    at equal SE with comparable weighted coefficients. Whatever the loop
+    lands on after exactly `_SCA_MAXITERS=150` damped steps is fully
+    deterministic (confirmed: two back-to-back calls with identical
+    inputs return byte-identical results) but is NOT a "closed-form
+    optimum" in the sense the old two-phase form's own optimum was --
+    there is no single interior point to hand-derive here. Testing the
+    exact 150-iteration landing point would be a regression pin on an
+    implementation detail (solver tie-breaking, exact vertex selection),
+    not a fidelity check.
 
-def _grid_at_bandwidth(scenario, bandwidth_hz):
-    import dataclasses
+    What IS checkable in closed form, and asserted here: the GBR flow's
+    penalty (`IA_P5G_TIER1_GBR_PENALTY=1.0e3`, dominating the PF/Delay
+    coefficients by 4-5 orders of magnitude once their own r_prev grows)
+    still drives it to its floor; and the residual pool (`cap_dl -
+    gbr_rate/se_gbr`, converted to bps at the shared SE) is exactly what
+    the PF+Delay flows split between them, whichever way the oscillation
+    happened to divide it -- capacity is never lost or invented.
 
-    carrier = dataclasses.replace(scenario.carrier, bandwidth_hz=bandwidth_hz)
-    return ResourceGrid(carrier, scenario.tdd)
-
-
-def test_maxmin_level_monotone_and_saturating_in_capacity():
-    """The max-min level must never fall as capacity rises, and must reach
-    1.0 once the GBR set is jointly feasible.
-
-    Regression guard for a conditioning bug: posed in raw bps, maximising a
-    unit-scale t against rate variables of order 1e7 made the solver report
-    `optimal` on a level that was both inaccurate and *non-monotone* --
-    it peaked mid-sweep and then decreased as capacity grew.
-    """
-    scenario = _cell_edge_starvation_scenario()
-    flows, snr, demand = _maxmin_inputs(scenario)
-
-    levels = []
-    for bw_mhz in (5, 10, 20, 40, 80, 160):
-        grid = _grid_at_bandwidth(scenario, bw_mhz * 1_000_000)
-        levels.append(solve_maxmin_gbr_level(flows, snr, grid, demand))
-
-    for lo, hi in zip(levels, levels[1:]):
-        assert hi >= lo - 1e-6, f"max-min level fell as capacity rose: {levels}"
-    assert levels[0] < 0.99, f"expected overload at 5 MHz, got t*={levels[0]}"
-    assert levels[-1] > 0.999, (
-        f"expected a feasible GBR set at 160 MHz, got t*={levels[-1]}"
-    )
-    # And the level tracks capacity proportionally while it is the binding
-    # constraint -- 5 -> 10 -> 20 MHz should roughly double each step.
-    assert levels[1] > 1.7 * levels[0], f"level not scaling with capacity: {levels}"
-
-
-def test_maxmin_level_is_one_without_gbr_flows():
-    """No GBR flows -> nothing to protect -> no floors, so the scenarios
-    that carry only Delay/PF flows are structurally untouched by the stage."""
-    from sim.scenarios import latency_bound_scenario, sensor_dense_scenario
-
-    for scenario in (sensor_dense_scenario(), latency_bound_scenario()):
-        flows, snr, demand = _maxmin_inputs(scenario)
-        grid = ResourceGrid(scenario.carrier, scenario.tdd)
-        assert solve_maxmin_gbr_level(flows, snr, grid, demand) == 1.0
-        assert gbr_maxmin_floors(flows, demand, level=1.0) == {}
-
-
-def test_gbr_contract_is_capped_by_offered_demand():
-    """A GBR flow offering less than its GFBR can never reach 100% of it, so
-    its contract is the demand -- otherwise it would pin the max-min level at
-    its own unreachable ratio and drag every other flow down with it."""
-    from sim.config import TDDConfig
-
-    scenario = ScenarioConfig(
-        name="underoffered_gbr",
-        horizon_slots=4000,
-        carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
-        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
-        ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=4000),
-             UEConfig(ue_id=2, mean_snr_db=20.0, coherence_slots=4000)],
-        flows=[
-            # Contracted for 8 Mbps but only ever offers 1 Mbps.
-            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
-                       gfbr_bps=8_000_000, pdb_ms=100, traffic_kind="poisson",
-                       traffic_params={"rate_bps": 1_000_000}),
-            FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="GBR",
-                       gfbr_bps=4_000_000, pdb_ms=100, traffic_kind="poisson",
-                       traffic_params={"rate_bps": 4_000_000}),
-        ],
-        seed=1,
-    )
-    flows, snr, demand = _maxmin_inputs(scenario)
-    assert gbr_contract_bps(flows[0], demand) == 1_000_000  # capped by demand
-    assert gbr_contract_bps(flows[1], demand) == 4_000_000  # GFBR binds
-
-    grid = ResourceGrid(scenario.carrier, scenario.tdd)
-    # 5 Mbps of reachable contract on a 20 MHz carrier at 20 dB: feasible.
-    # Without the demand cap the under-offered flow would hold t* at 1/8.
-    assert solve_maxmin_gbr_level(flows, snr, grid, demand) > 0.999
-
-
-def test_tier1_hard_floor_overrides_the_slack_penalty_sacrifice():
-    """The single-stage solve abandons the low-SE GBR flow; passing the
-    max-min floors back in as a hard bound is what stops it.
-
-    This is the core of the Finding 1 fix: the sacrifice is driven by the
-    *linear slack penalty* (minimising total shortfall bits under a capacity
-    constraint is a fractional knapsack, solved greedily by spectral
-    efficiency), so no reweighting of that penalty removes the vertex
-    solution -- only a constraint does.
-    """
-    scenario = _cell_edge_starvation_scenario()
-    flows, snr, demand = _maxmin_inputs(scenario)
-    grid = ResourceGrid(scenario.carrier, scenario.tdd)
-    gfbr = flows[0].gfbr_bps
-
-    single = solve_tier1(flows, snr, grid, demand)
-    rich, poor = (1, 2), (4, 2)  # ue1 at 24 dB, ue4 at 10 dB
-    assert single[rich] > 0.95 * gfbr, "expected the high-SE flow served in full"
-    assert single[poor] < 0.05 * gfbr, (
-        f"expected the single-stage solve to abandon the low-SE flow, "
-        f"got {single[poor] / gfbr:.0%} of GFBR"
-    )
-
-    level = solve_maxmin_gbr_level(flows, snr, grid, demand)
-    assert 0.0 < level < 1.0, f"expected partial infeasibility, t*={level}"
-    floors = gbr_maxmin_floors(flows, demand, level=level)
-    staged = solve_tier1(flows, snr, grid, demand, gbr_floor_bps=floors)
-
-    for key, floor in floors.items():
-        assert staged[key] >= floor * 0.999, (
-            f"{key} target {staged[key]:.0f} below its floor {floor:.0f}"
-        )
-    assert staged[poor] > single[poor], "the hard floor must lift the low-SE flow"
-
-
-# --- Tier-1 numerical accuracy (the two-phase lexicographic form) -----------
-
-
-def test_tier1_matches_analytic_optimum_on_overload():
-    """Tier-1 must hit the closed-form optimum on `overload`, where it is
-    small enough to solve by hand.
-
-    Three flows share one direction at equal SNR. The GBR flow takes its
-    floor; the residual pool is then split between the PF flow (w=1) and the
-    Delay flow (w=5) under `log`, which pins the Delay flow at its demand cap
-    and gives the PF flow the remainder.
-
-    Regression guard for a real defect: written as one objective with a
-    penalty ~1e7 larger than the utility, this returned `optimal_inaccurate`
-    with CLARABEL and SCS disagreeing by 3.6x, and under-served the Delay
-    class -- the highest-weighted one -- by 28%.
+    Demand values transcribed directly from
+    sim/scenarios/scenario_config_2.yml (not from the deleted
+    estimate_demand_bps/`_maxmin_inputs` helpers).
     """
     from sim.scenarios import overload_scenario
-    from scheduler.tier1 import _spectral_efficiency, grid_capacity_prbsym_per_sec
+    from scheduler.tier1 import _spectral_efficiency_per_slot, tier1_capacity_prbslot_per_sec
 
     scenario = overload_scenario()
-    flows, snr, demand = _maxmin_inputs(scenario)
+    flows = scenario.flows
+    snr = {ue.ue_id: ue.mean_snr_db for ue in scenario.ues}
+    demand = {(1, 9): 20_000_000.0, (2, 2): 4_000_000.0, (3, 1): 640_000.0}
     grid = ResourceGrid(scenario.carrier, scenario.tdd)
-    se = _spectral_efficiency(flows, snr)
-    cap_dl, _ = grid_capacity_prbsym_per_sec(grid)
+    se = _spectral_efficiency_per_slot(flows, snr)
+    cap_dl, _ = tier1_capacity_prbslot_per_sec(grid)
 
     by_class = {f.flow_class: (i, f) for i, f in enumerate(flows)}
     assert set(by_class) == {"PF", "GBR", "Delay"}, "fixture changed"
@@ -916,118 +688,40 @@ def test_tier1_matches_analytic_optimum_on_overload():
     (i_pf, f_pf), (i_gbr, f_gbr), (i_dly, f_dly) = (
         by_class["PF"], by_class["GBR"], by_class["Delay"]
     )
-    # The GBR floor is served first, leaving this rate pool for the other two.
     gbr_rate = min(f_gbr.gfbr_bps, demand[(f_gbr.ue_id, f_gbr.qfi)])
     pool = (cap_dl - gbr_rate / se[i_gbr]) * se[i_pf]
-    # Equal marginal utility: 1/(r_pf + e) == 5/(r_delay + e)  =>  r_delay = 5 r_pf + 4e
-    eps = 1.0
-    r_pf = (pool - 4 * eps) / 6.0
-    r_dly = pool - r_pf
-    d_dly = demand[(f_dly.ue_id, f_dly.qfi)]
-    if r_dly > d_dly:                      # Delay flow saturates its demand
-        r_dly, r_pf = d_dly, pool - d_dly
 
     targets = solve_tier1(flows, snr, grid, demand)
-    expected = {
-        (f_pf.ue_id, f_pf.qfi): r_pf,
-        (f_gbr.ue_id, f_gbr.qfi): gbr_rate,
-        (f_dly.ue_id, f_dly.qfi): r_dly,
-    }
-    for key, want in expected.items():
-        got = targets[key]
-        assert abs(got - want) <= max(1_000.0, 1e-3 * want), (
-            f"{key}: got {got:.0f} bps, analytic optimum {want:.0f} bps "
-            f"(off by {abs(got - want):.0f})"
-        )
-
-
-def test_tier1_is_solver_independent():
-    """Two different conic solvers must agree on the Tier-1 targets.
-
-    Solver disagreement is the sharpest available signal that a convex
-    program is badly posed -- it was ~440 kbps on `factory_robots` before
-    the two-phase rewrite, on rates of 4-14 Mbps.
-    """
-    import cvxpy as cp
-    import pytest
-
-    from sim.scenarios import factory_robots_scenario
-
-    available = [s for s in ("CLARABEL", "SCS") if s in cp.installed_solvers()]
-    if len(available) < 2:
-        pytest.skip("needs two conic solvers to cross-check")
-
-    scenario = factory_robots_scenario()
-    flows, snr, demand = _maxmin_inputs(scenario)
-    grid = ResourceGrid(scenario.carrier, scenario.tdd)
-
-    runs = []
-    for solver in available:
-        default = cp.Problem.solve
-        try:
-            cp.Problem.solve = lambda self, *a, **k: default(self, solver=solver)
-            runs.append(solve_tier1(flows, snr, grid, demand))
-        finally:
-            cp.Problem.solve = default
-
-    worst = max(abs(runs[0][k] - runs[1][k]) for k in runs[0])
-    assert worst < 200_000, (
-        f"{available[0]} and {available[1]} disagree by {worst:.0f} bps"
+    pf_key, gbr_key, dly_key = (
+        (f_pf.ue_id, f_pf.qfi), (f_gbr.ue_id, f_gbr.qfi), (f_dly.ue_id, f_dly.qfi)
     )
 
-
-def test_slice_vs_gbr_priority_is_channel_independent():
-    """The GBR-floor / slice-floor tie-break must depend on the configured
-    penalties, not on the UEs' spectral efficiency.
-
-    A slice slack is natively in PRB-symbols and a GBR slack in bps, so
-    comparing them raw makes the crossover land at `gbr_penalty * SE` --
-    i.e. the same deployment, same contracts, different channel, different
-    policy. Measured before the fix: crossover exactly `1e3 * SE`, a 4.3x
-    swing over a 10-30 dB range. Converting the slice slack to bps at the
-    slice's own SE pins the crossover at `gbr_penalty` for every channel.
-    """
-    from sim.config import TDDConfig
-    from scheduler.tier1 import _spectral_efficiency, grid_capacity_prbsym_per_sec
-
-    grid = ResourceGrid(
-        CarrierConfig(numerology=1, bandwidth_hz=20_000_000), TDDConfig()
+    assert abs(targets[gbr_key] - gbr_rate) <= max(1_000.0, 1e-3 * gbr_rate), (
+        f"GBR target {targets[gbr_key]:.0f} should sit at its floor "
+        f"{gbr_rate:.0f}"
     )
-    cap_dl, _ = grid_capacity_prbsym_per_sec(grid)
-    gbr_penalty = 1e3
+    total_residual = targets[pf_key] + targets[dly_key]
+    assert abs(total_residual - pool) <= max(1_000.0, 1e-3 * pool), (
+        f"PF+Delay should exactly consume the residual pool "
+        f"{pool:.0f}, got {total_residual:.0f}"
+    )
+    # Reproducibility: the oscillating-but-deterministic landing point
+    # must not vary call to call given identical inputs.
+    again = solve_tier1(flows, snr, grid, demand)
+    assert again == targets, "solve_tier1 must be deterministic given identical inputs"
 
-    def gbr_fraction_met(snr_db, slice_penalty):
-        """Slice 1 carries a GBR flow wanting 80% of DL; slice 2 has a 50%
-        DL floor and unbounded demand. Only one of them can be satisfied."""
-        flows = [
-            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
-                       gfbr_bps=1, pdb_ms=100, slice_id=1,
-                       traffic_kind="poisson", traffic_params={"rate_bps": 1}),
-            FlowConfig(ue_id=2, qfi=9, direction="DL", flow_class="PF",
-                       slice_id=2, traffic_kind="poisson",
-                       traffic_params={"rate_bps": 500_000_000}),
-        ]
-        snr = {1: snr_db, 2: snr_db}
-        se = _spectral_efficiency(flows, snr)
-        gfbr = 0.8 * cap_dl * se[0]
-        flows[0].gfbr_bps = gfbr
-        targets = solve_tier1(
-            flows, snr, grid, {(1, 2): gfbr, (2, 9): 500_000_000},
-            gbr_slack_penalty=gbr_penalty,
-            slice_shares={2: {"DL": 0.5}},
-            slice_slack_penalty=slice_penalty,
-        )
-        return targets[(1, 2)] / gfbr
 
-    for snr_db in (10.0, 20.0, 30.0):
-        # An order of magnitude either side of the crossover must decide it
-        # the same way regardless of channel quality.
-        assert gbr_fraction_met(snr_db, gbr_penalty / 10) > 0.99, (
-            f"at {snr_db} dB the GBR floor should win a 10x cheaper slice"
-        )
-        assert gbr_fraction_met(snr_db, gbr_penalty * 10) < 0.90, (
-            f"at {snr_db} dB a 10x dearer slice floor should win"
-        )
+# test_tier1_is_solver_independent deleted (Phase 2, two-tier commit 2,
+# docs/phase2-plan.md): tested that two interchangeable CVXPY conic
+# solver backends agree. scipy.optimize.linprog (D3) is the one library
+# now -- nothing to swap, the premise this test exercised is gone, not
+# merely one implementation of it.
+
+
+# test_slice_vs_gbr_priority_is_channel_independent deleted (Phase 2,
+# two-tier commit 2): slicing has no ground-truth citation anywhere in
+# ia_p5g_scheduler.c (confirmed absent, not merely unattested) -- see the
+# max-min section's own note above for the same finding.
 
 
 def test_documented_defaults_match_the_code():

@@ -282,12 +282,15 @@ they survive it:
   "reproduce measured behavior, not documented intent" rule now carries
   this as its third cited instance, and the first found in this codebase's
   own code rather than in ported OAI C.
-- **A fourth instance, found scoping two-tier's own Phase 2 rewrite:
-  `scheduler/two_tier.py`'s pre-Phase-2 max-min GBR stage (`gbr_maxmin`)
-  and adaptive dual-ascent GBR penalty (`gbr_penalty_lr`) have no
-  citation anywhere in `docs/phase2-plan.md` §2.1's Tier-1 ground truth**,
-  which describes only a *fixed*-constant soft-slack penalty
-  (`IA_P5G_TIER1_GBR_PENALTY = 1.0e3`) and no max-min pre-stage. Stronger
+- **A fourth instance, found scoping two-tier's own Phase 2 rewrite —
+  now confirmed, not merely "no citation found," by commit 2's direct
+  read of `ia_p5g_sca_solve`: `scheduler/two_tier.py`'s pre-Phase-2
+  max-min GBR stage (`gbr_maxmin`) and adaptive dual-ascent GBR penalty
+  (`gbr_penalty_lr`) have no counterpart in ground truth at all.**
+  `ia_p5g_sca_solve` (`ia_p5g_scheduler.c:974-1103`) is a single SCA
+  loop — no lexicographic two-phase structure, no separate max-min
+  pre-stage; every GBR flow's slack column gets the identical *fixed*
+  `IA_P5G_TIER1_GBR_PENALTY = 1.0e3`, set once, never adjusted. Stronger
   than an absent citation: this repo's own prior study already studied
   and rejected both mechanisms on the record
   (`design-docs/scheduler-study.md` §8.4, "A negative result: the
@@ -295,12 +298,34 @@ they survive it:
   captured for the `TwoTier`/`TwoTier-nomaxmin`/`TwoTier-adaptive` arms
   before Phase 2's rewrite ran a mechanism the deployed hardware
   scheduler does not have, and one this codebase's own study had already
-  found didn't work. Both are removed outright in the Phase 2 rewrite's
+  found didn't work. Both were removed outright in the Phase 2 rewrite's
   commit 1, not merely defaulted off — the pre-removal comparison of the
   three arms is preserved as a one-time snapshot in
   `docs/phase2-two-tier-delta.md` §1, since `TwoTier-nomaxmin`/
   `TwoTier-adaptive` cannot be reconstructed once `gbr_maxmin`/
   `gbr_penalty_lr` are deleted constructor kwargs.
+- **Two more mechanisms confirmed absent by the same commit-2 read, not
+  previously flagged even in commit 1's own scoping**: network slicing
+  (`slice_shares`/`slice_slack_penalty`) — zero mentions anywhere in
+  `ia_p5g_scheduler.c`/`.h` — and a *hard*-floor override on top of the
+  soft GFBR constraint (`gbr_floor_bps`, the old Python's max-min-fed
+  parameter) — the C's GBR row is always the soft `r_i + s_i >= gfbr_i`
+  form, with no separate hard-bound mechanism anywhere. Both permanent
+  loss, `scheduler/tier1.py` rewritten from `ia_p5g_scheduler.c` directly
+  (Phase 2, two-tier commit 2).
+- **A sixth pre-Phase-2 mechanism, a different kind of problem from the
+  five above: `demand_estimator="oracle"` (the old default) is not merely
+  uncited, it is *optimistic* in a way no real scheduler can be.**
+  Ground truth's Tier-1 demand is always a windowed-arrival *measurement*
+  (`(delivered_cum + backlog) − last-cycle snapshot`, divided by elapsed
+  time, `ia_p5g_scheduler.c:1238-1334`) — DL raw, UL EWMA-smoothed at
+  α=0.3 with a zero-fallback guard, further capped by PHR power headroom
+  — never a read of the flow's own true configured traffic parameters.
+  The old default gave Tier-1 perfect knowledge of each flow's *future*
+  offered rate, a capability no real gNB has. Every `TwoTier` regression
+  record captured before Phase 2's commit 2 ran with this oracle — not
+  just an unfaithful number, a number no real scheduler could ever
+  produce. Fixed in commit 2 (`scheduler/two_tier.py::_compute_demand_bps`).
 - **A previously-fixed sort bug**, visible in a live comment: sched-
   inactive UEs used to sort to the *front* of the queue ("a bug"), now
   fixed to sort last. Relevant for provenance if any existing hardware
@@ -1172,6 +1197,23 @@ these five, add a new tag rather than forcing it into an existing one.
   test_reservation.py::test_dl_fill_uses_declared_order_not_priority_
   order` is the only thing currently guarding this from silently
   regressing back to a priority sort.
+- `[OPEN: PHASE2]` **`paper/main.tex` §"Soft GBR floors are a knapsack"
+  rests on `solve_tier1` being lexicographic — ground truth has no such
+  structure, so the section's ~1e7× dominance figure has lost its
+  basis.** Found scoping two-tier's own Phase 2 commit 2
+  (`docs/phase2-plan.md`): `ia_p5g_sca_solve` (`ia_p5g_scheduler.c:974-
+  1103`) is a single SCA loop, not the deleted pre-Phase-2 Python's
+  phase-1-then-phase-2 form the paper's argument was built against.
+  Whether the fixed `IA_P5G_TIER1_GBR_PENALTY=1.0e3` still dominates the
+  utility term enough to produce knapsack-shaped (vertex, all-or-nothing)
+  allocations under the new single-phase form is open and empirically
+  answerable, not yet answered — `scripts/knapsack_diagnostic.py` was
+  the instrument that answered the old version of this question and no
+  longer runs post-commit-2 (`ImportError` on the private `tier1.py`
+  helpers it imported, all deleted in the rewrite). The first finding in
+  this whole port that reaches outside the simulator into a paper draft
+  — not recoverable only by grepping commit history, hence its own entry
+  here rather than a commit-message mention alone.
 
 ---
 
@@ -1225,9 +1267,11 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 (confirmed, refuted, or inconclusive-with-reason), guarantee traceability
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
-campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage:
-**19 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
-UL-access-chain dominance cluster counted once; 6 `[OPEN: PHASE2]`; 2
+campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage (updated
+two-tier commit 2, `docs/phase2-plan.md`, for the new knapsack-claim
+entry — this count is a snapshot, re-grep rather than trust it stale):
+**20 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
+UL-access-chain dominance cluster counted once; 7 `[OPEN: PHASE2]`; 2
 `[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/
 DECISION]`) plus whatever new items Phase 2/3 add using the same
 open-ended tag vocabulary (§8 preamble). "Closed" means flipped to

@@ -638,7 +638,7 @@ is the corpus-breaking commit, name it as such)
 | # | Commit | Predicted `--check` impact |
 |---|---|---|
 | 1 | **Landed.** Skeleton replacing SPS/shadow-split and the entire old Tier-1 apparatus (not just SPS/shadow-split — a VQ-less scheduler has nothing for a Tier-1 target to feed, restated scope, see commit's own message) with LCG-aggregate, UE-level ranking (D1) and no floor/VQ yet (plain PF-shaped fallback, explicitly NOT a ported mechanism — `docs/oai-port-map.md` row 35). Also fixed a real, live bug found verifying `gNB_scheduler.c:246,251` directly: the pre-rewrite file iterated `("DL","UL")`, the wrong order — corrected to UL-then-DL (row 38). Tagged pre-rewrite state as `phase2-pre-twotier-rewrite` (`dc1ab6a`). Deleted 24+6+1 tests whose mechanisms no longer exist (14 of the 24 in `test_smoke.py` permanently, with no successor — SPS entirely, plus the max-min/adaptive-penalty Tier-1 enhancements found to have no ground-truth citation, `README.md` §7); the rest restoration-mapped to specific future commits. Corrected the checklist's own figure while landing this: the corpus has **14** TwoTier-family records, not 16 (`regression/baseline_studies_1_3.json`, confirmed by reading the file directly) — 6 plain `TwoTier` (one per Study-1-mult/Study-2/Study-3) plus 8 `TwoTier-nomaxmin`/`TwoTier-adaptive` (Study 1 only, 4 mults × 2 variants), the latter no longer constructable once `gbr_maxmin`/`gbr_penalty_lr` are deleted kwargs — `scripts/scheduler_study.py`/`scripts/regression_corpus.py` edited to drop those two arms (Study 1: 5 scheduler arms → 3). Their pre-removal comparison is preserved in `docs/phase2-two-tier-delta.md` §1, captured before the arms were deleted. | **Not inert — confirmed exactly as predicted, precisely stated.** `--check`: 6 changed values (all plain `TwoTier`), 8 removed keys (the deleted variant arms), 0 added, 0 diffs on any PF/RoundRobin/Reservation record. `harq_masked_flow_double_grant_count` measured exactly 0 on all three regression-corpus scenarios for the new scheduler (SPS's backlog-pooling was the counter's only source — confirmed by direct measurement, not inferred). `cce_utilization` rose on 5 of 6 records; the sixth (`study1/overload_mult1.0`) moved −0.0001, resolved by direct instrumentation, not left unexplained: at this specific point, SPS was genuinely engaged (10/10 UEs held an SPS reservation, verified via a `phase2-pre-twotier-rewrite` worktree run), so the "removing the only zero-cost path raises CCE" mechanism is not inapplicable here — it held, but was offset by a second, correlated SPS-linked effect that also disappeared: the old scheduler wasted real (nonzero-CCE) *dynamic* grants that the driver then discarded as HARQ double-grants (`harq_masked_flow_double_grant_count`-adjacent — SPS's own non-destructive backlog pooling across a UE's SPS-eligible flows created dynamic-spillover races against an already-pending HARQ process). Measured directly (wrapping `scheduler.allocate()` and `Metrics.record_cce` separately in both the old worktree and the new run, not inferred): the old scheduler *emitted* 10,689 CCE-worth of grants but the driver only *applied* 10,370 — 319 CCE of scheduler effort was discarded as a double-grant, none of it real cost; the new scheduler's emitted and applied totals track much more closely (10,248 emitted vs. 10,355 applied, the small excess being ordinary HARQ-retransmission CCE, not double-grant waste, confirmed `harq_masked_flow_double_grant_count == 0` here). At this one heavily-overloaded operating point (GBR met only 1/10 pre-rewrite), the waste SPS's removal eliminated slightly outweighs the real dynamic-grant cost SPS's removal added, netting a near-zero, direction-flipped move — a second, verified mechanism dominating at the margin, not a failure of the first. Four confounded causes move the six surviving records (SPS removal, old-Tier-1 removal, the UL/DL ordering fix, the corrected blanket-decay EWMA form) — do not attribute any single observed metric movement to one cause alone from the aggregate `--check` numbers without a mechanism-isolated re-run; commits 2 onward will separate them naturally as each mechanism comes back individually. Full suite: 448 passed (440 + 8 new `test_two_tier.py` tests). |
-| 2 | Tier-1 SCA/GLPK solver at the corrected 0.1s-derived period (D3 for solver choice). | DL/UL target-rate responsiveness tightens (10× faster re-solve than the old 2000-slot/1.0s default) — predict which per-flow latency percentiles move, and in which direction, before capturing. |
+| 2 | **Landed.** Tier-1 SCA/GLPK-equivalent solver (`scipy.optimize.linprog`, D3 resolved — mirrors the C's own per-iteration plain-LP structure, not a single convex solve) at the corrected `tier1_period_s=0.1 ÷ slot_duration_s`-derived period, read directly from `ia_p5g_sca_solve` (`ia_p5g_scheduler.c:974-1103`), not from this document's own §2.1 summary. Confirmed, not merely suspected: no lexicographic two-phase structure, no max-min pre-stage, no adaptive penalty, no slicing, no hard-floor override — five ungrounded pre-Phase-2 mechanisms, permanent loss (`docs/oai-port-map.md` rows 39-40). A sixth, `demand_estimator="oracle"`, was optimistic rather than merely uncited — ground truth's demand is always a windowed-arrival measurement (row 42), DL raw / UL EWMA-smoothed, never a read of a flow's true configured rate. `capacity_safety_factor` resolved as real but fixed (`IA_P5G_TIER1_OVERHEAD_FACTOR=0.80`, row 43) — mechanism restored, old sweepable-knob test not. Weight-on-utility corrected from flow-class-based to priority-threshold-based (row 41). A capacity-discretization fork (whole-slot vs. symbol-granular) decided explicitly, not silently, in favor of ground truth's stricter whole-slot form for Tier-1 specifically, leaving the existing `grid_capacity_prbsym_per_sec` untouched for its other callers. `get_full_dl_slots_per_period`/`get_full_ul_slots_per_period` found in the full OAI checkout (`config.c:313-347`), not merely inferred from naming, confirming the whole-slot reading deliberately, not by default. **A genuine algorithmic finding made writing this commit's own tests, not assumed going in**: the SCA loop does not always converge to a smooth interior optimum — two flows sharing one capacity row at equal SE with comparable weighted coefficients cause `linprog`'s vertex solutions to oscillate, never satisfying the convergence tolerance, so `MAXITERS=150` halts mid-oscillation at a fully deterministic but non-closed-form point (`docs/oai-port-map.md` row 39, `scheduler/tier1.py::solve_tier1`'s own docstring). 11 of 15 real `test_smoke.py` tier1.py-dependent tests are permanent loss (7 no-ground-truth + 2 max-min + 1 max-min-only utility + 1 solver-independence, whose premise — swappable CVXPY backends — no longer applies); 2 rewritten against the new formulation, 1 unaffected (false-positive grep hit), 1 contingent-resolved (capacity helper). `scheduler/tier1.py` was **not** orphaned the way commit 1's docstring assumed — still imported by `scheduler/__init__.py` and `scripts/knapsack_diagnostic.py`; the latter is left untouched but flagged (`README.md` §8's new `[OPEN: PHASE2]` entry) since it will now `ImportError` and its own docstring's claim underpins a live `paper/main.tex` section whose empirical basis this commit's own top finding undercuts — a durable, out-of-simulator consequence, not a drive-by fix. | **Predicted zero `--check` movement** (Tier-1's output is computed and stored but consumed by nothing until commit 3's VQ lands) — the opposite framing from commit 1's "not inert." **Confirmed exactly, verified against commit 1's own output directly (not the frozen — and still uncaptured — pre-Phase-2 baseline file, which would show unrelated commit-1-vs-original diffs)**: a `phase2-pre-twotier-rewrite`-adjacent worktree at two-tier commit 1 (`80609f5`) captured its own regression baseline to a scratch path; `--check` against that scratch baseline from this commit's own code reports `OK — no drift beyond rel_tol=1e-06, abs_tol=1e-09` across all 20 records. Full suite: 439 passed (was 448 at commit 1 — net −9 from 11 deletions + 2 new capacity tests). **Framing for this commit's own message and for commit 8's delta table** (stated explicitly, not left implicit): this commit deletes several hundred lines of capability, but the pre-Phase-2 implementation was not a rough approximation of the deployed scheduler — it was a more elaborate scheduler solving a different and easier problem (perfect future demand, free knobs, extra protective staging), and five of its mechanisms have no counterpart in the deployed code at all. A simplification toward fidelity, not a capability regression. |
 | 3 | Windowed-ceiling VQ: DL arrival-delta (matches header) + UL's actual backlog-bound/catchup formula (does not match header — port the code). | UL-heavy scenarios' per-flow fairness/latency shift; DL comparatively stable (formula matches what stale-header intuition would already assume). |
 | 4 | UL floor: fruitless-shift (16× cap, 500ms decay) + ADQ (8-grant trigger). Property tests: shift caps at exactly 4; ADQ fires at exactly 8, not 7 or 9. | Crumb-fraction metric and UL starvation-adjacent percentiles move; predict direction (starved UEs should show *improved* tail latency once floor logic is real, not absent). |
 | 5 | DL LCP: single greedy DRB pass + SRB-exempt fill (the corrected, non-two-pass structure — see §6 Flags for the README correction this implies). | DL per-flow byte-fill patterns shift modestly; SRB-adjacent flows (if any in-corpus) most affected. |
@@ -656,6 +656,28 @@ repeat that here). Minimum set already named above in the per-commit
 tables (two-tier commits 1, 2, 4, 6); add to this subsection as each
 commit lands, with actual-vs-predicted scored the way every prior WP's
 "Update, WP4"/"Confirmed exactly"-style entries do.
+
+**Forward note for commit 3, written at commit 2's own close, not
+retroactively**: commit 3 (the VQ) carries **three** confounded sources
+of possible `--check` movement, not one, and should predict with all
+three in mind rather than attributing every observed diff to the VQ port
+by default — (1) the VQ port itself, the commit's own nominal subject;
+(2) the first real end-to-end exercise of Tier-1's SCA solve, since
+nothing consumes `_targets_bps` before commit 3 — numerical behavior
+under load, convergence across up to 150 iterations, and whether
+`scipy.optimize.linprog` behaves at the corpus's actual scale the way
+small hand-picked unit-test cases suggest are all genuinely untested
+until commit 3 runs it for real; (3) commit 2's own found vertex-
+oscillation property (`docs/oai-port-map.md` row 39) — any scenario with
+two same-direction, equal-(or near-equal-)SE flows and comparable
+weighted coefficients competing for one Tier-1 capacity row will not
+converge to a smooth target split, landing instead at whatever the
+150-iteration damped oscillation produces; if that split now feeds a VQ
+ceiling, an unexpected `--check` diff could be this, not a VQ bug.
+Disentangling which of the three explains a given movement may need the
+same kind of mechanism-isolated re-run this session used for commit 1's
+own `cce_utilization` anomaly (worktree-based old-vs-new instrumentation),
+not an assumption either way.
 
 ---
 
@@ -719,12 +741,34 @@ promote any of them as a side effect of this work.
 ## 7. Status
 
 Reservation commits 1, 2, 3, 3a, 4a, 4, 5, 6, 7, 8, 9, 10, 10a and 11
-landed — reservation's Phase 2 port is complete. Two-tier commit 1
-(the corpus-breaking skeleton) has now landed too — see this table's
-own row 1 entry above for what it did and confirmed; commits 2-9 not
-started. Two user decisions (D1, D2) obtained directly and recorded
-above before any code, matching `docs/wp-join-plan.md`'s D0a/D0b
-precedent. Sequencing (D4): reservation first, two-tier second.
+landed — reservation's Phase 2 port is complete. Two-tier commits 1
+(the corpus-breaking skeleton) and 2 (Tier-1 SCA/GLPK-equivalent solve)
+have now landed too — see this table's own row 1/row 2 entries above for
+what each did and confirmed; commits 3-9 not started. Two user decisions
+(D1, D2) obtained directly and recorded above before any code, matching
+`docs/wp-join-plan.md`'s D0a/D0b precedent. Sequencing (D4): reservation
+first, two-tier second.
+
+Commit 2 confirmed, not merely restated, five of the checklist's
+inherited-summary claims by reading `ia_p5g_sca_solve` directly rather
+than trusting `docs/phase2-plan.md`'s own §2.1: the max-min pre-stage,
+the adaptive dual-ascent penalty, and (two findings new to commit 2, not
+previously flagged even in commit 1's own scoping pass) network slicing
+and a hard-floor override are all confirmed to have zero ground-truth
+citation, not merely "none found yet." A sixth mechanism,
+`demand_estimator="oracle"`, turned out to be a different class of
+problem — optimistic, not merely uncited (`README.md` §7). The commit
+also found a genuine algorithmic property of the SCA loop itself (vertex-
+oscillating, non-smooth convergence for contested equal-SE flow pairs,
+`docs/oai-port-map.md` row 39) that neither this document's own summary
+nor the deleted pre-Phase-2 Python's design anticipated, and flagged a
+consequence reaching outside the simulator entirely — `paper/main.tex`'s
+knapsack-claim section rests on a mechanism (the lexicographic two-phase
+form) ground truth never had (`README.md` §8's new `[OPEN: PHASE2]`
+entry). Predicted and confirmed exactly: zero `--check` movement,
+verified against commit 1's own output directly via a scratch-baseline
+worktree capture, since Tier-1's target rates are computed and stored
+but consumed by nothing until commit 3's VQ lands.
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/

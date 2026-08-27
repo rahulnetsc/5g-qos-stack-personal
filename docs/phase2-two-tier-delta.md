@@ -74,3 +74,28 @@ absent from `docs/phase2-plan.md` §2.1's Tier-1 ground truth — so a
 "faithful new port vs. old Python" framing is not accurate on every row;
 some of the delta is old-Python-exceeds-hardware vs. new-Python-matches-
 hardware, not old-approximation vs. new-precision.
+
+**A second, distinct instance of the same framing problem, added at
+commit 2**: the old scheduler's `demand_estimator` also defaulted to
+`"oracle"` — every pre-Phase-2 `TwoTier` record ran Tier-1 with perfect
+knowledge of each flow's *future* offered rate, not merely an unfaithful
+estimate but one no real scheduler could ever produce (`README.md` §7).
+So commit 8's comparison is, on top of the `gbr_maxmin` point above,
+also partly old-scheduler-with-an-oracle vs. new-scheduler-without-one —
+a second, independent reason a reader should not default to "the rewrite
+introduced a regression" when the new arm performs differently, before
+first checking whether the old arm's number was ever achievable on real
+hardware in the first place. State both points together in commit 8's
+own framing, not just the `gbr_maxmin` one alone.
+
+**A third caveat for commit 8's own methodology, added at commit 2**:
+`scheduler/tier1.py::solve_tier1` has a confirmed, non-porting-defect
+property — its SCA loop does not always converge to a smooth interior
+optimum for two same-direction, near-equal-SE flows with comparable
+weighted coefficients (`docs/oai-port-map.md` row 39). Once commit 3's
+VQ makes Tier-1's output observable in scheduling outcomes, a seed-to-
+seed or scenario-to-scenario old-vs-new delta on such a flow pair may
+show what looks like noise or instability that is actually this
+deterministic-but-non-smooth oscillation, not a comparison artifact or a
+bug in either arm — worth checking against this finding before
+attributing an odd delta to something else.

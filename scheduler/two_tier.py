@@ -32,7 +32,6 @@ negative result (``design-docs/scheduler-study.md`` sec8.4) before this
 commit removed them from the live scheduler.
 
 Explicitly NOT here yet, each landing in its own later commit: the
-SCA/GLPK Tier-1 solve at the corrected 0.1s period (commit 2), the
 windowed-ceiling virtual queue -- DL matching its own header, UL not
 (commit 3), the UL floor's fruitless-shift/ADQ anti-starvation state
 machine (commit 4), the real single-pass SRB-exempt DL LCP fill
@@ -43,6 +42,23 @@ against the new field layout (commit 7) -- this class implements no
 ``getattr(scheduler, "reset_ue", None)``, so its absence simply means
 TwoTier is treated like PF (no context reset) in the interim, not an
 oversight.
+
+**Commit 2 (this commit) wires the real Tier-1 SCA/GLPK solve
+(``scheduler/tier1.py``, rewritten from ``ia_p5g_scheduler.c`` -- see
+that module's own docstring for the full ground-truth citation) in, but
+its output feeds nothing yet.** ``_rank_key`` stays the commit-1
+bootstrap PF coefficient until commit 3 lands the VQ that actually
+consumes a Tier-1 target rate. So this commit computes and stores real
+``_targets_bps`` every ``tier1_period_slots`` slots, and that's all --
+predicted, and confirmed, to move zero `--check` numbers (see
+``docs/phase2-plan.md``'s commit-2 entry). ``tier1_period_slots`` is
+derived from ``_TIER1_PERIOD_S = 0.1`` ÷ ``slot_duration_s`` at
+``configure()`` time (numerology-robust), not hardcoded, closing the
+stale-default finding ``README.md`` §7 already flagged. Demand feeding
+the solve is windowed-arrival, DL raw / UL EWMA-smoothed with a
+zero-fallback guard -- see ``_resolve_tier1``'s own docstring, which
+cites the exact C lines; not an oracle, unlike the deleted pre-Phase-2
+default.
 
 Like ``reservation.py``, this package depends only on stdlib and its own
 modules -- never on ``sim``. A UL grant is emitted as a single opaque
@@ -89,6 +105,20 @@ from dataclasses import dataclass
 from .flow import FlowConfig
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import bits_per_prb, cce_aggregation_level
+from .tier1 import solve_tier1
+
+# ia_p5g_scheduler.c:74-76 -- the deployed macro, not ia_p5g_scheduler.h's
+# stale "1.0 s default" doc comment (README.md sec7's own stale-default
+# finding, now closed here rather than merely documented). Slot count is
+# derived from this at configure() time, never hardcoded.
+_TIER1_PERIOD_S = 0.1
+
+# ia_p5g_scheduler.c:388 -- UL-only demand EWMA smoothing (see
+# scheduler/tier1.py's own citation of the same constant; duplicated here
+# rather than imported since it's a two_tier.py-local demand-tracking
+# concern, the same "small shared constant, not a cross-module import"
+# convention _PF_COEF_HYPOTHETICAL_SYMBOLS/_THR_EWMA_ALPHA already use).
+_UL_DEMAND_ALPHA = 0.3
 
 # Bootstrap-only constant, borrowed from reservation.py's own PF
 # coefficient convention (gNB_scheduler_ulsch.c:2205-2213,
@@ -143,6 +173,12 @@ class TwoTier:
     def __init__(self) -> None:
         self._flows: list[FlowConfig] = []
         self._ue_state: dict[int, _UeState] = {}
+        self._snr_avg: dict[int, float] = {}
+        self._targets_bps: dict[tuple[int, int], float] = {}
+        self._arr_hist: dict[tuple[int, int], float] = {}
+        self._ul_demand_smooth: dict[tuple[int, int], float] = {}
+        self._last_solve_slot = -(10**9)
+        self.tier1_period_slots = 1
 
     def configure(
         self,
@@ -152,7 +188,16 @@ class TwoTier:
     ) -> None:
         self._flows = list(flows)
         self.slot_duration_s = slot_duration_s
+        self._grid = grid
         self._ue_state = {f.ue_id: _UeState() for f in flows}
+        self._snr_avg = {}
+        self._targets_bps = {}
+        self._arr_hist = {(f.ue_id, f.qfi): 0.0 for f in flows}
+        self._ul_demand_smooth = {
+            (f.ue_id, f.qfi): 0.0 for f in flows if f.direction == "UL"
+        }
+        self.tier1_period_slots = max(1, round(_TIER1_PERIOD_S / slot_duration_s))
+        self._last_solve_slot = -(10**9)
 
     def allocate(
         self,
@@ -160,6 +205,11 @@ class TwoTier:
         buffers: BufferView,
         channel: ChannelView,
     ) -> list[Allocation]:
+        self._update_snr_ewma(channel)
+        if slot.slot_index - self._last_solve_slot >= self.tier1_period_slots:
+            self._resolve_tier1(slot.slot_index, buffers)
+            self._last_solve_slot = slot.slot_index
+
         # gNB_scheduler.c:246,251 -- UL before DL, unconditionally, every
         # slot. See module docstring: the pre-rewrite file had this
         # backwards (DL-then-UL); fixed here, verified directly against
@@ -171,6 +221,89 @@ class TwoTier:
         if slot.dl_symbols > 0:
             out.extend(self._allocate_direction(slot, buffers, channel, "DL"))
         return out
+
+    def _update_snr_ewma(self, channel: ChannelView) -> None:
+        """Tier-1's own SNR input -- solve_tier1 needs a per-UE SNR to
+        compute spectral efficiency. A plain smoothed CQI-visible read,
+        the same convention the pre-rewrite file used for the identical
+        purpose (not itself a claim about ground truth's own SNR-smoothing
+        specifics for Tier-1, which ia_p5g_scheduler.c does not appear to
+        smooth at all before ia_p5g_estimate_se_dl/_ul -- flagged, not
+        resolved, since it doesn't change this commit's own predicted-
+        zero-movement outcome either way; Tier-1's output is unconsumed
+        this commit regardless of exactly how its own inputs are formed)."""
+        for f in self._flows:
+            cur = channel.get_reported_snr_db(f.ue_id)
+            self._snr_avg[f.ue_id] = cur
+
+    def _resolve_tier1(self, slot_index: int, buffers: BufferView) -> None:
+        """ia_p5g_tier1_thread's per-cycle body (ia_p5g_scheduler.c:1120-
+        1345): build each flow's windowed-arrival demand, call
+        solve_tier1, and -- fail-soft, matching the C's own "keep last
+        good targets" behavior (scheduler/tier1.py::solve_tier1's own
+        docstring) -- only overwrite self._targets_bps when the solve
+        actually produced something. Not consumed by ranking until commit
+        3 (VQ); computed and stored here regardless, so commit 3 doesn't
+        also have to wire the solve itself.
+        """
+        if slot_index - self._last_solve_slot >= 10**8:
+            # First call this run (_last_solve_slot still at its sentinel
+            # init) -- no real prior cycle to measure elapsed time against.
+            # ia_p5g_scheduler.c:1137-1139's own fallback: use the nominal
+            # period, not a wall-clock delta that doesn't exist yet.
+            elapsed_s = _TIER1_PERIOD_S
+        else:
+            elapsed_s = (slot_index - self._last_solve_slot) * self.slot_duration_s
+        demand_bps = self._compute_demand_bps(buffers, elapsed_s)
+        targets = solve_tier1(self._flows, self._snr_avg, self._grid, demand_bps)
+        if targets:
+            self._targets_bps = targets
+
+    def _compute_demand_bps(
+        self, buffers: BufferView, elapsed_s: float
+    ) -> dict[tuple[int, int], float]:
+        """Windowed-arrival demand per flow -- ia_p5g_scheduler.c:1238-
+        1334. DL: raw arr_W/elapsed, never smoothed (:1256, ":1289-1290
+        must NOT be smoothed" -- the RLC buffer is exact and stable). UL:
+        the same base quantity, EWMA-smoothed at _UL_DEMAND_ALPHA with a
+        raw-value fallback when the smoothed estimate is still zero
+        (:1291-1301, first cycle after attach). Ground truth additionally
+        caps UL demand at the UE's PHR power headroom (:1303-1313) --
+        NOT wired here; sim/power.py stays dormant per this repo's own
+        convention (README.md sec4), a flagged gap, not a silent omission.
+
+        Known, pre-existing simulator limitation, not introduced here:
+        multiple flows sharing one UL LCG would each read the identical
+        estimated_ul_buffer_per_lcg and get independent (duplicated)
+        demand entries -- the same H5-gap shape already documented
+        elsewhere in this port (README.md sec8); no current scenario
+        triggers it.
+        """
+        demand: dict[tuple[int, int], float] = {}
+        for f in self._flows:
+            key = (f.ue_id, f.qfi)
+            st = buffers.state(f.ue_id, f.qfi)
+            if f.direction == "DL":
+                arr_cum = buffers.delivered_cum(f.ue_id, f.qfi) + st.bytes_queued
+                arr_w = arr_cum - self._arr_hist.get(key, 0.0)
+                self._arr_hist[key] = arr_cum
+                demand[key] = max(0.0, arr_w * 8.0 / elapsed_s)
+            else:
+                arr_cum = (
+                    buffers.delivered_cum(f.ue_id, f.qfi)
+                    + st.estimated_ul_buffer_per_lcg
+                )
+                arr_w = arr_cum - self._arr_hist.get(key, 0.0)
+                self._arr_hist[key] = arr_cum
+                demand_raw = max(0.0, arr_w * 8.0 / elapsed_s)
+                prev_smooth = self._ul_demand_smooth.get(key, 0.0)
+                smooth = (
+                    _UL_DEMAND_ALPHA * demand_raw
+                    + (1.0 - _UL_DEMAND_ALPHA) * prev_smooth
+                )
+                self._ul_demand_smooth[key] = smooth
+                demand[key] = smooth if smooth > 0.0 else demand_raw
+        return demand
 
     def _allocate_direction(
         self,
