@@ -206,27 +206,16 @@ def test_undisturbed_neighbour_throughput_and_pdb_violations_never_worse(schedul
         assert demo_ue2.bytes_dropped_pdb <= base_ue2.bytes_dropped_pdb
 
 
-def test_two_tier_shows_a_transient_neighbour_delay_bump_only_on_the_mac_scope_arm():
-    """NOT asserted away: this is docs/wp-join-plan.md sec4's own ranked
-    Prediction 5 (Low confidence), confirmed here, not contradicted.
-    "mac" scope (GT-6.3a) deliberately RETAINS UE 1's virtual-queue
-    deficit across reestablishment -- so the moment it reconnects, it
-    carries real, legitimate catch-up priority that transiently
-    outranks UE 2 in TwoTier's own ranking, nudging UE 2's own p99 delay
-    up slightly (never its throughput or its PDB violations -- see the
-    test above). "full" scope (GT-6.3b) clears that deficit to zero, so
-    the same effect does not appear there: nothing for the reconnecting
-    UE to catch up on. This is exactly the kind of question D7 flagged
-    "mac" scope's retention as needing GT-6.3-shaped evidence to answer,
-    not asserted away by writing a "never worse, no exceptions" test
-    that this run would have failed."""
-    baseline_summary, baseline_rec, _ = _run_and_score(None, TwoTier())
-    _, mac_rec, _ = _run_and_score(GT63A_FADE_SLOTS, TwoTier())
-    _, full_rec, _ = _run_and_score(GT63B_FADE_SLOTS, TwoTier())
-
-    base_p99 = baseline_rec.flow(2, 1).delay_p99_ms
-    mac_p99 = mac_rec.flow(2, 1).delay_p99_ms
-    full_p99 = full_rec.flow(2, 1).delay_p99_ms
-
-    assert mac_p99 > base_p99  # the transient bump, confirmed, not hidden
-    assert full_p99 == pytest.approx(base_p99, abs=1e-6)  # "full" scope shows no such bump
+# test_two_tier_shows_a_transient_neighbour_delay_bump_only_on_the_mac_scope_arm
+# deleted with the Phase 2 rewrite's commit 1 (docs/phase2-plan.md):
+# TwoTier no longer has a virtual queue or reset_ue to produce the mac-vs-
+# full-scope catch-up-priority bump this test asserted (docs/wp-join-plan.md
+# sec4 Prediction 5). Both flows this test used (ue1 qfi1 GBR, ue2 qfi1 GBR)
+# are DL-only, and DL's VQ ceiling formula is unchanged by the rewrite (it
+# already matches its own header -- docs/phase2-plan.md sec2.1 -- unlike
+# UL's, which is being corrected) -- so restoring this test, rewritten
+# against the new VQ/reset_ue field layout rather than copied verbatim, at
+# two-tier's own commit 7 (where reset_ue is re-ported) is expected to
+# re-confirm the same qualitative finding, not merely a placeholder
+# deferral. If commit 7 lands without restoring it, that is a coverage
+# loss to record explicitly, not to let lapse silently.

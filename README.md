@@ -282,6 +282,25 @@ they survive it:
   "reproduce measured behavior, not documented intent" rule now carries
   this as its third cited instance, and the first found in this codebase's
   own code rather than in ported OAI C.
+- **A fourth instance, found scoping two-tier's own Phase 2 rewrite:
+  `scheduler/two_tier.py`'s pre-Phase-2 max-min GBR stage (`gbr_maxmin`)
+  and adaptive dual-ascent GBR penalty (`gbr_penalty_lr`) have no
+  citation anywhere in `docs/phase2-plan.md` §2.1's Tier-1 ground truth**,
+  which describes only a *fixed*-constant soft-slack penalty
+  (`IA_P5G_TIER1_GBR_PENALTY = 1.0e3`) and no max-min pre-stage. Stronger
+  than an absent citation: this repo's own prior study already studied
+  and rejected both mechanisms on the record
+  (`design-docs/scheduler-study.md` §8.4, "A negative result: the
+  adaptive penalty is the wrong shape") — so every regression record
+  captured for the `TwoTier`/`TwoTier-nomaxmin`/`TwoTier-adaptive` arms
+  before Phase 2's rewrite ran a mechanism the deployed hardware
+  scheduler does not have, and one this codebase's own study had already
+  found didn't work. Both are removed outright in the Phase 2 rewrite's
+  commit 1, not merely defaulted off — the pre-removal comparison of the
+  three arms is preserved as a one-time snapshot in
+  `docs/phase2-two-tier-delta.md` §1, since `TwoTier-nomaxmin`/
+  `TwoTier-adaptive` cannot be reconstructed once `gbr_maxmin`/
+  `gbr_penalty_lr` are deleted constructor kwargs.
 - **A previously-fixed sort bug**, visible in a live comment: sched-
   inactive UEs used to sort to the *front* of the queue ("a bug"), now
   fixed to sort last. Relevant for provenance if any existing hardware

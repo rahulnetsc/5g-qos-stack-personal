@@ -170,15 +170,18 @@ def study_overload_sweep() -> None:
         "GBR contract = delivered throughput >= 95% of GFBR.\n"
     )
     base = factory_robots_scenario()
-    # TwoTier ships with the max-min GBR stage on. The two comparison rows
-    # pin it off: one isolates what the stage buys, the other keeps the
-    # adaptive-penalty negative result (section 8.4) a like-for-like
-    # comparison against the same single-stage baseline.
+    # Phase 2 (docs/phase2-plan.md): the old TwoTier's max-min GBR stage
+    # (gbr_maxmin) and adaptive dual-ascent penalty (gbr_penalty_lr) had
+    # no citation in the real ia_p5g_scheduler.c ground truth and were
+    # already a documented negative result (design-docs/scheduler-study.md
+    # sec8.4) -- removed in the Phase 2 rewrite, not merely defaulted off.
+    # The "TwoTier-nomaxmin"/"TwoTier-adaptive" comparison arms these two
+    # knobs drove are gone with them; the pre-removal comparison they used
+    # to produce is preserved as a one-time snapshot in
+    # docs/phase2-two-tier-delta.md sec1, not reproducible here anymore.
     scheds = [
         ("PF", _pf),
         ("TwoTier", lambda: _tt()),
-        ("TwoTier-nomaxmin", lambda: _tt(gbr_maxmin=False)),
-        ("  +adaptive", lambda: _tt(gbr_maxmin=False, gbr_penalty_lr=1e5)),
         ("Reservation", _reservation),
     ]
     print(
@@ -222,7 +225,12 @@ def study_pdcch_limited() -> None:
             f"{d['mean_delivery']:>11.0%}{d['min_delivery']:>10.0%}"
             f"{d['worst_p99']:>9.1f}ms"
         )
-    print(f"\n(PDCCH utilization, TwoTier uses SPS to bypass per-slot DCI.)")
+    print(
+        "\n(PDCCH utilization: as of Phase 2 commit 1, TwoTier no longer\n"
+        "has SPS -- docs/phase2-plan.md, confirmed absent from OAI C\n"
+        "entirely -- so every grant here costs real DCI/CCE, unlike the\n"
+        "pre-Phase-2 scheduler this comment used to describe.)"
+    )
 
 
 def study_latency_bound() -> None:
@@ -347,7 +355,11 @@ def study_ul_access_chain() -> None:
             print("".join(row))
     print(
         "\nFINDING (negative result, reported as instructed rather than\n"
-        "tuned away): the load-inversion does NOT appear. PF/RoundRobin\n"
+        "tuned away; TwoTier's own numbers here predate Phase 2's rewrite\n"
+        "-- docs/phase2-plan.md -- and have not been re-verified against\n"
+        "it; SPS is gone from TwoTier entirely as of commit 1, so this\n"
+        "paragraph's SPS-specific framing is historical, not current):\n"
+        "the load-inversion does NOT appear. PF/RoundRobin\n"
         "(non-SPS) show p99 INCREASING with load -- the opposite direction\n"
         "-- up to a sharp collapse to the PDB ceiling (100ms), not a smooth\n"
         "high-to-low curve. TwoTier (SPS-bypassed for these flows) stays\n"

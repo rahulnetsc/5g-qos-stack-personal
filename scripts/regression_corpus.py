@@ -46,13 +46,18 @@ def _cases() -> list[dict[str, Any]]:
     1-3 actually run, in scheduler_study.py's own terms."""
     cases: list[dict[str, Any]] = []
 
-    # Study 1 -- overload sweep: 4 capacity multipliers x 4 scheduler variants.
+    # Study 1 -- overload sweep: 4 capacity multipliers x 3 scheduler arms.
+    # Phase 2 (docs/phase2-plan.md): the old "TwoTier-nomaxmin"/
+    # "TwoTier-adaptive" arms drove gbr_maxmin/gbr_penalty_lr, both
+    # removed from TwoTier in the Phase 2 rewrite (no ground-truth
+    # citation; already a documented negative result, design-docs/
+    # scheduler-study.md sec8.4) -- their pre-removal comparison is
+    # preserved as a one-time snapshot in docs/phase2-two-tier-delta.md
+    # sec1, not reproducible from this corpus anymore.
     base = ss.factory_robots_scenario()
     study1_scheds: list[tuple[str, Callable]] = [
         ("PF", ss._pf),
         ("TwoTier", lambda: ss._tt()),
-        ("TwoTier-nomaxmin", lambda: ss._tt(gbr_maxmin=False)),
-        ("TwoTier-adaptive", lambda: ss._tt(gbr_maxmin=False, gbr_penalty_lr=1e5)),
         ("Reservation", ss._reservation),
     ]
     for mult in (1.0, 1.5, 2.0, 3.0):

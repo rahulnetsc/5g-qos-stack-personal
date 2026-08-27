@@ -1,1148 +1,352 @@
-from collections import defaultdict, deque
+"""Two-tier 5G QoS scheduler -- rewritten from ``oai-branches/two-tier/``.
+
+Phase 2 (``docs/phase2-plan.md``): unlike ``reservation.py``, this is a
+rewrite of a scheduler that already had 1148 lines of pre-Phase-2 Python
+and was wired into the regression corpus and ~65 test functions across
+three files. The pre-rewrite file is preserved at git tag
+``phase2-pre-twotier-rewrite`` (``dc1ab6a``) -- commit 8 diffs against it
+directly. See ``docs/oai-port-map.md``'s "Phase 2 -- two-tier" section for
+the file:line correspondence and ``docs/phase2-plan.md`` sec4 for the
+full checklist.
+
+This commit (1) is explicitly **not inert** -- unlike reservation's own
+commit 1, this immediately changes the behavior of a scheduler already
+exercised by the regression corpus and the wider test suite. It deletes,
+outright, two mechanisms confirmed absent from real hardware
+(``docs/phase2-plan.md`` sec2.1): SPS/Configured-Grant (``_SPSReservation``,
+``_allocate_sps``, ``_is_sps_eligible``, and everything that fed them) and
+the UL intra-TB per-flow byte-split estimators (``_shadow_lcp_split``/
+``_occupancy_split``/``_estimate_ul_split``) that modeled something the
+real gNB structurally cannot observe. It also drops, for now, the entire
+old Tier-1 LP apparatus (``_resolve_tier1``, the "measured"/"tracking"
+demand estimators, the adaptive dual-ascent GBR penalty, the max-min GBR
+pre-stage) -- not because those specific pieces are this commit's job,
+but because a VQ-less scheduler (see below) has nothing for a Tier-1
+target rate to feed. Two of those Tier-1 pieces do not come back at all:
+see ``README.md`` sec7's new bullet -- the adaptive penalty
+(``gbr_penalty_lr``) and the max-min pre-stage (``gbr_maxmin``) have no
+citation in ``docs/phase2-plan.md`` sec2.1's ground truth (which
+describes only a *fixed*-constant soft-slack penalty,
+``IA_P5G_TIER1_GBR_PENALTY = 1.0e3``) and were already a documented
+negative result (``design-docs/scheduler-study.md`` sec8.4) before this
+commit removed them from the live scheduler.
+
+Explicitly NOT here yet, each landing in its own later commit: the
+SCA/GLPK Tier-1 solve at the corrected 0.1s period (commit 2), the
+windowed-ceiling virtual queue -- DL matching its own header, UL not
+(commit 3), the UL floor's fruitless-shift/ADQ anti-starvation state
+machine (commit 4), the real single-pass SRB-exempt DL LCP fill
+(commit 5, replacing ``_dl_fill``'s placeholder below), MCS selection via
+OLLA (commit 6), and a re-port of ``reset_ue``/``SchedulerContextReset``
+against the new field layout (commit 7) -- this class implements no
+``reset_ue`` at all until then; ``sim/driver.py`` discovers it via
+``getattr(scheduler, "reset_ue", None)``, so its absence simply means
+TwoTier is treated like PF (no context reset) in the interim, not an
+oversight.
+
+Like ``reservation.py``, this package depends only on stdlib and its own
+modules -- never on ``sim``. A UL grant is emitted as a single opaque
+``ue_grant=True`` Allocation (unchanged from the pre-rewrite file's own
+``_emit_grant``); ``sim/ue_lcp.py`` performs the real per-flow split
+entirely on the driver side. This scheduler's ranking and grant sizing
+read only UE-aggregate quantities (``bytes_reported`` summed across a
+UE's flows in a direction) -- never a per-flow split, and (once the VQ
+lands in commit 3) never a per-flow virtual queue on the UL side either,
+matching ``docs/phase2-plan.md`` D1's requirement that UL state be
+LCG-aggregate, the real gNB's own visibility (``ia_p5g_scheduler.c``'s
+``vq_ul[UE][LCG]``, not per-flow).
+
+**The per-UE throughput EWMA and PF coefficient below are a deliberate,
+temporary engineering placeholder, not a ported mechanism.** Unlike
+``reservation.py``, where this exact formula *is* real ground truth
+(final comparator tiebreak, ``gNB_scheduler_{ul,dl}sch.c``), two-tier's
+own ground-truth ranking is never PF-coefficient-shaped at any point --
+it is VQ-sum-based (DL, commit 3) or VQ-plus-urgency-based (UL, commit 3)
+from the start. This placeholder exists only so commit 1 has *some*
+ranking rule while VQ doesn't exist yet, structurally mirroring
+``reservation.py`` commit 1's own bootstrap shape and reusing its exact
+constants (``_PF_COEF_HYPOTHETICAL_SYMBOLS = 10``, EWMA ``alpha = 0.01``)
+as an engineering convention, not because two-tier's own
+``gNB_scheduler_{ul,dl}sch.c`` has been checked and found to match --
+it hasn't been, and this placeholder is deleted in commit 3, so it isn't
+going to be. Do not add a C file:line citation for this formula in the
+port-map row; record it as "no ground truth -- temporary bootstrap,
+removed commit 3" instead, so a future reader doesn't go looking for a
+citation that was never claimed.
+
+The one piece of this file that *is* a live-source citation:
+``gNB_scheduler.c:246,251`` (confirmed byte-identical across both
+branches, ``oai-branches/README.md``) runs ``nr_schedule_ulsch`` before
+``nr_schedule_ue_spec`` (DL) unconditionally, every slot -- UL-then-DL.
+**The pre-rewrite ``two_tier.py`` had this backwards**: its own
+``allocate()`` iterated ``("DL", "UL")``, DL first -- a real, live bug in
+the scheduler that produced every existing TwoTier regression record,
+not a cosmetic one. Fixed here.
+"""
+
 from dataclasses import dataclass
 
 from .flow import FlowConfig
-from .interfaces import (
-    Allocation,
-    BufferView,
-    ChannelView,
-    GridView,
-    SlotView,
-)
+from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import bits_per_prb, cce_aggregation_level
-from .tier1 import (
-    estimate_demand_bps,
-    gbr_maxmin_floors,
-    solve_maxmin_gbr_level,
-    solve_tier1,
-)
+
+# Bootstrap-only constant, borrowed from reservation.py's own PF
+# coefficient convention (gNB_scheduler_ulsch.c:2205-2213,
+# gNB_scheduler_dlsch.c:814-821 -- reservation's own citation, NOT
+# verified against two-tier's own gNB_scheduler_{ul,dl}sch.c, which this
+# scheduler's real ranking never uses at all -- see module docstring).
+# Deleted along with the rest of this placeholder in commit 3.
+_PF_COEF_HYPOTHETICAL_SYMBOLS = 10
+
+# Bootstrap-only constant -- see module docstring. Not a citation to
+# two-tier's own C source.
+_THR_EWMA_ALPHA = 0.01
 
 
 @dataclass
-class _SPSReservation:
-    """A per-slot PRB reservation for one (UE, QFI) flow in one direction.
+class _UeState:
+    """Per-UE throughput EWMA, one instance per UE, both directions.
 
-    ``snr_ref_db`` is the SNR the reservation was sized against -- the
-    fixed MCS operating point for this SPS grant. Real 5G SPS uses a
-    semi-static MCS chosen conservatively (safety margin below the
-    smoothed CQI). Every firing uses this fixed MCS, so BLER at the true
-    SNR of the firing slot depends on how far the true SNR sits from
-    ``snr_ref_db`` (driver -> bler_for_mcs).
+    Bootstrap-only state -- see module docstring. Decayed for every
+    connected UE every slot (blanket decay), not gated on this-slot
+    candidacy -- reservation's own commit 1 gated this on candidacy and
+    found (commit 10a, ``docs/oai-port-map.md`` row 14) that ground
+    truth actually decays unconditionally, gated only on a UL-failure/
+    DRX signal this simulator's ``Scheduler`` protocol doesn't expose.
+    Landing the corrected (blanket) form from the start here rather than
+    repeating reservation's now-fixed mistake -- even though, for this
+    placeholder, no C citation is being claimed either way.
     """
 
+    dl_thr_bytes_per_slot: float = 0.0
+    ul_thr_bytes_per_slot: float = 0.0
+
+
+@dataclass
+class _Candidate:
     ue_id: int
-    qfi: int
-    direction: str  # 'DL' or 'UL'
-    prbs_per_slot: int
-    snr_ref_db: float
+    flows: list[FlowConfig]
+    bits_per_rb: int
+    bler: float
+    snr_db: float
+    coef: float
 
 
 class TwoTier:
-    """Tier-1 LP (every N slots) sets per-flow target rates; Tier-2 uses
-    drift-plus-penalty (Lyapunov optimization) to steer actual rates to targets.
-
-    Virtual queue per flow:
-        Q_i += target_i * slot_duration_s          (grow at the Tier-1 target)
-        Q_i  = min(Q_i, windowed_ceiling_i)        (clamp, see below)
-        Q_i  = max(0, Q_i - delivered_i)           (drain by delivered bits)
-    The virtual queue is a control accumulator, not a buffer of real bits.
-    Its arrivals are the Tier-1 *target* rate (the only lever Tier-1 has on
-    Tier-2).
-
-    The ceiling is the bits the flow legitimately should have delivered over
-    the last `tier1_period` slots but didn't:
-        ceiling_i = max(0, min(target_i * W, arrived_W_i) - delivered_W_i)
-    where W is the window in seconds and arrived_W / delivered_W are bits
-    over the trailing window. A flow can't be owed more than its target,
-    nor more than what actually arrived. Using a *windowed* arrival count
-    rather than instantaneous backlog is essential: a bursty flow's RLC
-    buffer momentarily empties between frames, and clamping Q to that
-    instantaneous (near-zero) backlog destroys the legitimate rate-tracking
-    debt, letting continuous flows starve bursty GBR ones.
-
-    Per-slot scheduling is per UE, mirroring the 5G MAC. Each UE is granted
-    PRBs once (one DCI), ranked by the summed drift-plus-penalty deficit of
-    its backlogged flows times its spectral efficiency:
-        ue_metric = (sum_f  Q_f + delay_urgency_f) * spectral_efficiency_ue
-    The grant's transport block is then filled by the MAC multiplexer
-    (_mac_lcp_fill) across the UE's flows -- logical-channel prioritization:
-    by priority_level, then by drift-plus-penalty deficit. For Delay-class
-    flows an HoL/PDB urgency term is folded into Q_f. The rule stays
-    opportunistic but rate-tracking: a UE whose flows are behind target and
-    which has a good channel wins the grant.
+    """Rewritten in place from the pre-Phase-2 file (tag
+    ``phase2-pre-twotier-rewrite``). Commit 1: ``Scheduler`` protocol
+    conformance, a per-UE throughput-EWMA bootstrap ranking, no VQ, no
+    UL floor, no Tier-1 -- see module docstring for what's deleted and
+    what lands in later commits.
     """
 
-    def __init__(
-        self,
-        tier1_period_slots: int = 2000,
-        snr_window_slots: int = 100,
-        delay_urgency_weight: float = 4.0,
-        delay_exponent: float = 2.0,
-        enable_sps: bool = True,
-        sps_safety_margin: float = 1.10,
-        sps_budget_fraction: float = 0.85,
-        sps_min_scale: float = 0.75,
-        sps_snr_margin_db: float = 0.0,
-        gbr_penalty_init: float = 1e3,
-        gbr_penalty_lr: float = 0.0,
-        gbr_penalty_max: float = 1e6,
-        gbr_penalty_se_exponent: float = 0.0,
-        gbr_maxmin: bool = True,
-        gbr_maxmin_scale: float = 1.0,
-        capacity_safety_factor: float = 1.0,
-        slice_shares: "dict[int, dict[str, float]] | None" = None,
-        slice_slack_penalty: float = 1e3,
-        ul_split_estimator: str = "shadow_lcp",
-        ul_bucket_sync_gain: float = 0.0,
-        demand_estimator: str = "oracle",
-        demand_ewma_alpha: float = 0.3,
-        bsr_lag_slots: int = 0,
-        demand_track_gain_up: float = 0.5,
-        demand_track_gain_down: float = 0.1,
-        apply_demand_cap: bool = False,
-    ) -> None:
-        self.tier1_period = max(1, tier1_period_slots)
-        self.snr_window = max(1, snr_window_slots)
-        self.delay_w = delay_urgency_weight
-        self.delay_exp = delay_exponent
-        # SPS: decide PRB reservation for periodic flows after each Tier-1 solve.
-        self.enable_sps = enable_sps
-        self.sps_safety_margin = sps_safety_margin
-        # SPS reserves at most this fraction of the carrier, leaving a
-        # dynamic pool for burst spillover.
-        self.sps_budget_fraction = sps_budget_fraction
-        # If a priority tier's SPS reservations would be scaled below this
-        # fraction of their desired size, the tier is run dynamically
-        # instead -- unless that would overrun the PDCCH/CCE budget.
-        self.sps_min_scale = sps_min_scale
-        # SPS uses a fixed MCS chosen at reservation time from
-        # (smoothed CQI SNR - this margin), in dB. Real 5G SPS is
-        # semi-static; picking a conservative MCS trades some spectral
-        # efficiency (larger reservations) for BLER robustness against
-        # CQI drift under channel variation. The deployment should size
-        # this margin to its channel volatility: a slow-varying industrial
-        # channel benefits little (default 0.0); a mobile deployment with
-        # significant Doppler benefits more. See the sensitivity study in
-        # scripts/cqi_study.py.
-        self.sps_snr_margin_db = sps_snr_margin_db
-        # Adaptive per-flow GBR slack penalty (dual ascent). gbr_penalty_lr=0
-        # freezes the penalty at gbr_penalty_init -> identical to the old
-        # uniform-scalar behaviour.
-        self.gbr_penalty_init = gbr_penalty_init
-        self.gbr_penalty_lr = gbr_penalty_lr
-        self.gbr_penalty_max = gbr_penalty_max
-        # Spectral-efficiency tilt exponent k on the GBR slack penalty (see
-        # solve_tier1): 0 = off, k>0 efficiency-first, k<0 RB-level parity.
-        self.gbr_penalty_se_exponent = gbr_penalty_se_exponent
-        # Two-stage GBR protection, ON by default. A max-min stage runs ahead
-        # of the utility solve and pins every GBR flow at gbr_maxmin_scale *
-        # t* of its contracted floor, where t* is the largest fraction all of
-        # them can hold at once. Without it the utility solve is a
-        # shortfall-minimising knapsack that abandons the lowest-SE GBR flows
-        # outright -- a hard floor is the only thing that stops it, since
-        # reweighting a linear penalty just picks a different victim.
-        #
-        # The default is on because the stage is *self-disabling* where it is
-        # not needed: whenever the GBR set is jointly feasible t* = 1, the
-        # floor is non-binding, and the result is identical to leaving it
-        # off. It costs something only in genuine GBR overload, and there
-        # what it costs is aggregate throughput bought by starving a
-        # cell-edge flow to zero. gbr_maxmin_scale dials the guarantee back:
-        # 1.0 claims the whole achievable floor, 0.0 restores the
-        # single-stage behaviour exactly. See scheduler/tier1.py.
-        self.gbr_maxmin = gbr_maxmin
-        self.gbr_maxmin_scale = gbr_maxmin_scale
-        # Scales the LP's per-direction PRB-symbol budget in both stages
-        # (max-min and utility). 1.0 = the sim's raw grid capacity;
-        # <1.0 shaves off headroom for control-plane / HARQ / retransmit
-        # overhead the model does not itemise (typical deployment values
-        # 0.85-0.95). See `scheduler-study.md` §4.5 and scenario RAN table
-        # in §6.1 for how peak vs achievable capacity relate.
-        self.capacity_safety_factor = capacity_safety_factor
-        # Last max-min level solved, for diagnostics/telemetry. NaN until
-        # the first Tier-1 solve; stays NaN when gbr_maxmin is off.
-        self.maxmin_level = float("nan")
-        # How the gNB guesses the UE's uplink transport-block split, which
-        # is what drains the uplink virtual queues. It never observes the
-        # real split (TS 38.321 sec 5.4.3.1 runs in the UE).
-        #   "occupancy"  -- apportion by BSR-reported buffer. What the OAI
-        #                   port does today; uses only the BSR.
-        #   "shadow_lcp" -- run the UE's own LCP against a shadow copy of
-        #                   its PBR token buckets. Strictly more information:
-        #                   the gNB configured those PBRs, so it can predict
-        #                   the algorithm rather than approximate its result.
-        self.ul_split_estimator = ul_split_estimator
-        # Closed-loop correction on the shadow buckets. Each time a fresh BSR
-        # contradicts the predicted backlog, the residual is fed back into the
-        # bucket at this gain. 0 disables it (pure open-loop shadow).
-        self.ul_bucket_sync_gain = ul_bucket_sync_gain
-        # Where Tier-1's per-flow demand cap comes from.
-        #   "oracle"   -- the flow's configured offered rate, known exactly and
-        #                 forever. No gNB has this; it is the remaining
-        #                 instance of the "perfect knowledge" pattern that the
-        #                 BSR and CQI work closed (NOTES.md 2026-05-17).
-        #   "measured" -- estimated from observed arrivals over the trailing
-        #                 Tier-1 window, then EWMA-smoothed. For uplink the
-        #                 arrivals are inferred the way a gNB must:
-        #                 delivered + BSR-reported backlog.
-        # Unlike BSR/CQI staleness, this gap flatters *Tier-1*: a perfect
-        # demand cap is exactly right, an estimated one is not.
-        self.demand_estimator = demand_estimator
-        # EWMA smoothing on the measured estimate. A rate-adaptive source
-        # forms a closed loop with the scheduler, and if its response period
-        # is near the Tier-1 window the raw estimate oscillates; smoothing
-        # slower than that period is what damps it.
-        self.demand_ewma_alpha = demand_ewma_alpha
-        self._demand_smooth: dict[tuple[int, int], float] = {}
-        # --- "tracking" estimator state -------------------------------------
-        # The buffer obeys  B_k = B_{k-1} + A_k - S_k - X_k, where A is the
-        # demand we want, S is what our own grant served (known), and X is
-        # what the UE discarded on PDB expiry (never reported for uplink).
-        # We dead-reckon B forward from the last BSR using our current demand
-        # estimate, then correct that estimate from the residual when the next
-        # BSR lands.
-        #
-        # The gains are deliberately asymmetric. A positive residual (buffer
-        # bigger than predicted) can only mean we under-estimated arrivals.
-        # A negative one is ambiguous: either we over-estimated arrivals, or
-        # the UE silently discarded. Since r_i <= D_i is a *hard* cap, an
-        # under-estimate is unrecoverable while an over-estimate only wastes
-        # headroom -- so correct up briskly and down cautiously.
-        self.bsr_lag_slots = max(0, int(bsr_lag_slots))
-        self.demand_track_gain_up = demand_track_gain_up
-        self.demand_track_gain_down = demand_track_gain_down
-        # Whether Tier-1 caps each flow at its offered load at all.
-        #
-        # OFF by default (2026-08-07). The cap was redundant: Tier-2's windowed
-        # ceiling already clamps a flow's virtual queue to what actually
-        # arrived, so a quiet flow is never scheduled however generous its
-        # Tier-1 target -- and the ceiling does it from *observation* where the
-        # cap needed a *prediction*. Requiring that prediction was the whole
-        # reason Tier-1 had to estimate demand from delayed, lossy BSRs with an
-        # unobservable discard term, and a cap that collapses is what turns an
-        # estimation error into unrecoverable starvation. Measured free to
-        # remove on both study scenarios. See NOTES.md 2026-08-07.
-        self.apply_demand_cap = apply_demand_cap
-        self._buf_est: dict[tuple[int, int], float] = {}
-        self._buf_hist: dict[tuple[int, int], deque] = {}
-        self._served_this_slot: dict[tuple[int, int], int] = {}
-        # Shadow bucket state, per UL flow: [tokens_bits, capacity_bits, pbr]
-        self._ul_shadow_bucket: dict[tuple[int, int], list[float]] = {}
-        # What the gNB thinks each UL flow's backlog is after its last grant,
-        # used to detect BSR disagreement for the closed-loop correction.
-        self._ul_predicted_backlog: dict[tuple[int, int], float] = {}
-        # Network-slice RB shares {slice_id: {"DL": frac, "UL": frac}};
-        # None disables slicing. Enforced as a soft Tier-1 floor.
-        self.slice_shares = slice_shares
-        self.slice_slack_penalty = slice_slack_penalty
-
+    def __init__(self) -> None:
         self._flows: list[FlowConfig] = []
-        self._snr_avg: dict[int, float] = {}
-        self._targets_bps: dict[tuple[int, int], float] = {}
-        self._demand_bps: dict[tuple[int, int], float] = {}
-        self._virtual_q: dict[tuple[int, int], float] = {}
-        self._gbr_penalty: dict[tuple[int, int], float] = {}
-        # Trailing-window snapshots of cumulative arrived/delivered bytes,
-        # one append per slot, length tier1_period -> a sliding window.
-        self._arr_hist: dict[tuple[int, int], deque] = {}
-        self._del_hist: dict[tuple[int, int], deque] = {}
-        self._sps: list[_SPSReservation] = []
-        self._sps_keys: set[tuple[int, int]] = set()
-        self.slot_duration_s = 0.0
-        self._grid: GridView | None = None
-        self._last_solve_slot = -(10**9)
-        self._tier1_solve_count = 0
+        self._ue_state: dict[int, _UeState] = {}
 
-    def configure(self, flows, slot_duration_s, grid):
+    def configure(
+        self,
+        flows: list[FlowConfig],
+        slot_duration_s: float,
+        grid: GridView,
+    ) -> None:
         self._flows = list(flows)
-        self._flow_by_key = {(f.ue_id, f.qfi): f for f in flows}
         self.slot_duration_s = slot_duration_s
-        self._grid = grid
-        self._snr_avg = {}
-        self._demand_bps = {(f.ue_id, f.qfi): estimate_demand_bps(f) for f in flows}
-        self._targets_bps = dict(self._demand_bps)
-        self._virtual_q = {(f.ue_id, f.qfi): 0.0 for f in flows}
-        self._gbr_penalty = {
-            (f.ue_id, f.qfi): self.gbr_penalty_init for f in flows
-        }
-        self._arr_hist = {
-            (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
-        }
-        # Shadow copy of every uplink flow's PBR token bucket. Same PBR and
-        # bucket-size-duration the network configured on the UE, so the gNB
-        # can run the UE's algorithm -- it just cannot see the UE's real
-        # backlog, which is where the two copies drift apart.
-        self._ul_shadow_bucket = {}
-        self._ul_predicted_backlog = {}
-        self._buf_est = {(f.ue_id, f.qfi): 0.0 for f in flows}
-        self._buf_hist = {
-            (f.ue_id, f.qfi): deque(maxlen=self.bsr_lag_slots + 1)
-            for f in flows
-        }
-        self._served_this_slot = {(f.ue_id, f.qfi): 0 for f in flows}
-        for f in flows:
-            if f.direction != "UL":
-                continue
-            pbr = f.effective_pbr_bps()
-            self._ul_shadow_bucket[(f.ue_id, f.qfi)] = [
-                0.0, pbr * (f.bsd_ms / 1000.0), pbr
-            ]
-            self._ul_predicted_backlog[(f.ue_id, f.qfi)] = 0.0
-        self._del_hist = {
-            (f.ue_id, f.qfi): deque(maxlen=self.tier1_period) for f in flows
-        }
-
-    def reset_ue(self, ue_id: int, scope: str, buffers: BufferView) -> None:
-        """WP-Join commit 7 (docs/wp-join-plan.md sec1.9, D7): the ONLY
-        scheduler in this repo that implements ``interfaces.py::
-        SchedulerContextReset`` -- see that protocol's own docstring for
-        the ``scope`` contract. PF/gradient/RoundRobin implement nothing;
-        their own (checkable, not assumed) reason is documented in
-        docs/wp-join-plan.md's own D8.
-
-        ``"full"`` mirrors exactly what ``configure()`` initialises for
-        one flow, per flow of this UE -- not a separate, independently-
-        invented "fresh" state. ``_arr_hist``/``_del_hist`` are RE-SEEDED
-        with this UE's CURRENT cumulative arrived/delivered bits (one
-        entry), not cleared to empty: ``buffers.arrived_cum``/
-        ``delivered_cum`` are lifetime counters that never reset on
-        their own, so an empty history would compute its very first
-        post-reset window against a "since the dawn of the run" baseline
-        instead of "since this reset" -- self-healing within one
-        ``tier1_period`` either way, but a needless clamp-to-zero
-        artifact for that whole window if skipped (found while writing
-        this method, not assumed from the field list alone).
-        ``_demand_smooth`` is ALSO cleared here even though ``configure()``
-        itself never clears it -- a latent, harmless-in-practice gap in
-        ``configure()`` (invisible there because it's only ever called
-        once per run, immediately after ``__init__`` already left the
-        dict empty), not a precedent this method should replicate: a
-        genuinely fresh UE carrying forward a pre-outage demand EWMA is
-        exactly the kind of residual state GT-6.2 is testing for.
-
-        ``"mac"`` resets only the state structurally tied to the BSR/
-        MAC reporting cycle that a lost radio link invalidates
-        (``_buf_est``/``_buf_hist``, the "tracking" demand estimator's
-        own predict/correct loop; ``_served_this_slot``; the UL shadow
-        token bucket and its predicted-backlog counterpart, which mirror
-        the UE's own MAC-layer bucket -- reset alongside it in ``sim/
-        ue_lcp.py``). It deliberately does NOT touch ``_virtual_q``/
-        ``_demand_bps``/``_targets_bps``/``_gbr_penalty``/``_snr_avg``/
-        ``_arr_hist``/``_del_hist``/``_demand_smooth`` -- real
-        reestablishment retains the UE's context, so the scheduler's
-        longer-run fairness ledger (accumulated GBR deficit, demand
-        belief) is real, owed state, not residue. Whether that
-        retention is correct is GT-6.3's own question (D7); this is the
-        switch to revisit if it turns out to be wrong.
-
-        ``_sps``/``_sps_keys`` need no action either scope:
-        ``_update_sps_reservations`` rebuilds both from scratch every
-        ``tier1_period`` regardless (see that method's own ``self._sps
-        = []`` at its top), so a stale reservation for this UE cannot
-        survive past the next periodic Tier-1 solve.
-        """
-        if scope not in ("mac", "full"):
-            raise ValueError(f"scope must be 'mac' or 'full' (got {scope!r})")
-        ue_flows = [f for f in self._flows if f.ue_id == ue_id]
-        if not ue_flows:
-            return
-
-        for f in ue_flows:
-            key = (f.ue_id, f.qfi)
-            self._buf_est[key] = 0.0
-            self._buf_hist[key] = deque(maxlen=self.bsr_lag_slots + 1)
-            self._served_this_slot[key] = 0
-            if f.direction == "UL":
-                pbr = f.effective_pbr_bps()
-                self._ul_shadow_bucket[key] = [0.0, pbr * (f.bsd_ms / 1000.0), pbr]
-                self._ul_predicted_backlog[key] = 0.0
-
-        if scope == "mac":
-            return
-
-        self._snr_avg.pop(ue_id, None)
-        for f in ue_flows:
-            key = (f.ue_id, f.qfi)
-            demand = estimate_demand_bps(f)
-            self._demand_bps[key] = demand
-            self._targets_bps[key] = demand
-            self._virtual_q[key] = 0.0
-            self._gbr_penalty[key] = self.gbr_penalty_init
-            self._demand_smooth.pop(key, None)
-            arr_now = buffers.arrived_cum(*key) * 8
-            del_now = buffers.delivered_cum(*key) * 8
-            self._arr_hist[key] = deque([arr_now], maxlen=self.tier1_period)
-            self._del_hist[key] = deque([del_now], maxlen=self.tier1_period)
-
-    def _track_demand(self, buffers) -> None:
-        """One step of the buffer-tracking demand estimator, per slot.
-
-        Predict:  B_hat_k = B_hat_{k-1} + D_hat*dt - S_k
-        Correct:  when the BSR from `bsr_lag_slots` ago lands, compare it with
-                  what we predicted the buffer was at that instant and push the
-                  residual into D_hat.
-
-        A missing BSR is simply a slot with no correction -- the predictor
-        keeps running on the last estimate, which is the graceful-degradation
-        property the differencing estimator did not have.
-        """
-        if self.demand_estimator != "tracking":
-            return
-        dt = self.slot_duration_s
-        for f in self._flows:
-            key = (f.ue_id, f.qfi)
-            d_hat = self._demand_smooth.get(key, 0.0)
-            served = self._served_this_slot.get(key, 0)
-            # --- predict -------------------------------------------------
-            b = self._buf_est.get(key, 0.0) + d_hat * dt / 8.0 - served
-            self._buf_est[key] = max(0.0, b)
-            hist = self._buf_hist[key]
-            # --- correct -------------------------------------------------
-            # hist[0] is what we predicted the buffer was bsr_lag_slots ago,
-            # which is the instant the BSR now in hand describes.
-            if len(hist) == hist.maxlen and hist.maxlen > 0:
-                st = buffers.state(f.ue_id, f.qfi)
-                observed = (
-                    st.bytes_reported if f.direction == "UL" else st.bytes_queued
-                )
-                residual = observed - hist[0]
-                lag_s = max(dt, self.bsr_lag_slots * dt)
-                gain = (self.demand_track_gain_up if residual > 0
-                        else self.demand_track_gain_down)
-                d_hat = max(0.0, d_hat + gain * residual * 8.0 / lag_s)
-                self._demand_smooth[key] = d_hat
-                # Re-anchor the predictor to the measurement so the error does
-                # not accumulate; the residual has been accounted for above.
-                self._buf_est[key] = max(0.0, self._buf_est[key] + residual)
-            hist.append(self._buf_est[key])
-        self._served_this_slot = {k: 0 for k in self._served_this_slot}
-
-    def _update_demand_estimate(self, buffers) -> None:
-        """Re-estimate each flow's offered rate from what actually arrived.
-
-        Arrivals over the trailing Tier-1 window, converted to a rate. For
-        uplink the gNB cannot see arrivals directly, so it infers them the
-        way a real one does -- cumulative delivered plus the BSR-reported
-        backlog -- which inherits the BSR's lag and loss.
-        """
-        if self.demand_estimator == "tracking":
-            # Already tracked per slot; just publish it to Tier-1.
-            for f in self._flows:
-                key = (f.ue_id, f.qfi)
-                if key in self._demand_smooth:
-                    self._demand_bps[key] = max(
-                        self._demand_smooth[key], f.gfbr_bps
-                    )
-            return
-        if self.demand_estimator != "measured":
-            return
-        window_s = max(1, self.tier1_period) * self.slot_duration_s
-        a = self.demand_ewma_alpha
-        for f in self._flows:
-            key = (f.ue_id, f.qfi)
-            st = buffers.state(f.ue_id, f.qfi)
-            visible_backlog = (
-                st.bytes_reported if f.direction == "UL" else st.bytes_queued
-            )
-            # Discarded bytes were offered. Omitting them is what turns a
-            # starved flow into one that appears to have stopped asking: its
-            # data ages out on PDB expiry, so delivered + backlog stops
-            # growing while its true offered rate is unchanged. The estimate
-            # then caps it lower, it starves harder, and more of its data is
-            # discarded -- a lock-in with no physical cause. A real gNB knows
-            # its own RLC discards, so counting them is not cheating.
-            arr_now = (
-                buffers.delivered_cum(*key)
-                + visible_backlog
-                + buffers.dropped_cum(*key)
-            ) * 8
-            hist = self._arr_hist[key]
-            arrived_w = arr_now - (hist[0] if hist else 0)
-            raw = max(0.0, arrived_w / window_s)
-            prev = self._demand_smooth.get(key)
-            self._demand_smooth[key] = raw if prev is None else (
-                a * raw + (1.0 - a) * prev
-            )
-            self._demand_bps[key] = self._demand_smooth[key]
-
-    def _resolve_tier1(self) -> None:
-        snr_in = {
-            f.ue_id: self._snr_avg.get(f.ue_id, 20.0) for f in self._flows
-        }
-        # Stage A (optional): the max-min GBR satisfaction level, turned into
-        # hard per-flow floors for the utility solve below. Without it the
-        # utility objective is free to abandon the lowest-SE GBR flows.
-        floors = None
-        if self.gbr_maxmin:
-            self.maxmin_level = solve_maxmin_gbr_level(
-                flows=self._flows,
-                snr_db_per_ue=snr_in,
-                grid=self._grid,
-                demand_bps=self._demand_bps,
-                capacity_safety_factor=self.capacity_safety_factor,
-                slice_shares=self.slice_shares,
-                slice_slack_penalty=self.slice_slack_penalty,
-            )
-            floors = gbr_maxmin_floors(
-                flows=self._flows,
-                demand_bps=self._demand_bps,
-                level=self.maxmin_level,
-                scale=self.gbr_maxmin_scale,
-            )
-
-        self._targets_bps = solve_tier1(
-            flows=self._flows,
-            snr_db_per_ue=snr_in,
-            grid=self._grid,
-            demand_bps=self._demand_bps,
-            gbr_slack_penalty=self._gbr_penalty,
-            capacity_safety_factor=self.capacity_safety_factor,
-            se_penalty_exponent=self.gbr_penalty_se_exponent,
-            slice_shares=self.slice_shares,
-            slice_slack_penalty=self.slice_slack_penalty,
-            gbr_floor_bps=floors,
-            apply_demand_cap=self.apply_demand_cap,
-        )
-        self._tier1_solve_count += 1
-        self._update_gbr_penalties()
-        if self.enable_sps:
-            self._update_sps_reservations(snr_in)
-
-    def _update_gbr_penalties(self) -> None:
-        """Dual ascent on the per-flow GBR slack penalty.
-
-        A GBR flow that misses its GFBR has its penalty raised by
-        gbr_penalty_lr * (shortfall / GFBR). The shortfall is normalized by
-        GFBR so it lands in [0, 1] and the learning rate is scale-free. The
-        penalty is capped at gbr_penalty_max so a genuinely infeasible flow
-        cannot diverge -- hitting the cap is itself the signal that the flow
-        needs admission control rather than more penalty.
-
-        With gbr_penalty_lr == 0 this is a no-op: the penalty stays at its
-        uniform initial value, identical to the old scalar behaviour.
-        """
-        if self.gbr_penalty_lr <= 0.0:
-            return
-        for f in self._flows:
-            if f.flow_class != "GBR" or f.gfbr_bps <= 0:
-                continue
-            key = (f.ue_id, f.qfi)
-            shortfall = max(0.0, f.gfbr_bps - self._targets_bps.get(key, 0.0))
-            if shortfall <= 0.0:
-                continue
-            self._gbr_penalty[key] = min(
-                self.gbr_penalty_max,
-                self._gbr_penalty[key]
-                + self.gbr_penalty_lr * (shortfall / f.gfbr_bps),
-            )
-
-    @staticmethod
-    def _is_sps_eligible(f: FlowConfig) -> bool:
-        return f.traffic_kind in ("deterministic", "video_frame")
-
-    def _sps_floor_bps(self, f: FlowConfig) -> float:
-        """The contracted baseline an SPS reservation should carry: a GBR
-        flow's GFBR, otherwise a periodic flow's deterministic offered rate.
-        This is a Tier-1 *input* (the contract), not the LP's derived target,
-        so SPS sizing stays decoupled from the LP's overload arbitration."""
-        if f.flow_class == "GBR" and f.gfbr_bps > 0:
-            return f.gfbr_bps
-        return estimate_demand_bps(f)
-
-    def _update_sps_reservations(self, snr_in: dict[int, float]) -> None:
-        """Decide which periodic flows get SPS reservations and how big.
-
-        Each SPS reservation is sized to the flow's contracted floor (see
-        _sps_floor_bps). Reservations are allocated per direction in priority
-        order (lower flow.priority_level first). Within a priority tier, if
-        the floors over-subscribe the remaining PRB budget, every reservation
-        in the tier is scaled back proportionally -- so no flow is dropped
-        merely for being late in the flow list (NOTES.md Finding 2). Leftover
-        budget carries to the next tier. SPS is capped at sps_budget_fraction
-        of the carrier, leaving a dynamic pool for burst spillover.
-        """
-        self._sps = []
-        self._sps_keys = set()
-        if not self._grid:
-            return
-
-        pattern_len = len(self._grid.pattern)
-        # Per-direction slot counts, per-slot symbol counts, and the per-slot
-        # PDCCH/CCE budget seen in the cycle.
-        per_dir_slot_count = {"DL": 0, "UL": 0}
-        per_dir_avg_symbols = {"DL": 0.0, "UL": 0.0}
-        per_dir_cce_budget = {"DL": 0, "UL": 0}
-        for i in range(pattern_len):
-            sg = self._grid.slot_grid(i)
-            if sg.dl_symbols > 0:
-                per_dir_slot_count["DL"] += 1
-                per_dir_avg_symbols["DL"] += sg.dl_symbols
-                per_dir_cce_budget["DL"] = sg.pdcch_cce_budget
-            if sg.ul_symbols > 0:
-                per_dir_slot_count["UL"] += 1
-                per_dir_avg_symbols["UL"] += sg.ul_symbols
-                per_dir_cce_budget["UL"] = sg.pdcch_cce_budget
-        for d in ("DL", "UL"):
-            n = per_dir_slot_count[d]
-            per_dir_avg_symbols[d] = per_dir_avg_symbols[d] / n if n > 0 else 0
-
-        cycle_duration_s = pattern_len * self.slot_duration_s
-        budget = int(self._grid.prb_count * self.sps_budget_fraction)
-
-        for direction in ("DL", "UL"):
-            n_dir_slots = per_dir_slot_count[direction]
-            avg_sym = per_dir_avg_symbols[direction]
-            if n_dir_slots == 0 or avg_sym == 0:
-                continue
-
-            eligible = [
-                f for f in self._flows
-                if self._is_sps_eligible(f) and f.direction == direction
-            ]
-            remaining = budget
-            # Priority tiers: lower priority_level number == higher priority.
-            for plevel in sorted({f.priority_level for f in eligible}):
-                if remaining <= 0:
-                    break
-                tier = [f for f in eligible if f.priority_level == plevel]
-
-                # PRBs each flow wants to carry its contracted floor.
-                # Sized at the *conservative* MCS (snr - sps_snr_margin_db):
-                # real SPS is semi-static and cannot re-pick MCS per firing,
-                # so a lower MCS trades some spectral efficiency for BLER
-                # robustness against CQI drift / channel fades. The same
-                # conservative SNR (`snr_for_mcs`) is stamped on the
-                # reservation and reused at every firing, so the driver
-                # (via bler_for_mcs) reflects the fixed-MCS behaviour.
-                desired: list[tuple[FlowConfig, int, float]] = []
-                for f in tier:
-                    floor_bps = self._sps_floor_bps(f)
-                    if floor_bps <= 0:
-                        continue
-                    snr = snr_in.get(f.ue_id, 20.0)
-                    snr_for_mcs = snr - self.sps_snr_margin_db
-                    bits_per_rb, bler = bits_per_prb(snr_for_mcs, symbols=int(avg_sym))
-                    effective_bits = bits_per_rb * (1.0 - bler)
-                    if effective_bits <= 0:
-                        continue
-                    bytes_per_dir_slot = (
-                        floor_bps * self.sps_safety_margin * cycle_duration_s
-                        / n_dir_slots / 8
-                    )
-                    prbs = max(1, int(-(-bytes_per_dir_slot * 8 // effective_bits)))
-                    desired.append((f, prbs, snr_for_mcs))
-
-                total = sum(p for _, p, _ in desired)
-                if total <= 0:
-                    continue
-                # Scale the whole tier proportionally if it over-commits, so
-                # every flow keeps a (smaller) standing grant rather than the
-                # last-listed flows getting none.
-                scale = min(1.0, remaining / total)
-
-                # Viability floor. If SPS would be undersized (scale below
-                # sps_min_scale), a fixed reservation tends to lose to the
-                # adaptive dynamic scheduler, so drop the tier to dynamic.
-                # Exception: if running the tier dynamically would overrun
-                # the per-slot PDCCH/CCE budget, SPS's zero-DCI property
-                # still makes it the lesser evil, so keep it.
-                if scale < self.sps_min_scale:
-                    tier_cce = sum(
-                        cce_aggregation_level(snr_in.get(f.ue_id, 20.0))
-                        for f, _, _ in desired
-                    )
-                    if tier_cce <= per_dir_cce_budget[direction]:
-                        continue  # dynamic can absorb the tier -- skip SPS
-                    # else: keep the undersized reservation for CCE relief.
-
-                for f, prbs, snr_ref in desired:
-                    granted = max(1, round(prbs * scale))
-                    self._sps.append(
-                        _SPSReservation(
-                            ue_id=f.ue_id,
-                            qfi=f.qfi,
-                            direction=direction,
-                            prbs_per_slot=granted,
-                            snr_ref_db=snr_ref,
-                        )
-                    )
-                    self._sps_keys.add((f.ue_id, f.qfi))
-                    remaining -= granted
-                remaining = max(0, remaining)
-
-    def _update_snr_ewma(self, channel: ChannelView) -> None:
-        # Uses the CQI-visible SNR -- Tier-1 target rates and SPS MCS pick
-        # must live off what the gNB is entitled to see, not the true SNR.
-        alpha = 1.0 - 1.0 / self.snr_window
-        for f in self._flows:
-            cur = channel.get_reported_snr_db(f.ue_id)
-            prev = self._snr_avg.get(f.ue_id, cur)
-            self._snr_avg[f.ue_id] = alpha * prev + (1.0 - alpha) * cur
+        self._ue_state = {f.ue_id: _UeState() for f in flows}
 
     def allocate(
-        self, slot: SlotView, buffers: BufferView, channel: ChannelView
+        self,
+        slot: SlotView,
+        buffers: BufferView,
+        channel: ChannelView,
     ) -> list[Allocation]:
-        self._update_snr_ewma(channel)
-        # Mirror the UE's token-bucket refill, then let any fresh BSR nudge
-        # the shadow copy back towards the real one.
-        self._refill_ul_shadow()
-        self._sync_ul_buckets(buffers)
-        self._track_demand(buffers)
-        if slot.slot_index - self._last_solve_slot >= self.tier1_period:
-            self._update_demand_estimate(buffers)
-            self._resolve_tier1()
-            self._last_solve_slot = slot.slot_index
-
-        # Grow each virtual queue at its Tier-1 target rate, then clamp to a
-        # windowed ceiling: the bits the flow legitimately should have
-        # delivered over the last tier1_period slots but didn't. A windowed
-        # arrival count (not instantaneous backlog) is what lets a bursty
-        # flow keep its rate-tracking debt across the gaps between frames.
-        window_s = self.tier1_period * self.slot_duration_s
-        for f in self._flows:
-            key = (f.ue_id, f.qfi)
-            target_bps = self._targets_bps.get(key, 0.0)
-            self._virtual_q[key] += target_bps * self.slot_duration_s
-
-            arr_now = buffers.arrived_cum(*key) * 8
-            del_now = buffers.delivered_cum(*key) * 8
-            arr_hist = self._arr_hist[key]
-            del_hist = self._del_hist[key]
-            arrived_w = arr_now - (arr_hist[0] if arr_hist else 0)
-            delivered_w = del_now - (del_hist[0] if del_hist else 0)
-            arr_hist.append(arr_now)
-            del_hist.append(del_now)
-
-            # Can't be owed more than the target, nor more than what arrived.
-            should_deliver = min(target_bps * window_s, arrived_w)
-            ceiling = max(0.0, should_deliver - delivered_w)
-            if self._virtual_q[key] > ceiling:
-                self._virtual_q[key] = ceiling
-
-        # Tracks bytes the scheduler has committed (drained-equivalent) to
-        # each flow within this slot, so SPS + dynamic for the same flow
-        # don't both allocate against the original backlog.
-        committed_this_slot: dict[tuple[int, int], int] = defaultdict(int)
-
+        # gNB_scheduler.c:246,251 -- UL before DL, unconditionally, every
+        # slot. See module docstring: the pre-rewrite file had this
+        # backwards (DL-then-UL); fixed here, verified directly against
+        # the C rather than inherited from the old Python or the plan
+        # doc's own prose.
         out: list[Allocation] = []
-        # Per direction: SPS first, then dynamic on remaining PRBs.
-        for direction in ("DL", "UL"):
-            symbols = slot.dl_symbols if direction == "DL" else slot.ul_symbols
-            if symbols <= 0:
-                continue
-
-            sps_outs, sps_prbs_used = self._allocate_sps(
-                slot, buffers, channel, direction, committed_this_slot
-            )
-            out.extend(sps_outs)
-
-            remaining_prbs = slot.prb_count - sps_prbs_used
-            if remaining_prbs > 0:
-                out.extend(
-                    self._allocate_dynamic(
-                        slot,
-                        buffers,
-                        channel,
-                        direction,
-                        remaining_prbs,
-                        committed_this_slot,
-                    )
-                )
+        if slot.ul_symbols > 0:
+            out.extend(self._allocate_direction(slot, buffers, channel, "UL"))
+        if slot.dl_symbols > 0:
+            out.extend(self._allocate_direction(slot, buffers, channel, "DL"))
         return out
 
-    def _remaining_backlog(self, key, buffers, committed) -> int:
-        """Real bytes still queued for a flow, net of whatever has already
-        been committed to it this slot (so SPS then dynamic for the same
-        flow do not both allocate against the original backlog). This is
-        the *real* backlog -- used by SPS (a CG UE just fills its reserved
-        grant with whatever it has) and by the MAC LCP fill (once a grant
-        exists the UE fills with real bytes, no BSR involved)."""
-        return max(0, buffers.state(*key).bytes_queued - committed.get(key, 0))
-
-    def _remaining_reported(self, key, buffers, committed) -> int:
-        """BSR-visible bytes for a flow, net of committed. This is what
-        the dynamic scheduler can actually see for eligibility and grant
-        sizing -- ``bytes_reported`` is the sim/bsr.py-modelled, per-LCG,
-        quantised BSR view for UL flows (see BufferStateView). For DL
-        flows it is identical to _remaining_backlog."""
-        return max(0, buffers.state(*key).bytes_reported - committed.get(key, 0))
-
-    def _compute_flow_q(self, direction, buffers, committed, now_s):
-        """Per-flow effective virtual deficit for `direction`: the Tier-2
-        virtual queue (or, for an SPS flow's dynamic spillover, its real
-        backlog) plus an HoL/PDB urgency bonus for Delay-class flows."""
-        base = {}
-        for f in self._flows:
-            if f.direction != direction:
-                continue
-            key = (f.ue_id, f.qfi)
-            if key in self._sps_keys:
-                base[key] = self._remaining_backlog(key, buffers, committed) * 8.0
-            else:
-                base[key] = self._virtual_q[key]
-        max_q = max(base.values(), default=0.0)
-
-        q_by_key = {}
-        for f in self._flows:
-            if f.direction != direction:
-                continue
-            key = (f.ue_id, f.qfi)
-            q = base[key]
-            if f.flow_class == "Delay" and f.pdb_ms > 0:
-                hol = buffers.hol_delay_s(f.ue_id, f.qfi, now_s)
-                if hol > 0:
-                    urgency = min(1.0, hol / (f.pdb_ms / 1000.0)) ** self.delay_exp
-                    q += self.delay_w * urgency * max(max_q, 1.0)
-            q_by_key[key] = q
-        return q_by_key
-
-    def _mac_lcp_fill(self, ue_flows, tbs_bytes, q_by_key, buffers, committed):
-        """MAC logical-channel multiplexer: fill one UE's transport block
-        across its flows. Flows are served in priority order (lower
-        priority_level first), and within a priority tier by drift-plus-
-        penalty deficit -- the flow furthest behind its Tier-1 target first.
-        Returns [(flow_key, bytes), ...]."""
-        order = sorted(
-            ue_flows,
-            key=lambda f: (f.priority_level, -q_by_key.get((f.ue_id, f.qfi), 0.0)),
-        )
-        fills: list[tuple[tuple[int, int], int]] = []
-        remaining = tbs_bytes
-        for f in order:
-            if remaining <= 0:
-                break
-            key = (f.ue_id, f.qfi)
-            take = min(self._remaining_backlog(key, buffers, committed), remaining)
-            if take > 0:
-                fills.append((key, take))
-                remaining -= take
-        return fills
-
-    def _emit_grant(
-        self, ue_id, direction, prbs_used, tbs_bytes, bler, ue_flows,
-        q_by_key, buffers, committed, cce_cost, is_sps, snr_used_db,
+    def _allocate_direction(
+        self,
+        slot: SlotView,
+        buffers: BufferView,
+        channel: ChannelView,
+        direction: str,
     ) -> list[Allocation]:
-        """Fill a UE's transport block via the MAC multiplexer and emit one
-        per-flow Allocation per filled flow. The grant's PRB count and DCI
-        cost ride on the first Allocation -- one DCI per UE grant.
+        symbols = slot.ul_symbols if direction == "UL" else slot.dl_symbols
 
-        ``snr_used_db`` is the SNR view that picked the MCS for this grant
-        -- reported (CQI-lagged) SNR for a dynamic grant, or the SPS
-        conservative reference SNR for a configured grant. Stamped on every
-        Allocation so the driver can compute mismatch-aware BLER.
-        """
+        # Blanket per-slot decay -- see _UeState's docstring.
         if direction == "UL":
-            # The gNB sizes the block; the UE fills it (TS 38.321 sec
-            # 5.4.3.1). We emit one grant and let the host split it, and we
-            # drain the virtual queues from an *estimate* of that split --
-            # BSR-reported backlog is all a real gNB has to go on. The
-            # estimate self-corrects: over-drain a flow's queue and it grows
-            # faster next slot, raising that UE's metric again.
-            fills = self._estimate_ul_split(ue_flows, tbs_bytes, buffers, committed)
-            for key, byts in fills:
-                delivered_bits = byts * 8 * (1.0 - bler)
-                self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
-                committed[key] += int(byts * (1.0 - bler))
-                if key in self._served_this_slot:
-                    self._served_this_slot[key] += int(byts * (1.0 - bler))
-            return [
-                Allocation(
-                    ue_id=ue_id, qfi=-1, direction=direction,
-                    prbs=prbs_used, bytes_capacity=tbs_bytes,
-                    cce_cost=cce_cost, is_sps=is_sps,
-                    snr_used_db=snr_used_db, ue_grant=True,
-                )
-            ]
+            for state in self._ue_state.values():
+                state.ul_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
+        else:
+            for state in self._ue_state.values():
+                state.dl_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
 
-        fills = self._mac_lcp_fill(ue_flows, tbs_bytes, q_by_key, buffers, committed)
-        out: list[Allocation] = []
-        for i, (key, byts) in enumerate(fills):
-            delivered_bits = byts * 8 * (1.0 - bler)
-            self._virtual_q[key] = max(0.0, self._virtual_q[key] - delivered_bits)
-            committed[key] += int(byts * (1.0 - bler))
-            if key in self._served_this_slot:
-                self._served_this_slot[key] += int(byts * (1.0 - bler))
-            out.append(
-                Allocation(
-                    ue_id=ue_id, qfi=key[1], direction=direction,
-                    prbs=prbs_used if i == 0 else 0,
-                    bytes_capacity=byts,
-                    cce_cost=cce_cost if i == 0 else 0,
-                    is_sps=is_sps,
-                    snr_used_db=snr_used_db,
-                )
-            )
-        return out
-
-    def _estimate_ul_split(self, ue_flows, tbs_bytes, buffers, committed):
-        """The gNB's guess at how a UE will fill an uplink grant.
-
-        A real gNB never learns the true split -- the LCP runs in the UE --
-        so the drain of the uplink virtual queues rests on an estimate. Two
-        are offered; see ``ul_split_estimator``.
-        """
-        if self.ul_split_estimator == "shadow_lcp":
-            return self._shadow_lcp_split(ue_flows, tbs_bytes, buffers, committed)
-        return self._occupancy_split(ue_flows, tbs_bytes, buffers, committed)
-
-    def _occupancy_split(self, ue_flows, tbs_bytes, buffers, committed):
-        """Apportion the block by BSR-reported occupancy. Uses only the BSR,
-        and is what the OAI port does today."""
-        occ = []
-        for f in ue_flows:
-            key = (f.ue_id, f.qfi)
-            free = max(0, buffers.state(f.ue_id, f.qfi).bytes_reported
-                       - committed.get(key, 0))
-            if free > 0:
-                occ.append((key, free))
-        total = sum(v for _, v in occ)
-        if total <= 0:
-            return []
-        out = []
-        for key, v in occ:
-            share = int(tbs_bytes * v / total)
-            if share > 0:
-                out.append((key, min(share, v)))
-        return out
-
-    def _shadow_lcp_split(self, ue_flows, tbs_bytes, buffers, committed):
-        """Predict the split by running the UE's own LCP on shadow buckets.
-
-        The gNB configured each channel's PBR and bucket-size duration, so it
-        can reproduce the *algorithm* exactly. What it cannot reproduce is the
-        UE's view of its own backlog: BSR is delayed, lossy, and reported per
-        logical channel *group* rather than per channel. Where the two views
-        differ the shadow bucket is debited differently from the real one and
-        the copies drift.
-
-        The drift is bounded, and self-correcting at both rails: a bucket
-        cannot leave [0, PBR*BSD], so a persistently starved channel pins both
-        copies at 0 and an idle one pins both at the cap. Divergence survives
-        only in the middle of the range. ``ul_bucket_sync_gain`` adds an
-        explicit closed-loop correction on top -- see _sync_ul_buckets.
-        """
-        order = sorted(ue_flows, key=lambda f: f.priority_level)
-        taken: dict[tuple[int, int], int] = {}
-        remaining = tbs_bytes
-
-        def believed_backlog(f):
-            key = (f.ue_id, f.qfi)
-            return max(0, buffers.state(f.ue_id, f.qfi).bytes_reported
-                       - committed.get(key, 0) - taken.get(key, 0))
-
-        # Round 1 -- prioritised bit rate, bounded by the shadow bucket.
-        for f in order:
-            if remaining <= 0:
-                break
-            key = (f.ue_id, f.qfi)
-            b = self._ul_shadow_bucket.get(key)
-            if b is None or b[0] <= 0.0:
-                continue
-            take = min(int(b[0] / 8.0), believed_backlog(f), remaining)
-            if take > 0:
-                taken[key] = taken.get(key, 0) + take
-                b[0] = max(0.0, b[0] - take * 8.0)
-                remaining -= take
-
-        # Round 2 -- strict priority for the remainder.
-        for f in order:
-            if remaining <= 0:
-                break
-            key = (f.ue_id, f.qfi)
-            take = min(believed_backlog(f), remaining)
-            if take > 0:
-                taken[key] = taken.get(key, 0) + take
-                remaining -= take
-
-        for f in ue_flows:
-            key = (f.ue_id, f.qfi)
-            self._ul_predicted_backlog[key] = max(
-                0.0, buffers.state(f.ue_id, f.qfi).bytes_reported
-                - committed.get(key, 0) - taken.get(key, 0)
-            )
-        return [(k, v) for k, v in taken.items() if v > 0]
-
-    def _refill_ul_shadow(self) -> None:
-        """Advance the shadow buckets one slot, mirroring the UE."""
-        for b in self._ul_shadow_bucket.values():
-            b[0] = min(b[1], b[0] + b[2] * self.slot_duration_s)
-
-    def _sync_ul_buckets(self, buffers) -> None:
-        """Closed-loop correction of the shadow buckets from fresh BSRs.
-
-        The bucket itself is never reported, but its error shows up in the
-        backlog: if the gNB predicted a channel would be drained to X and the
-        BSR says Y > X, the UE served that channel less than predicted, so it
-        spent fewer tokens and the shadow bucket is too low. Feed the residual
-        back at ``ul_bucket_sync_gain``.
-
-        The signal is contaminated -- new arrivals also raise the reported
-        backlog, and they are indistinguishable from a mis-prediction in a
-        single sample. That argues for a small gain: this is a slow nudge to
-        stop drift accumulating, not a per-slot correction. It is off by
-        default so the open-loop shadow can be measured on its own.
-        """
-        if self.ul_bucket_sync_gain <= 0.0:
-            return
-        for key, b in self._ul_shadow_bucket.items():
-            predicted = self._ul_predicted_backlog.get(key, 0.0)
-            reported = buffers.state(key[0], key[1]).bytes_reported
-            residual_bits = (reported - predicted) * 8.0
-            if residual_bits > 0.0:
-                # Served less than predicted -> tokens were not spent.
-                b[0] = min(b[1], b[0] + self.ul_bucket_sync_gain * residual_bits)
-            elif residual_bits < 0.0:
-                b[0] = max(0.0, b[0] + self.ul_bucket_sync_gain * residual_bits)
-
-    def _allocate_sps(
-        self,
-        slot: SlotView,
-        buffers: BufferView,
-        channel: ChannelView,
-        direction: str,
-        committed_this_slot: dict[tuple[int, int], int],
-    ) -> tuple[list[Allocation], int]:
-        """Serve the SPS configured grants for `direction`, per UE. A UE's
-        reservations (one per SPS-eligible flow) are pooled into a single
-        grant whose transport block the MAC multiplexer fills across the
-        UE's flows. SPS consumes no PDCCH."""
-        symbols = slot.dl_symbols if direction == "DL" else slot.ul_symbols
-        now_s = slot.slot_index * self.slot_duration_s
-        q_by_key = self._compute_flow_q(
-            direction, buffers, committed_this_slot, now_s
-        )
-
-        ue_reservations: dict[int, list[_SPSReservation]] = defaultdict(list)
-        for sps in self._sps:
-            if sps.direction == direction:
-                ue_reservations[sps.ue_id].append(sps)
-
-        out: list[Allocation] = []
-        prbs_used_total = 0
-        for ue_id, reservations in ue_reservations.items():
-            ue_flows = [self._flow_by_key[(s.ue_id, s.qfi)] for s in reservations]
-            ue_backlog = sum(
-                self._remaining_backlog((f.ue_id, f.qfi), buffers, committed_this_slot)
-                for f in ue_flows
-            )
-            if ue_backlog <= 0:
-                # Empty configured grant: a real gNB wastes the PRBs; the
-                # simulator releases them (release-on-empty CG).
-                continue
-            # SPS uses the fixed MCS stamped on the reservation at
-            # configuration time -- semi-static, not per-firing CQI. All
-            # of a UE's reservations share the same snr_ref_db (built from
-            # the same smoothed CQI minus the same margin).
-            snr_ref = reservations[0].snr_ref_db
-            bits_per_rb, bler = bits_per_prb(snr_ref, symbols=symbols)
-            if bits_per_rb <= 0:
-                continue
-
-            reserved_prbs = sum(s.prbs_per_slot for s in reservations)
-            prbs_for_sps = min(reserved_prbs, slot.prb_count - prbs_used_total)
-            if prbs_for_sps <= 0:
-                continue
-            # Right-size the grant to the UE's actual backlog.
-            prbs_needed = (ue_backlog * 8 + bits_per_rb - 1) // bits_per_rb
-            prbs_used = min(prbs_for_sps, max(1, prbs_needed))
-            tbs_bytes = min(ue_backlog, (prbs_used * bits_per_rb) // 8)
-            if tbs_bytes <= 0:
-                continue
-            prbs_used_total += prbs_used
-
-            out.extend(self._emit_grant(
-                ue_id, direction, prbs_used, tbs_bytes, bler, ue_flows,
-                q_by_key, buffers, committed_this_slot, cce_cost=0, is_sps=True,
-                snr_used_db=snr_ref,
-            ))
-        return out, prbs_used_total
-
-    def _allocate_dynamic(
-        self,
-        slot: SlotView,
-        buffers: BufferView,
-        channel: ChannelView,
-        direction: str,
-        prb_budget: int,
-        committed_this_slot: dict[tuple[int, int], int],
-    ) -> list[Allocation]:
-        """Per-UE dynamic scheduling. Each UE is granted PRBs once (one DCI),
-        sized to a transport block; the MAC multiplexer then fills the TB
-        across the UE's flows. UEs are ranked by the summed drift-plus-
-        penalty deficit of their backlogged flows times spectral efficiency."""
-        symbols = slot.dl_symbols if direction == "DL" else slot.ul_symbols
-        now_s = slot.slot_index * self.slot_duration_s
-        q_by_key = self._compute_flow_q(
-            direction, buffers, committed_this_slot, now_s
-        )
-
-        # Group this direction's backlogged flows by UE. Eligibility uses
-        # the BSR-visible view -- a UE whose data hasn't been reported yet
-        # cannot be scheduled dynamically. (SPS-served flows still count
-        # here for their spillover; their view is real, since a CG UE
-        # needs no BSR.)
-        ue_flows: dict[int, list[FlowConfig]] = defaultdict(list)
+        # D1 (docs/phase2-plan.md sec3): UE-aggregate only, never a
+        # per-flow split. Multiple flows sharing one LCG would each read
+        # the identical bytes_reported and be summed here more than
+        # once -- a known, currently-untriggered gap (no scenario in
+        # this repo shares an LCG across UL flows -- README sec8's H5
+        # follow-up), the same shape reservation.py's own ue_backlog sum
+        # carries, not fixed here either.
+        ue_flows: dict[int, list[FlowConfig]] = {}
         for f in self._flows:
             if f.direction != direction:
                 continue
-            key = (f.ue_id, f.qfi)
-            visible = (
-                self._remaining_backlog(key, buffers, committed_this_slot)
-                if key in self._sps_keys
-                else self._remaining_reported(key, buffers, committed_this_slot)
-            )
-            if visible > 0:
-                ue_flows[f.ue_id].append(f)
+            if buffers.state(f.ue_id, f.qfi).bytes_reported <= 0:
+                continue
+            ue_flows.setdefault(f.ue_id, []).append(f)
+        if not ue_flows:
+            return []
 
-        # Rank UEs by total deficit x spectral efficiency. bits_per_rb here
-        # is from the CQI-visible SNR -- what the gNB knows to pick MCS
-        # from; the driver applies mismatch-aware BLER against the true SNR.
-        scored: list[tuple[float, int, list, int, float, float]] = []
+        candidates: list[_Candidate] = []
         for ue_id, flows in ue_flows.items():
-            snr_reported = channel.get_reported_snr_db(ue_id)
-            bits_per_rb, bler = bits_per_prb(snr_reported, symbols=symbols)
+            state = self._ue_state[ue_id]
+
+            snr = channel.get_reported_snr_db(ue_id)
+            bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
             if bits_per_rb <= 0:
                 continue
-            ue_q = sum(q_by_key.get((f.ue_id, f.qfi), 0.0) for f in flows)
-            scored.append((ue_q * bits_per_rb, ue_id, flows, bits_per_rb, bler, snr_reported))
-        scored.sort(key=lambda x: x[0], reverse=True)
 
-        prbs_left = prb_budget
+            # Bootstrap-only coefficient -- see module docstring.
+            hyp_bits, _ = bits_per_prb(snr, symbols=_PF_COEF_HYPOTHETICAL_SYMBOLS)
+            hyp_tbs_bytes = hyp_bits // 8
+            thr = (
+                state.ul_thr_bytes_per_slot
+                if direction == "UL"
+                else state.dl_thr_bytes_per_slot
+            )
+            coef = hyp_tbs_bytes / max(thr, 1.0)
+            candidates.append(_Candidate(ue_id, flows, bits_per_rb, bler, snr, coef))
+
+        if not candidates:
+            return []
+
+        candidates.sort(key=self._rank_key)
+
+        prbs_left = slot.prb_count
         cce_left = slot.pdcch_cce_budget
         out: list[Allocation] = []
-        for _metric, ue_id, flows, bits_per_rb, bler, snr_reported in scored:
+        for c in candidates:
             if prbs_left <= 0:
                 break
-            # AL / DCI cost is picked from the same CQI view as the MCS.
-            cce_cost = cce_aggregation_level(snr_reported)
+            cce_cost = cce_aggregation_level(c.snr_db)
             if cce_left < cce_cost:
                 continue
-            # Grant sizing uses the BSR-visible view (mixed with real for
-            # SPS-served flows -- their CG relation still applies). The
-            # MAC LCP fill (_emit_grant → _mac_lcp_fill) then takes bytes
-            # from real bytes_queued up to the granted TB.
+
             ue_backlog = sum(
-                (
-                    self._remaining_backlog((f.ue_id, f.qfi), buffers, committed_this_slot)
-                    if (f.ue_id, f.qfi) in self._sps_keys
-                    else self._remaining_reported((f.ue_id, f.qfi), buffers, committed_this_slot)
-                )
-                for f in flows
+                buffers.state(f.ue_id, f.qfi).bytes_reported for f in c.flows
             )
             if ue_backlog <= 0:
                 continue
-            prbs_needed = (ue_backlog * 8 + bits_per_rb - 1) // bits_per_rb
+            prbs_needed = -(-(ue_backlog * 8) // c.bits_per_rb)  # ceil div
+            # No follower budget yet (commit 4) -- unbounded by anything
+            # but this slot's own remaining PRBs.
             prbs_used = min(prbs_left, max(1, prbs_needed))
-            tbs_bytes = min(ue_backlog, (prbs_used * bits_per_rb) // 8)
+            tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
             if tbs_bytes <= 0:
                 continue
             prbs_left -= prbs_used
             cce_left -= cce_cost
 
-            out.extend(self._emit_grant(
-                ue_id, direction, prbs_used, tbs_bytes, bler, flows,
-                q_by_key, buffers, committed_this_slot,
-                cce_cost=cce_cost, is_sps=False,
-                snr_used_db=snr_reported,
-            ))
+            expected_bytes = tbs_bytes * (1.0 - c.bler)
+            state = self._ue_state[c.ue_id]
+            if direction == "UL":
+                state.ul_thr_bytes_per_slot += _THR_EWMA_ALPHA * expected_bytes
+            else:
+                state.dl_thr_bytes_per_slot += _THR_EWMA_ALPHA * expected_bytes
+
+            out.extend(
+                self._emit_grant(
+                    c.ue_id, direction, prbs_used, tbs_bytes, c.flows,
+                    buffers, cce_cost, c.snr_db,
+                )
+            )
         return out
+
+    def _rank_key(self, candidate: _Candidate) -> tuple:
+        """Commit 1: the bootstrap PF coefficient (descending) is the
+        only tier. Commit 3 replaces this entirely with the real VQ-sum
+        (DL) / VQ-plus-urgency (UL) metric -- not an addition to this
+        tuple the way reservation's sort tiers prepend onto its own
+        coefficient, since two-tier's ground truth never uses this
+        coefficient at all (see module docstring).
+        """
+        return (-candidate.coef,)
+
+    def _emit_grant(
+        self,
+        ue_id: int,
+        direction: str,
+        prbs_used: int,
+        tbs_bytes: int,
+        ue_flows: list[FlowConfig],
+        buffers: BufferView,
+        cce_cost: int,
+        snr_used_db: float,
+    ) -> list[Allocation]:
+        if direction == "UL":
+            # The gNB sizes the block; the UE fills it (TS 38.321
+            # sec5.4.3.1). sim/ue_lcp.py performs the real split on the
+            # driver side -- unchanged from the pre-rewrite file's own
+            # convention, see module docstring and docs/phase2-plan.md
+            # sec3/D1.
+            return [
+                Allocation(
+                    ue_id=ue_id, qfi=-1, direction=direction,
+                    prbs=prbs_used, bytes_capacity=tbs_bytes,
+                    cce_cost=cce_cost, snr_used_db=snr_used_db,
+                    ue_grant=True,
+                )
+            ]
+
+        fills = self._dl_fill(ue_flows, tbs_bytes, buffers)
+        out: list[Allocation] = []
+        for i, (qfi, byts) in enumerate(fills):
+            out.append(
+                Allocation(
+                    ue_id=ue_id, qfi=qfi, direction=direction,
+                    prbs=prbs_used if i == 0 else 0,
+                    bytes_capacity=byts,
+                    cce_cost=cce_cost if i == 0 else 0,
+                    snr_used_db=snr_used_db,
+                )
+            )
+        return out
+
+    def _dl_fill(
+        self, ue_flows: list[FlowConfig], tbs_bytes: int, buffers: BufferView
+    ) -> list[tuple[int, int]]:
+        """Placeholder DL fill -- priority order, then backlog. NOT the
+        real single-pass SRB-exempt LCP
+        (``ia_p5g_compute_lcp_budget``/``nr_generate_dlsch_pdu``,
+        ``docs/phase2-plan.md`` sec2.1) -- that sorts DRBs by
+        ``(priority ASC, vq_dl DESC)``, and ``vq_dl`` doesn't exist until
+        commit 3. Upgraded in commit 5, mirroring how reservation's own
+        commit-1 placeholder was upgraded in its commit 6.
+        """
+        order = sorted(
+            ue_flows,
+            key=lambda f: (
+                f.priority_level,
+                -buffers.state(f.ue_id, f.qfi).bytes_queued,
+            ),
+        )
+        fills: list[tuple[int, int]] = []
+        remaining = tbs_bytes
+        for f in order:
+            if remaining <= 0:
+                break
+            backlog = buffers.state(f.ue_id, f.qfi).bytes_queued
+            take = min(backlog, remaining)
+            if take > 0:
+                fills.append((f.qfi, take))
+                remaining -= take
+        return fills

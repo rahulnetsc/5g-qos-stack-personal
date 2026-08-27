@@ -10,130 +10,48 @@
 #
 # Naming discipline: keys here must match `TwoTier.__init__` kwargs
 # one-to-one. There is no nesting; the visual grouping via comments is
-# for humans only.
+# for humans only. `load_two_tier_config` validates every key against the
+# constructor signature and rejects unknowns.
 #
-# ─── Tier-1 (strategic LP, ~1 s cadence) ────────────────────────────────
-
-# How often to re-solve the Tier-1 LP, in slots. At numerology mu=1
-# (0.5 ms slot) 2000 slots = 1 s. A longer period reduces LP CPU cost;
-# too long and the target rates go stale relative to buffer / SNR drift.
-tier1_period_slots: 2000
-
-# EWMA window (in slots) for the per-UE SNR that Tier-1 sees. Smooths
-# CQI noise before the LP solve. Independent of `cqi_delay_slots` in the
-# host -- that's the delay on the raw report; this is the smoothing on
-# top.
-snr_window_slots: 100
-
-# ─── Tier-1: soft GBR floor (weighted-shortfall term) ───────────────────
-# The Tier-1 LP has two phases: (1) minimise weighted GBR + slice
-# shortfall; (2) maximise log utility s.t. phase-1 optimum. The three
-# knobs below shape the *relative* per-flow weight in phase 1.
-
-# Base weight per GBR flow in the phase-1 shortfall objective. Since
-# phase 1 minimises shortfall on its own (not as a term added to the
-# utility), only *relative* penalties matter -- the absolute magnitude
-# no longer holds the model together.
-gbr_penalty_init: 1000.0
-
-# Adaptive per-flow dual-ascent learning rate. When > 0, flows that keep
-# missing their GFBR get their per-flow penalty escalated between solves
-# (up to `gbr_penalty_max`). 0 freezes at `gbr_penalty_init` (uniform).
-# Superseded in most cases by `gbr_maxmin` below -- kept for the
-# diagnostic sensitivity study (scripts/scheduler_study.py, adaptive row).
-gbr_penalty_lr: 0.0
-gbr_penalty_max: 1000000.0
-
-# Spectral-efficiency tilt: p_i is multiplied by (SE_i / SE_max) ** k.
-# k=0: no tilt (default). k>0: efficiency-first (discount poor-SE flows).
-# k<0: RB-level parity (boost poor-SE flows). Explored 2026-05, rejected
-# for cell-edge protection -- only relocates starvation. Left as a knob.
-gbr_penalty_se_exponent: 0.0
-
-# ─── Tier-1: max-min GBR stage (Finding 1 fix, default ON) ──────────────
-# A max-min stage runs ahead of phase 1 and pins every GBR flow at
-# `gbr_maxmin_scale * t*` of its contracted floor, where t* is the
-# largest fraction all of them can hold at once. Self-disabling where
-# not needed (whenever t*=1, floor is non-binding, bit-identical to off).
-# Costs only in genuine GBR overload, where it trades ~4% aggregate
-# throughput for a fleet degraded evenly instead of two robots dropped.
-
-gbr_maxmin: true
-
-# 1.0 = claim the whole achievable floor. 0.0 = restore the single-stage
-# behaviour exactly. 0.75 is the defensible knee if the trade becomes
-# contentious (see NOTES.md 2026-08-06 for the cost curve).
-gbr_maxmin_scale: 1.0
-
-# Scales the LP's per-direction PRB-symbol budget. 1.0 = raw grid
-# capacity. Typical deployment values 0.85-0.95, shaving headroom for
-# control-plane overhead / HARQ retransmits / interference not itemised
-# in the sim. Both stages (max-min and utility) see the scaled budget,
-# so it's a symmetric budget-tightening knob, not a way to bias one
-# stage against the other. See scheduler-study.md §4.5 / §6.1.
-capacity_safety_factor: 1.0
-
-# ─── Tier-1: network slicing (optional) ─────────────────────────────────
-# Per-slice share of PRB-symbol capacity per direction, as a soft floor
-# in phase 1. `null` (unset) disables slicing entirely.
+# Phase 2 (docs/phase2-plan.md): TwoTier is being rewritten in place,
+# commit by commit (docs/phase2-plan.md sec4's checklist), and its
+# constructor currently takes NO kwargs -- commit 1 deleted every knob
+# below (SPS entirely, the whole pre-Phase-2 Tier-1 apparatus) and none
+# has been re-added yet. This file is intentionally near-empty until a
+# later commit reintroduces a real, ground-truth-backed knob; each
+# section below states which commit (if any) is expected to bring an
+# equivalent key back, and two -- the max-min GBR stage and the adaptive
+# dual-ascent penalty -- are not coming back at all (no citation in
+# docs/phase2-plan.md sec2.1's ground truth; already a documented
+# negative result, design-docs/scheduler-study.md sec8.4; see README.md
+# sec7). Restore this file's structure incrementally as each commit
+# lands its own real config surface, not by copying the old file back.
 #
-# Shape when enabled:
-#   slice_shares:
-#     0: {DL: 0.5, UL: 0.5}      # slice 0 gets half of each direction
-#     1: {DL: 0.25, UL: 0.25}    # slice 1 gets a quarter
+# ─── Tier-1 (SCA/GLPK, 0.1s cadence) -- commit 2 ─────────────────────────
+# (no keys yet)
 #
-# The floor is soft (a penalised slack, see `slice_slack_penalty`), the
-# per-direction capacity constraint keeps it work-conserving, and each
-# slice's floor is capped at its own offered demand -- an idle slice
-# holds nothing.
-slice_shares: null
-
-# Weight in phase 1 for the slice-slack term. Denominated in *bps* (the
-# slice slack is converted from PRB-symbols to bps via the slice's
-# demand-weighted SE), so at the default 1000.0 -- equal to
-# `gbr_penalty_init` -- a bit denied to a slice floor costs the same as
-# a bit denied to a GBR floor. That parity is deliberate but a policy
-# choice; adjust if you want tenant-level slice guarantees to outrank
-# per-flow GBR guarantees or vice versa.
-slice_slack_penalty: 1000.0
-
-# ─── Tier-2 (per-slot drift-plus-penalty) ───────────────────────────────
-
-# Delay-class HoL urgency: for a Delay flow with HoL/PDB ratio r, its
-# virtual queue gets a bonus of `delay_urgency_weight * r^delay_exponent
-# * max_system_Q`. Scaling by max_system_Q lets a small-target Delay flow
-# preempt bulk when its deadline approaches. Defaults tuned so that a
-# flow at 50% of PDB carries ~1x the system's largest queue; 100% carries
-# ~4x. Adjust if the deadline class needs to preempt earlier / later.
-delay_urgency_weight: 4.0
-delay_exponent: 2.0
-
-# ─── SPS / Configured Grants ────────────────────────────────────────────
-
-# Master switch. When off, all flows go through the dynamic scheduler.
-enable_sps: true
-
-# Reservation-sizing safety margin (rate ratio, not dB). 1.10 = size the
-# reservation for 10% more than the contracted floor, absorbing small
-# rate estimation error and quantisation noise.
-sps_safety_margin: 1.10
-
-# Fraction of the carrier that SPS may reserve, per direction. Leaves
-# a dynamic pool for burst spillover. Real 5G deployments typically
-# reserve ~80-90% for CG; 85% is a middle default.
-sps_budget_fraction: 0.85
-
-# Viability floor. If a priority tier's SPS reservations would be
-# proportionally scaled below this fraction of desired, the tier is
-# dropped to dynamic scheduling instead -- unless doing so would overrun
-# the per-slot PDCCH/CCE budget, in which case the undersized SPS is
-# kept for the zero-DCI property alone.
-sps_min_scale: 0.75
-
-# MCS margin (dB) below the smoothed CQI SNR that SPS uses to pick its
-# fixed MCS at reservation time. Trades spectral efficiency (larger
-# reservations at a lower MCS per PRB) for BLER robustness against
-# channel drift. 0.0 for slow-varying industrial channels (default);
-# non-zero (and swept experimentally) as mobility rises. See §7.6 of
-# design-docs/scheduler-study.md and scripts/cqi_study.py.
-sps_snr_margin_db: 0.0
+# ─── Tier-2 windowed-ceiling VQ -- commit 3 ──────────────────────────────
+# (no keys yet)
+#
+# ─── UL floor (fruitless-shift / ADQ) -- commit 4 ────────────────────────
+# (no keys yet)
+#
+# ─── DL LCP fill -- commit 5 ─────────────────────────────────────────────
+# (no keys yet)
+#
+# ─── MCS selection / OLLA -- commit 6 ────────────────────────────────────
+# (no keys yet)
+#
+# ─── SPS / Configured Grants -- permanently removed ──────────────────────
+# Confirmed absent from OAI C entirely (docs/phase2-plan.md sec2.1);
+# `_SPSReservation`/`_allocate_sps`/`enable_sps`/`sps_*` existed only in
+# the pre-Phase-2 Python (tag phase2-pre-twotier-rewrite, dc1ab6a).
+#
+# ─── Max-min GBR stage / adaptive dual-ascent penalty -- permanently
+#     removed ─────────────────────────────────────────────────────────────
+# `gbr_maxmin`/`gbr_maxmin_scale`/`gbr_penalty_lr`/`gbr_penalty_se_exponent`
+# had no citation in docs/phase2-plan.md sec2.1's Tier-1 ground truth
+# (a *fixed*-constant soft-slack penalty only) and were already a
+# documented negative result (design-docs/scheduler-study.md sec8.4).
+# Their pre-removal comparison is preserved as a one-time snapshot in
+# docs/phase2-two-tier-delta.md sec1.

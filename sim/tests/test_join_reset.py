@@ -11,136 +11,26 @@ import pytest
 
 from sim.bsr import BsrModel
 from sim.buffer import BufferModel
-from sim.config import CarrierConfig, ScenarioConfig, ScriptedFadeWindow, TDDConfig, UEConfig
+from sim.config import CarrierConfig, ScenarioConfig, ScriptedFadeWindow, UEConfig
 from sim.driver import run
 from sim.join import JoinConfig, JoinEvent
-from sim.resource import ResourceGrid
 from sim.ue_lcp import UeLcp
 from sim.ul_access import UlAccessModel
 from sim.baselines.gradient import GradientScheduler
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
-from scheduler import TwoTier
 from scheduler.flow import FlowConfig
 
 
-# -- TwoTier.reset_ue: direct, deterministic field-level checks -------------
-
-
-def _configured_two_tier(flows):
-    tt = TwoTier()
-    grid = ResourceGrid(CarrierConfig(bandwidth_hz=20_000_000, numerology=1), TDDConfig())
-    tt.configure(flows, grid.slot_duration_s, grid)
-    return tt
-
-
-def _dirty_ue_state(tt, ue_id, qfi, buffers):
-    """Simulate accumulated state for one flow as if the scheduler had
-    been running for a while -- nonzero everywhere reset_ue might touch,
-    so a field that reset_ue silently skips is caught, not masked by
-    already being zero."""
-    key = (ue_id, qfi)
-    tt._snr_avg[ue_id] = 15.0
-    tt._demand_bps[key] = 999_999.0
-    tt._targets_bps[key] = 999_999.0
-    tt._virtual_q[key] = 12345.0
-    tt._gbr_penalty[key] = 7.0
-    tt._buf_est[key] = 500.0
-    tt._served_this_slot[key] = 42
-    tt._demand_smooth[key] = 111.0
-    tt._arr_hist[key].append(1_000_000)
-    tt._del_hist[key].append(500_000)
-    buffers.register(ue_id, qfi, is_ul=False)
-    buffers.enqueue(ue_id, qfi, 2_000, 0.0)
-    buffers.drain(ue_id, qfi, 1_000, 1.0, 1.0)
-
-
-def test_reset_ue_mac_scope_retains_the_fairness_ledger():
-    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
-    tt = _configured_two_tier([flow])
-    buffers = BufferModel()
-    _dirty_ue_state(tt, 1, 1, buffers)
-
-    tt.reset_ue(1, "mac", buffers)
-
-    # Retained -- real reestablishment keeps the UE's context.
-    assert tt._snr_avg[1] == 15.0
-    assert tt._demand_bps[(1, 1)] == 999_999.0
-    assert tt._targets_bps[(1, 1)] == 999_999.0
-    assert tt._virtual_q[(1, 1)] == 12345.0
-    assert tt._gbr_penalty[(1, 1)] == 7.0
-    assert tt._demand_smooth.get((1, 1)) == 111.0
-    assert list(tt._arr_hist[(1, 1)]) == [1_000_000]
-    assert list(tt._del_hist[(1, 1)]) == [500_000]
-    # Reset -- the BSR/MAC-report-cycle-adjacent shadow state.
-    assert tt._buf_est[(1, 1)] == 0.0
-    assert tt._served_this_slot[(1, 1)] == 0
-
-
-def test_reset_ue_full_scope_clears_the_fairness_ledger_too():
-    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
-    tt = _configured_two_tier([flow])
-    buffers = BufferModel()
-    _dirty_ue_state(tt, 1, 1, buffers)
-
-    tt.reset_ue(1, "full", buffers)
-
-    assert tt._snr_avg.get(1) is None
-    assert tt._virtual_q[(1, 1)] == 0.0
-    assert tt._gbr_penalty[(1, 1)] == tt.gbr_penalty_init
-    assert tt._demand_smooth.get((1, 1)) is None
-    assert tt._buf_est[(1, 1)] == 0.0
-    assert tt._served_this_slot[(1, 1)] == 0
-    # Re-seeded with CURRENT cumulative (2000 bits*8 arrived, 1000*8
-    # delivered from _dirty_ue_state's enqueue/drain above), not cleared
-    # to empty -- the trap found while implementing this method.
-    assert list(tt._arr_hist[(1, 1)]) == [2_000 * 8]
-    assert list(tt._del_hist[(1, 1)]) == [1_000 * 8]
-
-
-def test_reset_ue_full_scope_resets_ul_shadow_bucket():
-    flow = FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF",
-                       pbr_bps=100_000, bsd_ms=100.0)
-    tt = _configured_two_tier([flow])
-    buffers = BufferModel()
-    buffers.register(1, 1, is_ul=True)
-    tt._ul_shadow_bucket[(1, 1)][0] = 99999.0  # tokens
-    tt._ul_predicted_backlog[(1, 1)] = 12345.0
-
-    tt.reset_ue(1, "full", buffers)
-
-    assert tt._ul_shadow_bucket[(1, 1)][0] == 0.0
-    assert tt._ul_predicted_backlog[(1, 1)] == 0.0
-
-
-def test_reset_ue_does_not_touch_a_different_ue():
-    flows = [
-        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
-        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
-    ]
-    tt = _configured_two_tier(flows)
-    buffers = BufferModel()
-    _dirty_ue_state(tt, 1, 1, buffers)
-    tt._virtual_q[(2, 1)] = 55555.0
-
-    tt.reset_ue(1, "full", buffers)
-
-    assert tt._virtual_q[(2, 1)] == 55555.0  # untouched
-
-
-def test_reset_ue_is_a_no_op_for_a_ue_with_no_flows():
-    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
-    tt = _configured_two_tier([flow])
-    buffers = BufferModel()
-    tt.reset_ue(99, "full", buffers)  # UE 99 doesn't exist -- must not raise
-
-
-def test_reset_ue_rejects_an_invalid_scope():
-    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
-    tt = _configured_two_tier([flow])
-    buffers = BufferModel()
-    with pytest.raises(ValueError):
-        tt.reset_ue(1, "bogus", buffers)
+# -- TwoTier.reset_ue: deleted with the Phase 2 rewrite's commit 1 -----------
+#
+# scheduler/two_tier.py's commit 1 (docs/phase2-plan.md) drops reset_ue
+# entirely rather than porting it -- the fields these tests poked
+# (_virtual_q, _demand_bps, _gbr_penalty, the UL shadow bucket) no longer
+# exist. sim/driver.py discovers reset_ue via getattr(scheduler,
+# "reset_ue", None), so its absence just means TwoTier is treated like PF
+# (no context reset) in the interim. Restored at two-tier's own commit 7,
+# rewritten against the new field layout, not copied back verbatim.
 
 
 # -- PF/gradient/RoundRobin: checkable, not assumed, to have no reset_ue --

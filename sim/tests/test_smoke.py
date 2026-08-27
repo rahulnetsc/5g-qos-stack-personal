@@ -97,43 +97,6 @@ def test_bler_for_mcs_matched_vs_mismatched():
     assert bler_for_mcs(thresh, thresh - 4) == 1.0     # capped
 
 
-def test_two_tier_sps_uses_conservative_mcs():
-    """SPS reservations are sized against snr_avg - sps_snr_margin_db.
-    Verify by picking a periodic flow with an explicit non-default margin
-    (default is 0.0 for slow-varying channels; a non-zero margin is used
-    where CQI can drift meaningfully -- see cqi_study.py)."""
-    tt = TwoTier(
-        tier1_period_slots=200,
-        enable_sps=True,
-        sps_snr_margin_db=3.0,
-    )
-    sc = ScenarioConfig(
-        name="sps_mcs",
-        horizon_slots=400,
-        carrier=CarrierConfig(bandwidth_hz=20_000_000, numerology=1),
-        ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=1000)],
-        flows=[
-            FlowConfig(
-                ue_id=1, qfi=2, direction="UL", flow_class="GBR",
-                gfbr_bps=4_000_000, pdb_ms=20,
-                traffic_kind="deterministic",
-                traffic_params={"period_ms": 5.0, "bytes_per_period": 2500},
-            ),
-        ],
-    )
-    run(sc, tt)
-    # The reservation is sized against snr_avg - margin at the moment of
-    # the SPS solve (which may differ slightly from the final snr_avg due
-    # to AR(1) drift), so allow a few dB of tolerance vs mean - margin.
-    assert len(tt._sps) == 1
-    sps = tt._sps[0]
-    assert sps.ue_id == 1 and sps.direction == "UL"
-    assert abs(sps.snr_ref_db - (20.0 - 3.0)) < 2.0
-    # And strictly below the smoothed SNR by at least ~2.5 dB (the margin
-    # minus a small AR(1) wiggle room).
-    assert sps.snr_ref_db < tt._snr_avg[1] - 2.5
-
-
 def test_buffer_basic_drain():
     b = BufferModel()
     b.register(1, 9)
@@ -471,25 +434,6 @@ def test_tier1_capacity_safety_factor_shaves_targets():
     assert total_shaved > total_full * 0.4
 
 
-def test_two_tier_forwards_capacity_safety_factor():
-    """TwoTier(capacity_safety_factor=…) must reach solve_tier1. Inspected
-    at the Tier-1 target-rate layer (Tier-2 tracks these; the actual sim
-    PRB budget is unchanged, so end-to-end delivery only shifts if
-    Tier-1's shaved targets no longer saturate the grid)."""
-    scen = _overload_scenario()
-    tt_full = TwoTier(tier1_period_slots=2000, gbr_maxmin=False)
-    tt_shaved = TwoTier(tier1_period_slots=2000, gbr_maxmin=False,
-                        capacity_safety_factor=0.5)
-    run(scen, tt_full)
-    run(scen, tt_shaved)
-    full_total = sum(tt_full._targets_bps.values())
-    shaved_total = sum(tt_shaved._targets_bps.values())
-    assert shaved_total < full_total * 0.7, (
-        f"capacity_safety_factor=0.5 should shave the LP's total target ~half; "
-        f"got {shaved_total/1e6:.1f} Mbps vs {full_total/1e6:.1f} Mbps"
-    )
-
-
 def test_grid_capacity_helper():
     """Capacity computation should be > 0 and respect TDD pattern."""
     from sim.config import TDDConfig
@@ -498,245 +442,6 @@ def test_grid_capacity_helper():
     assert cap_dl > 0 and cap_ul > 0
     # DSUUU has 1 D + S(DL) symbols, vs 3 U + S(UL); UL > DL by symbol count
     assert cap_ul > cap_dl
-
-
-def test_two_tier_beats_gradient_on_gbr_overload():
-    """Under overload, TwoTier should deliver more of the GBR target than the
-    Gradient scheduler with hardcoded weights."""
-    grad = run(
-        _overload_scenario(),
-        GradientScheduler(ewma_window_slots=200, gbr_urgency_weight=5.0),
-    )
-    tt = run(_overload_scenario(), TwoTier(tier1_period_slots=2000))
-    grad_gbr = grad["flows"]["ue2_qfi2"]["throughput_bps"]
-    tt_gbr = tt["flows"]["ue2_qfi2"]["throughput_bps"]
-    target = 4_000_000.0
-    assert tt_gbr > grad_gbr, (
-        f"TwoTier ({tt_gbr/1e6:.2f}) should beat Gradient ({grad_gbr/1e6:.2f})"
-    )
-    assert tt_gbr / target > 0.9, (
-        f"TwoTier should hit > 90% of GFBR; got {tt_gbr/1e6:.2f} Mbps"
-    )
-
-
-def test_two_tier_sps_does_not_double_allocate():
-    """Regression guard: SPS + dynamic-spillover for the same flow must not
-    drain more bytes than were ever queued. delivered + dropped <= arrived."""
-    from sim.scenarios import smoke_scenario, vision_scenario
-    for sc_factory in (smoke_scenario, vision_scenario):
-        scenario = sc_factory()
-        summary = run(scenario, TwoTier(tier1_period_slots=2000))
-        for fk, m in summary["flows"].items():
-            arrived = m["bytes_arrived"]
-            delivered = m["bytes_delivered"]
-            dropped = m["bytes_dropped"]
-            assert delivered <= arrived, (
-                f"{scenario.name}/{fk}: delivered {delivered} > arrived {arrived}"
-            )
-            assert delivered + dropped <= arrived, (
-                f"{scenario.name}/{fk}: delivered+dropped > arrived"
-            )
-
-
-def test_two_tier_sps_engages_for_periodic_flow():
-    """A video_frame flow under TwoTier should get an SPS reservation."""
-    from sim.scenarios import vision_scenario
-    sched = TwoTier(tier1_period_slots=2000)
-    summary = run(vision_scenario(), sched)
-    # After at least one Tier-1 solve, SPS list should include the cameras.
-    sps_keys = sched._sps_keys
-    # 3 video_frame flows in vision_scenario should all get SPS reservations.
-    assert len([k for k in sps_keys if k[1] == 2]) == 3, (
-        f"Expected all 3 video flows to get SPS; got {sps_keys}"
-    )
-    # And the cameras should still be delivering well (>= 95% of offered).
-    for ue in (1, 2, 3):
-        ratio = summary["flows"][f"ue{ue}_qfi2"]["delivery_ratio"]
-        assert ratio >= 0.95, f"camera ue{ue} delivery ratio {ratio} too low"
-
-
-def test_two_tier_sps_disabled_falls_back_to_dynamic():
-    """With enable_sps=False the scheduler should still serve everyone, just
-    using only dynamic scheduling."""
-    from sim.scenarios import vision_scenario
-    sched = TwoTier(tier1_period_slots=2000, enable_sps=False)
-    summary = run(vision_scenario(), sched)
-    assert len(sched._sps_keys) == 0
-    # System should still complete; cameras may have higher tail latency.
-    for ue in (1, 2, 3):
-        assert summary["flows"][f"ue{ue}_qfi2"]["bytes_delivered"] > 0
-
-
-def test_two_tier_sps_oversubscribed_tier_falls_back_to_dynamic():
-    """NOTES.md Finding 2: when SPS-eligible flows over-subscribe the carrier,
-    the viability floor sends the whole tier to dynamic rather than handing
-    out undersized reservations (or starving the last-listed flows). The
-    factory_robots UL video flows over-commit and the cell is not CCE-bound,
-    so the tier is all-or-nothing -- here, none get an SPS reservation."""
-    from sim.scenarios import factory_robots_scenario
-
-    scenario = factory_robots_scenario()
-    sched = TwoTier(tier1_period_slots=2000)
-    run(scenario, sched)
-    ul_video = {
-        (f.ue_id, f.qfi) for f in scenario.flows
-        if f.direction == "UL" and f.traffic_kind == "video_frame"
-    }
-    reserved = ul_video & sched._sps_keys
-    # All-or-nothing: never a list-order subset.
-    assert reserved == set(), (
-        f"over-subscribed UL tier should fall back to dynamic; got SPS for "
-        f"{sorted(reserved)}"
-    )
-
-
-def test_two_tier_sps_priority_tier_decides_the_winner():
-    """When two equally-sized SPS-eligible flows over-commit a carrier, the
-    one in the higher-priority tier (lower priority_level) is funded and the
-    other is left for dynamic. Swapping the priorities swaps the winner."""
-    from sim.config import TDDConfig
-
-    grid = ResourceGrid(
-        CarrierConfig(numerology=1, bandwidth_hz=10_000_000), TDDConfig()
-    )
-
-    def two_flows(pri1, pri2):
-        # Identical periodic DL flows; each alone nearly fills the SPS
-        # budget, so together they over-commit and only one can be funded.
-        return [
-            FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="Delay",
-                       priority_level=pri1, pdb_ms=20,
-                       traffic_kind="deterministic",
-                       traffic_params={"period_ms": 2.0,
-                                       "bytes_per_period": 700}),
-            FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="Delay",
-                       priority_level=pri2, pdb_ms=20,
-                       traffic_kind="deterministic",
-                       traffic_params={"period_ms": 2.0,
-                                       "bytes_per_period": 700}),
-        ]
-
-    def reserved(flows):
-        sched = TwoTier(tier1_period_slots=2000)
-        sched.configure(flows, grid.slot_duration_s, grid)
-        sched._update_sps_reservations({1: 20.0, 2: 20.0})
-        return {(s.ue_id, s.qfi) for s in sched._sps}
-
-    assert reserved(two_flows(1, 50)) == {(1, 1)}, "higher-priority ue1 wins"
-    assert reserved(two_flows(50, 1)) == {(2, 1)}, "higher-priority ue2 wins"
-
-
-def test_two_tier_beats_pf_under_pdcch_pressure():
-    """30 small periodic sensors saturate the UL PDCCH budget. TwoTier with
-    SPS should deliver every sensor's full demand with low latency; PF, lacking
-    SPS, hits the DCI cap and drops packets.
-    """
-    from sim.scenarios import sensor_dense_scenario
-    from sim.baselines.pf import ProportionalFair
-
-    sc = sensor_dense_scenario()
-    pf_sum = run(sc, ProportionalFair(ewma_window_slots=200))
-    tt_sum = run(sc, TwoTier(tier1_period_slots=2000))
-
-    pf_min_delivery = min(
-        pf_sum["flows"][k]["delivery_ratio"] for k in pf_sum["flows"]
-    )
-    tt_min_delivery = min(
-        tt_sum["flows"][k]["delivery_ratio"] for k in tt_sum["flows"]
-    )
-    pf_worst_p99 = max(
-        pf_sum["flows"][k]["hol_p99_ms"] for k in pf_sum["flows"]
-    )
-    tt_worst_p99 = max(
-        tt_sum["flows"][k]["hol_p99_ms"] for k in tt_sum["flows"]
-    )
-
-    assert tt_min_delivery > pf_min_delivery, (
-        f"TwoTier min delivery {tt_min_delivery:.1%} should beat PF "
-        f"{pf_min_delivery:.1%}"
-    )
-    assert tt_min_delivery >= 0.99, (
-        f"TwoTier should deliver ~100% per sensor; got {tt_min_delivery:.1%}"
-    )
-    assert tt_worst_p99 < pf_worst_p99, (
-        f"TwoTier worst p99 HoL {tt_worst_p99} ms should beat PF {pf_worst_p99} ms"
-    )
-
-
-def test_latency_bound_two_tier_protects_deadlines():
-    """In the DL-congested latency-bound scenario, TwoTier must hold the
-    medium-rate interactive (Delay) flows within their PDB while PF, which
-    is deadline-blind, misses some. Guards study 3 of scheduler_study.py."""
-    from sim.scenarios import latency_bound_scenario
-    from sim.baselines.pf import ProportionalFair
-
-    sc = latency_bound_scenario()
-    pdb_ms = next(f.pdb_ms for f in sc.flows if f.flow_class == "Delay")
-    delay_keys = [
-        f"ue{f.ue_id}_qfi{f.qfi}" for f in sc.flows if f.flow_class == "Delay"
-    ]
-
-    pf = run(sc, ProportionalFair(ewma_window_slots=200))
-    tt = run(sc, TwoTier(tier1_period_slots=2000))
-
-    def on_time(summary):
-        return sum(
-            1 for k in delay_keys
-            if summary["flows"][k]["delivery_ratio"] >= 0.99
-            and summary["flows"][k]["hol_p99_ms"] <= pdb_ms
-        )
-
-    tt_worst_p99 = max(tt["flows"][k]["hol_p99_ms"] for k in delay_keys)
-    # WP5 commit 4a: loosened > to >= -- investigated directly (docs/
-    # wp5-plan.md commit 4a), confirmed via a pre-4a worktree comparison
-    # that PF is unchanged (5->5) and TwoTier degraded (8->5), not PF
-    # catching up. The degradation is real fidelity (genuine HARQ-loss on
-    # 2/8 flows this run) plus README.md sec8's flagged, deliberately-
-    # unfixed SPS/masking accounting drift (552 double-grant hits this
-    # run) -- both already understood and recorded, not a new bug this
-    # assertion should keep failing on.
-    assert on_time(tt) >= on_time(pf), (
-        f"TwoTier on-time {on_time(tt)} should not fall behind PF {on_time(pf)}"
-    )
-    assert tt_worst_p99 <= pdb_ms, (
-        f"TwoTier worst p99 HoL {tt_worst_p99} ms exceeds PDB {pdb_ms} ms"
-    )
-
-
-@pytest.mark.xfail(
-    reason=(
-        "WP5 commit 4a (docs/wp5-plan.md): TwoTier now holds 5/8, not 8/8 -- "
-        "a wider break than the tie in test_latency_bound_two_tier_protects_"
-        "deadlines, split out rather than silently loosened or left failing "
-        "the whole module. Real fidelity (genuine HARQ-loss on 2/8 flows) "
-        "plus README.md sec8's flagged, deliberately-unfixed SPS/masking "
-        "accounting drift, both already understood -- but whether 'holds "
-        "every deadline' is still the right bar post-HARQ is an open "
-        "decision, not resolved here."
-    ),
-    strict=True,
-)
-def test_latency_bound_two_tier_holds_every_deadline():
-    """Split out of test_latency_bound_two_tier_protects_deadlines (WP5
-    commit 4a) -- this specific claim now fails by a much wider margin
-    (3/8 missing) than that test's tie, and wasn't part of what was asked
-    to be investigated when the tie was."""
-    from sim.scenarios import latency_bound_scenario
-
-    sc = latency_bound_scenario()
-    pdb_ms = next(f.pdb_ms for f in sc.flows if f.flow_class == "Delay")
-    delay_keys = [
-        f"ue{f.ue_id}_qfi{f.qfi}" for f in sc.flows if f.flow_class == "Delay"
-    ]
-    tt = run(sc, TwoTier(tier1_period_slots=2000))
-    on_time = sum(
-        1 for k in delay_keys
-        if tt["flows"][k]["delivery_ratio"] >= 0.99
-        and tt["flows"][k]["hol_p99_ms"] <= pdb_ms
-    )
-    assert on_time == len(delay_keys), (
-        f"TwoTier should hold every deadline; got {on_time}/{len(delay_keys)}"
-    )
 
 
 def test_pdcch_budget_caps_dynamic_allocations():
@@ -779,7 +484,7 @@ def test_timeseries_recording_returns_per_slot_data():
 
     scenario = smoke_scenario()
     summary = run(
-        scenario, TwoTier(tier1_period_slots=2000), record_timeseries=True
+        scenario, TwoTier(), record_timeseries=True
     )
     assert "timeseries" in summary
     ts = summary["timeseries"]
@@ -798,93 +503,8 @@ def test_timeseries_default_off():
     """Without record_timeseries=True, summary should omit the heavy ts data."""
     from sim.scenarios import smoke_scenario
 
-    summary = run(smoke_scenario(), TwoTier(tier1_period_slots=2000))
+    summary = run(smoke_scenario(), TwoTier())
     assert "timeseries" not in summary
-
-
-def test_two_tier_virtual_queue_windowed_ceiling():
-    """The windowed ceiling bounds Q at one Tier-1 window of target inflow:
-    Q_i <= target_bps_i * tier1_period * slot_duration_s. This pins the
-    cap and guards against runaway Q for a flow offered below its target."""
-    scenario = ScenarioConfig(
-        name="below_target",
-        horizon_slots=2000,
-        carrier=CarrierConfig(numerology=1, bandwidth_hz=30_000_000),
-        ues=[UEConfig(ue_id=1, mean_snr_db=22.0, coherence_slots=2000)],
-        flows=[
-            FlowConfig(
-                ue_id=1, qfi=9, direction="DL", flow_class="PF",
-                traffic_kind="poisson",
-                traffic_params={"rate_bps": 2_000_000},
-            )
-        ],
-        seed=5,
-    )
-    sched = TwoTier(tier1_period_slots=2000)
-    violations = []
-    orig_allocate = sched.allocate
-
-    def checked_allocate(slot, buffers, channel):
-        result = orig_allocate(slot, buffers, channel)
-        window_s = sched.tier1_period * sched.slot_duration_s
-        for key, q in sched._virtual_q.items():
-            cap = sched._targets_bps.get(key, 0.0) * window_s
-            if q > cap * 1.01 + 1:
-                violations.append((slot.slot_index, key, q, cap))
-        return result
-
-    sched.allocate = checked_allocate  # type: ignore[method-assign]
-    run(scenario, sched)
-    assert not violations, f"virtual queue exceeded windowed cap: {violations[:3]}"
-
-
-def test_two_tier_windowed_ceiling_protects_bursty_gbr():
-    """Regression guard for the 10-robot finding: a bursty GBR flow sharing a
-    UE with a continuous best-effort flow must not be starved by TwoTier.
-    With the old instantaneous-backlog clamp the bursty flow's Q collapsed
-    between video frames and the continuous PF flow won; the windowed
-    ceiling fixes that. TwoTier should serve the GBR flow at least as well
-    as plain PF does."""
-    from sim.config import TDDConfig
-    from sim.baselines.pf import ProportionalFair
-
-    def scenario():
-        return ScenarioConfig(
-            name="mixed_flow_ue",
-            horizon_slots=8000,
-            carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
-            tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
-            ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=2000)],
-            flows=[
-                # Bursty GBR video on the same UE as ...
-                FlowConfig(
-                    ue_id=1, qfi=2, direction="UL", flow_class="GBR",
-                    gfbr_bps=6_000_000, pdb_ms=30,
-                    traffic_kind="video_frame",
-                    traffic_params={
-                        "period_ms": 33.33, "avg_bytes": 25_000,
-                        "i_frame_multiplier": 4.0,
-                        "i_frame_period_in_frames": 30,
-                    },
-                ),
-                # ... a continuous best-effort upload competing in the UL pool.
-                FlowConfig(
-                    ue_id=1, qfi=9, direction="UL", flow_class="PF",
-                    pdb_ms=300, traffic_kind="poisson",
-                    traffic_params={"rate_bps": 15_000_000},
-                ),
-            ],
-            seed=4,
-        )
-
-    pf = run(scenario(), ProportionalFair(ewma_window_slots=200))
-    tt = run(scenario(), TwoTier(tier1_period_slots=2000))
-    pf_gbr = pf["flows"]["ue1_qfi2"]["delivery_ratio"]
-    tt_gbr = tt["flows"]["ue1_qfi2"]["delivery_ratio"]
-    assert tt_gbr >= pf_gbr, (
-        f"TwoTier GBR delivery {tt_gbr:.0%} should be >= PF's {pf_gbr:.0%} "
-        "(bursty GBR must not lose to continuous PF on the same UE)"
-    )
 
 
 def test_tier1_per_flow_penalty_shifts_allocation():
@@ -1047,76 +667,6 @@ def _two_gbr_partial_infeasible_scenario():
     )
 
 
-def test_two_tier_adaptive_penalty_helps_poor_snr_gbr():
-    """Adaptive per-flow penalty (b>0) rebalances the GBR sacrifice toward
-    the poor-SNR flow, improving the worst-served GBR flow vs fixed b=0.
-
-    The max-min stage is switched off here: it protects the same flow by a
-    stronger mechanism, which would mask what this test is measuring.
-    """
-    fixed = run(_two_gbr_partial_infeasible_scenario(),
-                TwoTier(tier1_period_slots=2000, gbr_penalty_lr=0.0,
-                        gbr_maxmin=False))
-    adaptive = run(_two_gbr_partial_infeasible_scenario(),
-                   TwoTier(tier1_period_slots=2000, gbr_penalty_lr=1e5,
-                           gbr_maxmin=False))
-
-    def min_delivery(summary):
-        return min(f["delivery_ratio"] for f in summary["flows"].values())
-
-    assert min_delivery(adaptive) > min_delivery(fixed) + 0.01, (
-        f"adaptive min delivery {min_delivery(adaptive):.1%} should beat "
-        f"fixed {min_delivery(fixed):.1%}"
-    )
-    # The poor-SNR flow (ue2) specifically improves.
-    assert (
-        adaptive["flows"]["ue2_qfi2"]["delivery_ratio"]
-        > fixed["flows"]["ue2_qfi2"]["delivery_ratio"]
-    )
-
-
-def test_two_tier_adaptive_penalty_caps_at_max():
-    """A genuinely infeasible GBR flow must not diverge: its penalty stops
-    at gbr_penalty_max instead of growing without bound."""
-    from sim.config import TDDConfig
-
-    scenario = ScenarioConfig(
-        name="infeasible_gbr",
-        horizon_slots=8000,  # 4 Tier-1 solves
-        carrier=CarrierConfig(numerology=1, bandwidth_hz=10_000_000),
-        tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
-        ues=[UEConfig(ue_id=1, mean_snr_db=8.0, coherence_slots=4000)],
-        flows=[
-            FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="GBR",
-                       gfbr_bps=50_000_000,  # far above carrier capacity
-                       pdb_ms=100, traffic_kind="poisson",
-                       traffic_params={"rate_bps": 50_000_000}),
-        ],
-        seed=1,
-    )
-    p_max = 5_000.0
-    sched = TwoTier(
-        tier1_period_slots=2000, gbr_penalty_lr=1e6, gbr_penalty_max=p_max
-    )
-    run(scenario, sched)
-    pen = sched._gbr_penalty[(1, 2)]
-    assert pen <= p_max, f"penalty {pen} exceeded cap {p_max}"
-    assert pen == p_max, (
-        f"infeasible flow should drive the penalty to the cap; got {pen}"
-    )
-
-
-def test_two_tier_adaptive_penalty_disabled_by_default():
-    """With gbr_penalty_lr=0 (default) the penalties never move from init."""
-    from sim.scenarios import overload_scenario
-
-    sched = TwoTier(tier1_period_slots=2000)  # default gbr_penalty_lr=0
-    run(overload_scenario(), sched)
-    assert all(
-        p == sched.gbr_penalty_init for p in sched._gbr_penalty.values()
-    )
-
-
 def test_two_tier_runs_without_overload():
     """With abundant capacity, TwoTier should serve every flow's full demand."""
     scenario = ScenarioConfig(
@@ -1133,7 +683,7 @@ def test_two_tier_runs_without_overload():
         ],
         seed=4,
     )
-    summary = run(scenario, TwoTier(tier1_period_slots=2000))
+    summary = run(scenario, TwoTier())
     flow = summary["flows"]["ue1_qfi9"]
     # Should deliver near 100% of offered
     assert flow["delivery_ratio"] > 0.95
@@ -1332,70 +882,6 @@ def test_tier1_hard_floor_overrides_the_slack_penalty_sacrifice():
     assert staged[poor] > single[poor], "the hard floor must lift the low-SE flow"
 
 
-def test_two_tier_maxmin_lifts_the_worst_served_gbr_flow():
-    """End to end: gbr_maxmin=True raises min GBR delivery, and the gain
-    lands on the poor-SNR flow that the single-stage form starves."""
-    single = run(_cell_edge_starvation_scenario(),
-                 TwoTier(tier1_period_slots=2000, gbr_maxmin=False))
-    maxmin = run(_cell_edge_starvation_scenario(),
-                 TwoTier(tier1_period_slots=2000, gbr_maxmin=True))
-
-    def min_delivery(summary):
-        return min(f["delivery_ratio"] for f in summary["flows"].values())
-
-    assert min_delivery(maxmin) > min_delivery(single) + 0.05, (
-        f"max-min min delivery {min_delivery(maxmin):.1%} should beat "
-        f"single-stage {min_delivery(single):.1%}"
-    )
-    # ue4 (10 dB) is the flow the single-stage solve abandons.
-    assert single["flows"]["ue4_qfi2"]["delivery_ratio"] < 0.10
-    assert maxmin["flows"]["ue4_qfi2"]["delivery_ratio"] > 0.20
-
-
-def test_two_tier_maxmin_scale_zero_matches_single_stage():
-    """gbr_maxmin_scale=0 claims none of the achievable floor, so it must be
-    byte-identical to switching the stage off -- the knob's null setting."""
-    single = run(_two_gbr_partial_infeasible_scenario(),
-                 TwoTier(tier1_period_slots=2000, gbr_maxmin=False))
-    zero = run(_two_gbr_partial_infeasible_scenario(),
-               TwoTier(tier1_period_slots=2000, gbr_maxmin=True,
-                       gbr_maxmin_scale=0.0))
-    for fk, m in single["flows"].items():
-        assert zero["flows"][fk]["bytes_delivered"] == m["bytes_delivered"]
-
-
-def test_two_tier_maxmin_enabled_by_default():
-    """The stage is on by default, and the default solves it for real.
-
-    It is safe as a default because it self-disables: whenever the GBR set
-    is jointly feasible t* == 1 and the floor binds nothing. Guarded here so
-    the default cannot be flipped back silently.
-    """
-    from sim.scenarios import overload_scenario
-
-    sched = TwoTier(tier1_period_slots=2000)
-    assert sched.gbr_maxmin is True
-    assert sched.gbr_maxmin_scale == 1.0
-    run(overload_scenario(), sched)
-    # A level was actually solved (not the NaN sentinel) and is a fraction.
-    assert sched.maxmin_level == sched.maxmin_level
-    assert 0.0 <= sched.maxmin_level <= 1.0
-
-
-def test_two_tier_maxmin_default_is_free_when_gbr_set_is_feasible():
-    """The default must not cost anything on a workload whose GBR floors all
-    fit -- that is the whole justification for having it on."""
-    from sim.scenarios import smoke_scenario
-
-    on = run(smoke_scenario(), TwoTier(tier1_period_slots=2000))
-    off = run(smoke_scenario(), TwoTier(tier1_period_slots=2000,
-                                        gbr_maxmin=False))
-    for fk, m in off["flows"].items():
-        assert on["flows"][fk]["bytes_delivered"] == m["bytes_delivered"], (
-            f"{fk}: the max-min default changed a feasible-GBR workload"
-        )
-
-
 # --- Tier-1 numerical accuracy (the two-phase lexicographic form) -----------
 
 
@@ -1545,63 +1031,31 @@ def test_slice_vs_gbr_priority_is_channel_independent():
 
 
 def test_documented_defaults_match_the_code():
-    """The two documented parameter tables must not drift from the code.
+    """Signature-drift guard, kept alive across the Phase 2 rewrite rather
+    than deleted with the mechanism-specific tests
+    (docs/phase2-plan.md's two-tier commit 1) -- update the expected knob
+    set here every commit that changes ``TwoTier.__init__``, rather than
+    letting this test go stale or deleting it.
 
-    Scheduler knobs are tabulated in design-docs/scheduler-study.md 4.5;
-    the simulator-fidelity knobs, whose defaults deliberately differ from
-    the settings the studies run, are in 5.1. A defaults table is worse
-    than no table once it is stale, and these values are cited as
-    decided-by-evidence throughout the study.
+    Phase 2 commit 1: the constructor takes no kwargs at all -- every
+    pre-Phase-2 knob was deleted (SPS entirely; the old Tier-1 apparatus
+    pending commit 2's rewrite). ``design-docs/scheduler-study.md``
+    sec4.5's knob table is correspondingly stale until commits 2+
+    reintroduce real, ground-truth-backed knobs -- not updated here since
+    there is nothing left to tabulate yet; update it alongside whichever
+    future commit adds the first real kwarg back. The rest of this
+    function (sec5.1's CQI/BSR fidelity defaults) is untouched by Phase 2
+    and still guards its own, unrelated claims.
     """
     import inspect
     from pathlib import Path
 
-    from scheduler import solve_tier1
-
-    documented = {
-        "tier1_period_slots": 2000,
-        "snr_window_slots": 100,
-        "delay_urgency_weight": 4.0,
-        "delay_exponent": 2.0,
-        "enable_sps": True,
-        "sps_safety_margin": 1.10,
-        "sps_budget_fraction": 0.85,
-        "sps_min_scale": 0.75,
-        "sps_snr_margin_db": 0.0,
-        "gbr_penalty_init": 1e3,
-        "gbr_penalty_lr": 0.0,
-        "gbr_penalty_max": 1e6,
-        "gbr_penalty_se_exponent": 0.0,
-        "gbr_maxmin": True,
-        "gbr_maxmin_scale": 1.0,
-        "capacity_safety_factor": 1.0,
-        "slice_shares": None,
-        "slice_slack_penalty": 1e3,
-        "ul_split_estimator": "shadow_lcp",
-        "ul_bucket_sync_gain": 0.0,
-        "demand_estimator": "oracle",
-        "demand_ewma_alpha": 0.3,
-        "bsr_lag_slots": 0,
-        "demand_track_gain_up": 0.5,
-        "demand_track_gain_down": 0.1,
-        "apply_demand_cap": False,
-    }
     actual = inspect.signature(TwoTier.__init__).parameters
-    assert set(documented) == set(actual) - {"self"}, (
-        "TwoTier gained or lost a knob -- update scheduler-study.md 4.5"
+    assert set(actual) - {"self"} == set(), (
+        "TwoTier gained a knob -- update this test's expected set (and "
+        "design-docs/scheduler-study.md sec4.5 once a knob has real "
+        "ground truth behind it, docs/phase2-plan.md)"
     )
-    for name, want in documented.items():
-        assert actual[name].default == want, (
-            f"TwoTier.{name} default is {actual[name].default!r}, "
-            f"scheduler-study.md 4.5 documents {want!r}"
-        )
-
-    # capacity_safety_factor lives on both surfaces -- solve_tier1 accepts
-    # it directly, TwoTier forwards it (added late so it wasn't in the
-    # original 17-knob table). Defaults must match.
-    t1 = inspect.signature(solve_tier1).parameters
-    assert t1["capacity_safety_factor"].default == 1.0
-    assert actual["capacity_safety_factor"].default == 1.0
 
     # Section 5.1: the CQI fidelity knob defaults to perfect information, so
     # a unit test never has to reason about report latency. UL BSR realism
