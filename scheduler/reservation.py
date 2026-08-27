@@ -744,6 +744,28 @@ class Reservation:
     ) -> list[Allocation]:
         symbols = slot.ul_symbols if direction == "UL" else slot.dl_symbols
 
+        # Commit 10a correction (docs/oai-port-map.md row 14): ground
+        # truth decays EVERY connected UE's thr_ue every slot --
+        # gNB_scheduler_ulsch.c:2074,2083-2085 / _dlsch.c:742,750-752 --
+        # gated only on nr_mac_ue_is_active() (gNB_scheduler_
+        # primitives.c:3802: sched_ctrl->ul_failure / a DRX-style
+        # transm_interrupt timer -- nothing about backlog). Commits 1-10
+        # gated this on candidacy (backlog>0 this slot) instead -- the
+        # OPPOSITE of ground truth, not merely an unmodeled detail; see
+        # the port-map row for the full correction. This simulator has no
+        # UL-failure/DRX signal on the Scheduler protocol -- a
+        # structurally-absent input in the same category as has_srb/
+        # do_sched/TA/OLLA's round telemetry -- so the gate is treated as
+        # permanently open: every configured UE decays every slot,
+        # regardless of whether it has backlog this slot or ever appears
+        # in ue_flows below.
+        if direction == "UL":
+            for state in self._ue_state.values():
+                state.ul_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
+        else:
+            for state in self._ue_state.values():
+                state.dl_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
+
         ue_flows: dict[int, list[FlowConfig]] = {}
         for f in self._flows:
             if f.direction != direction:
@@ -754,19 +776,9 @@ class Reservation:
         if not ue_flows:
             return []
 
-        # gNB_scheduler_ulsch.c:2083-2087 / _dlsch.c:750-752: the
-        # throughput EWMA is touched only for UEs being considered as a
-        # scheduling candidate this slot (i.e. with pending data) -- NOT
-        # a blanket every-UE-every-slot decay the way
-        # sim/baselines/pf.py's own _r_avg is. A UE with nothing queued
-        # this slot keeps last-known thr_ue untouched, matching the C.
         candidates: list[_Candidate] = []
         for ue_id, flows in ue_flows.items():
             state = self._ue_state[ue_id]
-            if direction == "UL":
-                state.ul_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
-            else:
-                state.dl_thr_bytes_per_slot *= 1.0 - _THR_EWMA_ALPHA
 
             snr = channel.get_reported_snr_db(ue_id)
             # Below-lowest-MCS-threshold viability gate -- a sim-only

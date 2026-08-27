@@ -384,25 +384,41 @@ they survive it:
   either direction.
 
   *What the numbers actually showed, against PF on the same scenarios*
-  (`uv run python scripts/scheduler_study.py`, full tables there):
+  (`uv run python scripts/scheduler_study.py`, full tables there; figures
+  below are post-commit-10a, corrected for the throughput-EWMA bug —
+  `docs/oai-port-map.md` row 14 — commit 10's own first-look numbers moved
+  when that landed, by up to ~6M on Study 1's 1.5x point, and are not
+  repeated here):
   - **Study 1 (overload sweep, 4 capacity points)**: Reservation tracks PF
-    closely at every point — total throughput within ~1-2%, GBR-contracts-
-    met count within ±1 flow, no consistent directional edge either way
-    (Reservation: 69.0M/0-10, 96.2M/6-10, 86.5M/5-10, 86.8M/6-10 vs PF:
+    closely at every point — total throughput within ~4%, GBR-contracts-
+    met count within ±2 flow, no consistent directional edge either way
+    (Reservation: 67.2M/0-10, 90.0M/4-10, 85.8M/5-10, 86.7M/6-10 vs PF:
     68.7M/1-10, 95.3M/5-10, 85.9M/6-10, 88.2M/7-10 across 1.0x-3.0x). The
     sort tiers, target-based sizing, and follower budget do not visibly
     differentiate it from bare PF here, despite all three being live and
     (per the table above) genuinely exercised at this scenario.
   - **Study 2 (PDCCH-limited)**: Reservation is visibly *worse* than PF
-    (4.3M total / 8 of 30 on-time vs PF's 4.8M / 14 of 30) — expected in
-    direction, not magnitude: Reservation has no SPS/CCE-avoidance
-    mechanism (TwoTier's 9.6M/30-of-30 comes specifically from bypassing
-    per-slot DCI), so under CCE pressure it competes for PDCCH the same
-    way PF does and should track PF's ballpark; it tracks the ballpark
-    but underperforms it.
+    (4.1M total / 9 of 30 on-time vs PF's 4.8M / 14 of 30), UL PRB
+    utilization *higher* than PF's (61.7% vs 41.1%) despite delivering
+    fewer bytes, and a sharp bimodal per-UE p99 split (roughly half the
+    UEs +7.5 to +9.5ms worse, the other half unchanged to ~2ms better) —
+    this is a latency/PDB regression, not a throughput-for-protection
+    trade, and it survives the EWMA fix nearly unchanged in shape and
+    magnitude, ruling out coefficient staleness as the cause. Being
+    investigated in its own commit, not tuned away here; one candidate
+    mechanism (unconfirmed): the follower budget's `n_followers_need ×
+    min_rb` term saturates hard in this scenario (83 UL PRBs, `min_rb=5`,
+    so ≥16 simultaneous candidates floors every earlier-ranked UE's
+    budget at `min_rb`; the modal 13-14 simultaneous count already leaves
+    only ~18-23 PRBs for the top-ranked candidate) — and because this
+    scenario's flows are all plain-PF class, ranking reduces to the PF
+    coefficient, so the *most underserved* UEs rank first and would be
+    squeezed hardest, while already-well-served UEs rank last and take
+    the leftover PRBs. Not yet traced to individual ranking positions.
   - **Study 3 (latency-bound)**: the one case with a real, visible
-    difference from PF — Reservation matches TwoTier's contract-met count
-    and mean on-time delivery (5 of 8, 99%) against PF's 88%, while
+    difference from PF, and one that *improved* under the EWMA fix —
+    Reservation now clears TwoTier's own contract-met count (6 of 8 vs
+    TwoTier's 5 of 8, both far above PF's 88% mean/5-of-8), while
     allowing more bulk DL throughput than TwoTier (16.3M vs 14.0M, PF's
     26.6M). The PDB-tier sort and GBR-tier prioritization appear to be
     what's actually load-bearing here, under Study 3's tight-PDB/

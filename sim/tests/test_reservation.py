@@ -55,6 +55,7 @@ from scheduler.reservation import (
     _dl_follower_budget,
     _dl_grant_target,
     _dl_needs_service,
+    _THR_EWMA_ALPHA,
     _ul_follower_budget,
     _ul_grant_target,
     _ul_needs_service,
@@ -242,6 +243,39 @@ def test_pf_coefficient_formula_matches_hand_computation():
     assert expected_coef == pytest.approx(52 / 99.0)
     # The post-decay thr is what allocate() should have left behind.
     assert sched._ue_state[1].dl_thr_bytes_per_slot > 0.0
+
+
+def test_thr_ewma_decays_every_slot_even_when_ue_has_no_backlog():
+    """Commit 10a correction (docs/oai-port-map.md row 14): ground truth
+    decays every connected UE's thr_ue every slot
+    (gNB_scheduler_ulsch.c:2074,2083-2085 / _dlsch.c:742,750-752), gated
+    only on nr_mac_ue_is_active() -- a UL-failure/DRX-equivalent this
+    simulator doesn't have, not on backlog. Commits 1-10 gated the decay
+    on candidacy instead (the opposite), so a UE with no backlog kept a
+    stale-high thr indefinitely. Verified directly: a UE with backlog in
+    slot 0, none in slots 1-2 (no candidate built either slot -- confirms
+    this exercises the gap, not a normal grant), must show its thr having
+    decayed through the gap when it becomes a candidate again."""
+    sched = Reservation()
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="DL")]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    channel = _FakeChannel({1: 20.0})
+
+    buffers.set(1, 1, bytes_queued=6000)
+    slot0 = _FakeSlot(slot_index=0, dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48)
+    sched.allocate(slot0, buffers, channel)
+    thr_after_slot0 = sched._ue_state[1].dl_thr_bytes_per_slot
+    assert thr_after_slot0 > 0.0
+
+    buffers.set(1, 1, bytes_queued=0)
+    for i in (1, 2):
+        slot = _FakeSlot(slot_index=i, dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48)
+        out = sched.allocate(slot, buffers, channel)
+        assert out == []
+
+    expected = thr_after_slot0 * (1.0 - _THR_EWMA_ALPHA) ** 2
+    assert sched._ue_state[1].dl_thr_bytes_per_slot == pytest.approx(expected)
 
 
 # -- 3. unbounded grant, no follower budget yet ---------------------------
