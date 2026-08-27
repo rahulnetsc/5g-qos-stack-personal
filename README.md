@@ -1197,6 +1197,26 @@ these five, add a new tag rather than forcing it into an existing one.
   test_reservation.py::test_dl_fill_uses_declared_order_not_priority_
   order` is the only thing currently guarding this from silently
   regressing back to a priority sort.
+- `[OPEN: PHASE2]` **Two-tier's UL OR-gate starvation fix
+  (`ia_p5g_ul_metric`'s bugfix) only reaches a UE that has already
+  cleared a separate, non-OR-gate-aware candidacy pre-filter.** Found
+  landing two-tier commit 3a (`docs/oai-port-map.md` row 52): ground
+  truth includes a UL LCG's `vq_ul` deficit in the ranking metric if
+  EITHER `estimated_ul_buffer_per_lcg > 0` OR `vq_ul > 0` — specifically
+  to keep a BSR-decayed-to-zero flow visible via its durable VQ deficit
+  during a grant freeze (cited incident: "d639 zero grants for 55s").
+  `scheduler/two_tier.py::_ul_base_q` ports this OR-gate correctly, but
+  it only runs for UEs that already became scheduling *candidates* —
+  gated upstream in `_allocate_direction` on
+  `bytes_reported > 0` for at least one flow, a check that does not
+  consult `vq_ul` at all. A UE with zero `bytes_reported` across every
+  UL flow but a real `vq_ul` deficit never becomes a candidate in the
+  first place, regardless of the OR-gate inside `_ul_base_q` — the same
+  category of starvation the OR-gate exists to prevent, one layer
+  higher, unaddressed. Not verified whether ground truth's own
+  candidate-selection loop has this same limitation (out of scope for
+  commit 3a's own research); not fixed here since it would mean
+  reworking the pre-filter itself, a separate, larger change.
 - `[OPEN: PHASE2]` **`paper/main.tex` §"Soft GBR floors are a knapsack"
   rests on `solve_tier1` being lexicographic — ground truth has no such
   structure, so the section's ~1e7× dominance figure has lost its
@@ -1268,13 +1288,13 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage (updated
-two-tier commit 2, `docs/phase2-plan.md`, for the new knapsack-claim
-entry — this count is a snapshot, re-grep rather than trust it stale):
-**20 open entries** remain (7 `[OPEN: WP9]`, including the 4-facet
-UL-access-chain dominance cluster counted once; 7 `[OPEN: PHASE2]`; 2
-`[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/
-DECISION]`) plus whatever new items Phase 2/3 add using the same
-open-ended tag vocabulary (§8 preamble). "Closed" means flipped to
+two-tier commit 3a, `docs/phase2-plan.md`, for the new UL OR-gate/
+candidacy-pre-filter entry — this count is a snapshot, re-grep rather
+than trust it stale): **21 open entries** remain (7 `[OPEN: WP9]`,
+including the 4-facet UL-access-chain dominance cluster counted once;
+8 `[OPEN: PHASE2]`; 2 `[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual
+`[OPEN: HARDWARE/DECISION]`) plus whatever new items Phase 2/3 add
+using the same open-ended tag vocabulary (§8 preamble). "Closed" means flipped to
 `[RESOLVED]` with a citation of what closed it; "carried to the hardware
 campaign" means still tagged `[OPEN: HARDWARE]` (or the hardware half of
 a dual tag) at this gate — `[OPEN: WP9]`/`[OPEN: PHASE2]`/`[OPEN:
