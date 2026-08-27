@@ -44,6 +44,7 @@ from sim.scenarios import (
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
 from scheduler import load_two_tier
+from scheduler.reservation import Reservation
 
 # TwoTier is configured from the reference YAML in scheduler/, so every
 # study run uses the shipped defaults documented alongside the code
@@ -75,6 +76,10 @@ def _pf():
 
 def _tt(**overrides):
     return load_two_tier(SCHEDULER_CONFIG, **overrides)
+
+
+def _reservation():
+    return Reservation()
 
 
 def _flow_meta(scenario: ScenarioConfig) -> dict:
@@ -174,6 +179,7 @@ def study_overload_sweep() -> None:
         ("TwoTier", lambda: _tt()),
         ("TwoTier-nomaxmin", lambda: _tt(gbr_maxmin=False)),
         ("  +adaptive", lambda: _tt(gbr_maxmin=False, gbr_penalty_lr=1e5)),
+        ("Reservation", _reservation),
     ]
     print(
         f"{'capacity':>9}  {'scheduler':<18}{'total':>9}"
@@ -200,7 +206,10 @@ def study_pdcch_limited() -> None:
         "within the 15 ms PDB.\n"
     )
     sc = sensor_dense_scenario()
-    scheds = [("RoundRobin", RoundRobin), ("PF", _pf), ("TwoTier", _tt)]
+    scheds = [
+        ("RoundRobin", RoundRobin), ("PF", _pf), ("TwoTier", _tt),
+        ("Reservation", _reservation),
+    ]
     print(
         f"{'scheduler':<14}{'total':>9}{'on-time':>10}"
         f"{'mean deliv':>12}{'min deliv':>11}{'worst p99':>11}"
@@ -226,7 +235,10 @@ def study_latency_bound() -> None:
     )
     sc = latency_bound_scenario()
     meta = _flow_meta(sc)
-    scheds = [("RoundRobin", RoundRobin), ("PF", _pf), ("TwoTier", _tt)]
+    scheds = [
+        ("RoundRobin", RoundRobin), ("PF", _pf), ("TwoTier", _tt),
+        ("Reservation", _reservation),
+    ]
     print(
         f"{'scheduler':<14}{'ctrl on-time':>14}{'ctrl mean':>11}"
         f"{'ctrl worst p99':>16}{'bulk DL':>10}"

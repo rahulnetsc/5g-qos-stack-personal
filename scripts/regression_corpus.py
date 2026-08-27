@@ -53,6 +53,7 @@ def _cases() -> list[dict[str, Any]]:
         ("TwoTier", lambda: ss._tt()),
         ("TwoTier-nomaxmin", lambda: ss._tt(gbr_maxmin=False)),
         ("TwoTier-adaptive", lambda: ss._tt(gbr_maxmin=False, gbr_penalty_lr=1e5)),
+        ("Reservation", ss._reservation),
     ]
     for mult in (1.0, 1.5, 2.0, 3.0):
         sc = ss._scale_capacity(base, mult)
@@ -64,7 +65,10 @@ def _cases() -> list[dict[str, Any]]:
 
     # Study 2 -- PDCCH-limited (sensor_dense).
     sc2 = ss.sensor_dense_scenario()
-    for sched_name, factory in [("RoundRobin", RoundRobin), ("PF", ss._pf), ("TwoTier", ss._tt)]:
+    for sched_name, factory in [
+        ("RoundRobin", RoundRobin), ("PF", ss._pf), ("TwoTier", ss._tt),
+        ("Reservation", ss._reservation),
+    ]:
         cases.append({
             "study": 2, "case": "pdcch_limited", "scenario": sc2,
             "scheduler_name": sched_name, "scheduler_factory": factory,
@@ -72,7 +76,10 @@ def _cases() -> list[dict[str, Any]]:
 
     # Study 3 -- latency-bound.
     sc3 = ss.latency_bound_scenario()
-    for sched_name, factory in [("RoundRobin", RoundRobin), ("PF", ss._pf), ("TwoTier", ss._tt)]:
+    for sched_name, factory in [
+        ("RoundRobin", RoundRobin), ("PF", ss._pf), ("TwoTier", ss._tt),
+        ("Reservation", ss._reservation),
+    ]:
         cases.append({
             "study": 3, "case": "latency_bound", "scenario": sc3,
             "scheduler_name": sched_name, "scheduler_factory": factory,

@@ -271,6 +271,29 @@ def test_pf_smoke_completes():
     assert summary["flows"]["ue1_qfi9"]["bytes_delivered"] > 0
 
 
+def test_reservation_smoke_completes():
+    """Phase 2, reservation commit 10: the first time this scheduler runs
+    inside the real driver -- real buffers, HARQ, the UL access chain,
+    ue_lcp -- rather than sim/tests/test_reservation.py's synthetic
+    fixtures (that file deliberately has no sim/ dependency, matching
+    reservation.py's own "never on sim" boundary, so this end-to-end
+    exercise belongs here instead). Runs the actual Study 1 scenario
+    (scripts/scheduler_study.py), not a minimal single-flow one, since
+    that is what commit 10 wires in and captures. A failure here is a
+    finding about the port that fixtures couldn't reveal, not a test to
+    adjust until it passes."""
+    from sim.scenarios import factory_robots_scenario
+    from scheduler.reservation import Reservation
+
+    summary = run(factory_robots_scenario(), Reservation())
+    assert summary["horizon_s"] > 0
+    assert summary["flows"]
+    for fk, m in summary["flows"].items():
+        assert m["bytes_arrived"] >= 0
+        assert m["bytes_delivered"] >= 0
+    assert any(m["bytes_delivered"] > 0 for m in summary["flows"].values())
+
+
 def _overload_scenario():
     """Both PF and GBR flows demand more than capacity. Capacity ~5 Mbps DL on
     a 10 MHz carrier at SNR 20 dB; PF demands 20 Mbps, GBR demands its full

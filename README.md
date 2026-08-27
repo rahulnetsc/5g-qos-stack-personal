@@ -347,6 +347,118 @@ they survive it:
   is an accurate transcription of two of these six points but on its own
   hides this crossover entirely — exactly the kind of detail "reproduce
   the two headline numbers" would miss.
+- **Reservation vs. PF at Studies 1-3 (Phase 2 reservation commit 10):
+  what the comparison measures, and what it found.** Commit 10 is the
+  first point in this lineage where Reservation runs inside the real
+  driver on real scenarios rather than synthetic fixtures — the first
+  study numbers it has ever produced. Reported here as run, not tuned in
+  response to what it showed.
+
+  *Which mechanisms are live, and where.* Reservation's real,
+  non-placeholder mechanisms as of commit 9 are: the sort tiers (GBR
+  deficit, PDB), target-based grant sizing (commit 4a), the follower
+  budget, the post-grant deficit drain, and the real two-pass DL LCP
+  fill. The follower budget's operating regime (`n_followers_need>0`) was
+  checked empirically, not assumed from scenario UE counts — instrumented
+  `Reservation._allocate_direction` and ran it through `sim.driver.run()`
+  on all three scenarios, counting simultaneous per-slot backlogged UEs
+  per direction:
+
+  | Scenario (Study) | UL slots, ≥3 simultaneous backlogged UEs | DL slots, ≥3 |
+  |---|---|---|
+  | factory_robots, N=10 (Study 1) | 96.7% | 12.5% |
+  | sensor_dense, N=30 (Study 2) | 70.9% | 0.0% (no DL traffic at all) |
+  | latency_bound, N=12 (Study 3) | 0.0% (no UL traffic at all) | 95.2% |
+
+  **Neither direction is exercised by all three studies — Study 2 carries
+  no DL traffic and Study 3 carries no UL traffic.** So of the six new
+  records this commit captures, DL's mechanisms (the follower budget's DL
+  side, DL's target sizing, the real two-pass DL LCP) are exercised by
+  Studies 1 and 3 only; UL's (the follower budget's UL side, UL's target
+  sizing, the deficit drain) by Studies 1 and 2 only. The follower budget
+  itself, specifically, is well covered in **both** directions across
+  this set — a stronger, narrower claim than "Reservation ran on three
+  studies," and the one this instrumentation actually supports. This
+  resolves `f0ae919`'s open question with real per-slot counts, not
+  scenario-config inference — not a Study-4-style N=2 degenerate case in
+  either direction.
+
+  *What the numbers actually showed, against PF on the same scenarios*
+  (`uv run python scripts/scheduler_study.py`, full tables there):
+  - **Study 1 (overload sweep, 4 capacity points)**: Reservation tracks PF
+    closely at every point — total throughput within ~1-2%, GBR-contracts-
+    met count within ±1 flow, no consistent directional edge either way
+    (Reservation: 69.0M/0-10, 96.2M/6-10, 86.5M/5-10, 86.8M/6-10 vs PF:
+    68.7M/1-10, 95.3M/5-10, 85.9M/6-10, 88.2M/7-10 across 1.0x-3.0x). The
+    sort tiers, target-based sizing, and follower budget do not visibly
+    differentiate it from bare PF here, despite all three being live and
+    (per the table above) genuinely exercised at this scenario.
+  - **Study 2 (PDCCH-limited)**: Reservation is visibly *worse* than PF
+    (4.3M total / 8 of 30 on-time vs PF's 4.8M / 14 of 30) — expected in
+    direction, not magnitude: Reservation has no SPS/CCE-avoidance
+    mechanism (TwoTier's 9.6M/30-of-30 comes specifically from bypassing
+    per-slot DCI), so under CCE pressure it competes for PDCCH the same
+    way PF does and should track PF's ballpark; it tracks the ballpark
+    but underperforms it.
+  - **Study 3 (latency-bound)**: the one case with a real, visible
+    difference from PF — Reservation matches TwoTier's contract-met count
+    and mean on-time delivery (5 of 8, 99%) against PF's 88%, while
+    allowing more bulk DL throughput than TwoTier (16.3M vs 14.0M, PF's
+    26.6M). The PDB-tier sort and GBR-tier prioritization appear to be
+    what's actually load-bearing here, under Study 3's tight-PDB/
+    congested-DL shape specifically.
+
+  **Reported as a finding about the port's current shape, not adjusted in
+  response**: of Reservation's five live mechanisms, only the PDB/GBR
+  sort tiers show a clear, attributable effect across Studies 1-3 as
+  currently constructed; the follower budget and target-based sizing are
+  confirmed *exercised* (table above) without yet being confirmed
+  *differentiating* at these specific operating points. That is
+  information about how much of the port is load-bearing today, not a
+  disappointment to route around — a scenario constructed to stress the
+  follower budget specifically (distinct from Study 1's GBR-overload
+  framing) is a WP9 candidate, not a Phase-2 fix.
+
+  *What is NOT yet measured by any of this*, from the dormant/not-
+  applicable inventory (`docs/oai-port-map.md`, cited per row) — six
+  causes, not reconciled to any prior summary of this count:
+  - **No SRB/RRC-signaling traffic model exists at all** (row 17):
+    `has_srb`'s sort tier (both directions) and its cap on UL/DL
+    grant-sizing targets (rows 25c, 26) are permanent no-ops — 3 dormant.
+    DL's SRB LCP pass (row 31) is not-applicable, a stronger category —
+    there is no data model to gate a pass on to begin with.
+  - **No `do_sched`/TA-equivalent signal reaches the `Scheduler`
+    protocol** (rows 27, 28): UL's liveness and `sched_inactive` tiers,
+    DL's liveness/TA tier — 3 dormant — plus the `needs_service`
+    consequence on both directions (the candidate list is pre-filtered to
+    real backlog, so `needs_service`'s `has_srb`/`has_gbr`/`do_sched`
+    OR-terms never get a chance to matter) — 2 more. 5 total.
+  - **No beam modeling anywhere in `scheduler/`/`sim/`** (rows 27, 28):
+    UL and DL per-beam pre-checks — 2 not-applicable.
+  - **OLLA's offset is provably 0** (commit 9, row 33): retransmission
+    grants bypass `Scheduler.allocate()` entirely (WP5 Decision 4), so the
+    round-1 telemetry `get_mcs_from_bler`'s ratchet needs never reaches
+    this scheduler — 1 dormant, shared UL+DL mechanism.
+  - **No current scenario exercises the mechanism** (rows 21, 25a, 25b,
+    30): the UL GBR deficit's shared-LCG dedup (the H5 gap), the
+    `gbr_bytes_slot`/`has_pending_gbr` sub-mechanism and the `B`-floor
+    branch in UL grant sizing, and the DL post-grant deficit drain (needs
+    2+ GBR DL flows on one UE) — 4 dormant.
+  - **Integer-numerology math makes a truncation branch a no-op** (row
+    24): the deficit block's `window` ratio truncation is a no-op at
+    every real slot duration, exercised only by a synthetic 0.3 ms slot
+    in tests — 1 dormant.
+
+  13 dormant + 3 not-applicable across these 6 causes, by direct count
+  against the port-map — not reconciled to a prior "twelve" figure, which
+  came from a summary of a summary and has no independent authority over
+  counting the rows directly.
+
+  **Study 4 is out of scope for this commit and deferred to WP9** — see
+  the existing `[OPEN: WP9]` entry below (`f0ae919`): its N=2 scenario
+  would reproduce the hardware campaign's own null result for the
+  identical structural reason (`n_followers_need` capped at 1), not
+  produce a new finding.
 
 ---
 

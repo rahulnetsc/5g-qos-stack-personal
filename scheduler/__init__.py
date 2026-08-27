@@ -29,6 +29,7 @@ from .tier1 import (
 )
 from .two_tier import TwoTier
 from .config_loader import load_two_tier, load_two_tier_config
+from .reservation import Reservation
 
 __all__ = [
     "FlowConfig",
@@ -52,4 +53,5 @@ __all__ = [
     "TwoTier",
     "load_two_tier",
     "load_two_tier_config",
+    "Reservation",
 ]
