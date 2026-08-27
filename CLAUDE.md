@@ -169,10 +169,44 @@ PF arm.** `allocate()` schedules DL then UL each slot, updating the same
 slot depends on its UL grant history too. Confirmed via WP4: sweeping only
 `sr_period_slots` (UL-only) shifted PF's per-UE DL PRB counts while
 TwoTier's and RoundRobin's `dl_prb_utilization` stayed bit-for-bit
-identical. Not a bug, and not a Tier-1 boundary leak — don't "fix" it by
-splitting into per-direction rates — but expect PF-arm DL drift whenever a
-UL-only change lands, and check `pf.py` before assuming a DL mismatch
-means something crossed a scheduler boundary it shouldn't have.
+identical **for that specific sweep**. Not a bug, and not a Tier-1
+boundary leak — don't "fix" it by splitting into per-direction rates —
+but expect PF-arm DL drift whenever a UL-only change lands, and check
+`pf.py` before assuming a DL mismatch means something crossed a
+scheduler boundary it shouldn't have. **Not evidence that TwoTier (or
+any scheduler) is immune to cross-direction effects in general** — see
+the very next invariant below for a different, simulator-level mechanism
+(`HarqProcessPool.due_this_slot()`'s shared iteration order) that moved
+TwoTier's own UL numbers from a DL-only change.
+
+**`sim/harq.py::HarqProcessPool.due_this_slot()` iterates one shared
+dict across every (UE, direction) pool, in insertion order — a DL-only
+scheduling change can still shift UL HARQ outcomes for a different UE.**
+`_pools` lazily creates a `(ue_id, direction)` entry the first time that
+UE gets a grant in that direction; `due_this_slot()` returns every due
+process across every pool in that dict's iteration order, and
+`sim/driver.py`'s retransmission loop draws HARQ outcomes in exactly
+that order — `harq_rng_dl`/`harq_rng_ul` stay correctly separated
+per-direction (WP5's own fix), but *within* one direction, if a DL-only
+change reorders which UE gets its first grant earliest, the relative
+insertion order of `(ue_id, "UL")` keys among the `(other_ue, "DL")`
+keys they're interleaved with can shift too — reordering which UL UE's
+retry draws from `harq_rng_ul` first, giving different UEs different
+random values without any change to UL's own scheduling logic. Found
+scoping two-tier's Phase 2 commit 3 (`docs/phase2-plan.md`): a DL-only
+sort-tier change (`has_gbr`/`pdb_ms`, no UL code touched) moved
+`ul_prb_utilization` and per-UE UL delivered-bytes on 2 of 6 regression
+records, confirmed via direct trace (identical SNR, identical
+`_ul_rank_key` formula, but a real ~94-byte drain-amount divergence at
+the first affected UL grant, growing over the run) — not a bug, and not
+limited to two-tier: any scheduler is exposed the moment its own DL and
+UL grant timing for different UEs can vary independently. Don't "fix" by
+sorting `due_this_slot()`'s output (would silently change which UE's
+retry resolves first, a different behavior change, not a neutral one);
+expect small UL drift whenever a DL-only change lands (or vice versa)
+and confirm via a worktree-instrumented direct-cause trace before
+assuming a cross-direction mismatch means a scheduler boundary was
+crossed.
 
 **`sim/bsr.py`'s per-LCG array is frozen between BSRs — do not drain it on
 a grant, and do not resync it with the scalar `estimated_ul_buffer`.**

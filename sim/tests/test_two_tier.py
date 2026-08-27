@@ -1,30 +1,33 @@
-"""Phase 2, two-tier commit 1: scheduler/two_tier.py's rewrite skeleton.
+"""Phase 2, two-tier commits 1-3: scheduler/two_tier.py's rewrite.
 
-Scheduler protocol conformance, per-UE throughput EWMA (blanket decay,
-not candidacy-gated -- landing the corrected form from the start rather
-than reservation's own commit-1-through-10a path), a bootstrap PF
-coefficient as the only ranking criterion (explicitly NOT a ported
-mechanism -- see scheduler/two_tier.py's module docstring), no VQ, no UL
-floor, no Tier-1 solve, UL-then-DL per-slot order (fixed from the
-pre-rewrite file's own DL-then-UL bug).
+Commit 1: Scheduler protocol conformance, per-UE throughput EWMA
+(blanket decay, not candidacy-gated -- landing the corrected form from
+the start rather than reservation's own commit-1-through-10a path), a
+bootstrap PF coefficient as the only ranking criterion (explicitly NOT a
+ported mechanism -- see scheduler/two_tier.py's module docstring),
+UL-then-DL per-slot order (fixed from the pre-rewrite file's own
+DL-then-UL bug). Commit 2: the real Tier-1 SCA/GLPK-equivalent solve
+wired in, output unconsumed. Commit 3: DL's real 3-tier comparator
+(has_gbr -> pdb_ms -> the still-bootstrap coefficient) and UL's
+deliberately-revised 2-tier one (sched_inactive -> coefficient, no
+has_gbr/pdb_ms -- ground truth's own architectural reason: Tier-1's
+targets already carry the GBR guarantee into Tier-2's VQ deficit on UL).
+The VQ itself -- what actually replaces the bootstrap coefficient -- is
+commit 3a, not yet landed.
 
 See docs/phase2-plan.md's two-tier commit checklist and
-docs/oai-port-map.md's "Phase 2 -- two-tier" section (rows 35-38) for the
+docs/oai-port-map.md's "Phase 2 -- two-tier" section (rows 35-48) for the
 full citation/divergence detail.
 
-Predicted `--check` outcome, scored in docs/phase2-plan.md's own
-commit-1 entry: NOT inert -- all 6 surviving plain-`TwoTier` regression
-records move (SPS + old Tier-1 apparatus removal, the UL/DL ordering
-fix, and the corrected blanket-decay EWMA form, four confounded causes);
-the 8 `TwoTier-nomaxmin`/`TwoTier-adaptive` records disappear entirely
-(gbr_maxmin/gbr_penalty_lr no longer exist as constructor kwargs).
-Confirmed exactly: --check reported 6 changed values (all plain
-`TwoTier`), 8 removed keys, 0 added, 0 diffs on any PF/RoundRobin/
-Reservation record. harq_masked_flow_double_grant_count measured 0 on
-all three regression-corpus scenarios (SPS's backlog-pooling was the
-only source of that counter); cce_utilization rose on 5 of 6 records
-(the sixth, study1 mult1.0x, moved -0.0001 -- noise-level, not a
-counter-example).
+Commit 3's own predicted `--check` outcome, scored in docs/phase2-plan.md:
+DL confirmed to move (real, ranking-affecting tiers); UL predicted NOT to
+move, which was wrong on 2 of 6 records -- traced directly, not shrugged
+off, to sim/harq.py::HarqProcessPool.due_this_slot()'s shared,
+insertion-order-dependent iteration (CLAUDE.md's new invariant,
+docs/oai-port-map.md row 48) moving UL HARQ outcomes from a DL-only
+timing change, with _ul_rank_key and reported SNR confirmed
+byte-identical -- a real simulator-infrastructure property, not a bug in
+this commit's own tier logic.
 """
 
 from dataclasses import dataclass
@@ -63,9 +66,17 @@ class _FakeBuffers:
     def __init__(self) -> None:
         self._states: dict[tuple[int, int], _FakeBufferState] = {}
 
-    def set(self, ue_id: int, qfi: int, bytes_queued: int) -> None:
+    def set(
+        self, ue_id: int, qfi: int, bytes_queued: int,
+        estimated_ul_buffer_per_lcg: int | None = None,
+    ) -> None:
         self._states[(ue_id, qfi)] = _FakeBufferState(
             bytes_queued=bytes_queued, bytes_reported=bytes_queued,
+            estimated_ul_buffer_per_lcg=(
+                bytes_queued
+                if estimated_ul_buffer_per_lcg is None
+                else estimated_ul_buffer_per_lcg
+            ),
         )
 
     def state(self, ue_id: int, qfi: int) -> _FakeBufferState:
@@ -288,3 +299,166 @@ def test_dl_emits_one_allocation_per_filled_flow_with_real_qfi():
     out = sched.allocate(slot, buffers, channel)
     assert {a.qfi for a in out} == {1, 2}
     assert all(a.direction == "DL" and not a.ue_grant for a in out)
+
+
+# -- 6. commit 3: DL's has_gbr -> pdb_ms -> coefficient sort tiers ----------
+# ia_p5g_dl_cmp, ia_p5g_scheduler.c:1397-1411 -- the never-revised
+# lexicographic form. One fixture per tier boundary (reservation.py's own
+# commit-2 discipline), so a wrong tier ORDER fails distinguishably from
+# wrong tier CONTENT.
+
+
+def test_dl_has_gbr_tier_beats_the_coefficient_tiebreak():
+    """A GBR flow (real deficit, accumulates unconditionally on the very
+    first call -- has_gbr=True) must win the only grant over a non-GBR
+    flow with a far more favourable (lower) thr_ue coefficient."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 10.0    # would win on coef alone
+    sched._ue_state[2].dl_thr_bytes_per_slot = 1000.0  # would lose on coef alone
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=82, pdcch_cce_budget=48)
+    out = sched.allocate(slot, buffers, channel)
+
+    by_ue = {a.ue_id for a in out}
+    assert by_ue == {2}, f"GBR flow (has_gbr) should win despite a worse coefficient; got {by_ue}"
+
+
+def test_dl_pdb_tier_beats_the_coefficient_tiebreak_within_the_same_has_gbr_bucket():
+    """Two non-GBR flows (has_gbr=False for both) -- the one with the
+    tighter (lower) pdb_ms wins the only grant even with a worse
+    coefficient. Neither has been granted before, so remaining_pdb ==
+    pdb_ms exactly (no age truncation to reason about)."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=10.0),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF", pdb_ms=300.0),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 1000.0  # worse coef
+    sched._ue_state[2].dl_thr_bytes_per_slot = 10.0    # better coef
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=82, pdcch_cce_budget=48)
+    out = sched.allocate(slot, buffers, channel)
+
+    by_ue = {a.ue_id for a in out}
+    assert by_ue == {1}, f"tighter pdb_ms should win despite a worse coefficient; got {by_ue}"
+
+
+def test_dl_coefficient_remains_the_final_tiebreak_when_has_gbr_and_pdb_tie():
+    """Both non-GBR, both at the default pdb_ms (100.0, never granted
+    before -> tied remaining_pdb) -- the tiebreak falls through to the
+    bootstrap coefficient, same outcome as the pre-commit-3
+    coefficient-only test this one is adjacent to."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_thr_bytes_per_slot = 10.0
+    sched._ue_state[2].dl_thr_bytes_per_slot = 1000.0
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=6000)
+    buffers.set(2, 1, bytes_queued=6000)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=82, pdcch_cce_budget=48)
+    out = sched.allocate(slot, buffers, channel)
+
+    by_ue = {a.ue_id for a in out}
+    assert by_ue == {1}, f"lower-thr_ue UE1 should win the tiebreak; got {by_ue}"
+
+
+def test_dl_gbr_deficit_accumulates_unconditionally_even_without_backlog():
+    """gNB_scheduler_dlsch.c:381-388 -- deficit accumulation and
+    has_unfulfilled_gbr are UNCONDITIONAL for every GBR-configured flow,
+    unlike UL's per-LCG-estimate-gated form. Calling _dl_gbr_and_pdb for
+    a GBR flow with zero backlog must still report has_gbr=True."""
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()  # no backlog registered -- bytes_queued == 0
+
+    has_gbr, pdb_ms, _guaranteed, _be = sched._dl_gbr_and_pdb(1, buffers, slot_index=0)
+    assert has_gbr is True
+    # bytes_queued == 0 -> best_remaining_pdb stays the C's own 9999
+    # sentinel (never updated, since the update is gated on backlog).
+    assert pdb_ms == 9999
+
+
+def test_ul_gbr_deficit_gated_per_lcg_on_the_real_estimate():
+    """gNB_scheduler_ulsch.c:2210 -- gated per-LCG on
+    estimated_ul_buffer_per_lcg > 0, unlike DL's unconditional form. A
+    UL GBR flow with a zero per-LCG estimate must NOT accumulate a
+    deficit at all (has_gbr stays False)."""
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1_000_000, lcg=1,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=0, estimated_ul_buffer_per_lcg=0)
+
+    has_gbr, pdb_ms, _guaranteed, _be = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert has_gbr is False
+    assert pdb_ms == 9999
+    assert sched._ue_state[1].ul_lcg_deficit_bytes.get(1, 0) == 0
+
+
+# -- 7. commit 3: UL's sched_inactive tier is a documented, permanent no-op
+
+def test_ul_sched_inactive_never_fires_ranking_stays_coefficient_only():
+    """ia_p5g_ul_cmp's revised form (ia_p5g_scheduler.c:2092-2111):
+    sched_inactive is structurally absent here (no do_sched-equivalent
+    signal), so _ul_rank_key collapses to (1, -coef) for every
+    candidate, every time -- verified directly on the key, not inferred
+    from a ranking outcome that could coincidentally match either way."""
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="UL")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    from scheduler.two_tier import _Candidate
+
+    c = _Candidate(ue_id=1, flows=[flow], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=5.0)
+    assert sched._ul_rank_key(c) == (1, -5.0)
+    c.sched_inactive = True  # never actually set by this scheduler, but
+    assert sched._ul_rank_key(c) == (0, -5.0)  # the key itself is real
+
+
+# -- 8. commit 3: _dl_rank_key/_ul_rank_key stay independently sourced -----
+
+
+def test_dl_and_ul_rank_keys_stay_independently_sourced_not_deduped():
+    """Guards against a future refactor collapsing these into one shared
+    comparator just because their tuple shapes might look similar --
+    DL's real comparator has 3 tiers, UL's revised one has 2, and they
+    must stay textually and citationally distinct (same guard shape as
+    reservation.py's own test_ul_and_dl_rank_keys_stay_independently_
+    sourced_not_deduped)."""
+    import inspect
+
+    dl_src = inspect.getsource(TwoTier._dl_rank_key)
+    ul_src = inspect.getsource(TwoTier._ul_rank_key)
+    assert dl_src != ul_src
+    # Check the actual return expressions, not the prose (which explains
+    # UL's own has_gbr exclusion by name, a false positive for a bare
+    # substring check).
+    dl_return = dl_src.rsplit("return", 1)[-1]
+    ul_return = ul_src.rsplit("return", 1)[-1]
+    assert "candidate.has_gbr" in dl_return and "candidate.has_gbr" not in ul_return
+    assert "candidate.sched_inactive" in ul_return and "candidate.sched_inactive" not in dl_return

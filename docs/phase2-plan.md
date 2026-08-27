@@ -238,15 +238,31 @@ the current Python's `tier1_period_slots` default is now a third — see
 above). LCG 0 (SRB) excluded (`:3597`); `lcid = lcg + 3` mapping
 (`:3658`).
 
-**UE ranking metric composition**: DL is a pure VQ sum
-(`ia_p5g_dl_metric`, `:1896-1923`, `Σ vq_dl × spectral_eff` over active
-LCIDs). UL's actual comparator metric is richer than the header's
-documented `ia_p5g_ul_metric()` (a plain `Σ Q_g × SE`,
+**UE ranking metric composition — corrected and completed at two-tier
+commit 3, `docs/oai-port-map.md` rows 44-45; the paragraph below
+originally described only the coefficient formula, not the comparator
+each one sits inside, which turns out to be the more consequential
+fact.** DL's coefficient itself is a pure VQ sum (`ia_p5g_dl_metric`,
+`:1896-1923`, `Σ vq_dl × spectral_eff` over active LCIDs) — but it is
+only the **final tiebreak** of a 3-tier lexicographic comparator,
+`has_gbr → pdb_ms → coef` (`ia_p5g_dl_cmp`, `:1397-1411`), never
+revised from the original form. UL's actual comparator metric is richer
+than the header's documented `ia_p5g_ul_metric()` (a plain `Σ Q_g × SE`,
 `ia_p5g_scheduler.h:391`) — the real `ia_p5g_pf_ul()` computes
 `base_q + W·urgency^EXP·max(max_q,1)` inline (`:2891-2917`, constants
 `:443-444,478-481,501`), a deadline-urgency barrier term the exported
 stub doesn't reflect. Port the inline composite, not the documented
-stub.
+stub. **But UL's comparator (`ia_p5g_ul_cmp`, `:2112-2125`) is not
+DL's 3-tier form with a richer coefficient bolted on — it was
+*deliberately revised away* from that exact form**, down to
+`sched_inactive → coef` alone, and the C states the architectural
+reason directly (`:2092-2111`, quoted in full in port-map row 45):
+Tier-1's targets already encode the GBR guarantee, so Tier-2's own VQ
+deficit on UL already carries it, and a separate `has_gbr` tier would
+double-count it — the clearest statement of the two-tier scheduler's
+own design found anywhere in this port. DL keeps its separate tier
+only because DL's own coefficient never absorbed a GBR-carrying term
+the way UL's composite did.
 
 **UL service-interval floor** (`ia_p5g_ul_summary_t` struct,
 `:682-744`; constants `:80-107`): `theta = max(pdb_ms / 8 / slot_ms, 2)`
@@ -639,7 +655,8 @@ is the corpus-breaking commit, name it as such)
 |---|---|---|
 | 1 | **Landed.** Skeleton replacing SPS/shadow-split and the entire old Tier-1 apparatus (not just SPS/shadow-split — a VQ-less scheduler has nothing for a Tier-1 target to feed, restated scope, see commit's own message) with LCG-aggregate, UE-level ranking (D1) and no floor/VQ yet (plain PF-shaped fallback, explicitly NOT a ported mechanism — `docs/oai-port-map.md` row 35). Also fixed a real, live bug found verifying `gNB_scheduler.c:246,251` directly: the pre-rewrite file iterated `("DL","UL")`, the wrong order — corrected to UL-then-DL (row 38). Tagged pre-rewrite state as `phase2-pre-twotier-rewrite` (`dc1ab6a`). Deleted 24+6+1 tests whose mechanisms no longer exist (14 of the 24 in `test_smoke.py` permanently, with no successor — SPS entirely, plus the max-min/adaptive-penalty Tier-1 enhancements found to have no ground-truth citation, `README.md` §7); the rest restoration-mapped to specific future commits. Corrected the checklist's own figure while landing this: the corpus has **14** TwoTier-family records, not 16 (`regression/baseline_studies_1_3.json`, confirmed by reading the file directly) — 6 plain `TwoTier` (one per Study-1-mult/Study-2/Study-3) plus 8 `TwoTier-nomaxmin`/`TwoTier-adaptive` (Study 1 only, 4 mults × 2 variants), the latter no longer constructable once `gbr_maxmin`/`gbr_penalty_lr` are deleted kwargs — `scripts/scheduler_study.py`/`scripts/regression_corpus.py` edited to drop those two arms (Study 1: 5 scheduler arms → 3). Their pre-removal comparison is preserved in `docs/phase2-two-tier-delta.md` §1, captured before the arms were deleted. | **Not inert — confirmed exactly as predicted, precisely stated.** `--check`: 6 changed values (all plain `TwoTier`), 8 removed keys (the deleted variant arms), 0 added, 0 diffs on any PF/RoundRobin/Reservation record. `harq_masked_flow_double_grant_count` measured exactly 0 on all three regression-corpus scenarios for the new scheduler (SPS's backlog-pooling was the counter's only source — confirmed by direct measurement, not inferred). `cce_utilization` rose on 5 of 6 records; the sixth (`study1/overload_mult1.0`) moved −0.0001, resolved by direct instrumentation, not left unexplained: at this specific point, SPS was genuinely engaged (10/10 UEs held an SPS reservation, verified via a `phase2-pre-twotier-rewrite` worktree run), so the "removing the only zero-cost path raises CCE" mechanism is not inapplicable here — it held, but was offset by a second, correlated SPS-linked effect that also disappeared: the old scheduler wasted real (nonzero-CCE) *dynamic* grants that the driver then discarded as HARQ double-grants (`harq_masked_flow_double_grant_count`-adjacent — SPS's own non-destructive backlog pooling across a UE's SPS-eligible flows created dynamic-spillover races against an already-pending HARQ process). Measured directly (wrapping `scheduler.allocate()` and `Metrics.record_cce` separately in both the old worktree and the new run, not inferred): the old scheduler *emitted* 10,689 CCE-worth of grants but the driver only *applied* 10,370 — 319 CCE of scheduler effort was discarded as a double-grant, none of it real cost; the new scheduler's emitted and applied totals track much more closely (10,248 emitted vs. 10,355 applied, the small excess being ordinary HARQ-retransmission CCE, not double-grant waste, confirmed `harq_masked_flow_double_grant_count == 0` here). At this one heavily-overloaded operating point (GBR met only 1/10 pre-rewrite), the waste SPS's removal eliminated slightly outweighs the real dynamic-grant cost SPS's removal added, netting a near-zero, direction-flipped move — a second, verified mechanism dominating at the margin, not a failure of the first. Four confounded causes move the six surviving records (SPS removal, old-Tier-1 removal, the UL/DL ordering fix, the corrected blanket-decay EWMA form) — do not attribute any single observed metric movement to one cause alone from the aggregate `--check` numbers without a mechanism-isolated re-run; commits 2 onward will separate them naturally as each mechanism comes back individually. Full suite: 448 passed (440 + 8 new `test_two_tier.py` tests). |
 | 2 | **Landed.** Tier-1 SCA/GLPK-equivalent solver (`scipy.optimize.linprog`, D3 resolved — mirrors the C's own per-iteration plain-LP structure, not a single convex solve) at the corrected `tier1_period_s=0.1 ÷ slot_duration_s`-derived period, read directly from `ia_p5g_sca_solve` (`ia_p5g_scheduler.c:974-1103`), not from this document's own §2.1 summary. Confirmed, not merely suspected: no lexicographic two-phase structure, no max-min pre-stage, no adaptive penalty, no slicing, no hard-floor override — five ungrounded pre-Phase-2 mechanisms, permanent loss (`docs/oai-port-map.md` rows 39-40). A sixth, `demand_estimator="oracle"`, was optimistic rather than merely uncited — ground truth's demand is always a windowed-arrival measurement (row 42), DL raw / UL EWMA-smoothed, never a read of a flow's true configured rate. `capacity_safety_factor` resolved as real but fixed (`IA_P5G_TIER1_OVERHEAD_FACTOR=0.80`, row 43) — mechanism restored, old sweepable-knob test not. Weight-on-utility corrected from flow-class-based to priority-threshold-based (row 41). A capacity-discretization fork (whole-slot vs. symbol-granular) decided explicitly, not silently, in favor of ground truth's stricter whole-slot form for Tier-1 specifically, leaving the existing `grid_capacity_prbsym_per_sec` untouched for its other callers. `get_full_dl_slots_per_period`/`get_full_ul_slots_per_period` found in the full OAI checkout (`config.c:313-347`), not merely inferred from naming, confirming the whole-slot reading deliberately, not by default. **A genuine algorithmic finding made writing this commit's own tests, not assumed going in**: the SCA loop does not always converge to a smooth interior optimum — two flows sharing one capacity row at equal SE with comparable weighted coefficients cause `linprog`'s vertex solutions to oscillate, never satisfying the convergence tolerance, so `MAXITERS=150` halts mid-oscillation at a fully deterministic but non-closed-form point (`docs/oai-port-map.md` row 39, `scheduler/tier1.py::solve_tier1`'s own docstring). 11 of 15 real `test_smoke.py` tier1.py-dependent tests are permanent loss (7 no-ground-truth + 2 max-min + 1 max-min-only utility + 1 solver-independence, whose premise — swappable CVXPY backends — no longer applies); 2 rewritten against the new formulation, 1 unaffected (false-positive grep hit), 1 contingent-resolved (capacity helper). `scheduler/tier1.py` was **not** orphaned the way commit 1's docstring assumed — still imported by `scheduler/__init__.py` and `scripts/knapsack_diagnostic.py`; the latter is left untouched but flagged (`README.md` §8's new `[OPEN: PHASE2]` entry) since it will now `ImportError` and its own docstring's claim underpins a live `paper/main.tex` section whose empirical basis this commit's own top finding undercuts — a durable, out-of-simulator consequence, not a drive-by fix. | **Predicted zero `--check` movement** (Tier-1's output is computed and stored but consumed by nothing until commit 3's VQ lands) — the opposite framing from commit 1's "not inert." **Confirmed exactly, verified against commit 1's own output directly (not the frozen — and still uncaptured — pre-Phase-2 baseline file, which would show unrelated commit-1-vs-original diffs)**: a `phase2-pre-twotier-rewrite`-adjacent worktree at two-tier commit 1 (`80609f5`) captured its own regression baseline to a scratch path; `--check` against that scratch baseline from this commit's own code reports `OK — no drift beyond rel_tol=1e-06, abs_tol=1e-09` across all 20 records. Full suite: 439 passed (was 448 at commit 1 — net −9 from 11 deletions + 2 new capacity tests). **Framing for this commit's own message and for commit 8's delta table** (stated explicitly, not left implicit): this commit deletes several hundred lines of capability, but the pre-Phase-2 implementation was not a rough approximation of the deployed scheduler — it was a more elaborate scheduler solving a different and easier problem (perfect future demand, free knobs, extra protective staging), and five of its mechanisms have no counterpart in the deployed code at all. A simplification toward fidelity, not a capability regression. |
-| 3 | Windowed-ceiling VQ: DL arrival-delta (matches header) + UL's actual backlog-bound/catchup formula (does not match header — port the code). | UL-heavy scenarios' per-flow fairness/latency shift; DL comparatively stable (formula matches what stale-header intuition would already assume). |
+| 3 | **Landed, retitled.** Originally scoped as "windowed-ceiling VQ" — split into this row (the GBR-deficit/PDB sort tiers) and a new row **3a** (the VQ itself) once reading `ia_p5g_dl_cmp` directly (`ia_p5g_scheduler.c:1397-1411`) showed DL's real comparator is `has_gbr → pdb_ms → coef`, not the pure-VQ-sum ranking this document's own §2.1 described — a user decision, `docs/oai-port-map.md` rows 44-45 carry the full finding. DL kept the original 3-tier lexicographic form; UL was *deliberately revised away* from it (design-revision comment, `:2092-2111`, quoted in row 45) to `sched_inactive → coef` alone, since Tier-1's targets already encode the GBR guarantee so the VQ deficit already carries it on UL — the clearest architectural statement of the two-tier design found in this port so far, now also corrected into §2.1 below. This row ports the shared GBR-deficit/PDB-remaining computation (confirmed byte-identical, by diff, to `reservation.py`'s own already-fixed `_dl_gbr_and_pdb`/`_ul_gbr_and_pdb` — reused directly, not re-derived, row 46) and wires `has_gbr`/`pdb_ms` as real DL sort tiers; UL's own deficit tracking is built but not yet a sort tier (feeds commit 3a's urgency term instead). Rows 4-9 below are **not** renumbered (reservation's own 3a/4a/10a precedent) — cross-references to "commit 7"/"commit 8" elsewhere stay valid. | **DL confirmed exactly** (real, ranking-affecting tiers move `--check` on any GBR/PDB-diverse scenario). **UL prediction (\"should not move\") was wrong** — 2 of 6 records show real UL movement (`ul_prb_utilization`, per-UE UL bytes) despite `_ul_rank_key`/reported SNR confirmed byte-identical to commit 2. Traced directly (worktree-instrumented, not inferred) to `sim/harq.py::HarqProcessPool.due_this_slot()`'s insertion-order-dependent shared iteration across every `(UE, direction)` pool (`docs/oai-port-map.md` row 48, new `CLAUDE.md` invariant) — a pre-existing simulator property, not a bug in this commit's own tier logic, but a genuine miss on the stated prediction, recorded as such rather than silently corrected. |
+| 3a | **Not started.** Windowed-ceiling VQ: DL arrival-delta (matches header) + UL's actual backlog-bound/catchup formula (does not match header — port the code, `IA_P5G_VQ_UL_CATCHUP_N=5`). UL's real composite coefficient (`base_q + delay_w·urgency^delay_exp·max_q) × SE`, row 45's own `_delta` GBR-scaling term reading commit 3's `ul_lcg_deficit_bytes`) replaces the bootstrap placeholder entirely as `_ul_rank_key`'s sole ranking term; DL's VQ-sum × SE replaces the bootstrap placeholder as the *final tiebreak only*, since commit 3's `has_gbr`/`pdb_ms` tiers stay ahead of it. **Checkable prediction carried from commit 3, to be scored here**: if row 45's architectural claim is right, a UL GBR flow should be protected by the VQ deficit alone, no tier assisting — score this directly, not just cite the comment. | UL-heavy scenarios' per-flow fairness/latency shift; DL comparatively stable (formula matches what stale-header intuition would already assume) but no longer inert as commit 3's tiers already moved it. |
 | 4 | UL floor: fruitless-shift (16× cap, 500ms decay) + ADQ (8-grant trigger). Property tests: shift caps at exactly 4; ADQ fires at exactly 8, not 7 or 9. | Crumb-fraction metric and UL starvation-adjacent percentiles move; predict direction (starved UEs should show *improved* tail latency once floor logic is real, not absent). |
 | 5 | DL LCP: single greedy DRB pass + SRB-exempt fill (the corrected, non-two-pass structure — see §6 Flags for the README correction this implies). | DL per-flow byte-fill patterns shift modestly; SRB-adjacent flows (if any in-corpus) most affected. |
 | 6 | MCS-selection call site + OLLA follow-on (D2) — reuse the shared helper from reservation commits 8/9 if the staircase/ratchet wiring is scheduler-agnostic. | Per D2(i): predicted drift for `periodic_control`/`condition_monitor` flows, checked against actual output. Run D2(ii)'s compounding test; record result. |
@@ -657,26 +674,36 @@ tables (two-tier commits 1, 2, 4, 6); add to this subsection as each
 commit lands, with actual-vs-predicted scored the way every prior WP's
 "Update, WP4"/"Confirmed exactly"-style entries do.
 
-**Forward note for commit 3, written at commit 2's own close, not
-retroactively**: commit 3 (the VQ) carries **three** confounded sources
-of possible `--check` movement, not one, and should predict with all
-three in mind rather than attributing every observed diff to the VQ port
-by default — (1) the VQ port itself, the commit's own nominal subject;
-(2) the first real end-to-end exercise of Tier-1's SCA solve, since
-nothing consumes `_targets_bps` before commit 3 — numerical behavior
-under load, convergence across up to 150 iterations, and whether
-`scipy.optimize.linprog` behaves at the corpus's actual scale the way
-small hand-picked unit-test cases suggest are all genuinely untested
-until commit 3 runs it for real; (3) commit 2's own found vertex-
-oscillation property (`docs/oai-port-map.md` row 39) — any scenario with
-two same-direction, equal-(or near-equal-)SE flows and comparable
-weighted coefficients competing for one Tier-1 capacity row will not
-converge to a smooth target split, landing instead at whatever the
-150-iteration damped oscillation produces; if that split now feeds a VQ
-ceiling, an unexpected `--check` diff could be this, not a VQ bug.
-Disentangling which of the three explains a given movement may need the
-same kind of mechanism-isolated re-run this session used for commit 1's
-own `cce_utilization` anomaly (worktree-based old-vs-new instrumentation),
+**Forward note for commit 3a (the VQ; renamed from a bare "commit 3"
+once commit 3 itself split into the tiers, see that row above), written
+at commit 3's own close, not retroactively**: commit 3a carries **four**
+confounded sources of possible `--check` movement, not one, and should
+predict with all four in mind rather than attributing every observed
+diff to the VQ port by default — (1) the VQ port itself, the commit's
+own nominal subject; (2) the first real end-to-end exercise of Tier-1's
+SCA solve, since nothing consumes `_targets_bps` before commit 3a --
+numerical behavior under load, convergence across up to 150 iterations,
+and whether `scipy.optimize.linprog` behaves at the corpus's actual
+scale the way small hand-picked unit-test cases suggest are all
+genuinely untested until commit 3a runs it for real; (3) commit 2's own
+found vertex-oscillation property (`docs/oai-port-map.md` row 39) — any
+scenario with two same-direction, equal-(or near-equal-)SE flows and
+comparable weighted coefficients competing for one Tier-1 capacity row
+will not converge to a smooth target split, landing instead at whatever
+the 150-iteration damped oscillation produces; if that split now feeds a
+VQ ceiling, an unexpected `--check` diff could be this, not a VQ bug;
+(4) **new, found at commit 3 itself**: `sim/harq.py::HarqProcessPool.
+due_this_slot()`'s shared, insertion-order-dependent iteration
+(`docs/oai-port-map.md` row 48, `CLAUDE.md`'s new invariant) — commit 3
+already confirmed a DL-only change can move UL numbers through this
+pre-existing simulator property with zero UL logic involved, so commit
+3a's own DL-vs-UL changes (now landing simultaneously, not staggered
+the way commit 3's DL-only change was) should expect this mechanism to
+contribute too, on top of the other three. Disentangling which of the
+four explains a given movement may need the same kind of
+mechanism-isolated re-run this session used for commit 1's own
+`cce_utilization` anomaly and commit 3's own UL-movement finding
+(worktree-based old-vs-new instrumentation),
 not an assumption either way.
 
 ---
@@ -742,10 +769,13 @@ promote any of them as a side effect of this work.
 
 Reservation commits 1, 2, 3, 3a, 4a, 4, 5, 6, 7, 8, 9, 10, 10a and 11
 landed — reservation's Phase 2 port is complete. Two-tier commits 1
-(the corpus-breaking skeleton) and 2 (Tier-1 SCA/GLPK-equivalent solve)
-have now landed too — see this table's own row 1/row 2 entries above for
-what each did and confirmed; commits 3-9 not started. Two user decisions
-(D1, D2) obtained directly and recorded above before any code, matching
+(the corpus-breaking skeleton), 2 (Tier-1 SCA/GLPK-equivalent solve),
+and 3 (the GBR-deficit/PDB-remaining sort tiers -- split from a bare
+"commit 3" originally scoped as the VQ, see that row's own entry above)
+have now landed too — see this table's own row 1/row 2/row 3 entries
+above for what each did and confirmed; commit 3a (the VQ, newly
+inserted) and commits 4-9 not started. Two user decisions (D1, D2)
+obtained directly and recorded above before any code, matching
 `docs/wp-join-plan.md`'s D0a/D0b precedent. Sequencing (D4): reservation
 first, two-tier second.
 
@@ -768,7 +798,47 @@ form) ground truth never had (`README.md` §8's new `[OPEN: PHASE2]`
 entry). Predicted and confirmed exactly: zero `--check` movement,
 verified against commit 1's own output directly via a scratch-baseline
 worktree capture, since Tier-1's target rates are computed and stored
-but consumed by nothing until commit 3's VQ lands.
+but consumed by nothing until commit 3a's VQ lands.
+
+Commit 3 itself began as a routine question — does the VQ prepend to
+`_rank_key` or replace it — and reading `ia_p5g_dl_cmp` directly to
+answer it found DL's real comparator is a 3-tier lexicographic
+structure (`has_gbr → pdb_ms → coef`) this document's own §2.1 never
+stated, and that UL's comparator was *deliberately revised away* from
+that same form for a documented architectural reason (Tier-1's targets
+already carry the GBR guarantee into Tier-2's VQ deficit on UL, so a
+separate tier would double-count it) — the clearest statement of the
+two-tier scheduler's own design found in this port to date, now folded
+into §2.1 itself rather than left standing next to source that
+contradicted it. The user's decision split the originally-single
+"commit 3 = VQ" scope into this commit (the tiers) and a new commit 3a
+(the VQ), landing the tiers first since they are the *higher*-precedence
+terms in DL's real comparator and the VQ is only ever a tiebreak there —
+before this split, a VQ landing under nothing could not have
+demonstrated its own mechanism working. The underlying GBR-deficit/PDB
+computation is confirmed byte-identical, by direct diff, to
+`reservation.py`'s own already-fixed `_dl_gbr_and_pdb`/`_ul_gbr_and_pdb`
+— reused directly rather than re-derived, closing that research question
+before it could reopen bugs reservation's own port already found and
+fixed. The `"unchanged from original pf_ul()"` comment was checked, not
+trusted, and — a first for this port's five comment-vs-code checks —
+confirmed correct for what it specifically describes, though narrower in
+scope than the block it sits in.
+
+**Predicted DL-only movement; confirmed DL moved, but UL moved too, on 2
+of 6 records — a real miss on the stated prediction, investigated
+directly rather than absorbed as noise.** Traced (not inferred) to
+`sim/harq.py::HarqProcessPool.due_this_slot()`'s shared, insertion-
+order-dependent iteration across every `(UE, direction)` pool — a
+DL-only grant-timing change can shift which UL UE's retransmission
+draws first from the shared `harq_rng_ul` stream, with zero change to UL
+scheduling logic itself (`_ul_rank_key` and reported SNR confirmed
+byte-identical at the point checked). A genuine, now-documented property
+of this simulator's own pre-existing infrastructure (`CLAUDE.md`'s new
+invariant, `docs/oai-port-map.md` row 48) — not a bug in this commit,
+but a real cross-direction sensitivity distinct from (and a sibling of)
+the already-documented `pf.py::_r_avg` finding, flagged forward as a
+fourth confounded risk source for commit 3a.
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/
