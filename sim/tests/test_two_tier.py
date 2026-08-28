@@ -87,6 +87,7 @@ from scheduler.interfaces import Allocation
 from scheduler.two_tier import (
     TwoTier,
     _Candidate,
+    _OLLA_OFFSET,
     _PF_COEF_HYPOTHETICAL_SYMBOLS,
     _TIER1_PERIOD_S,
     _VQ_UL_CATCHUP_N,
@@ -1677,3 +1678,145 @@ def test_latency_bound_two_tier_protects_deadlines():
     assert tt_worst_p99 <= pdb_ms, (
         f"TwoTier worst p99 HoL {tt_worst_p99} ms exceeds PDB {pdb_ms} ms"
     )
+
+
+# -- 22. commit 6: MCS-selection call site + OLLA follow-on (D2) -----------
+
+
+def test_olla_offset_is_pinned_at_zero():
+    """_OLLA_OFFSET == 0, provably given this scheduler's available
+    inputs (module docstring), matching reservation.py's own commit-9
+    disposition -- required for a two-tier-vs-reservation comparison to
+    measure scheduling policy rather than link adaptation."""
+    assert _OLLA_OFFSET == 0
+
+
+def test_bits_per_prb_for_mcs_matches_bits_per_prb_via_mcs_index_for_snr_at_every_staircase_boundary():
+    """The equivalence this commit's whole zero-movement prediction rests
+    on: with _OLLA_OFFSET pinned at 0, bits_per_prb_for_mcs(mcs_index_
+    for_snr(snr), symbols) must equal bits_per_prb(snr, symbols) exactly,
+    for any snr the viability gate actually lets through (i.e. at or
+    above the lowest table threshold) -- this is WHY grant sizing
+    changing which function computes it doesn't move any existing
+    assertion. Swept across every _MCS_TABLE threshold and just above
+    each one (not sampled at a few midpoints, per the approved plan's
+    own instruction) -- a boundary is exactly where a two-path lookup
+    would diverge if it does at all: an off-by-one in the staircase
+    walk, or a rounding difference between how the index is derived and
+    how the threshold walk terminates, would show up here first.
+
+    Below the lowest threshold the two paths are NOT expected to agree
+    -- bits_per_prb signals "untransmittable" ((0, 1.0)) while
+    bits_per_prb_for_mcs(mcs_index_for_snr(snr), ...) would return the
+    FLOOR row's real values (mcs_index_for_snr floors at 0 rather than
+    "no viable MCS", by its own documented design). That divergence is
+    exactly why the viability gate stays keyed on the raw walk and
+    never lets a below-threshold candidate reach bits_per_prb_for_mcs
+    at all (module docstring) -- confirmed here as a real divergence,
+    not assumed inert, so the gate's necessity is demonstrated rather
+    than merely asserted.
+    """
+    from scheduler import link
+
+    thresholds = [row[0] for row in link._MCS_TABLE]
+    in_range_snrs = [thresholds[-1] + 20.0]  # well above the highest
+    for t in thresholds:
+        in_range_snrs.append(t)  # exactly at this threshold
+        in_range_snrs.append(t + 0.01)  # just above this threshold
+    # every threshold but the lowest is also "just below the NEXT one"
+    for t in thresholds[1:]:
+        in_range_snrs.append(t - 0.01)
+
+    for snr in in_range_snrs:
+        for symbols in (10, 14):
+            direct = link.bits_per_prb(snr, symbols=symbols)
+            via_index = link.bits_per_prb_for_mcs(
+                link.mcs_index_for_snr(snr) + _OLLA_OFFSET, symbols=symbols
+            )
+            assert direct == via_index, (
+                f"diverges at snr={snr}, symbols={symbols}: "
+                f"direct={direct} via_index={via_index}"
+            )
+
+    # Below the lowest threshold: a real, expected divergence, not tested
+    # as an oversight -- this is exactly what the viability gate exists
+    # to route around (see docstring above).
+    below = thresholds[0] - 0.01
+    direct_below = link.bits_per_prb(below, symbols=14)
+    via_index_below = link.bits_per_prb_for_mcs(
+        link.mcs_index_for_snr(below) + _OLLA_OFFSET, symbols=14
+    )
+    assert direct_below == (0, 1.0)
+    assert direct_below != via_index_below
+
+
+def test_mcs_index_persisted_at_candidate_build_time_both_directions():
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL"),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=1),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000)
+    buffers.set(1, 2, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+    channel = _FakeChannel({1: 20.0})
+
+    from scheduler.link import mcs_index_for_snr
+    expected = mcs_index_for_snr(20.0) + _OLLA_OFFSET
+
+    dl_slot = _FakeSlot(dl_symbols=14, ul_symbols=0)
+    sched.allocate(dl_slot, buffers, channel)
+    assert sched._ue_state[1].dl_mcs_index == expected
+
+    ul_slot = _FakeSlot(dl_symbols=0, ul_symbols=14)
+    sched.allocate(ul_slot, buffers, channel)
+    assert sched._ue_state[1].ul_mcs_index == expected
+
+
+def test_grant_sizing_reads_the_persisted_mcs_index_not_a_fresh_snr_pick():
+    """Verified to actually fail under a simulated reversion (monkeypatch
+    bits_per_prb_for_mcs to a rate the real table could never produce at
+    this SNR, confirm the emitted grant reflects it) -- the same standard
+    commits 4/5's own discriminating tests are held to."""
+    import scheduler.two_tier as two_tier_module
+
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100_000)
+    channel = _FakeChannel({1: 20.0})
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=50)
+
+    orig = two_tier_module.bits_per_prb_for_mcs
+    try:
+        two_tier_module.bits_per_prb_for_mcs = lambda mcs_index, symbols=14: (
+            999_999,
+            0.0,
+        )
+        out = sched.allocate(slot, buffers, channel)
+        assert out[0].bytes_capacity > 0
+        # A rate the real table's top row (index 11, se=7.5) could never
+        # reach at 14 symbols confirms grant sizing actually read the
+        # monkeypatched path, not a cached/independent SNR-driven value.
+        assert out[0].bytes_capacity > (int(7.5 * 12 * 14) // 8) * 50
+    finally:
+        two_tier_module.bits_per_prb_for_mcs = orig
+
+
+def test_viability_gate_stays_keyed_on_raw_snr_walk_not_persisted_index():
+    """A below-lowest-threshold SNR must still exclude the UE -- if the
+    gate were routed through mcs_index_for_snr (which floors at 0
+    instead of signaling "no viable MCS"), an arbitrarily-low-SNR UE
+    would wrongly look transmittable."""
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000)
+    channel = _FakeChannel({1: -50.0})  # well below the lowest threshold
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0)
+
+    out = sched.allocate(slot, buffers, channel)
+    assert out == []

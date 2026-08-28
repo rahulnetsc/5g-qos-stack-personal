@@ -34,14 +34,90 @@ commit removed them from the live scheduler.
 Explicitly NOT here yet, each landing in its own later commit: the
 PHR-based PRB ceiling (structurally out of scope entirely -- not
 merely deferred, see commit 4a's own module-docstring section below),
-MCS selection via OLLA (commit 6), and a re-port of
-``reset_ue``/``SchedulerContextReset`` against the new field layout
-(commit 7) -- this class implements no ``reset_ue`` at all until then;
-``sim/driver.py`` discovers it via ``getattr(scheduler, "reset_ue",
-None)``, so its absence simply means TwoTier is treated like PF (no
-context reset) in the interim, not an oversight.
+and a re-port of ``reset_ue``/``SchedulerContextReset`` against the new
+field layout (commit 7) -- this class implements no ``reset_ue`` at all
+until then; ``sim/driver.py`` discovers it via ``getattr(scheduler,
+"reset_ue", None)``, so its absence simply means TwoTier is treated
+like PF (no context reset) in the interim, not an oversight.
 
-**Commit 5 (this commit) lands the post-grant GBR-deficit drain, in
+**Commit 6 (this commit) lands MCS-selection call site + OLLA
+follow-on (D2), one commit not two -- unlike ``reservation.py``'s own
+commits 8/9, which split BECAUSE landing commit 8 didn't yet know
+whether the ratchet would prove reachable. That uncertainty is already
+resolved by the time this commit starts (see below), so there is
+nothing left to stage across two commits.** A persistent per-UE-
+per-direction MCS index (``_UeState.ul_mcs_index``/``dl_mcs_index``)
+now drives grant sizing, via ``scheduler/link.py``'s already-shared
+``mcs_index_for_snr``/``bits_per_prb_for_mcs`` -- confirmed genuinely
+scheduler-agnostic this commit (free module functions, no
+``reservation.py`` coupling), not assumed from ``docs/phase2-plan.md``
+row 6's own forward note.
+
+**This commit carries a hard constraint no prior two-tier commit has
+had: whatever disposition lands must MATCH ``reservation.py``'s, or a
+two-tier-vs-reservation comparison would measure link adaptation
+instead of scheduling policy.** ``reservation.py``'s own commit 9
+proved its OLLA offset is 0 -- ``get_mcs_from_bler``'s own trigger
+(``NR_mac_dir_stats_t.rounds[0]``/``[1]``) is incremented at grant-
+finalization by the SAME component that issues both new-tx and retry
+grants, a symmetry WP5 Decision 4 breaks (retries never reach
+``Scheduler.allocate()``). **Confirmed here, independently, against
+two-tier's own C, not merely cited from reservation's identical
+finding**: ``oai-branches/two-tier/gNB_scheduler_primitives.c`` is
+byte-identical to reservation's copy (``get_mcs_from_bler`` is the
+literal same function); two-tier's own ``ia_p5g_scheduler.c`` has the
+identical ``bo->harq_round_max == 1`` call-site gate at both its DL
+(``:1526-1536``) and UL (``:2540-2552``) blocks; the ``rounds[]``
+increment sites (``UE->mac_stats.ul.rounds[cur_harq->round]++``/
+``.dl.rounds[harq->round]++``) live in two-tier's OWN ``post_process_
+ulsch``/``_dlsch`` (``gNB_scheduler_ulsch.c:2724``, already fully read
+and ported at commit 5; ``_dlsch.c:1168``). Since WP5 Decision 4 is a
+simulator-architecture fact, not a scheduler-specific one, the
+identical gap applies: ``_OLLA_OFFSET = 0`` here for the same reason,
+not merely because reservation's is.
+
+**D2(i)/(ii)/(iii) are blocked here for the identical reason
+reservation's own commit 9 already found -- the D2 decision record's
+own checklist does not survive contact with ground truth, a second
+time.** D2(i) (predict drift for ``periodic_control``/
+``condition_monitor`` flows) has nothing to predict -- the offset is 0
+regardless of flow kind. D2(ii) (the compounding-vs-coincidence test)
+needs a live ratchet to produce the degradation it compares; none
+exists. D2(iii) (flip ``README.md`` sec8's OLLA entry to
+``[RESOLVED]``) -- reservation's own commit 9 retagged it
+``[OPEN: PHASE2]`` to ``[OPEN: WP9]`` instead (the ``sim``/``scheduler``
+boundary question stays open, deferred until a live call site exists);
+same disposition here, the existing entry updated in place rather than
+flipped or duplicated.
+
+**The below-lowest-MCS-threshold viability gate stays keyed on the raw
+SNR walk (``bits_per_prb``), not the persisted MCS index** --
+``mcs_index_for_snr`` floors at index 0 rather than signaling "no
+viable MCS" (its own documented convention: a persisted field must
+always be a concrete int), so routing the gate through it would
+silently make an arbitrarily-low-SNR UE look transmittable. Same
+disposition ``reservation.py``'s own commit 9 already landed.
+
+**Row 6's own "reuse the shared helper... if scheduler-agnostic"
+forward note held under check -- the first of three checked in this
+port to hold, not a pattern of failure.** `_dl_stamp`'s stale citation
+(commit 3a) and port-map row 46's "reused directly" claim (commit 4b)
+were both wrong; this one wasn't. The invariant is "verify before
+executing," not "such notes are unreliable" -- checking is cheap and
+the outcome isn't predictable in advance, which is exactly why all
+three needed checking regardless of how the first two turned out.
+
+**Predicted, and confirmed by direct proof, not just by ``--check``
+staying clean: zero movement, the same shape as reservation's own
+commit 9 (its first correctly-predicted-inert result in that
+lineage).** `bits_per_prb_for_mcs(mcs_index_for_snr(snr), symbols)` is
+numerically identical to `bits_per_prb(snr, symbols)` at every point on
+the staircase when `_OLLA_OFFSET == 0` -- proven by a dedicated
+boundary-by-boundary test (every threshold, and just below each one),
+not sampled at a few midpoints, since a boundary is exactly where a
+two-path lookup would diverge if it does at all.
+
+**Commit 5 (already landed) lands the post-grant GBR-deficit drain, in
 both directions, plus the real DL LCP fill -- closing the "joint
 VQ-correction commit" 3a's own docstring flagged.** Neither direction's
 deficit (``ul_lcg_deficit_bytes``/``dl_flow_deficit_bytes``) had ever
@@ -610,7 +686,12 @@ from dataclasses import dataclass, field
 
 from .flow import FlowConfig
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
-from .link import bits_per_prb, cce_aggregation_level
+from .link import (
+    bits_per_prb,
+    bits_per_prb_for_mcs,
+    cce_aggregation_level,
+    mcs_index_for_snr,
+)
 from .tier1 import solve_tier1
 
 # ia_p5g_scheduler.c:74-76 -- the deployed macro, not ia_p5g_scheduler.h's
@@ -651,6 +732,27 @@ _PDB_FALLBACK_MS = 300
 # _update_vq_ul's own docstring) -- NOT the arrival-delta form the
 # module's own header describes.
 _VQ_UL_CATCHUP_N = 5
+
+# Commit 6 (D2(b)) -- OLLA's offset from the instantaneous MCS pick
+# (mcs_index_for_snr), provably 0 given this scheduler's available
+# inputs, not merely a placeholder. get_mcs_from_bler's own trigger
+# (NR_mac_dir_stats_t.rounds[0]/[1]) is incremented at grant-
+# finalization by the SAME component that issues both new-tx and retry
+# grants (post_process_ulsch:2724/post_process_dlsch:1168, two-tier's
+# own files) -- a symmetry this simulator's WP5 Decision 4 breaks
+# (retransmission scheduling moved entirely to sim/driver.py's HARQ
+# seam, never reaching Scheduler.allocate()). With round-1 telemetry
+# structurally unobservable, the C's own bler ratchet clamps at
+# min_mcs from the first update -- offset = mcs - min_mcs == 0,
+# unconditionally, forever, fully determined without executing
+# sim/olla.py::update_mcs_from_bler. Confirmed independently against
+# two-tier's own C this commit (byte-identical gNB_scheduler_
+# primitives.c, byte-identical bo->harq_round_max call-site gate in
+# ia_p5g_scheduler.c's own DL/UL blocks) -- the identical disposition
+# reservation.py's own commit 9 already landed and cited here, not
+# re-derived, since the underlying argument (a sim/driver.py-level
+# fact, not a scheduling-policy one) is the same for both schedulers.
+_OLLA_OFFSET = 0
 
 # ia_p5g_scheduler.c:443-444,478-481,501 -- UL's composite-coefficient
 # urgency term (barrier function + priority weight + GBR-deficit floor).
@@ -714,6 +816,13 @@ class _UeState:
     dl_flow_last_grant_slot: dict[int, int] = field(default_factory=dict)
     vq_dl: dict[int, float] = field(default_factory=dict)
     vq_ul: dict[int, float] = field(default_factory=dict)
+    # Commit 6 (D2(a)) -- a persistent per-UE-per-direction MCS index,
+    # mirroring reservation.py's own _UeState fields (same shape, same
+    # ground truth -- gNB_scheduler_primitives.c confirmed byte-identical
+    # between branches). Link adaptation had no stored home anywhere in
+    # this scheduler before this.
+    ul_mcs_index: int | None = None
+    dl_mcs_index: int | None = None
     floor_rx_lastseen: int = 0
     floor_last_move_slot: int | None = None
     floor_alive_slot: int | None = None
@@ -994,14 +1103,39 @@ class TwoTier:
             state = self._ue_state[ue_id]
 
             snr = channel.get_reported_snr_db(ue_id)
-            bits_per_rb, bler = bits_per_prb(snr, symbols=symbols)
-            if bits_per_rb <= 0:
+            # Below-lowest-MCS-threshold viability gate -- deliberately
+            # stays keyed on the raw SNR walk (bits_per_prb), not the
+            # persisted MCS index below: mcs_index_for_snr floors at 0
+            # rather than signaling "no viable MCS" (its own documented
+            # convention, a persisted field must always be a concrete
+            # int), so routing this gate through it would silently make
+            # an arbitrarily-low-SNR UE look transmittable. Same
+            # disposition reservation.py's own commit 9 already landed.
+            if bits_per_prb(snr, symbols=symbols)[0] <= 0:
                 continue
+
+            # Commit 6 (D2(a)/D2(b)): a persistent per-UE-per-direction
+            # MCS index now drives sizing, matching ground truth's own
+            # selected_mcs (gNB_scheduler_{ul,dl}sch.c). _OLLA_OFFSET is
+            # provably 0 given this scheduler's available inputs, not
+            # merely defaulted -- module docstring's own section, and
+            # confirmed independently against two-tier's own C, not
+            # merely cited from reservation.py's identical finding.
+            mcs_index = mcs_index_for_snr(snr) + _OLLA_OFFSET
+            if direction == "UL":
+                state.ul_mcs_index = mcs_index
+            else:
+                state.dl_mcs_index = mcs_index
+            bits_per_rb, bler = bits_per_prb_for_mcs(mcs_index, symbols=symbols)
 
             # Real spectral-efficiency factor -- see module docstring's
             # _PF_COEF_HYPOTHETICAL_SYMBOLS note (ia_p5g_scheduler.c:1540,
-            # :2707).
-            hyp_bits, _ = bits_per_prb(snr, symbols=_PF_COEF_HYPOTHETICAL_SYMBOLS)
+            # :2707). Ground truth's selected_mcs feeds both this
+            # hypothetical TBS and the real grant's TBS (row 15) -- reads
+            # the same persisted index, not a fresh SNR pick.
+            hyp_bits, _ = bits_per_prb_for_mcs(
+                mcs_index, symbols=_PF_COEF_HYPOTHETICAL_SYMBOLS
+            )
             hyp_tbs_bytes = hyp_bits // 8
 
             candidate = _Candidate(

@@ -1015,12 +1015,19 @@ these five, add a new tag rather than forcing it into an existing one.
   `scheduler` boundary question is deferred, not resolved** — it becomes
   live only if retry telemetry ever reaches `allocate()`, e.g. via a
   `Scheduler`-protocol extension analogous to `SchedulerContextReset`.
-  **Two-tier's own future OLLA commit hits the identical wall**: this is
-  a property of WP5 Decision 4, not of reservation's scheduling policy,
-  so whatever disposition eventually unblocks this must land identically
-  on both arms, or a two-tier-vs-reservation comparison would measure
-  "one arm has OLLA, one doesn't" rather than a real scheduling
-  difference.
+  **Confirmed landed, two-tier's own OLLA commit (6) hit the identical
+  wall — checked directly against two-tier's own C, not assumed to
+  transfer from this entry's own forward claim.** `oai-branches/
+  two-tier/gNB_scheduler_primitives.c` is byte-identical to
+  reservation's copy (`get_mcs_from_bler` is the literal same
+  function); `ia_p5g_scheduler.c`'s own DL/UL blocks have the identical
+  `bo->harq_round_max == 1` call-site gate; the `rounds[]` increment
+  sites live in two-tier's own `post_process_ulsch`/`post_process_
+  dlsch`, structurally identical to reservation's. `_OLLA_OFFSET = 0`
+  landed there too, for the same reason, confirmed rather than merely
+  matched. Both arms now carry the same disposition, so a two-tier-vs-
+  reservation comparison measures scheduling policy, not "one arm has
+  OLLA, one doesn't."
 
   **Original concern, for history — resolved by commits 8/9's design, not
   by this new blocker's absence:** real hardware's `get_mcs_from_bler`
@@ -1041,7 +1048,10 @@ these five, add a new tag rather than forcing it into an existing one.
   effect) is coincidental co-occurrence; supra-additive degradation is a
   genuine interaction worth naming as such, rather than three items
   (this one, WP4's load-inversion result, the crumb-fraction shortfall)
-  that only rhyme. Full method in `docs/wp5-plan.md` commit 6.
+  that only rhyme. Full method in `docs/wp5-plan.md` commit 6. **Stays
+  blocked for two-tier's own OLLA commit too, same reason** — no live
+  ratchet exists on either arm to produce the degradation this test
+  would compare.
 - `[OPEN: PHASE2]` **Reservation's "liveness" sort tiers — UL's tiers 2
   (`liveness`) and 4 (`sched_inactive`-last), and DL's tier 2
   (`liveness`, TA-pending) — all need a signal the `Scheduler` protocol

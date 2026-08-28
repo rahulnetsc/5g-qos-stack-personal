@@ -714,7 +714,7 @@ is the corpus-breaking commit, name it as such)
 | 4a | **Landed.** UL floor's grant-sizing bypass: FIX-2 (`gbr_below`, the GBR-PRB-reserve cap — a general anti-monopolization safeguard on every UL DATA-class grant, not floor-specific, `docs/oai-port-map.md` row 60) and the floor's own uncapped-to-`max_rbSize` sizing (row 62), replacing commit 4's fixed `min_rb` rescue grant. **Confirmed NOT the same shape as `reservation.py`'s own UL follower budget** — two real structural differences (baseline: remaining-PRB-count vs. static `bwp_size`; scope: GBR-specific vs. any-needy-follower), not a naming coincidence (row 60's own Divergence cell). PHR-based capping confirmed structurally out of scope entirely, same disposition `reservation.py`'s own commit 4a already recorded for the identical connection point (row 63). The `B_eff` deficit-accumulated grant-sizing target is deliberately NOT built here — named as its own commit, 4b, per user decision (row 64) — since `ul_total_target_bytes` is real and GFBR-exercised on this corpus, unlike everything actually built in this commit. | **Predicted zero movement, on two independent confirmed grounds, stated before running**: (1) the floor's own sizing change is gated on `floor_fire`, confirmed never to fire on this corpus (commit 4's own result); (2) `gbr_below`'s reserve is gated on `gbr_bytes_slot > 0`, which never fires either — `mfbr_bps` is never configured on any flow in any scenario in this repo, the identical fact `reservation.py`'s own already-landed `gbr_bytes_slot` found for the same quantity (`docs/oai-port-map.md` row 61). **Confirmed exactly**: `--check` against a commit-4 worktree baseline reports `OK — no drift` across all 20 records — every mechanism actually built in this commit is inert on the current corpus by construction, not by coincidence, a repeat of commit 4's own "predicted inert, confirmed inert" result on different (but related) grounds. Full suite: 476 passed (6 new tests). |
 | 4b | **Landed.** `B_eff`, the deficit-accumulated UL grant-sizing target, wired into ordinary (non-floor-fired) DATA sizing (`docs/oai-port-map.md` row 64). **Row 46's own flag did not hold, confirmed by direct read**: `ul_total_target_bytes` is `_ul_gbr_and_pdb`'s own third accumulator, not `guaranteed_bytes + be_bytes`'s sum — the divergence is `be_bytes`'s own GBR-LCG overflow term, which `ul_total_target_bytes` excludes (row 65, this port's second self-inflicted finding, a new `CLAUDE.md` invariant). **`reservation.py`'s own `_ul_grant_target` confirmed NOT a template** — a genuine sum in a different C file, plus an extra `has_srb`-cap step two-tier's own `B_eff` lacks (row 66); D1 (PRB-vs-bytes sizing) transferred directly regardless. | **Predicted movement, and it moved — scored, not assumed.** `study1`/factory_robots (GBR): moved, the GFBR mechanism. `study2`/sensor_dense (0 GBR): also moved, confirmed traced to the non-GBR frozen-BSR mechanism specifically (`has_gbr` always `False` there), not assumed. `study3`/latency_bound (0 UL): zero movement, as predicted. Only `TwoTier` records moved. Full suite: 480 passed (4 new tests). |
 | 5 | **Landed.** UL's post-grant served-split (`_ul_served_split`, `docs/oai-port-map.md` row 67) — a genuine greedy priority-order walk, neither `reservation.py`'s own full-credit bug nor a proportional split (`_ul_drain`, unaffected). Feeds a fix to commit 3's own `_ul_stamp` (row 68, a fourth "copied from reservation's pattern without checking two-tier's own C" instance) and UL's post-grant GBR-deficit drain, never built before this commit (row 69). DL: the real LCP fill (`ia_p5g_compute_lcp_budget`, priority ASC/vq_dl DESC — structurally almost identical to the commit-1 placeholder it replaces, only the tiebreak field changes) landed TOGETHER with DL's own deficit drain (row 70) — **not split the way reservation's fill/drain were**, decided from the C's actual shape: reservation's own fill fix was a large rewrite justifying a split, two-tier's is a one-field sort-key swap that doesn't need one. Both provably-redundant-guard drain simplifications (`max(0, deficit-x)` for the C's `if(deficit>0): -=; if(<0): =0`) stated, not hidden (row 69/70). Restored 3 of commit 1's own disposition-table tests (the 2 VQ windowed-ceiling tests, orphaned by the 3/3a split — see the process-finding note above the commit-9 row; `test_latency_bound_two_tier_protects_deadlines`, rewritten only for the `TwoTier()` constructor signature). | **Predicted both directions move (`factory_robots`/`sensor_dense` as UL candidates, `factory_robots`'s UE10 as a DL candidate) — scored, hits and misses both recorded, not assumed clean.** Actual: only `study1`/`factory_robots` moved (all 4 overload multipliers, 979 mismatches, all `TwoTier`; PF/RoundRobin/Reservation unchanged) — `sensor_dense`/`latency_bound` showed zero movement. Traced to source: `factory_robots`'s movement is 100% UL (UEs 8/9/10 each pair a GBR flow, always higher-priority, with a PF flow on a different LCG — row 69); DL contributed nothing anywhere in the corpus, confirmed on two independent grounds — no UE anywhere has two same-priority DL flows (so the fill's tiebreak never engages, including UE10, where the two flows' priorities genuinely differ — the specific DL prediction was wrong), and no DL flow in the corpus is GBR-class (so the drain never has anything to act on, row 70). `sensor_dense`'s predicted UL movement was also wrong, explained precisely: it has no UE with more than one active UL LCG, so the served-split provably reduces to the old single-LCG trivial case. Full suite: 493 passed (13 new tests, 3 restored). |
-| 6 | MCS-selection call site + OLLA follow-on (D2) — reuse the shared helper from reservation commits 8/9 if the staircase/ratchet wiring is scheduler-agnostic. | Per D2(i): predicted drift for `periodic_control`/`condition_monitor` flows, checked against actual output. Run D2(ii)'s compounding test; record result. |
+| 6 | **Landed.** MCS-selection call site (`docs/oai-port-map.md` row 72) + OLLA follow-on (row 73), landed as ONE commit — the shared-helper reuse row 6's own forward note anticipated is confirmed TRUE (`scheduler/link.py`'s functions are genuinely scheduler-agnostic, no new helper needed), the first of three checked forward-looking notes in this port to hold. `_OLLA_OFFSET = 0` confirmed independently against two-tier's own C (byte-identical `gNB_scheduler_primitives.c`, identical call-site gates, `rounds[]` increment sites live in two-tier's own `post_process_ulsch`/`_dlsch`) — the same disposition reservation's own commit 9 landed, not merely inherited by assumption. | **D2(i)/(ii)/(iii) blocked, for the identical reason reservation's own commit 9 already found — the D2 decision record's own checklist does not survive contact with ground truth, a second time.** No drift to predict (i); no live ratchet for the compounding test (ii); `README.md` §8's existing entry updated in place, not flipped to `[RESOLVED]` (iii). `--check` against a commit-5 worktree baseline: `OK — no drift`, predicted and proven directly (a staircase-boundary equivalence test, not sampled at midpoints) before running. |
 | 7 | `reset_ue`/`SchedulerContextReset` — **required re-port**, not a copy-forward: the existing implementation (`two_tier.py:295-375`) resets VQ/deficit/demand fields whose names and structure change under commits 2-5 above. | Inert on its own (only fires on a join-event reconnection edge; no WP-Join scenario runs in the base corpus). |
 | 8 | **Old-vs-new TwoTier delta comparison — its own commit, prerequisite to commit 9.** Run the pre-Phase-2 `two_tier.py` (checked out from git history) and the rewritten one side-by-side on the same seeds/scenarios; commit the full per-record delta table as `docs/phase2-two-tier-delta.md`. This is the last point the old numbers are directly comparable to the new ones outside git history. | N/A — a comparison artifact commit, not a code change; must land before commit 9. |
 | 9 | Re-capture the 16 existing TwoTier regression records — the sanctioned re-baseline. Commit message states why the major movers moved (stale-2000-slot-default fix, real UL VQ formula, real DL LCP, SPS removal), citing commit 8's delta table rather than re-deriving the explanation. Verification must explicitly check `harq_masked_flow_double_grant_count == 0` across every corpus record for both schedulers. **Also verify every test commit 1's own disposition table marked restore-at-N was actually restored by the commit it names** — see the renumbering-orphaned-obligation note below, found scoping commit 5. | Intended, documented `--capture` — not silencing an unexplained diff. |
@@ -861,11 +861,12 @@ VQ, replacing the bootstrap PF coefficient in both directions), 4 (the
 UL service-interval floor's state machine plus the new Tier 1.5
 comparator slot it requires), 4a (the floor's grant-sizing bypass,
 FIX-2 plus the real uncapped-to-`max_rbSize` sizing), 4b (`B_eff`, the
-deficit-accumulated UL grant-sizing target), and 5 (UL's post-grant
+deficit-accumulated UL grant-sizing target), 5 (UL's post-grant
 served-split/stamp-fix/deficit-drain, DL's real LCP fill plus its own
-deficit drain) have now landed — see this table's own row 1/row 2/
-row 3/row 3a/row 4/row 4a/row 4b/row 5 entries above for what each did
-and confirmed; commits 6-9 not started. Two
+deficit drain), and 6 (MCS-selection call site + OLLA follow-on, D2)
+have now landed — see this table's own row 1/row 2/row 3/row 3a/row 4/
+row 4a/row 4b/row 5/row 6 entries above for what each did and
+confirmed; commits 7-9 not started. Two
 user decisions (D1, D2) obtained directly and recorded
 above before any code, matching
 `docs/wp-join-plan.md`'s D0a/D0b precedent. Sequencing (D4): reservation
@@ -1160,6 +1161,59 @@ not the old flat `_virtual_q` structure), alongside
 `test_latency_bound_two_tier_protects_deadlines` (restored essentially
 as-is, only the constructor signature changed). Full suite: 493 passed
 (13 new tests, 3 restored).
+
+**Commit 6 landed MCS-selection + OLLA follow-on (D2), one commit not
+two — unlike reservation's own commits 8/9, decided because the
+uncertainty that justified reservation's split (whether the ratchet
+would prove reachable) is already resolved before this commit starts.**
+A persistent per-UE-per-direction MCS index now drives grant sizing via
+`scheduler/link.py::mcs_index_for_snr`/`bits_per_prb_for_mcs` — the
+SAME free module functions reservation's own commit 8 already made
+scheduler-agnostic, confirmed by direct read this commit rather than
+assumed from row 6's own forward note ("reuse the shared helper... if
+scheduler-agnostic"). **That note is confirmed TRUE — the first of
+three checked forward-looking notes in this port to hold, not a
+pattern of failure.** Two prior ones (`_dl_stamp`'s stale citation at
+commit 3a; port-map row 46's "reused directly" claim at commit 4b) were
+wrong; this one wasn't. The invariant is "verify before executing,"
+and its evidence is that checking is cheap and the outcome isn't
+predictable in advance — not that such notes are unreliable. Three
+checked, one held.
+
+**The hard constraint this commit carries and no prior two-tier commit
+has had — whatever disposition lands must MATCH reservation's, or a
+comparison would measure link adaptation instead of scheduling
+policy — is satisfied, confirmed independently rather than assumed
+transferred.** `oai-branches/two-tier/gNB_scheduler_primitives.c` is
+byte-identical to reservation's copy (`diff`, confirmed this commit);
+`ia_p5g_scheduler.c`'s own DL/UL blocks have the identical
+`bo->harq_round_max == 1` call-site gate; the `rounds[]` increment
+sites live in two-tier's own `post_process_ulsch`/`_dlsch` (already
+fully read and ported at commit 5), structurally identical to
+reservation's. Since WP5 Decision 4 (retries never reach
+`Scheduler.allocate()`) is a simulator-architecture fact, not a
+scheduler-specific one, the identical gap applies — `_OLLA_OFFSET = 0`
+here for the same reason, not merely because reservation's is.
+
+**D2(i)/(ii)/(iii) are blocked here for the identical reason
+reservation's own commit 9 already found — the D2 decision record's
+own checklist does not survive contact with ground truth, a second
+time.** No drift to predict for `periodic_control`/`condition_monitor`
+flows (i) — the offset is 0 regardless of flow kind. No live ratchet
+to run the compounding-vs-coincidence test against (ii). `README.md`
+§8's existing OLLA entry updated in place to confirm two-tier hit the
+identical wall (iii) — not flipped to `[RESOLVED]`, matching
+reservation's own retag-to-`[OPEN: WP9]` disposition rather than D2's
+original plan.
+
+**Predicted and proven directly, not just observed via `--check`
+staying clean: zero movement.** The numeric equivalence the whole
+prediction rests on (`bits_per_prb_for_mcs(mcs_index_for_snr(snr), symbols)
+== bits_per_prb(snr, symbols)` at offset 0) was swept across every
+staircase threshold and just above each one, not sampled at a few
+midpoints — a boundary is where a two-path lookup would diverge if it
+does at all. `--check` against a commit-5 worktree baseline: `OK — no
+drift`, confirmed exactly. Full suite: 498 passed (5 new tests).
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/
