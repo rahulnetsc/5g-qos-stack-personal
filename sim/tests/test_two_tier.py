@@ -199,14 +199,12 @@ def test_configure_then_allocate_runs_end_to_end_and_returns_allocations():
     assert out  # something was granted
 
 
-def test_reset_ue_is_not_implemented():
-    """Commit 1 deliberately drops reset_ue rather than porting it (see
-    module docstring) -- restored at commit 7 against the new field
-    layout. sim/driver.py discovers it via getattr(scheduler, "reset_ue",
-    None), so this is what makes TwoTier fall back to "no context reset"
-    in the interim, the same disposition PF/gradient/RoundRobin already
-    have (docs/wp-join-plan.md D8)."""
-    assert getattr(TwoTier(), "reset_ue", None) is None
+def test_reset_ue_is_now_implemented():
+    """Commit 1 deliberately dropped reset_ue rather than porting it
+    (see module docstring); commit 7 lands it, genuinely re-derived per
+    field rather than restored verbatim -- closes this claim rather than
+    leaving it stale (docs/oai-port-map.md's own convention)."""
+    assert getattr(TwoTier(), "reset_ue", None) is not None
 
 
 # -- 2. per-slot direction order: UL before DL ----------------------------
@@ -1820,3 +1818,191 @@ def test_viability_gate_stays_keyed_on_raw_snr_walk_not_persisted_index():
 
     out = sched.allocate(slot, buffers, channel)
     assert out == []
+
+
+# -- 23. commit 7: reset_ue / SchedulerContextReset -------------------------
+
+
+def _dirty_ue_state(sched, ue_id):
+    """Nonzero everywhere reset_ue might touch, so a field it silently
+    skips is caught rather than masked by already being zero -- same
+    discipline the pre-rewrite implementation's own test helper used."""
+    state = sched._ue_state[ue_id]
+    state.vq_dl[1] = 12345.0
+    state.vq_ul[1] = 6789.0
+    state.ul_lcg_deficit_bytes[1] = 500
+    state.dl_flow_deficit_bytes[1] = 700
+    state.ul_lcg_last_grant_slot[1] = 3
+    state.dl_flow_last_grant_slot[1] = 4
+    state.ul_mcs_index = 5
+    state.dl_mcs_index = 6
+    state.floor_rx_lastseen = 111
+    state.floor_last_move_slot = 10
+    state.floor_alive_slot = 10
+    state.floor_fruitless = 2
+    state.floor_fruitless_slot = 10
+    state.floor_adq_backoff = 1
+    state.floor_adq_slot = 10
+    state.floor_crumb_run = 3
+    state.floor_disarmed = True
+
+
+def test_reset_ue_mac_scope_retains_the_fairness_ledger():
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL"),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=1),
+    ]
+    sched = TwoTier()
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    _dirty_ue_state(sched, 1)
+    buffers = _FakeBuffers()
+
+    sched.reset_ue(1, "mac", buffers)
+
+    state = sched._ue_state[1]
+    assert state.vq_dl[1] == 12345.0
+    assert state.vq_ul[1] == 6789.0
+    assert state.ul_lcg_deficit_bytes[1] == 500
+    assert state.dl_flow_deficit_bytes[1] == 700
+    assert state.ul_lcg_last_grant_slot[1] == 3
+    assert state.dl_flow_last_grant_slot[1] == 4
+    assert state.ul_mcs_index == 5
+    assert state.dl_mcs_index == 6
+    assert state.floor_rx_lastseen == 111
+    assert state.floor_alive_slot == 10
+    assert state.floor_fruitless == 2
+    assert state.floor_disarmed is True
+
+
+def test_reset_ue_full_scope_clears_the_fairness_ledger_too():
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL"),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=1),
+    ]
+    sched = TwoTier()
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    _dirty_ue_state(sched, 1)
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=2000)  # dl qfi1
+    buffers.set_delivered_cum(1, 1, 500)
+    buffers.set(1, 2, bytes_queued=800, estimated_ul_buffer_per_lcg=800)  # ul qfi2
+    buffers.set_delivered_cum(1, 2, 300)
+
+    sched.reset_ue(1, "full", buffers)
+
+    state = sched._ue_state[1]
+    assert state.vq_dl == {}
+    assert state.vq_ul == {}
+    assert state.ul_lcg_deficit_bytes == {}
+    assert state.dl_flow_deficit_bytes == {}
+    assert state.ul_lcg_last_grant_slot == {}
+    assert state.dl_flow_last_grant_slot == {}
+    assert state.ul_mcs_index is None
+    assert state.dl_mcs_index is None
+    assert state.floor_rx_lastseen == 0
+    assert state.floor_alive_slot is None
+    assert state.floor_fruitless == 0
+    assert state.floor_disarmed is False
+    # Re-seeded from CURRENT cumulative counters, not cleared to empty --
+    # the same trap the pre-rewrite implementation's own test caught.
+    assert sched._del_hist[(1, 1)] == 500
+    assert sched._arr_hist[(1, 1)] == 500 + 2000  # del_cum + bytes_queued (DL)
+    assert sched._del_hist[(1, 2)] == 300
+    assert sched._arr_hist[(1, 2)] == 300 + 800  # del_cum + est_ul_buffer (UL)
+
+
+def test_reset_ue_does_not_touch_a_different_ue():
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL"),
+    ]
+    sched = TwoTier()
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    _dirty_ue_state(sched, 1)
+    sched._ue_state[2].vq_dl[1] = 55555.0
+    buffers = _FakeBuffers()
+
+    sched.reset_ue(1, "full", buffers)
+
+    assert sched._ue_state[2].vq_dl[1] == 55555.0  # untouched
+
+
+def test_reset_ue_is_a_no_op_for_a_ue_with_no_flows():
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL")
+    sched = TwoTier()
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    sched.reset_ue(99, "full", buffers)  # UE 99 doesn't exist -- must not raise
+
+
+def test_reset_ue_rejects_an_invalid_scope():
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL")
+    sched = TwoTier()
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    with pytest.raises(ValueError):
+        sched.reset_ue(1, "bogus", buffers)
+
+
+def test_reset_ue_full_scope_resets_ul_shadow_bucket_is_retired():
+    """test_reset_ue_full_scope_resets_ul_shadow_bucket, from commit 1's
+    own disposition table, is RETIRED not restored -- it tested
+    _ul_shadow_bucket/_ul_predicted_backlog, the UL intra-TB per-flow
+    estimators CLAUDE.md's own standing invariant says never to
+    reintroduce (deleted permanently at commit 1, no successor field).
+    This marker exists so the retirement is a recorded decision, not a
+    silent gap -- see docs/oai-port-map.md's own row for this commit."""
+
+
+def test_reset_ue_mac_scope_leaves_stale_floor_state_and_no_immediate_fire_follows():
+    """Pins the end-to-end behavioral claim this commit's own planning
+    settled, not just the reset_ue call in isolation, so a future change
+    to _UL_FLOOR_ALIVE_MS or the arm logic cannot silently move it.
+    Seeds floor fields as if this UE went silent long ago (well beyond
+    the alive window) with leftover fruitless/disarmed state from
+    earlier probing, calls reset_ue(mac) (a no-op per this commit's own
+    design), then confirms the floor does not fire immediately even
+    under the EXACT fixture that would fire it if armed -- B==0 (the
+    desync fault, bytes_reported gated to 0) with a real per-LCG
+    estimate (so _ul_has_pending_gbr is true and the arm/fire logic
+    actually runs, rather than short-circuiting on an unrelated gate).
+    armed is derived from elapsed time since floor_alive_slot,
+    independent of anything reset_ue could touch -- confirmed
+    discriminating below: the identical fixture WITH a recent
+    floor_alive_slot does fire."""
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=1_000_000, mfbr_bps=1_000_000,
+    )
+    sched = TwoTier()
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    state = sched._ue_state[1]
+    state.floor_alive_slot = 0  # long ago -- unarmed by the time of the far call below
+    state.floor_last_move_slot = 0
+    state.floor_fruitless = 3
+    state.floor_disarmed = True
+    buffers = _FakeBuffers()
+    # B==0 (bytes_reported gated to 0) but a real per-LCG estimate --
+    # the desync-fault shape empty_fire exists to rescue, and the one
+    # fixture that actually exercises the arm/fire logic (b>0 would
+    # block empty_fire regardless of armed, proving nothing).
+    buffers.set(1, 1, bytes_queued=0, estimated_ul_buffer_per_lcg=1000)
+
+    sched.reset_ue(1, "mac", buffers)
+    assert state.floor_alive_slot == 0  # confirmed untouched by mac scope
+
+    far_future_slot = 100_000  # elapsed since floor_alive_slot=0 exceeds _UL_FLOOR_ALIVE_MS
+    fired, _sil = sched._update_ul_floor(1, buffers, far_future_slot)
+    assert fired is False
+
+    # Discriminating check: the SAME fixture, but with floor_alive_slot
+    # recent enough to still be armed, DOES fire -- confirming the
+    # no-fire result above is because of the stale alive_slot
+    # specifically, not because this fixture can never fire at all.
+    sched2 = TwoTier()
+    sched2.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    state2 = sched2._ue_state[1]
+    state2.floor_alive_slot = far_future_slot - 3500  # within the alive window
+    state2.floor_last_move_slot = 0
+    fired2, _sil2 = sched2._update_ul_floor(1, buffers, far_future_slot)
+    assert fired2 is True

@@ -207,15 +207,35 @@ def test_undisturbed_neighbour_throughput_and_pdb_violations_never_worse(schedul
 
 
 # test_two_tier_shows_a_transient_neighbour_delay_bump_only_on_the_mac_scope_arm
-# deleted with the Phase 2 rewrite's commit 1 (docs/phase2-plan.md):
-# TwoTier no longer has a virtual queue or reset_ue to produce the mac-vs-
-# full-scope catch-up-priority bump this test asserted (docs/wp-join-plan.md
-# sec4 Prediction 5). Both flows this test used (ue1 qfi1 GBR, ue2 qfi1 GBR)
-# are DL-only, and DL's VQ ceiling formula is unchanged by the rewrite (it
-# already matches its own header -- docs/phase2-plan.md sec2.1 -- unlike
-# UL's, which is being corrected) -- so restoring this test, rewritten
-# against the new VQ/reset_ue field layout rather than copied verbatim, at
-# two-tier's own commit 7 (where reset_ue is re-ported) is expected to
-# re-confirm the same qualitative finding, not merely a placeholder
-# deferral. If commit 7 lands without restoring it, that is a coverage
-# loss to record explicitly, not to let lapse silently.
+# -- restoration ATTEMPTED at commit 7, then retired with a documented
+# empirical finding, not silently left failing or force-passed.
+#
+# reset_ue is real and correct here -- sim/tests/test_join_reset.py's own
+# unit tests directly confirm mac scope retains vq_dl/vq_ul, full scope
+# clears them to fresh _UeState() (scheduler/two_tier.py::reset_ue's own
+# docstring). Commit 3's own argument for why THIS test would transfer
+# ("both flows are DL-only; DL's VQ ceiling formula is unchanged by the
+# rewrite, matching its own header") checked out true on both counts --
+# and was still wrong about the OUTCOME, for a reason neither commit 3
+# nor this commit's own planning anticipated: instrumented directly this
+# commit, vq_dl for UE 1's GBR flow reads exactly 0.0 throughout this
+# scenario -- not just at the reconnection moment, but continuously
+# through NORMAL pre-outage operation too. The windowed-ceiling clamp
+# (arrival-delta bound, commit 3a) keeps vq_dl pinned near 0 whenever a
+# flow's GBR target is being met continuously, which this scenario's own
+# steady 2Mbps-target/1.6Mbps-deterministic-traffic shape does throughout
+# -- confirmed NOT a mechanism bug (the same instrumentation against
+# factory_robots_scenario shows vq_dl/vq_ul reaching four- and five-digit
+# values under real contention). The OLD `_virtual_q` this test originally
+# exercised apparently accumulated unconditionally, unlike vq_dl's own
+# backlog-gated, ceiling-clamped design -- a genuine behavioral
+# divergence between the two VQ implementations this scenario happens to
+# sit exactly on the wrong side of. Both flows are DL-only by the test's
+# own design (matching the reconnection-neighbour-effect it wants to
+# isolate), and UL's own vq_ul ceiling is gated on backlog the identical
+# way, so swapping direction doesn't route around it. Redesigning the
+# scenario to force a genuine pre-outage vq_dl deficit (e.g.
+# under-provisioning UE 1's own grant capacity so its GBR target isn't
+# continuously met) would need its own scoping, not a same-commit fix --
+# recorded here as the concrete next step if this coverage is picked up
+# again, rather than left as a bare "retired."

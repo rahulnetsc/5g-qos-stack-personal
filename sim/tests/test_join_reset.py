@@ -11,26 +11,161 @@ import pytest
 
 from sim.bsr import BsrModel
 from sim.buffer import BufferModel
-from sim.config import CarrierConfig, ScenarioConfig, ScriptedFadeWindow, UEConfig
+from sim.config import CarrierConfig, ScenarioConfig, ScriptedFadeWindow, TDDConfig, UEConfig
 from sim.driver import run
 from sim.join import JoinConfig, JoinEvent
+from sim.resource import ResourceGrid
 from sim.ue_lcp import UeLcp
 from sim.ul_access import UlAccessModel
 from sim.baselines.gradient import GradientScheduler
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
+from scheduler import TwoTier
 from scheduler.flow import FlowConfig
 
 
-# -- TwoTier.reset_ue: deleted with the Phase 2 rewrite's commit 1 -----------
-#
-# scheduler/two_tier.py's commit 1 (docs/phase2-plan.md) drops reset_ue
-# entirely rather than porting it -- the fields these tests poked
-# (_virtual_q, _demand_bps, _gbr_penalty, the UL shadow bucket) no longer
-# exist. sim/driver.py discovers reset_ue via getattr(scheduler,
-# "reset_ue", None), so its absence just means TwoTier is treated like PF
-# (no context reset) in the interim. Restored at two-tier's own commit 7,
-# rewritten against the new field layout, not copied back verbatim.
+# -- TwoTier.reset_ue: restored at commit 7, rewritten against the new ------
+# field layout (_UeState's 17 fields across VQ/deficit/last-grant-slot/
+# MCS-index/floor -- see scheduler/two_tier.py::reset_ue's own docstring
+# for the full per-field mac/full disposition and its ground-truth
+# citations). Not a verbatim restoration -- the pre-rewrite fields these
+# tests originally poked (_virtual_q, _demand_bps, _gbr_penalty, the UL
+# shadow bucket) no longer exist.
+
+
+def _configured_two_tier(flows):
+    tt = TwoTier()
+    grid = ResourceGrid(CarrierConfig(bandwidth_hz=20_000_000, numerology=1), TDDConfig())
+    tt.configure(flows, grid.slot_duration_s, grid)
+    return tt
+
+
+def _dirty_ue_state(tt, ue_id, dl_qfi, ul_qfi):
+    """Nonzero everywhere reset_ue might touch, so a field it silently
+    skips is caught rather than masked by already being zero -- same
+    discipline the pre-rewrite implementation's own helper used."""
+    state = tt._ue_state[ue_id]
+    state.vq_dl[dl_qfi] = 12345.0
+    state.vq_ul[1] = 6789.0
+    state.dl_flow_deficit_bytes[dl_qfi] = 700
+    state.ul_lcg_deficit_bytes[1] = 500
+    state.dl_flow_last_grant_slot[dl_qfi] = 4
+    state.ul_lcg_last_grant_slot[1] = 3
+    state.dl_mcs_index = 6
+    state.ul_mcs_index = 5
+    state.floor_rx_lastseen = 111
+    state.floor_alive_slot = 10
+    state.floor_last_move_slot = 10
+    state.floor_fruitless = 2
+    state.floor_fruitless_slot = 10
+    state.floor_adq_backoff = 1
+    state.floor_adq_slot = 10
+    state.floor_crumb_run = 3
+    state.floor_disarmed = True
+
+
+def test_reset_ue_mac_scope_retains_the_fairness_ledger():
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=1),
+    ]
+    tt = _configured_two_tier(flows)
+    buffers = BufferModel()
+    buffers.register(1, 1, is_ul=False)
+    buffers.register(1, 2, is_ul=True, lcg=1)
+    _dirty_ue_state(tt, 1, dl_qfi=1, ul_qfi=2)
+
+    tt.reset_ue(1, "mac", buffers)
+
+    state = tt._ue_state[1]
+    assert state.vq_dl[1] == 12345.0
+    assert state.vq_ul[1] == 6789.0
+    assert state.dl_flow_deficit_bytes[1] == 700
+    assert state.ul_lcg_deficit_bytes[1] == 500
+    assert state.dl_flow_last_grant_slot[1] == 4
+    assert state.ul_lcg_last_grant_slot[1] == 3
+    assert state.dl_mcs_index == 6
+    assert state.ul_mcs_index == 5
+    assert state.floor_alive_slot == 10
+    assert state.floor_fruitless == 2
+    assert state.floor_disarmed is True
+
+
+def test_reset_ue_full_scope_clears_the_fairness_ledger_too():
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=1),
+    ]
+    tt = _configured_two_tier(flows)
+    buffers = BufferModel()
+    buffers.register(1, 1, is_ul=False)
+    buffers.register(1, 2, is_ul=True, lcg=1)
+    _dirty_ue_state(tt, 1, dl_qfi=1, ul_qfi=2)
+    buffers.enqueue(1, 1, 2_000, 0.0)
+    buffers.drain(1, 1, 1_000, 1.0, 1.0)
+
+    tt.reset_ue(1, "full", buffers)
+
+    state = tt._ue_state[1]
+    assert state.vq_dl == {}
+    assert state.vq_ul == {}
+    assert state.dl_flow_deficit_bytes == {}
+    assert state.ul_lcg_deficit_bytes == {}
+    assert state.dl_flow_last_grant_slot == {}
+    assert state.ul_lcg_last_grant_slot == {}
+    assert state.dl_mcs_index is None
+    assert state.ul_mcs_index is None
+    assert state.floor_alive_slot is None
+    assert state.floor_fruitless == 0
+    assert state.floor_disarmed is False
+    # Re-seeded with CURRENT cumulative (1000 delivered, 1000 still
+    # queued -> 2000 arrived-equivalent for the DL demand-estimator
+    # derivation), not cleared to empty -- the trap found while
+    # implementing this method (module docstring's own citation).
+    assert tt._del_hist[(1, 1)] == 1_000
+    assert tt._arr_hist[(1, 1)] == 2_000
+
+
+def test_reset_ue_does_not_touch_a_different_ue():
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
+    ]
+    tt = _configured_two_tier(flows)
+    buffers = BufferModel()
+    buffers.register(1, 1, is_ul=False)
+    buffers.register(2, 1, is_ul=False)
+    _dirty_ue_state(tt, 1, dl_qfi=1, ul_qfi=1)
+    tt._ue_state[2].vq_dl[1] = 55555.0
+
+    tt.reset_ue(1, "full", buffers)
+
+    assert tt._ue_state[2].vq_dl[1] == 55555.0  # untouched
+
+
+def test_reset_ue_is_a_no_op_for_a_ue_with_no_flows():
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
+    tt = _configured_two_tier([flow])
+    buffers = BufferModel()
+    tt.reset_ue(99, "full", buffers)  # UE 99 doesn't exist -- must not raise
+
+
+def test_reset_ue_rejects_an_invalid_scope():
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000)
+    tt = _configured_two_tier([flow])
+    buffers = BufferModel()
+    with pytest.raises(ValueError):
+        tt.reset_ue(1, "bogus", buffers)
+
+
+def test_reset_ue_full_scope_ul_shadow_bucket_field_poke_is_retired():
+    """test_reset_ue_full_scope_resets_ul_shadow_bucket, from commit 1's
+    own disposition table, is RETIRED not restored -- it poked
+    _ul_shadow_bucket/_ul_predicted_backlog, the UL intra-TB per-flow
+    estimators CLAUDE.md's own standing invariant says never to
+    reintroduce (deleted permanently at commit 1, no successor field).
+    This marker exists so the retirement is a recorded decision, not a
+    silent gap."""
 
 
 # -- PF/gradient/RoundRobin: checkable, not assumed, to have no reset_ue --
