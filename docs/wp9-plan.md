@@ -498,8 +498,45 @@ Either outcome answers H1's own "which bound binds is itself a result."
 
 **D4-4 — Can any cell distinguish the schedulers where the hardware's N=2
 could not? (the project's founding question).**
-*Expectation:* **Yes at N ≥ 8** on M07/M08, and — equally load-bearing —
-**No at N=2 on any primary metric.**
+*Expectation, amended pre-stage-1 (see below):* **Yes at N ≥ 8** on M07/M08,
+and — equally load-bearing — **No at N=2 on any primary metric.**
+
+**Amendment, made BEFORE stage 1 ran and prompted by §1.2's base-point
+re-derivation, not by sweep output.** The re-derivation put the base cell at
+N=8, and its single-seed observation there already shows GBR contracts
+8/8, 7/8, 5/8 — separation on M07, the exact metric this expectation names,
+at the exact N it names. That is *consistent* with the expectation as
+written, but it means the base point probably sits **inside** the regime
+rather than below it, and the original wording anticipates only one of two
+genuinely different findings. The interesting question moves from "does
+separation appear by N=8" to "**where below 8 does it start**".
+
+So the expectation is resolved one level finer, on the levels the N axis
+already carries (2, 4, 8 — unchanged):
+
+- **N=8: separation expected**, on M07/M08. Effectively already indicated;
+  the gate's job here is to confirm it survives 10 paired seeds with a CI
+  excluding 0, not to discover it.
+- **N=4: genuinely open, and this is now the informative cell.** §1.1 puts
+  the PDCCH bound at 8 and the follower-budget bound at 11, so N=4 is below
+  both. Separation at N=4 would mean the arms diverge for a reason those two
+  bounds do not explain — a finding about the ranking policies themselves
+  rather than about a capacity boundary. No separation at N=4, with
+  separation at N=8, would place the boundary in (4, 8] and put it near the
+  predicted PDCCH bound, corroborating §1.1.
+- **N=2: no separation expected** — unchanged, and still the positive
+  control and stop condition below.
+
+**A boundary between 4 and 8 and a boundary below 4 are different findings,
+and both are now anticipated in writing rather than one of them being
+explained after the fact.**
+
+*Unchanged by this amendment, deliberately:* the falsifier below, the five
+primary metrics, the §6.4 gate, and the N=2 stop condition. Only the
+expectation's resolution moved, and only before any stage-1 cell executed —
+the commit that made this change predates the commit that runs stage 1, which
+is what makes that claim checkable rather than asserted.
+
 **The N=2 cell is a positive control on the whole sweep design, and a stop
 condition — not a data point and not a caveat.** The hardware measurement's
 own author settled that the schedulers do not differentiate at N=2. If this
