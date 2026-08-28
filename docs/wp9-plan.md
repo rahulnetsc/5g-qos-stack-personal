@@ -66,7 +66,7 @@ point. Stated once, here, because "all else equal" is otherwise undefined.
 | RAN | `dsuuu_40mhz` — 55 PRB, μ=2, 0.25 ms slots, DSUUU | `factory_robots_scenario`'s own default RAN |
 | PDCCH | D-slot CCE 48, U-slot 32, S-slot 16; `average_agg_level` = 4 | `sim/resource.py:33-57`; the hardcoded AL is CLAUDE.md's own known issue |
 | N | 8 UEs | §3 |
-| Offered load | ×1.5, **UL-load-scaled, not capacity-scaled** | §3, exclusions |
+| Offered load | **×1.0** (was ×1.5 pre-fix), **UL-load-scaled, not capacity-scaled** | §3, exclusions; **re-derived post-fix, §1.2** |
 | `min_rb` | 5 | the calibration campaign's deployed value |
 | `mfbr_bps` | 0 (off) | never configured on any flow anywhere in this repo |
 | Mix | per UE: UL GBR video + UL telemetry (10 Hz) + DL command (20 Hz) | maps onto T1/T2/T3 of the hardware plan §1 |
@@ -86,6 +86,119 @@ changing it would invalidate the `a5f6baa` baseline for no benefit.
 **`record_timeseries=True` unconditionally.** M04, M09 and M19 report
 `pending` without it — three of nineteen metrics silently absent from every
 cell. It was measured, not assumed, to be free.
+
+### 1.2 Base-point re-derivation, post-fix (amendment)
+
+§1's base point was chosen against measurements taken **under the
+SR-trigger defect** (`docs/oai-port-map.md` row 79). Those measurements are
+what motivated the pause; these are what justify the base point that
+replaces it. Re-measured post-fix, same workload shapes, N=8, 4,000 slots,
+UL PRB utilisation, `(pre-fix)` in parentheses:
+
+| variant | PF | Reservation | TwoTier | (pre-fix PF/Res/TT) |
+|---|---|---|---|---|
+| BE only, poisson | 0.905 | 0.931 | 0.934 | (0.008 / 0.006 / 0.006) |
+| BE only, bursty, same mean rate | 0.937 | 0.933 | 0.937 | (0.123 / 0.038 / 0.015) |
+| BE only (1 UL/UE) | 0.907 | 0.932 | 0.933 | (0.008 / 0.006 / 0.006) |
+| BE + video (2 UL/UE) | 0.937 | 0.936 | 0.937 | (0.937 / 0.338 / 0.014) |
+| BE + telemetry (2 UL/UE) | 0.911 | 0.929 | 0.933 | (0.009 / 0.001 / 0.001) |
+| BE + video + telemetry (3 UL/UE) | 0.936 | 0.925 | 0.934 | (0.936 / 0.015 / 0.014) |
+
+**The collapse is gone entirely, and so is the utilisation ordering.** Every
+arm now sits at 0.905-0.937 on every shape; the pre-fix
+PF > Reservation > TwoTier spread of up to 60x was the defect, reproducing
+the worktree patch's own 0.928/0.924/0.934 near-parity. TwoTier is now
+marginally *highest* on most shapes -- the reverse of the pre-fix ordering.
+`_BE_PER_UE_BPS = 8e6` is **retained**: post-fix it puts load ×1.0 at
+~96 Mbps offered against a cell that saturates near there, so the axis
+spans genuine underload to genuine overload.
+
+**Does an arm ordering survive? On utilisation, no. On the outcome metrics,
+yes — and that changes what the base point means.** Post-fix load curve at
+the real 20,000-slot horizon:
+
+| load | arm | UL util | deliv/off | loss (M02) | GBR met |
+|---|---|---|---|---|---|
+| 0.75 | PF / Res / TT | 0.936 / 0.919 / 0.936 | 0.848 / 0.818 / 0.838 | 0.116 / 0.146 / 0.136 | 8/8 / 8/8 / 8/8 |
+| **1.0** | PF / Res / TT | 0.936 / 0.921 / 0.932 | 0.699 / 0.670 / 0.623 | **0.261 / 0.289 / 0.356** | **8/8 / 7/8 / 5/8** |
+| 1.25 | PF / Res / TT | 0.936 / 0.920 / 0.934 | 0.592 / 0.573 / 0.575 | 0.365 / 0.382 / 0.384 | 8/8 / 7/8 / 5/8 |
+
+Utilisation is saturated (~0.93) across the whole band and **is not a
+discriminator post-fix**, so the base point is chosen on outcome metrics
+instead. **The base cell is therefore not neutral ground: the arms already
+separate there**, PF > Reservation > TwoTier on both loss and GBR contracts.
+
+Stated carefully, because it is pre-registration-relevant: this is a
+**single-seed observation, not a result**. It has no paired-seed effect size
+and no bootstrap CI, and it is exactly what §6.4's gate exists to confirm or
+reject. It does **not** pre-answer D4-4 -- but it does mean stage 1 starts
+from a cell where a candidate signal is already visible, which is good for
+informativeness (the base and its excursions will pass `is_informative`) and
+which must not be mistaken later for a result the sweep produced. If the
+gate does not confirm it at 10 seeds, that is the finding.
+
+**A correction to this module's own earlier reasoning, found while
+re-measuring.** `sim/parametric.py` originally justified putting the load on
+the best-effort filler with a *mechanical* claim -- that periodic instrument
+flows cannot keep a cell occupied, evidenced by the 195-vs-3131 grant-count
+gap. **That claim was the defect talking, and post-fix it is false**:
+re-measured, the instrument flows alone deliver **98.7% of what they offer at
+~49% UL utilisation on all three arms**. Nothing collapses. The design
+survives, but for two more ordinary reasons that are now the ones stated in
+the code: methodological (load_mult must not change the quantity G1/G3/G5
+measure -- the same instrument/load split GT-3.2 and GT-7.3 use), and
+arithmetic (at profile rates the instruments offer ~32 Mbps against a
+~100 Mbps cell, so they cannot reach overload without being distorted past
+what they represent). Recorded rather than quietly re-worded, since a comment
+whose stated reason has been falsified is exactly the kind of stale
+justification this project keeps catching.
+
+**Base load ×1.5 → ×1.0**, on three grounds: non-zero loss on all three arms
+so `is_informative` passes; the widest arm spread in the band (loss 0.261 →
+0.356, and GBR-met 8/7/5, where 0.75 separates on neither contract count and
+1.25 is already compressing); and ~96 Mbps offered against a ~100 Mbps cell,
+i.e. a natural "100% load" reference matching the hardware sweep's own
+framing.
+
+**§4's axis levels re-checked against the new base, not left inherited:**
+
+- **Load axis amended: 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0** (was 0.5, 0.75,
+  1.0, 1.5, 2.0, 3.0). **×0.25 dropped** -- measured zero loss on all arms,
+  so `regime_selection_excluded` would discard it and the cell is wasted
+  budget. **×1.25 added** to densify the 0.75-1.5 band, which is where the
+  arms actually separate. ×0.5 retained as the last near-zero-loss anchor
+  (loss 0.000 at 4k but it does separate on GBR-met 8/7/6, so it is not
+  uninformative in the panel's wider sense). ×3.0 retained for M13's load
+  ramp even though the arms converge there -- G12's first-violation order
+  needs genuine overload. Core plane becomes 6 N x 7 load = **42 cells**
+  (was 36); stage 1 ≈ 56 cells, still ~1.5 h single-core, inside the 4 h
+  ceiling.
+- **N axis unchanged (2, 4, 8, 16, 24, 32).** §1.1's boundary prediction is
+  a function of `prb_count`, CCE budget and `min_rb` only -- no traffic term
+  -- so the fix does not touch it. **Worth stating explicitly**: because the
+  BE filler is per-UE, total offered load scales with N, so at N=32 / load
+  ×1.0 the cell is ~4x overloaded. That is deliberate and correct for G10 --
+  "admissible fleet size" *is* "at what N do the guarantees break" -- but it
+  means N and load are not orthogonal, and the core plane must be read as a
+  plane rather than two independent lines.
+- **Base N=8 unchanged**, `min_rb`=5, `mfbr`=0, SNR, `sr_period`, `k2`,
+  `cqi_delay`, horizon, `record_timeseries` all unchanged -- none was chosen
+  against a defect-affected measurement.
+- **`min_rb` / `mfbr` / SNR-spread / PDB / `sr_period` / `k2` / InF /
+  shared-LCG / bg excursion levels survive unchanged**: each is a config or
+  channel knob whose levels were picked from ground truth or from the axis's
+  own hypothesis, not from a measured base value.
+- **One known limitation, recorded rather than fixed:** `_burstify` now
+  applies only to the instrument flows (telemetry, video, DL command), since
+  the BE filler is `poisson` and carries the load. So H2's duty-cycle axis
+  varies the burstiness of the *instruments* at constant mean rate, not of
+  the offered load as a whole. That is a narrower test of H2 than "the cell's
+  traffic becomes burstier", and the H2 result must be reported in those
+  terms.
+
+**The go/no-go rule (§6.4), the D4-4 N=2 control, and the five primary
+metrics are unaffected by this recalibration and stand exactly as
+committed.**
 
 ### 1.1 The predicted regime boundary, computed before anything runs
 
