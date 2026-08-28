@@ -713,11 +713,42 @@ is the corpus-breaking commit, name it as such)
 | 4a | Grant-sizing bypass for a fired floor: the GBR-PRB-reserve cap (`gbr_below`, `:3105-3124`, "FIX-2" — the follower-budget-style cap commit 4's own placeholder comment already anticipated), the uncapped-to-`available_rb` sizing for `floor_fire` (replacing commit 4's fixed `min_rb` rescue grant), and the PHR-based PRB ceiling (`:3126-3163`, "FIX-D" — applies to every DATA-class grant, not just floor fires; likely structurally absent pending `sim/power.py`'s own dormant PHR machinery, to be confirmed when this commit is actually planned). Rows 5-9 not renumbered (reservation's own 3a/4a/10a precedent). | Not yet planned. |
 | 4a | **Landed.** UL floor's grant-sizing bypass: FIX-2 (`gbr_below`, the GBR-PRB-reserve cap — a general anti-monopolization safeguard on every UL DATA-class grant, not floor-specific, `docs/oai-port-map.md` row 60) and the floor's own uncapped-to-`max_rbSize` sizing (row 62), replacing commit 4's fixed `min_rb` rescue grant. **Confirmed NOT the same shape as `reservation.py`'s own UL follower budget** — two real structural differences (baseline: remaining-PRB-count vs. static `bwp_size`; scope: GBR-specific vs. any-needy-follower), not a naming coincidence (row 60's own Divergence cell). PHR-based capping confirmed structurally out of scope entirely, same disposition `reservation.py`'s own commit 4a already recorded for the identical connection point (row 63). The `B_eff` deficit-accumulated grant-sizing target is deliberately NOT built here — named as its own commit, 4b, per user decision (row 64) — since `ul_total_target_bytes` is real and GFBR-exercised on this corpus, unlike everything actually built in this commit. | **Predicted zero movement, on two independent confirmed grounds, stated before running**: (1) the floor's own sizing change is gated on `floor_fire`, confirmed never to fire on this corpus (commit 4's own result); (2) `gbr_below`'s reserve is gated on `gbr_bytes_slot > 0`, which never fires either — `mfbr_bps` is never configured on any flow in any scenario in this repo, the identical fact `reservation.py`'s own already-landed `gbr_bytes_slot` found for the same quantity (`docs/oai-port-map.md` row 61). **Confirmed exactly**: `--check` against a commit-4 worktree baseline reports `OK — no drift` across all 20 records — every mechanism actually built in this commit is inert on the current corpus by construction, not by coincidence, a repeat of commit 4's own "predicted inert, confirmed inert" result on different (but related) grounds. Full suite: 476 passed (6 new tests). |
 | 4b | **Landed.** `B_eff`, the deficit-accumulated UL grant-sizing target, wired into ordinary (non-floor-fired) DATA sizing (`docs/oai-port-map.md` row 64). **Row 46's own flag did not hold, confirmed by direct read**: `ul_total_target_bytes` is `_ul_gbr_and_pdb`'s own third accumulator, not `guaranteed_bytes + be_bytes`'s sum — the divergence is `be_bytes`'s own GBR-LCG overflow term, which `ul_total_target_bytes` excludes (row 65, this port's second self-inflicted finding, a new `CLAUDE.md` invariant). **`reservation.py`'s own `_ul_grant_target` confirmed NOT a template** — a genuine sum in a different C file, plus an extra `has_srb`-cap step two-tier's own `B_eff` lacks (row 66); D1 (PRB-vs-bytes sizing) transferred directly regardless. | **Predicted movement, and it moved — scored, not assumed.** `study1`/factory_robots (GBR): moved, the GFBR mechanism. `study2`/sensor_dense (0 GBR): also moved, confirmed traced to the non-GBR frozen-BSR mechanism specifically (`has_gbr` always `False` there), not assumed. `study3`/latency_bound (0 UL): zero movement, as predicted. Only `TwoTier` records moved. Full suite: 480 passed (4 new tests). |
-| 5 | DL LCP: single greedy DRB pass + SRB-exempt fill (the corrected, non-two-pass structure — see §6 Flags for the README correction this implies). **Now confirmed a *joint* VQ-correction commit, not a pure LCP commit (found landing commit 3a, `docs/oai-port-map.md` row 50)**: commit 3a's own DL drain runs against `_dl_fill`'s placeholder split, not the real `(priority ASC, vq_dl DESC)` order `ia_p5g_compute_lcp_budget` produces — landing the real fill here will *also* change which LCID each TB's bytes drain from, changing `vq_dl`'s own trajectory and DL ranking downstream, on top of whatever the LCP fill itself changes about grant composition. Read this commit's own `--check` movement with both effects in mind, not as an LCP-only diff. | DL per-flow byte-fill patterns shift modestly; SRB-adjacent flows (if any in-corpus) most affected — **plus** a second-order `vq_dl`/DL-ranking shift from the drain finally consuming the correct split (see left column). |
+| 5 | **Landed.** UL's post-grant served-split (`_ul_served_split`, `docs/oai-port-map.md` row 67) — a genuine greedy priority-order walk, neither `reservation.py`'s own full-credit bug nor a proportional split (`_ul_drain`, unaffected). Feeds a fix to commit 3's own `_ul_stamp` (row 68, a fourth "copied from reservation's pattern without checking two-tier's own C" instance) and UL's post-grant GBR-deficit drain, never built before this commit (row 69). DL: the real LCP fill (`ia_p5g_compute_lcp_budget`, priority ASC/vq_dl DESC — structurally almost identical to the commit-1 placeholder it replaces, only the tiebreak field changes) landed TOGETHER with DL's own deficit drain (row 70) — **not split the way reservation's fill/drain were**, decided from the C's actual shape: reservation's own fill fix was a large rewrite justifying a split, two-tier's is a one-field sort-key swap that doesn't need one. Both provably-redundant-guard drain simplifications (`max(0, deficit-x)` for the C's `if(deficit>0): -=; if(<0): =0`) stated, not hidden (row 69/70). Restored 3 of commit 1's own disposition-table tests (the 2 VQ windowed-ceiling tests, orphaned by the 3/3a split — see the process-finding note above the commit-9 row; `test_latency_bound_two_tier_protects_deadlines`, rewritten only for the `TwoTier()` constructor signature). | **Predicted both directions move (`factory_robots`/`sensor_dense` as UL candidates, `factory_robots`'s UE10 as a DL candidate) — scored, hits and misses both recorded, not assumed clean.** Actual: only `study1`/`factory_robots` moved (all 4 overload multipliers, 979 mismatches, all `TwoTier`; PF/RoundRobin/Reservation unchanged) — `sensor_dense`/`latency_bound` showed zero movement. Traced to source: `factory_robots`'s movement is 100% UL (UEs 8/9/10 each pair a GBR flow, always higher-priority, with a PF flow on a different LCG — row 69); DL contributed nothing anywhere in the corpus, confirmed on two independent grounds — no UE anywhere has two same-priority DL flows (so the fill's tiebreak never engages, including UE10, where the two flows' priorities genuinely differ — the specific DL prediction was wrong), and no DL flow in the corpus is GBR-class (so the drain never has anything to act on, row 70). `sensor_dense`'s predicted UL movement was also wrong, explained precisely: it has no UE with more than one active UL LCG, so the served-split provably reduces to the old single-LCG trivial case. Full suite: 493 passed (13 new tests, 3 restored). |
 | 6 | MCS-selection call site + OLLA follow-on (D2) — reuse the shared helper from reservation commits 8/9 if the staircase/ratchet wiring is scheduler-agnostic. | Per D2(i): predicted drift for `periodic_control`/`condition_monitor` flows, checked against actual output. Run D2(ii)'s compounding test; record result. |
 | 7 | `reset_ue`/`SchedulerContextReset` — **required re-port**, not a copy-forward: the existing implementation (`two_tier.py:295-375`) resets VQ/deficit/demand fields whose names and structure change under commits 2-5 above. | Inert on its own (only fires on a join-event reconnection edge; no WP-Join scenario runs in the base corpus). |
 | 8 | **Old-vs-new TwoTier delta comparison — its own commit, prerequisite to commit 9.** Run the pre-Phase-2 `two_tier.py` (checked out from git history) and the rewritten one side-by-side on the same seeds/scenarios; commit the full per-record delta table as `docs/phase2-two-tier-delta.md`. This is the last point the old numbers are directly comparable to the new ones outside git history. | N/A — a comparison artifact commit, not a code change; must land before commit 9. |
-| 9 | Re-capture the 16 existing TwoTier regression records — the sanctioned re-baseline. Commit message states why the major movers moved (stale-2000-slot-default fix, real UL VQ formula, real DL LCP, SPS removal), citing commit 8's delta table rather than re-deriving the explanation. Verification must explicitly check `harq_masked_flow_double_grant_count == 0` across every corpus record for both schedulers. | Intended, documented `--capture` — not silencing an unexplained diff. |
+| 9 | Re-capture the 16 existing TwoTier regression records — the sanctioned re-baseline. Commit message states why the major movers moved (stale-2000-slot-default fix, real UL VQ formula, real DL LCP, SPS removal), citing commit 8's delta table rather than re-deriving the explanation. Verification must explicitly check `harq_masked_flow_double_grant_count == 0` across every corpus record for both schedulers. **Also verify every test commit 1's own disposition table marked restore-at-N was actually restored by the commit it names** — see the renumbering-orphaned-obligation note below, found scoping commit 5. | Intended, documented `--capture` — not silencing an unexplained diff. |
+
+**A process finding, found scoping commit 5, not just a restoration**:
+commit 1's own disposition table (its commit message, `80609f5`) mapped
+two deleted `test_smoke.py` tests (`test_two_tier_virtual_queue_windowed_
+ceiling`, `test_two_tier_windowed_ceiling_protects_bursty_gbr`) to
+"commit 3" by name — VQ *was* commit 3's whole scope at the time that
+table was written. When commit 3 itself split into commit 3 (the sort
+tiers) and commit 3a (the VQ), the restoration obligation did not split
+with it — neither commit restored the pair, and nothing caught the gap
+until commit 5 re-read the original disposition table directly. **Commit
+9's own closing check ("every test marked restore-at-N was actually
+restored") would have passed the letter of that check while missing this
+pair entirely**, since neither commit 3 nor 3a was ever the literal "N"
+the table named after the split — the check as originally scoped has no
+way to notice a renumbering moved the target out from under an
+obligation written before the renumbering existed. **The lesson
+generalizes, not a one-off**: when a commit splits, its own inherited
+restoration obligations have to be re-mapped to the split's new numbers
+explicitly, not left pointing at a number that no longer means what it
+meant when the obligation was written — this document's own commit-9 row
+above is amended to check for renumbering-orphaned entries specifically,
+not just "was every named test restored." **Checked, not assumed, for
+the other two splits in this port so far**: commit 1's own message
+names no forward obligation pinned to a bare "commit 4" (its "3 to
+commit 4-6/verified-at-9" entry was always a range, not a single number,
+so the 4/4a/4b insertions — pure additions, never a reassignment of
+scope already promised under the name "commit 4" — cannot have orphaned
+it the way the bare "commit 3" reference was orphaned); commits 3 and 3a's
+own messages were grepped directly for forward references to "commit 4"
+and found none. **The VQ pair is the only orphaned obligation found in
+this port to date, and this commit (5) closes it** (Test plan, below).
 
 ### Ranked falsifiable predictions
 
@@ -829,10 +860,12 @@ landed — reservation's Phase 2 port is complete. Two-tier commits 1
 VQ, replacing the bootstrap PF coefficient in both directions), 4 (the
 UL service-interval floor's state machine plus the new Tier 1.5
 comparator slot it requires), 4a (the floor's grant-sizing bypass,
-FIX-2 plus the real uncapped-to-`max_rbSize` sizing), and 4b (`B_eff`,
-the deficit-accumulated UL grant-sizing target) have now landed — see
-this table's own row 1/row 2/row 3/row 3a/row 4/row 4a/row 4b entries
-above for what each did and confirmed; commits 5-9 not started. Two
+FIX-2 plus the real uncapped-to-`max_rbSize` sizing), 4b (`B_eff`, the
+deficit-accumulated UL grant-sizing target), and 5 (UL's post-grant
+served-split/stamp-fix/deficit-drain, DL's real LCP fill plus its own
+deficit drain) have now landed — see this table's own row 1/row 2/
+row 3/row 3a/row 4/row 4a/row 4b/row 5 entries above for what each did
+and confirmed; commits 6-9 not started. Two
 user decisions (D1, D2) obtained directly and recorded
 above before any code, matching
 `docs/wp-join-plan.md`'s D0a/D0b precedent. Sequencing (D4): reservation
@@ -1072,6 +1105,61 @@ moved — PF/RoundRobin/Reservation records stayed bit-for-bit identical,
 confirming the change stayed scheduler-scoped. Full suite: 480 passed
 (4 new tests, 3 existing call sites updated for `_ul_gbr_and_pdb`'s
 new 7-tuple return).
+
+**Commit 5 landed the post-grant GBR-deficit drain, in both directions,
+plus the real DL LCP fill — closing commit 3a's own "joint VQ-correction
+commit" flag.** Neither direction's deficit had ever been drained
+before this commit (confirmed by grep — one write site each: commit 3's
+own accumulation, plus commit 4's floor-forgiveness reset on UL). Three
+genuinely different "who gets how much of this TB" computations were
+found to coexist in this file, read end to end rather than assumed from
+the deficit-drain lines alone: UL's already-landed VQ drain (commit 3a,
+proportional-by-share); UL's NEW served-split (this commit, a genuine
+greedy priority-order walk — neither `reservation.py`'s own drain, which
+credits the FULL `tb_size` to every active LCG and is a documented bug
+in reservation's own C, nor a proportional split); and DL's real fill
+(structurally almost identical to the commit-1 placeholder it replaces —
+the only change is the tiebreak field, `-bytes_queued` to `-vq_dl`).
+**A real bug found in the CURRENT port, a correction to already-landed
+commit 3**: `_ul_stamp` stamped every active LCG, copied from
+`reservation.py`'s own gate — correct there (reservation credits every
+active LCG regardless of priority), wrong here (two-tier's own greedy
+walk means an unserved LCG should not be stamped, and was). No test
+named `_ul_stamp` directly before this commit, so four commits (3, 3a,
+4, 4a) passed with the gap unexercised — a fourth instance of "a
+mechanism copied from reservation's pattern without checking two-tier's
+own, structurally different C," fixed with a guard test verified to
+actually fail under the reverted code before landing.
+
+**Fill and drain landed together, one commit, NOT split the way
+reservation's were (its commits 5/6) — decided from the C's actual
+shape, not the checklist row's.** Reservation split because its own
+fill fix was a large rewrite (a genuine two-pass SRB/DRB loop replacing
+a placeholder of an entirely different shape); two-tier's fill fix is a
+one-field sort-key swap on a placeholder that already had the right
+structure, so the coupling argument that justified reservation's split
+does not transfer.
+
+**`--check` scored precisely, hits and misses both recorded — see the
+checklist row's own outcome cell above for the full trace.** In brief:
+predicted both directions move; only `study1`/`factory_robots` actually
+moved (UEs 8/9/10's paired GBR+PF UL flows on different LCGs, under
+the overload sweep), 100% attributable to UL — DL's own new machinery
+(fill reorder, deficit drain) is confirmed structurally inert across
+the ENTIRE corpus on two independent grounds (no same-priority DL-flow
+UE anywhere, so the fill's tiebreak never engages even at the one
+candidate UE10 the prediction named; zero DL GBR flows anywhere, so
+the drain has nothing to act on). `sensor_dense`'s predicted UL
+movement was also wrong, explained precisely: no UE there has more
+than one active UL LCG, so the served-split provably reduces to the
+old single-LCG trivial case. Also closed a process finding from this
+same commit: commit 1's own disposition table mapped 2 VQ-ceiling
+tests to "commit 3" by name, orphaned when commit 3 split into 3/3a —
+restored here (rewritten against the real per-flow ceiling formula,
+not the old flat `_virtual_q` structure), alongside
+`test_latency_bound_two_tier_protects_deadlines` (restored essentially
+as-is, only the constructor signature changed). Full suite: 493 passed
+(13 new tests, 3 restored).
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/

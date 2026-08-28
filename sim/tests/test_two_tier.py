@@ -84,7 +84,13 @@ import pytest
 
 from scheduler.flow import FlowConfig
 from scheduler.interfaces import Allocation
-from scheduler.two_tier import TwoTier, _Candidate, _PF_COEF_HYPOTHETICAL_SYMBOLS
+from scheduler.two_tier import (
+    TwoTier,
+    _Candidate,
+    _PF_COEF_HYPOTHETICAL_SYMBOLS,
+    _TIER1_PERIOD_S,
+    _VQ_UL_CATCHUP_N,
+)
 
 
 # -- lightweight, Protocol-conforming fakes -- same pattern
@@ -1304,4 +1310,370 @@ def test_b_eff_gbr_target_exceeding_backlog_sizes_more_prbs_but_caps_bytes_at_ba
     expected_prbs_for_backlog_alone = -(-(100 * 8) // bits_per_rb)
     assert out[0].prbs > expected_prbs_for_backlog_alone, (
         "a deficit-driven target should size more PRBs than raw backlog alone"
+    )
+
+
+# -- 16. commit 5: UL's served-split -- greedy by priority, not proportional
+# or full-credit ---------------------------------------------------------
+
+
+def test_ul_served_split_is_greedy_by_priority_not_proportional_or_full_credit():
+    """post_process_ulsch, gNB_scheduler_ulsch.c:2756-2802. A small TB
+    fully serves the higher-priority LCG first, then whatever remains
+    goes to the next -- NOT reservation.py's own bug (full tb_size
+    credited to every active LCG, CLAUDE.md's "port the code not the
+    comment" rule) and NOT a proportional-by-share split (that's
+    _ul_drain/ia_p5g_drain_vq_ul, a different mechanism on the same
+    tb_size)."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, priority_level=10),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=2, priority_level=90),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=300)
+    buffers.set(1, 2, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+
+    served = sched._ul_served_split(1, buffers, tbs_bytes=500)
+    assert served == [(1, 300), (2, 200)]
+
+
+def test_ul_served_split_a_tb_too_small_leaves_lower_priority_lcgs_unserved():
+    """The lower-priority LCG is left out of the returned list entirely
+    when the TB is exhausted before reaching it -- feeds both the stamp
+    fix and the deficit drain below."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, priority_level=10),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=2, priority_level=90),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+    buffers.set(1, 2, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+
+    served = sched._ul_served_split(1, buffers, tbs_bytes=400)
+    assert served == [(1, 400)]
+
+
+# -- 17. commit 5: the _ul_stamp bug fix -- gated on served, not merely
+# active -------------------------------------------------------------------
+
+
+def test_ul_stamp_only_stamps_lcgs_actually_served_not_merely_active():
+    """Correction to commit 3's own port, found scoping commit 5.
+    Commit 3 copied reservation.py::_ul_drain_and_stamp's own gate
+    (estimated_ul_buffer_per_lcg > 0, "every active LCG") -- correct
+    THERE (reservation credits every active LCG the full TB), wrong
+    HERE (two-tier's own greedy walk means a TB too small to reach a
+    lower-priority LCG leaves it unserved, and the C does not stamp an
+    unserved LCG). Verified to actually fail under the reverted
+    (pre-fix, "stamp every active LCG") code before landing -- both
+    LCGs would stamp under that code; only lcg 1 should stamp here."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, priority_level=10),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=2, priority_level=90),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+    buffers.set(1, 2, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+
+    served = sched._ul_served_split(1, buffers, tbs_bytes=400)
+    sched._ul_stamp(served, 1, slot_index=7)
+
+    state = sched._ue_state[1]
+    assert state.ul_lcg_last_grant_slot.get(1) == 7
+    assert 2 not in state.ul_lcg_last_grant_slot
+
+
+# -- 18. commit 5: UL's post-grant GBR-deficit drain ------------------------
+
+
+def test_ul_deficit_drain_subtracts_served_not_full_tb_size():
+    """gNB_scheduler_ulsch.c:2795-2800. A GBR LCG left unserved by the
+    greedy walk (TB exhausted before reaching it) keeps its deficit
+    UNCHANGED -- not decremented by the raw tb_size the way
+    reservation.py's own (buggy) drain would."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, priority_level=10),
+        FlowConfig(
+            ue_id=1, qfi=2, direction="UL", lcg=2, priority_level=90,
+            flow_class="GBR", gfbr_bps=1_000_000,
+        ),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].ul_lcg_deficit_bytes[1] = 500
+    sched._ue_state[1].ul_lcg_deficit_bytes[2] = 500
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+    buffers.set(1, 2, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+
+    served = sched._ul_served_split(1, buffers, tbs_bytes=400)
+    sched._ul_deficit_drain(served, 1)
+
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[1] == 100  # 500 - 400
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[2] == 500  # unserved, untouched
+
+
+def test_ul_deficit_drain_floors_at_zero():
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1)
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].ul_lcg_deficit_bytes[1] = 100
+
+    sched._ul_deficit_drain([(1, 400)], 1)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[1] == 0
+
+
+def test_ul_vq_drain_still_uses_raw_tb_size_unaffected_by_served_split():
+    """_ul_drain (ia_p5g_drain_vq_ul) is a SEPARATE, proportional-by-
+    share mechanism on the raw tb_size -- confirms it stays proportional
+    (equal split here, equal buffers) rather than picking up the new
+    served-split's all-or-nothing shape ([lcg 1: 400, lcg 2: 0] is what
+    _ul_served_split would give these same buffers at this tb_size)."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, priority_level=10),
+        FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=2, priority_level=90),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].vq_ul[1] = 10000.0
+    sched._ue_state[1].vq_ul[2] = 10000.0
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+    buffers.set(1, 2, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+
+    sched._ul_drain(1, buffers, tb_size_bytes=400)
+    state = sched._ue_state[1]
+    assert state.vq_ul[1] == 10000.0 - 400 * 8 * 0.5
+    assert state.vq_ul[2] == 10000.0 - 400 * 8 * 0.5
+    assert 1 not in sched._ue_state[1].ul_lcg_deficit_bytes  # untouched by VQ drain
+
+
+# -- 19. commit 5: the real DL LCP fill order (priority ASC, vq_dl DESC) ---
+
+
+def test_dl_fill_order_uses_vq_dl_not_bytes_queued_as_tiebreak():
+    """ia_p5g_compute_lcp_budget, ia_p5g_scheduler.c:1945-2000.
+    Deliberately constructed so backlog order and vq_dl order disagree
+    -- flow A has the SMALLER backlog but the LARGER vq_dl; the real
+    order fills A first. The commit-1 placeholder this replaces
+    (-bytes_queued tiebreak) would fill B first -- this test would pass
+    under either rule if the two orderings agreed, which is why they're
+    deliberately put in tension."""
+    sched = TwoTier()
+    flow_a = FlowConfig(ue_id=1, qfi=1, direction="DL", priority_level=50)
+    flow_b = FlowConfig(ue_id=1, qfi=2, direction="DL", priority_level=50)
+    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].vq_dl[1] = 9000.0  # A: small backlog, big vq_dl
+    sched._ue_state[1].vq_dl[2] = 100.0   # B: big backlog, small vq_dl
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100)
+    buffers.set(1, 2, bytes_queued=9000)
+
+    fills = sched._dl_fill([flow_a, flow_b], tbs_bytes=100, buffers=buffers)
+    assert fills == [(1, 100)]  # A (higher vq_dl) filled first, exhausts the TB
+
+
+# -- 20. commit 5: DL's post-grant GBR-deficit drain ------------------------
+
+
+def test_dl_deficit_drain_by_real_delivered_bytes():
+    """gNB_scheduler_dlsch.c:1417-1427 -- drains by the real per-flow
+    fills output, not the raw granted TB."""
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_flow_deficit_bytes[1] = 500
+
+    sched._dl_deficit_drain([(1, 300)], 1)
+    assert sched._ue_state[1].dl_flow_deficit_bytes[1] == 200
+
+
+def test_dl_deficit_drain_skips_flows_that_got_no_fill_bytes():
+    """A flow the fill starved (TB exhausted before reaching it, so it
+    never appears in fills at all) keeps its deficit UNCHANGED."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="DL"),
+        FlowConfig(ue_id=1, qfi=2, direction="DL"),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_flow_deficit_bytes[1] = 500
+    sched._ue_state[1].dl_flow_deficit_bytes[2] = 500
+
+    sched._dl_deficit_drain([(1, 300)], 1)  # qfi 2 never fills -- absent
+    assert sched._ue_state[1].dl_flow_deficit_bytes[1] == 200
+    assert sched._ue_state[1].dl_flow_deficit_bytes[2] == 500
+
+
+def test_dl_deficit_drain_floors_at_zero():
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="DL")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    sched._ue_state[1].dl_flow_deficit_bytes[1] = 100
+
+    sched._dl_deficit_drain([(1, 400)], 1)
+    assert sched._ue_state[1].dl_flow_deficit_bytes[1] == 0
+
+
+# -- 21. commit 5: three restored tests, closing commit 1's own
+# disposition table (docs/phase2-plan.md, next to the commit-9 checklist)
+# --------------------------------------------------------------------------
+
+
+def test_two_tier_virtual_queue_windowed_ceiling():
+    """Restored from test_smoke.py (deleted commit 1, 80609f5), REWRITTEN
+    against the real per-flow ceiling formula -- not restored verbatim.
+    The pre-Phase-2 placeholder this test originally guarded had a single
+    flat `_virtual_q` dict and a simple `target_bps * window_s` cap; the
+    real, ported ceiling (`_update_vq_dl`/`_update_vq_ul`, commit 3a) is
+    per-flow state on `_UeState.vq_dl`/`vq_ul` with a genuinely different
+    formula (DL: arrival-delta-bound; UL: backlog/catchup-bound) -- the
+    old test's own internal-field access (`sched._virtual_q`,
+    `sched.tier1_period`) no longer exists under those names at all.
+
+    Both real ceilings are structurally bounded above by a simple,
+    provable multiple of the Tier-1 target window
+    (`ceiling = max(0, min(x, target_w_bits) - del_w_bits) <= target_w_bits`
+    for DL, `<= _VQ_UL_CATCHUP_N * target_w_bits` for UL) -- asserting
+    against that bound exercises the real end-to-end update path (growth,
+    arrival/delivery history bookkeeping, clamp) without recomputing the
+    exact formula, and still catches a genuine "runaway Q" regression.
+    """
+    from sim.config import CarrierConfig, ScenarioConfig, UEConfig
+    from sim.driver import run
+
+    scenario = ScenarioConfig(
+        name="below_target",
+        horizon_slots=2000,
+        carrier=CarrierConfig(numerology=1, bandwidth_hz=30_000_000),
+        ues=[UEConfig(ue_id=1, mean_snr_db=22.0, coherence_slots=2000)],
+        flows=[
+            FlowConfig(
+                ue_id=1, qfi=9, direction="DL", flow_class="PF",
+                traffic_kind="poisson",
+                traffic_params={"rate_bps": 2_000_000},
+            )
+        ],
+        seed=5,
+    )
+    sched = TwoTier()
+    violations = []
+    orig_allocate = sched.allocate
+
+    def checked_allocate(slot, buffers, channel):
+        result = orig_allocate(slot, buffers, channel)
+        r_bps = sched._targets_bps.get((1, 9), 0.0)
+        target_w_bits = r_bps * _TIER1_PERIOD_S
+        q = sched._ue_state[1].vq_dl.get(9, 0.0)
+        if q > target_w_bits * 1.01 + 1:
+            violations.append((slot.slot_index, q, target_w_bits))
+        return result
+
+    sched.allocate = checked_allocate  # type: ignore[method-assign]
+    run(scenario, sched)
+    assert not violations, f"vq_dl exceeded its provable ceiling: {violations[:3]}"
+
+
+def test_two_tier_windowed_ceiling_protects_bursty_gbr():
+    """Restored, essentially as-is, from test_smoke.py (deleted commit 1,
+    80609f5) -- the only change is TwoTier(tier1_period_slots=2000) ->
+    TwoTier() (no longer a constructor kwarg, docs/phase2-plan.md's own
+    commit-4a finding). No internal-field access, so nothing else about
+    this test's own mechanism has changed.
+
+    Regression guard for the 10-robot finding: a bursty GBR flow sharing
+    a UE with a continuous best-effort flow must not be starved by
+    TwoTier. With the old instantaneous-backlog clamp the bursty flow's
+    Q collapsed between video frames and the continuous PF flow won; the
+    windowed ceiling fixes that. TwoTier should serve the GBR flow at
+    least as well as plain PF does.
+    """
+    from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+    from sim.driver import run
+    from sim.baselines.pf import ProportionalFair
+
+    def scenario():
+        return ScenarioConfig(
+            name="mixed_flow_ue",
+            horizon_slots=8000,
+            carrier=CarrierConfig(numerology=1, bandwidth_hz=20_000_000),
+            tdd=TDDConfig(pattern="DSUUU", s_slot_split=(3, 2, 9)),
+            ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=2000)],
+            flows=[
+                # Bursty GBR video on the same UE as ...
+                FlowConfig(
+                    ue_id=1, qfi=2, direction="UL", flow_class="GBR",
+                    gfbr_bps=6_000_000, pdb_ms=30,
+                    traffic_kind="video_frame",
+                    traffic_params={
+                        "period_ms": 33.33, "avg_bytes": 25_000,
+                        "i_frame_multiplier": 4.0,
+                        "i_frame_period_in_frames": 30,
+                    },
+                ),
+                # ... a continuous best-effort upload competing in the UL pool.
+                FlowConfig(
+                    ue_id=1, qfi=9, direction="UL", flow_class="PF",
+                    pdb_ms=300, traffic_kind="poisson",
+                    traffic_params={"rate_bps": 15_000_000},
+                ),
+            ],
+            seed=4,
+        )
+
+    pf = run(scenario(), ProportionalFair(ewma_window_slots=200))
+    tt = run(scenario(), TwoTier())
+    pf_gbr = pf["flows"]["ue1_qfi2"]["delivery_ratio"]
+    tt_gbr = tt["flows"]["ue1_qfi2"]["delivery_ratio"]
+    assert tt_gbr >= pf_gbr, (
+        f"TwoTier GBR delivery {tt_gbr:.0%} should be >= PF's {pf_gbr:.0%} "
+        "(bursty GBR must not lose to continuous PF on the same UE)"
+    )
+
+
+def test_latency_bound_two_tier_protects_deadlines():
+    """Restored, essentially as-is, from test_smoke.py (deleted commit 1,
+    80609f5) -- the only change is TwoTier(tier1_period_slots=2000) ->
+    TwoTier(). This test's own body never referenced SPS (unlike its
+    sibling test_two_tier_beats_pf_under_pdcch_pressure, still deferred)
+    and directly exercises this commit's own new DL LCP fill + deficit
+    drain (latency_bound_scenario is DL-only).
+
+    In the DL-congested latency-bound scenario, TwoTier must hold the
+    medium-rate interactive (Delay) flows within their PDB while PF,
+    which is deadline-blind, misses some. Guards study 3 of
+    scheduler_study.py.
+    """
+    from sim.scenarios import latency_bound_scenario
+    from sim.baselines.pf import ProportionalFair
+    from sim.driver import run
+
+    sc = latency_bound_scenario()
+    pdb_ms = next(f.pdb_ms for f in sc.flows if f.flow_class == "Delay")
+    delay_keys = [
+        f"ue{f.ue_id}_qfi{f.qfi}" for f in sc.flows if f.flow_class == "Delay"
+    ]
+
+    pf = run(sc, ProportionalFair(ewma_window_slots=200))
+    tt = run(sc, TwoTier())
+
+    def on_time(summary):
+        return sum(
+            1 for k in delay_keys
+            if summary["flows"][k]["delivery_ratio"] >= 0.99
+            and summary["flows"][k]["hol_p99_ms"] <= pdb_ms
+        )
+
+    tt_worst_p99 = max(tt["flows"][k]["hol_p99_ms"] for k in delay_keys)
+    assert on_time(tt) >= on_time(pf), (
+        f"TwoTier on-time {on_time(tt)} should not fall behind PF {on_time(pf)}"
+    )
+    assert tt_worst_p99 <= pdb_ms, (
+        f"TwoTier worst p99 HoL {tt_worst_p99} ms exceeds PDB {pdb_ms} ms"
     )

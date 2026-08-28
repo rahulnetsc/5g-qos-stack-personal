@@ -1278,6 +1278,22 @@ these five, add a new tag rather than forcing it into an existing one.
   two schedulers with one of them's own signature starvation guard
   permanently unexercised — worth stating in that study's own
   limitations section, not just here.
+- `[OPEN: WP9]` **Two-tier's real DL LCP fill and DL deficit drain
+  (commit 5) are confirmed structurally inert across the ENTIRE
+  regression corpus, on two independent grounds — another instance of
+  category (2), the signal exists but no scenario constructs the
+  situation, not a new dormancy category.** The fill's own tiebreak
+  (`priority ASC, vq_dl DESC`, replacing a placeholder's `-bytes_queued`
+  one) only matters when two DL flows on the same UE share a
+  `priority_level` — checked directly, no scenario in the corpus has
+  this, including `factory_robots_scenario`'s own UE10 (two DL flows,
+  but genuinely different priorities). The deficit drain only matters
+  for a `flow_class == "GBR"` DL flow — checked directly, zero exist
+  anywhere in the corpus. Either a scenario with two same-priority DL
+  flows on one UE, or one with a DL GBR flow (5QIs 82-85's
+  delay-critical GBR class, currently UL-only everywhere it's used),
+  would exercise this — a one-line scenario change either way, the same
+  shape as the `mfbr_bps`/`min_rb` entries above.
 - `[OPEN: WP9]` **The follower budget's regime boundary is
   `n_followers_need × min_rb` (previous item) — this entry is the
   scenario-side input to that same product, checked while scoping
@@ -1415,10 +1431,10 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage (updated
-two-tier commit 4a, `docs/phase2-plan.md`, for the new `mfbr_bps`
-shared-unswept-parameter `[OPEN: WP9]` entry — this count is a
-snapshot, re-grep rather than trust it stale): **23 open entries**
-remain (9 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
+two-tier commit 5, `docs/phase2-plan.md`, for the new DL-fill/deficit-
+drain dormancy `[OPEN: WP9]` entry — this count is a
+snapshot, re-grep rather than trust it stale): **24 open entries**
+remain (10 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
 cluster counted once; 8 `[OPEN: PHASE2]`; 2 `[OPEN: HARDWARE]`; 3
 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/DECISION]`) plus whatever
 new items Phase 2/3 add

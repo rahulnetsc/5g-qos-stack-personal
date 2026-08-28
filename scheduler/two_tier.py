@@ -34,17 +34,106 @@ commit removed them from the live scheduler.
 Explicitly NOT here yet, each landing in its own later commit: the
 PHR-based PRB ceiling (structurally out of scope entirely -- not
 merely deferred, see commit 4a's own module-docstring section below),
-the real single-pass SRB-exempt DL LCP fill (commit 5, replacing
-``_dl_fill``'s placeholder below -- see this commit's own note on why
-that makes commit 5 a *joint* VQ-correction commit, not a pure LCP
-one), MCS selection via OLLA (commit 6), and a re-port of
+MCS selection via OLLA (commit 6), and a re-port of
 ``reset_ue``/``SchedulerContextReset`` against the new field layout
 (commit 7) -- this class implements no ``reset_ue`` at all until then;
 ``sim/driver.py`` discovers it via ``getattr(scheduler, "reset_ue",
 None)``, so its absence simply means TwoTier is treated like PF (no
 context reset) in the interim, not an oversight.
 
-**Commit 4b (this commit) lands `B_eff`, the deficit-accumulated UL
+**Commit 5 (this commit) lands the post-grant GBR-deficit drain, in
+both directions, plus the real DL LCP fill -- closing the "joint
+VQ-correction commit" 3a's own docstring flagged.** Neither direction's
+deficit (``ul_lcg_deficit_bytes``/``dl_flow_deficit_bytes``) had ever
+been drained before this commit -- confirmed by grep, one write site
+each (commit 3's own accumulation step; UL also has the floor's own
+forgiveness reset, commit 4).
+
+**UL and DL are NOT the same mechanism wearing two names -- three
+genuinely different "who gets how much of this TB" computations exist
+in this file, read end to end (not just the deficit-drain lines) to
+confirm this.** (1) UL's VQ drain (``_ul_drain``, ``ia_p5g_drain_vq_ul``,
+commit 3a): proportional split of the FULL raw ``tb_size`` by BSR-buffer
+share -- unaffected by this commit. (2) UL's NEW mechanism, this
+commit's own job (``post_process_ulsch``, ``gNB_scheduler_ulsch.c:
+2756-2802``): a genuine greedy priority-order walk (``_ul_served_
+split``) -- neither ``reservation.py``'s own drain (which credits the
+FULL ``tb_size`` to every active LCG, ``CLAUDE.md``'s "port the code not
+the comment" rule, a documented bug in reservation's own C) nor a
+proportional split. Two-tier's own C comment (``:2743-2746``) names
+that exact bug as "the old bug" and this walk as its fix -- **the two
+OAI branches' C genuinely differ here, not a porting error on either
+side.** (3) DL's real fill (``ia_p5g_compute_lcp_budget``,
+``ia_p5g_scheduler.c:1945-2000``): sort DRBs ``(priority ASC, vq_dl
+DESC)``, greedy ``min(backlog, remaining)`` -- structurally almost
+identical to the placeholder it replaces (same sort-then-greedy shape,
+the ONLY change is the tiebreak field, ``-bytes_queued`` to
+``-vq_dl``). DL's own deficit drain lives INSIDE this same fill loop in
+the C (``gNB_scheduler_dlsch.c:1417-1427``), draining by the real
+``lcid_bytes`` each flow got -- the same gate ``_dl_stamp`` already got
+right via ``_dl_fill``'s own ``fills`` list since commit 3a.
+
+**A real bug found in the CURRENT port, a correction to already-landed
+commit 3, not new-mechanism scoping.** ``_ul_stamp`` stamped every LCG
+with ``estimated_ul_buffer_per_lcg > 0``, copied from
+``reservation.py::_ul_drain_and_stamp``'s own gate -- **correct there**
+(reservation credits every active LCG the full TB regardless of
+priority, so "active" and "served" coincide trivially), **wrong here**
+(two-tier's own greedy walk means a small TB with 2+ active LCGs only
+serves the highest-priority one(s); a lower-priority active LCG was
+stamped by this port's prior code but is NOT stamped in the C,
+inflating its apparent freshness and shrinking ``_ul_gbr_and_pdb``'s
+``remaining_pdb`` incorrectly). No test named ``_ul_stamp`` or
+referenced ``ul_lcg_last_grant_slot`` directly before this commit --
+exercised only indirectly through ``_ul_gbr_and_pdb``'s own
+consumption, so four commits (3, 3a, 4, 4a) passed with this gap
+unexercised. **This is what makes the category dangerous -- a pattern
+correct where it was copied FROM, wrong where it landed, with nothing
+built to notice**: the fourth instance of "a mechanism copied from
+reservation's own pattern without checking two-tier's own,
+structurally different C" (after FIX-2 vs. follower budget, ``B_eff``
+vs. ``_ul_grant_target``, and now this). Fixed here as part of building
+the real served-list; the guard test is verified to actually fail
+under the reverted (pre-fix) code before landing, the same standard
+``docs/oai-port-map.md`` rows 29/30's own discriminating tests are
+held to.
+
+**Diffed against reservation's own already-landed commits 5/6, as this
+port's standing discipline requires.** UL diverges (row 29's bug is
+reservation-only, per point (2) above). DL's own drain arithmetic
+genuinely MATCHES reservation's (row 30: stamp and drain update
+together off one value, in one conditional block -- confirmed true of
+two-tier's C too). But reservation SPLIT fill (its commit 6) from drain
+(its commit 5) because ITS OWN fill fix was a large rewrite (a genuine
+two-pass SRB/DRB loop replacing a placeholder of an entirely different
+shape, row 31). **Two-tier's own fill fix is not that -- a one-field
+sort-key swap on a placeholder that already had the right structure.
+The coupling argument that justified reservation's split does not
+transfer; this commit lands fill and drain together**, matching
+``docs/phase2-plan.md`` row 5's own "joint commit" framing rather than
+reservation's split precedent -- decided from the C's actual shape, not
+from the checklist row.
+
+**Both provably-redundant-guard simplifications, stated not hidden**:
+the C's ``if (deficit>0): -=; if(<0): =0`` drain form reduces to an
+unconditional ``max(0, deficit - served_or_delivered)`` in both
+directions, since deficit is provably never negative anywhere else it's
+written (accumulation and, on UL, the floor's own forgiveness reset,
+both floor at 0) -- same category as ``docs/oai-port-map.md`` row 27's
+reservation finding, not a silent simplification.
+
+**A process finding, recorded here and in ``docs/phase2-plan.md`` next
+to the commit-9 checklist: commit 1's own disposition table mapped two
+now-restored tests (the VQ windowed-ceiling pair) to "commit 3" by
+name, written when VQ WAS commit 3's whole scope -- when commit 3 split
+into 3 and 3a, that obligation did not split with it, and neither
+commit restored the pair until this one.** Generalizes: a commit split
+has to re-map its own inherited restoration obligations explicitly, not
+leave them pointing at a number that no longer means what it meant when
+written. Checked, not assumed, that no other split (4/4a/4b) orphaned
+anything else -- see the doc for the full check.
+
+**Commit 4b (already landed) lands `B_eff`, the deficit-accumulated UL
 grant-sizing target, replacing `ue_backlog`-only sizing for ordinary
 (non-floor-fired) DATA UEs.** Ground truth (`ia_p5g_scheduler.c:3195-
 3204`): `ul_target = ul_total_target_bytes; if ul_target < B: ul_target
@@ -1417,11 +1506,12 @@ class TwoTier:
         self, fills: list[tuple[int, int]], ue_id: int, bler: float,
     ) -> None:
         """ia_p5g_drain_vq_dl, ia_p5g_scheduler.c:2002-2035 -- per-LCID,
-        (1-bler)-discounted. See module docstring for the DL-drain-
-        against-placeholder caveat: ground truth drains against
-        dl_lcid_budget (the real LCP fill, commit 5's job), this commit
-        drains against _dl_fill's placeholder split instead -- the
-        arithmetic here is faithful, its input is not, until commit 5.
+        (1-bler)-discounted. As of commit 5, ``fills`` is the real
+        (priority ASC, vq_dl DESC) LCP order (``_dl_fill``), not the
+        commit-1 placeholder this method drained against from commit 3a
+        through commit 4b -- the arithmetic here was always faithful,
+        only its input has now caught up (module docstring's own
+        "joint VQ-correction commit" note).
         """
         state = self._ue_state[ue_id]
         delivery_rate = max(0.0, min(1.0, 1.0 - bler))
@@ -1429,23 +1519,135 @@ class TwoTier:
             delivered_bits = byts * 8.0 * delivery_rate
             state.vq_dl[qfi] = max(0.0, state.vq_dl.get(qfi, 0.0) - delivered_bits)
 
-    def _ul_stamp(self, ue_id: int, buffers: BufferView, slot_index: int) -> None:
-        """Last-grant-slot stamping only. Gated per-active-LCG on
-        estimated_ul_buffer_per_lcg > 0, matching reservation.py::
-        _ul_drain_and_stamp's own (found-and-fixed) stamp gate --
-        iterates self._flows directly, not the candidate's already-
-        filtered flow list, so a crumb-gated-to-zero-report LCG with a
-        real per-LCG estimate still gets stamped.
+    def _dl_deficit_drain(
+        self, fills: list[tuple[int, int]], ue_id: int,
+    ) -> None:
+        """gNB_scheduler_dlsch.c:1417-1427 -- drains dl_flow_deficit_bytes
+        by the real per-flow delivered bytes (fills, the real LCP order
+        as of this commit), gated implicitly on fills' own "only flows
+        that got bytes" contract (if take > 0: fills.append(...),
+        _dl_fill). The unconditional max(0, ...) form is a confirmed-
+        equivalent simplification of the C's `if (deficit>0): -=;
+        if(<0): =0` -- deficit is provably never negative anywhere else
+        it's written (the accumulation step's own window-cap floors at
+        0, and it's the only other writer), so the two forms are
+        identical; a provably-redundant guard, same category as
+        docs/oai-port-map.md row 27's reservation one and _ul_deficit_
+        drain's own identical simplification above.
         """
         state = self._ue_state[ue_id]
+        for qfi, byts in fills:
+            state.dl_flow_deficit_bytes[qfi] = max(
+                0, state.dl_flow_deficit_bytes.get(qfi, 0) - byts
+            )
+
+    def _ul_served_split(
+        self, ue_id: int, buffers: BufferView, tbs_bytes: int,
+    ) -> list[tuple[int, int]]:
+        """post_process_ulsch, gNB_scheduler_ulsch.c:2756-2802 -- commit 5.
+
+        A genuine greedy priority-order allocation walk, NOT a
+        proportional split (that's _ul_drain/ia_p5g_drain_vq_ul, a
+        DIFFERENT mechanism on the SAME tb_size -- ground truth runs
+        both, independently, and this port keeps them independent too)
+        and NOT reservation.py's own drain (which credits the FULL
+        tb_size to every active LCG -- CLAUDE.md's "port the code not
+        the comment" rule, a documented bug in reservation's own C).
+        Two-tier's own C comment (:2743-2746) names that exact bug as
+        "the old bug" and this walk as its fix -- the two OAI branches'
+        C genuinely differ here, not a porting error on either side.
+
+        Build the active-LCG set (estimated_ul_buffer_per_lcg > 0,
+        deduped by LCG via self._flows, same pattern _ul_gbr_and_pdb/
+        _ul_drain already use), sort ascending by the representative
+        flow's priority_level, then walk tbs_bytes: each LCG in order
+        gets served = min(remaining, available). Only LCGs with
+        served > 0 are returned -- a TB too small to reach every active
+        LCG leaves the rest out entirely, feeding both the stamp and
+        the deficit drain below.
+
+        Tie-break note: every 5QI in FIVE_QI_PRIORITY has a distinct
+        priority value (scheduler/flow.py), so a tie requires two
+        DIFFERENT LCGs whose representative flows both fall back to
+        DEFAULT_PRIORITY_LEVEL -- unreached on this corpus, not chased
+        further. Python's stable sort (LCG-ascending among ties) is not
+        proven identical to the C's own non-stable exchange sort in
+        that case; flagged, not fixed, since it's provably unreachable
+        here.
+        """
+        candidates: list[tuple[int, int, int]] = []  # (priority, lcg, available)
         seen_lcgs: set[int] = set()
         for f in self._flows:
             if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
                 continue
-            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+            available = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
+            if available <= 0:
                 continue
             seen_lcgs.add(f.lcg)
-            state.ul_lcg_last_grant_slot[f.lcg] = slot_index
+            candidates.append((f.priority_level, f.lcg, available))
+        candidates.sort(key=lambda c: c[0])
+
+        served: list[tuple[int, int]] = []
+        remaining = tbs_bytes
+        for _priority, lcg, available in candidates:
+            if remaining <= 0:
+                break
+            s = min(remaining, available)
+            if s <= 0:
+                continue
+            served.append((lcg, s))
+            remaining -= s
+        return served
+
+    def _ul_stamp(
+        self, served: list[tuple[int, int]], ue_id: int, slot_index: int,
+    ) -> None:
+        """Last-grant-slot stamping, gated on served > 0 -- corrects a
+        bug in commit 3's own port, found scoping commit 5.
+
+        Commit 3 gated this on estimated_ul_buffer_per_lcg > 0 ("every
+        active LCG"), copied from reservation.py::_ul_drain_and_stamp's
+        own gate -- CORRECT there, since reservation credits every
+        active LCG the full tb_size regardless of priority, so "active"
+        and "served" coincide trivially. Two-tier's own C does NOT
+        coincide: post_process_ulsch's greedy priority walk (see
+        _ul_served_split) means a small TB with 2+ active LCGs only
+        serves the highest-priority one(s) -- a lower-priority active
+        LCG is not stamped in the C, but was stamped by this port's own
+        prior code, inflating its apparent freshness and shrinking
+        _ul_gbr_and_pdb's remaining_pdb incorrectly. A fourth instance
+        of "a mechanism copied from reservation's own pattern without
+        checking two-tier's own, structurally different C" (after
+        FIX-2 vs. follower budget, B_eff vs. _ul_grant_target). No test
+        named _ul_stamp or referenced ul_lcg_last_grant_slot directly
+        before this commit -- exercised only indirectly through
+        _ul_gbr_and_pdb's own consumption, so four commits (3, 3a, 4,
+        4a) passed with this gap unexercised.
+        """
+        state = self._ue_state[ue_id]
+        for lcg, _byts in served:
+            state.ul_lcg_last_grant_slot[lcg] = slot_index
+
+    def _ul_deficit_drain(
+        self, served: list[tuple[int, int]], ue_id: int,
+    ) -> None:
+        """post_process_ulsch, gNB_scheduler_ulsch.c:2795-2800 -- drains
+        ul_lcg_deficit_bytes by the modelled served bytes (from
+        _ul_served_split), NOT the full tb_size -- the fix two-tier's
+        own C comment names explicitly (see _ul_served_split). The
+        unconditional max(0, ...) form is a confirmed-equivalent
+        simplification of the C's `if (deficit>0): -=; if(<0): =0` --
+        deficit is provably never negative anywhere else it's written
+        (accumulation and the floor's own forgiveness both floor at 0),
+        so the two forms produce identical results; a provably-
+        redundant guard, the same category as docs/oai-port-map.md
+        row 27's reservation one, not silently simplified.
+        """
+        state = self._ue_state[ue_id]
+        for lcg, byts in served:
+            state.ul_lcg_deficit_bytes[lcg] = max(
+                0, state.ul_lcg_deficit_bytes.get(lcg, 0) - byts
+            )
 
     def _ul_drain(
         self, ue_id: int, buffers: BufferView, tb_size_bytes: int,
@@ -1803,7 +2005,9 @@ class TwoTier:
         bler: float,
     ) -> list[Allocation]:
         if direction == "UL":
-            self._ul_stamp(ue_id, buffers, slot_index)
+            served = self._ul_served_split(ue_id, buffers, tbs_bytes)
+            self._ul_stamp(served, ue_id, slot_index)
+            self._ul_deficit_drain(served, ue_id)
             self._ul_drain(ue_id, buffers, tbs_bytes)
             self._ul_floor_track_crumb_run(ue_id, prbs_used)
             # The gNB sizes the block; the UE fills it (TS 38.321
@@ -1823,6 +2027,7 @@ class TwoTier:
         fills = self._dl_fill(ue_flows, tbs_bytes, buffers)
         self._dl_stamp(fills, ue_id, slot_index)
         self._dl_drain(fills, ue_id, bler)
+        self._dl_deficit_drain(fills, ue_id)
         out: list[Allocation] = []
         for i, (qfi, byts) in enumerate(fills):
             out.append(
@@ -1839,20 +2044,22 @@ class TwoTier:
     def _dl_fill(
         self, ue_flows: list[FlowConfig], tbs_bytes: int, buffers: BufferView
     ) -> list[tuple[int, int]]:
-        """Placeholder DL fill -- priority order, then backlog. NOT the
-        real single-pass SRB-exempt LCP
-        (``ia_p5g_compute_lcp_budget``/``nr_generate_dlsch_pdu``,
-        ``docs/phase2-plan.md`` sec2.1) -- that sorts DRBs by
-        ``(priority ASC, vq_dl DESC)``. Upgraded in commit 5 (also then
-        a joint VQ-correction commit -- see module docstring), mirroring
-        how reservation's own commit-1 placeholder was upgraded in its
-        commit 6.
+        """The real single-pass SRB-exempt LCP fill,
+        ``ia_p5g_compute_lcp_budget``, ``ia_p5g_scheduler.c:1945-2000``
+        -- landed commit 5, replacing commit 1's placeholder. Sort DRBs
+        ``(priority ASC, vq_dl DESC)``, greedy ``min(backlog,
+        remaining)`` per flow -- structurally identical to the
+        placeholder it replaces (same sort-then-greedy shape); the ONLY
+        change is the tiebreak field, ``-bytes_queued`` to ``-vq_dl``.
+        Pass 0 (SRB) is not applicable -- ``FlowConfig`` has no SRB
+        representation, same disposition as ``reservation.py``'s own
+        commit 6 (``docs/oai-port-map.md`` row 31).
         """
         order = sorted(
             ue_flows,
             key=lambda f: (
                 f.priority_level,
-                -buffers.state(f.ue_id, f.qfi).bytes_queued,
+                -self._ue_state[f.ue_id].vq_dl.get(f.qfi, 0.0),
             ),
         )
         fills: list[tuple[int, int]] = []
