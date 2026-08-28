@@ -694,26 +694,43 @@ class Reservation:
     key (here, Python's ``sorted``) produces the grant order.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, min_rb: int = 5) -> None:
+        # min_rb: UL's follower-budget floor (nrmac->min_grant_prb) --
+        # a deliberate operator/experimenter choice for the calibration
+        # campaign, not a physical constant. See module docstring's
+        # commit-4 section for the full provenance and why DL's own
+        # floor (_DL_FOLLOWER_MIN_RB_SIZE) is a separate constant.
+        #
+        # A CONSTRUCTOR kwarg as of WP9 commit 0, mirroring TwoTier's own
+        # (``two_tier.py``, its commit 4), because a host that constructs
+        # the scheduler is the only place that gets to choose this:
+        # ``sim/driver.py`` calls ``configure()`` with three positional
+        # arguments and no way to pass a fourth, so before this the value
+        # was pinned at the literal default on every run the driver made,
+        # and WP9's min_rb axis (docs/wp9-plan.md D1) could not move the
+        # Reservation arm at all. Pure plumbing: no behaviour changes at
+        # the default.
         self._flows: list[FlowConfig] = []
         self._ue_state: dict[int, _UeState] = {}
-        self.min_rb: int = 5
+        self.min_rb: int = min_rb
 
     def configure(
         self,
         flows: list[FlowConfig],
         slot_duration_s: float,
         grid: GridView,
-        min_rb: int = 5,
+        min_rb: int | None = None,
     ) -> None:
-        # min_rb: UL's follower-budget floor (nrmac->min_grant_prb) --
-        # a deliberate operator/experimenter choice for the calibration
-        # campaign, not a physical constant. See module docstring's
-        # commit-4 section for the full provenance and why DL's own
-        # floor (_DL_FOLLOWER_MIN_RB_SIZE) is a separate constant.
+        # ``None`` means "not supplied", and is NOT the same as 0 --
+        # sim/tests/test_reservation.py's own follower-budget tests pass
+        # min_rb=0 deliberately, to isolate the clamp from the floor, so
+        # a truthiness fallback here (``min_rb or self.min_rb``) would
+        # silently rewrite their 0 back to 5 and quietly delete what
+        # those two tests exist to check.
         self._flows = list(flows)
         self.slot_duration_s = slot_duration_s
-        self.min_rb = min_rb
+        if min_rb is not None:
+            self.min_rb = min_rb
         self._ue_state = {f.ue_id: _UeState() for f in flows}
 
     def allocate(

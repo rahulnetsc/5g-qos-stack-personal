@@ -1771,3 +1771,50 @@ def test_grant_sizing_now_reads_the_persisted_mcs_index():
     assert len(out) == 1
     expected_bytes = (out[0].prbs * 4800) // 8
     assert out[0].bytes_capacity == expected_bytes
+
+
+# -- WP9 commit 0: min_rb plumbing ----------------------------------------
+# Pure plumbing, no behaviour change at the default. These three tests
+# exist because the failure mode is silent: before this commit a caller
+# could set min_rb and see it accepted, then have it overwritten by
+# configure()'s own default on the very next call the driver made.
+
+
+def test_constructor_min_rb_survives_configure():
+    """The bug this commit fixes. sim/driver.py calls configure() with
+    three positional args and no way to pass a fourth, so a constructor-
+    time min_rb had to survive configure() or be silently pinned at 5 on
+    every driver-made run -- which is what it was."""
+    sched = Reservation(min_rb=20)
+    assert sched.min_rb == 20
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
+    # Exactly the call sim/driver.py:157 makes -- three positional args.
+    sched.configure(flows, 0.0005, _grid())
+    assert sched.min_rb == 20
+
+
+def test_configure_min_rb_zero_is_not_treated_as_unset():
+    """0 is a real, deliberately-used value (the follower-budget tests
+    above pass it to isolate the clamp from the floor), so the fallback
+    must test `is None`, not truthiness. A `min_rb or self.min_rb`
+    implementation passes every other test in this file and silently
+    rewrites those two fixtures' 0 back to 5."""
+    sched = Reservation(min_rb=5)
+    flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
+    sched.configure(flows, 0.0005, _grid(), min_rb=0)
+    assert sched.min_rb == 0
+
+
+def test_constructor_min_rb_reaches_the_follower_budget():
+    """Not just stored -- actually consumed. Two needy followers at
+    min_rb=20 must reserve 40 PRBs where the default 5 would reserve 10,
+    so the value has a live path from __init__ to the budget formula and
+    is not merely an attribute nothing reads."""
+    assert _ul_follower_budget(
+        bwp_size=100, n_followers_need=2,
+        min_rb=Reservation(min_rb=20).min_rb, has_srb=False,
+    ) == 60
+    assert _ul_follower_budget(
+        bwp_size=100, n_followers_need=2,
+        min_rb=Reservation().min_rb, has_srb=False,
+    ) == 90

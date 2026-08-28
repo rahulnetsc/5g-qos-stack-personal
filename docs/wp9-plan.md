@@ -534,7 +534,7 @@ executes.
 
 | # | Commit | Predicted `--check` movement | Outcome |
 |---|---|---|---|
-| 0 | `Reservation` `min_rb` plumbing (B1) | **None** — `OK — no drift` | |
+| 0 | `Reservation` `min_rb` plumbing (B1) | **None** — `OK — no drift` | **Landed. Prediction HIT**, on the stated grounds: `OK -- no drift`, 516 passed (3 new). Verified both directions — the corpus path is byte-identical, *and* `Reservation(min_rb=20)` through the driver now produces genuinely different output, so the fix does something rather than only being accepted. **One real trap found, not hypothetical**: `configure()`'s fallback must test `is None`, not truthiness — `test_reservation.py`'s two follower-budget fixtures pass `min_rb=0` deliberately, and the truthiness variant was written and run, failing 3 tests. `docs/oai-port-map.md` row 78. |
 | 0b | BSR-desync fault-model feasibility check (read-only, no code) | n/a — no code | |
 | 1 | Sweep infrastructure (B2–B6), incl. the §6.4 rule as code | **None** — no `sim/`/`scheduler/` behaviour touched | |
 | 2 | Stage 1 (screening), ≤ 4 h; **N=2 control read first** | n/a | |
@@ -614,5 +614,6 @@ GT-2 on hardware remains the only test of that failure mode.**
 
 ## 10. Status
 
-**Plan approved; not yet started.** Commit sequence: 0 → 0b → 1 → stage 1
-(N=2 control read first) → stage 2 → the map.
+**Commit 0 landed** (prediction hit, `--check` clean, port-map row 78).
+Next: 0b (read-only feasibility check) → 1 (infrastructure + the §6.4 rule as
+code) → stage 1, N=2 control read first → stage 2 → the map.
