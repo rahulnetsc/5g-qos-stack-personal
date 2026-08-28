@@ -1324,6 +1324,25 @@ these five, add a new tag rather than forcing it into an existing one.
   present) before the fade begins, so a real deficit exists at the
   reconnection moment for `"mac"` scope to retain — a scenario-design
   change, not a code change, and its own commit if picked up.
+- `[OPEN: WP9]` **TwoTier's own UL PRB utilization FALLS as offered load
+  rises through `study1`'s (`factory_robots_scenario`) mult2.0→3.0
+  sweep — counterintuitive, an open question, not an explained one,
+  found producing commit 8's old-vs-new delta table
+  (`docs/phase2-two-tier-delta.md` §2).** Four data points: new arm
+  0.617 (mult2.0) → 0.432 (mult3.0), falling as more capacity/load is
+  offered. The pre-Phase-2 old arm does not show the same shape over
+  the same range (0.858 → 0.601, still falling but from a much higher
+  base, and with its own trough earlier, at mult1.5's 0.798, rising
+  again after) — so this is not simply "utilization falls with mult in
+  general," it is specific to the rewritten scheduler's own behavior in
+  this regime. Plausibly related to commit 5's own confirmed UL
+  served-split/deficit-drain effect on this scenario's UEs 8/9/10
+  (`docs/oai-port-map.md` row 69), layered onto the delta table's own
+  oracle/SPS/max-min framing, but not decomposed — this could turn out
+  to be a real property of the ported scheduler under GBR overload (a
+  genuine finding) or a bug nobody has looked for yet, and WP9's own
+  regime sweep runs exactly this range, so it will surface either way
+  if picked up as its own investigation rather than assumed benign.
 - `[OPEN: WP9]` **The follower budget's regime boundary is
   `n_followers_need × min_rb` (previous item) — this entry is the
   scenario-side input to that same product, checked while scoping
@@ -1461,10 +1480,10 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage (updated
-two-tier commit 7, `docs/phase2-plan.md`, for the new `reset_ue`
-mac-scope-VQ-retention dormancy `[OPEN: WP9]` entry — this count is a
-snapshot, re-grep rather than trust it stale): **25 open entries**
-remain (11 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
+two-tier commit 8, `docs/phase2-plan.md`, for the new UL-PRB-utilization-
+falls-with-load `[OPEN: WP9]` entry — this count is a
+snapshot, re-grep rather than trust it stale): **26 open entries**
+remain (12 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
 cluster counted once; 8 `[OPEN: PHASE2]`; 2 `[OPEN: HARDWARE]`; 3
 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/DECISION]`) plus whatever
 new items Phase 2/3 add

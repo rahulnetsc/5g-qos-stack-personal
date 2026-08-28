@@ -716,7 +716,7 @@ is the corpus-breaking commit, name it as such)
 | 5 | **Landed.** UL's post-grant served-split (`_ul_served_split`, `docs/oai-port-map.md` row 67) — a genuine greedy priority-order walk, neither `reservation.py`'s own full-credit bug nor a proportional split (`_ul_drain`, unaffected). Feeds a fix to commit 3's own `_ul_stamp` (row 68, a fourth "copied from reservation's pattern without checking two-tier's own C" instance) and UL's post-grant GBR-deficit drain, never built before this commit (row 69). DL: the real LCP fill (`ia_p5g_compute_lcp_budget`, priority ASC/vq_dl DESC — structurally almost identical to the commit-1 placeholder it replaces, only the tiebreak field changes) landed TOGETHER with DL's own deficit drain (row 70) — **not split the way reservation's fill/drain were**, decided from the C's actual shape: reservation's own fill fix was a large rewrite justifying a split, two-tier's is a one-field sort-key swap that doesn't need one. Both provably-redundant-guard drain simplifications (`max(0, deficit-x)` for the C's `if(deficit>0): -=; if(<0): =0`) stated, not hidden (row 69/70). Restored 3 of commit 1's own disposition-table tests (the 2 VQ windowed-ceiling tests, orphaned by the 3/3a split — see the process-finding note above the commit-9 row; `test_latency_bound_two_tier_protects_deadlines`, rewritten only for the `TwoTier()` constructor signature). | **Predicted both directions move (`factory_robots`/`sensor_dense` as UL candidates, `factory_robots`'s UE10 as a DL candidate) — scored, hits and misses both recorded, not assumed clean.** Actual: only `study1`/`factory_robots` moved (all 4 overload multipliers, 979 mismatches, all `TwoTier`; PF/RoundRobin/Reservation unchanged) — `sensor_dense`/`latency_bound` showed zero movement. Traced to source: `factory_robots`'s movement is 100% UL (UEs 8/9/10 each pair a GBR flow, always higher-priority, with a PF flow on a different LCG — row 69); DL contributed nothing anywhere in the corpus, confirmed on two independent grounds — no UE anywhere has two same-priority DL flows (so the fill's tiebreak never engages, including UE10, where the two flows' priorities genuinely differ — the specific DL prediction was wrong), and no DL flow in the corpus is GBR-class (so the drain never has anything to act on, row 70). `sensor_dense`'s predicted UL movement was also wrong, explained precisely: it has no UE with more than one active UL LCG, so the served-split provably reduces to the old single-LCG trivial case. Full suite: 493 passed (13 new tests, 3 restored). |
 | 6 | **Landed.** MCS-selection call site (`docs/oai-port-map.md` row 72) + OLLA follow-on (row 73), landed as ONE commit — the shared-helper reuse row 6's own forward note anticipated is confirmed TRUE (`scheduler/link.py`'s functions are genuinely scheduler-agnostic, no new helper needed), the first of three checked forward-looking notes in this port to hold. `_OLLA_OFFSET = 0` confirmed independently against two-tier's own C (byte-identical `gNB_scheduler_primitives.c`, identical call-site gates, `rounds[]` increment sites live in two-tier's own `post_process_ulsch`/`_dlsch`) — the same disposition reservation's own commit 9 landed, not merely inherited by assumption. | **D2(i)/(ii)/(iii) blocked, for the identical reason reservation's own commit 9 already found — the D2 decision record's own checklist does not survive contact with ground truth, a second time.** No drift to predict (i); no live ratchet for the compounding test (ii); `README.md` §8's existing entry updated in place, not flipped to `[RESOLVED]` (iii). `--check` against a commit-5 worktree baseline: `OK — no drift`, predicted and proven directly (a staircase-boundary equivalence test, not sampled at midpoints) before running. |
 | 7 | **Landed.** `reset_ue`/`SchedulerContextReset` (`docs/oai-port-map.md` rows 74/75) — the "required re-port" framing itself checked, not inherited: genuinely re-derived per field from the Protocol's own scope semantics (the field set now spans commits 1-6, not "2-5" as this row's own stale note said before this commit's doc pass). Reservation's own D6 ("document, don't implement") does NOT transfer — checked structurally: two-tier has no unconditional-per-slot mutator analogous to reservation's thr-EWMA, so state genuinely freezes during an outage rather than converging on its own. `"mac"` scope lands as a no-op regardless — every field independently justified (deficit/VQ explicitly Protocol-mandated; last-grant-slot and MCS index self-correcting; the 9 floor fields traced directly against the C, surviving an explicit challenge during planning). `"full"` scope replaces `_UeState()` wholesale and re-seeds `_arr_hist`/`_del_hist` from current cumulative counters. 6 of 7 commit-1-flagged tests restored; 1 retired (dead mechanism); 1 WP-Join test attempted, found empirically wrong, retired with the finding recorded (row 76). **Also confirmed, cheaply ahead of commit 8**: the pre-rewrite `scheduler/` package runs against current `sim/` unmodified (row 77) — commit 8's delta table will be a genuine live side-by-side. | **Both halves scored separately, as predicted**: inert on `--check` (`OK — no drift` against a commit-6 worktree baseline, confirmed — no WP-Join scenario runs in the base corpus) but NOT inert on the test suite (511 passed, up from 498 — 13 new/restored tests, 1 retired with a documented empirical finding rather than force-passed). |
-| 8 | **Old-vs-new TwoTier delta comparison — its own commit, prerequisite to commit 9.** Run the pre-Phase-2 `two_tier.py` (checked out from git history) and the rewritten one side-by-side on the same seeds/scenarios; commit the full per-record delta table as `docs/phase2-two-tier-delta.md`. This is the last point the old numbers are directly comparable to the new ones outside git history. | N/A — a comparison artifact commit, not a code change; must land before commit 9. |
+| 8 | **Landed.** Old-vs-new TwoTier delta comparison (`docs/phase2-two-tier-delta.md` §2) — the pre-Phase-2 `scheduler/` package (`two_tier.py` AND its matched-pair `tier1.py`, row 77's own procedure, extended this commit to also overlay `scripts/regression_corpus.py`/`scheduler_study.py` so the old `-nomaxmin`/`-adaptive` arms reconstruct too) run against CURRENT `sim/`, alongside current HEAD's own capture. Framed with the three regression-corpus scenarios as a gradient (study3: no old-arm privileges, a near-parity control; study1: growing gap with GBR-overload capacity; study2: SPS's own namesake scenario, the largest gap) rather than three independent numbers — the ORDERING is the evidence that the gap is privilege-attributable, not a broken rewrite. The 8 variant-arm records, freshly captured, are numerically identical to §1's own already-captured table — cross-checked, confirmed unaffected by `sim/` drift since `dc1ab6a`. A genuine open question found producing the table (new arm's own UL PRB utilization falling as offered load rises through study1's mult2.0→3.0) named as a standing question, not folded into the attribution paragraph — `README.md` §8's new `[OPEN: WP9]` entry. | N/A — a comparison artifact commit, no scheduler code changed; `uv run pytest sim/tests -q` as a sanity check only, no `--check`/`--capture` (that's commit 9, gated on this commit). |
 | 9 | Re-capture the 16 existing TwoTier regression records — the sanctioned re-baseline. Commit message states why the major movers moved (stale-2000-slot-default fix, real UL VQ formula, real DL LCP, SPS removal), citing commit 8's delta table rather than re-deriving the explanation. Verification must explicitly check `harq_masked_flow_double_grant_count == 0` across every corpus record for both schedulers. **Also verify every test commit 1's own disposition table marked restore-at-N was actually restored by the commit it names** — see the renumbering-orphaned-obligation note below, found scoping commit 5. | Intended, documented `--capture` — not silencing an unexplained diff. |
 
 **A process finding, found scoping commit 5, not just a restoration**:
@@ -863,11 +863,12 @@ comparator slot it requires), 4a (the floor's grant-sizing bypass,
 FIX-2 plus the real uncapped-to-`max_rbSize` sizing), 4b (`B_eff`, the
 deficit-accumulated UL grant-sizing target), 5 (UL's post-grant
 served-split/stamp-fix/deficit-drain, DL's real LCP fill plus its own
-deficit drain), 6 (MCS-selection call site + OLLA follow-on, D2), and 7
-(`reset_ue`/`SchedulerContextReset`) have now landed — see this table's
-own row 1/row 2/row 3/row 3a/row 4/row 4a/row 4b/row 5/row 6/row 7
-entries above for what each did and confirmed; commits 8-9 not started.
-Two user decisions (D1, D2) obtained directly and recorded
+deficit drain), 6 (MCS-selection call site + OLLA follow-on, D2), 7
+(`reset_ue`/`SchedulerContextReset`), and 8 (the old-vs-new delta
+table, `docs/phase2-two-tier-delta.md` §2) have now landed — see this
+table's own row 1/row 2/row 3/row 3a/row 4/row 4a/row 4b/row 5/row 6/
+row 7/row 8 entries above for what each did and confirmed; commit 9 not
+started. Two user decisions (D1, D2) obtained directly and recorded
 above before any code, matching
 `docs/wp-join-plan.md`'s D0a/D0b precedent. Sequencing (D4): reservation
 first, two-tier second.
@@ -1278,6 +1279,49 @@ archived numbers.
 confirmed exactly — inert on `--check` as predicted (no WP-Join scenario
 in the base corpus), but NOT inert on the test suite (511 passed, up
 from 498).
+
+**Commit 8 landed the old-vs-new TwoTier delta comparison
+(`docs/phase2-two-tier-delta.md` §2), the only Phase 2 two-tier commit
+that produces no scheduler code.** Row 77's own procedure (overlay the
+pre-rewrite `scheduler/` package onto current `sim/`) extended this
+commit: `scripts/regression_corpus.py`/`scripts/scheduler_study.py`
+also need overlaying to reconstruct the old `-nomaxmin`/`-adaptive`
+arms, which the current scripts dropped at commit 1. Freshly captured
+against current `sim/`, those 8 variant-arm records are numerically
+identical to §1's own already-captured (pre-`sim/`-drift) table —
+cross-checked directly, confirming §1 is still valid evidence, not
+re-derived.
+
+**The three regression-corpus scenarios were framed as a gradient, not
+three independent numbers, per the user's own explicit instruction —
+the ordering is the evidence, not any single delta.** `study3` (DL-
+only, none of the old arm's privileges apply) is a near-parity control:
+new arm very slightly ahead (0.4665 vs 0.4481). `study1`'s low
+multipliers (moderate load, max-min mostly non-binding) stay close to
+that control; its high multipliers (GBR overload, max-min's own
+designed binding regime) open a large old-arm-favoring gap. `study2`
+(`sensor_dense_scenario`, PDCCH-limited by construction — SPS's own
+namesake constraint) shows the single largest gap in the table,
+precisely where the old arm's strongest privilege applies. This
+ordering is what licenses reading the gaps as privilege-attributable
+rather than as a broken rewrite.
+
+**A genuine open question surfaced building the table, named as a
+standing question rather than folded into the attribution paragraph**:
+new arm's own UL PRB utilization FALLS as offered load rises through
+`study1`'s mult2.0→3.0 (0.617→0.432) — the old arm does not show the
+same shape over the same range. Plausibly related to commit 5's own
+confirmed UE-8/9/10 effect on this scenario, but not decomposed — a
+full attribution across 5+ confounded factors (5 commits with confirmed
+`--check` movement, plus the old arm's own 4 privileges) needs
+dedicated mechanism-isolated re-runs per delta, stated as a scoping
+boundary this commit does not attempt, not a decomposition silently
+skipped. `README.md` §8's new `[OPEN: WP9]` entry carries the full
+four-data-point record for WP9's own regime sweep to pick up.
+
+No `--check`/`--capture` — this commit touches no scheduler code, the
+whole point of its own framing. `uv run pytest sim/tests -q` as a
+sanity check only: still 511 passed.
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/

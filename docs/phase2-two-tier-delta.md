@@ -11,11 +11,11 @@ two-tier rewrite (`docs/phase2-plan.md`'s commit checklist):
    ground truth — see `README.md` §7), so this is the last point their
    effect is checkable against a live run rather than only against git
    history and `design-docs/scheduler-study.md`'s prose.
-2. **Old-vs-new TwoTier delta** (commit 8) — the full per-record
+2. **Old-vs-new TwoTier delta** (commit 8, landed) — the per-record
    comparison of the pre-Phase-2 `two_tier.py` (tagged
    `phase2-pre-twotier-rewrite`, `dc1ab6a`) against the rewritten one,
    run side-by-side on the same seeds/scenarios. Prerequisite to commit
-   9's re-capture. Not yet written.
+   9's re-capture.
 
 ## 1. Pre-removal variant-arm comparison (commit 1)
 
@@ -64,38 +64,129 @@ than that:
 
 ## 2. Old-vs-new TwoTier delta (commit 8)
 
-Not yet written — lands with commit 8, comparing
-`phase2-pre-twotier-rewrite` (`dc1ab6a`) against the rewritten scheduler
-on the same seeds/scenarios. Its own framing must note that this
-comparison is partly a comparison *against* non-ground-truth mechanisms:
-the old scheduler's default `TwoTier` arm ran with `gbr_maxmin=True` by
-default, itself one of the mechanisms §1 above and `README.md` §7 flag as
-absent from `docs/phase2-plan.md` §2.1's Tier-1 ground truth — so a
-"faithful new port vs. old Python" framing is not accurate on every row;
-some of the delta is old-Python-exceeds-hardware vs. new-Python-matches-
-hardware, not old-approximation vs. new-precision.
+**This is not a faithful-port-vs-faithful-port comparison, and the
+table below should be read with that stated first, not as a footnote.**
+The old scheduler's default `TwoTier` arm ran `gbr_maxmin=True`,
+`enable_sps=True`, `demand_estimator="oracle"` (perfect knowledge of
+each flow's *future* offered rate — not an unfaithful estimate, one no
+real scheduler could ever produce), and `tier1_period_slots=2000`
+(1.0s, against the deployed macro's real 0.1s, `CLAUDE.md`'s own
+stale-default invariant). None of `gbr_maxmin`/the adaptive dual-ascent
+penalty/network slicing/the hard-floor override/the lexicographic
+two-phase structure (`gbr_contract_bps` is the concrete function
+implementing the max-min stage's own per-flow floor, §1's own subject)
+have any citation in `ia_p5g_scheduler.c` (`docs/oai-port-map.md` rows
+39-40, five ungrounded mechanisms, permanent loss). Where the table
+below shows the old arm ahead, the first question is whether that
+margin is real scheduling-policy fidelity or one of these five
+privileges plus the oracle — not "the rewrite regressed."
 
-**A second, distinct instance of the same framing problem, added at
-commit 2**: the old scheduler's `demand_estimator` also defaulted to
+**The three regression-corpus scenarios form a gradient in exactly how
+many of those privileges apply, and the ordering is the evidence — more
+convincing than any single number on its own.** Captured this commit,
+`phase2-pre-twotier-rewrite` (`dc1ab6a`)'s own `scheduler/` package
+(both `two_tier.py` and its matched-pair `tier1.py`, row 77's exact
+procedure) run against CURRENT `sim/`, alongside current HEAD's own
+capture:
+
+| scenario | privileges in play | old delivery ratio | new delivery ratio |
+|---|---|---:|---:|
+| study3/latency_bound (DL-only) | none — no SPS (UL-only), max-min/oracle margin doesn't bind on this DL-only, non-GBR-overload shape | 0.4481 | 0.4665 |
+| study1/overload_mult1.0-1.5 | oracle + max-min, moderate load | 0.4493 / 0.5839 | 0.4813 / 0.5887 |
+| study1/overload_mult2.0-3.0 | oracle + max-min, GBR overload (max-min's own binding regime) | 0.8526 / 0.8862 | 0.6023 / 0.6134 |
+| study2/pdcch_limited (sensor_dense) | + SPS, this scenario's own namesake constraint | 0.9999 | 0.3924 |
+
+**study3 (DL-only, no SPS relevance, no GBR-overload for max-min to
+bind on) is the closest thing this project has to a controlled
+comparison — new arm is very slightly AHEAD (0.4665 vs 0.4481) with
+none of the old arm's privileges able to explain a gap either
+direction.** This is what licenses reading the other three rows as
+privilege-attributable rather than as a broken rewrite: the gap grows
+exactly as more of the old arm's ungrounded advantages come into play,
+not uniformly. study1's low-mult rows (moderate load, max-min mostly
+non-binding per §1's own finding that the stage self-disables once the
+GBR set is jointly feasible) show a small, new-arm-favoring gap similar
+to study3's control. study1's high-mult rows (max-min's own designed
+binding regime, GBR overload) flip to a large old-arm-favoring gap.
+study2 — SPS's own namesake scenario (`sensor_dense_scenario`, PDCCH-
+limited by construction; SPS's entire purpose is bypassing per-slot
+DCI/CCE contention for periodic flows) — shows the single largest gap
+in the whole table, specifically where the old arm's own strongest,
+most directly-applicable privilege applies.
+
+**Attribution to the new arm's own lineage where plausible, not an
+undifferentiated diff.** Five commits are confirmed to have moved
+`--check`-tracked metrics across commits 1-7: **1** (SPS/old-Tier-1
+removal, the UL/DL ordering fix, the corrected blanket-decay EWMA — 4
+confounded causes, not separable from aggregate `--check` alone), **3**
+(DL's real sort tiers; UL moved too, but via `HarqProcessPool`'s shared
+iteration order, not `_ul_rank_key` itself), **3a** (the VQ port, the
+largest single movement in this whole lineage), **4b** (`B_eff`, the
+GFBR and frozen-BSR mechanisms), **5** (UL-only, `factory_robots`'s
+UEs 8/9/10 specifically, the served-split/deficit-drain fix). study1's
+own UL PRB utilization is consistent with commit 5's confirmed
+UEs-8/9/10 effect layering onto the oracle/SPS/max-min gap above,
+though fully decomposing a delta across 5+ confounded factors (each of
+the five commits above, plus the four old-arm privileges) would need
+dedicated mechanism-isolated re-runs per row — not this commit's own
+job, stated as a scoping boundary rather than a decomposition not
+actually done.
+
+**An open question, not an explained one, found producing this
+table**: new arm's own UL PRB utilization FALLS as offered load rises
+through `study1`'s mult2.0→3.0 (0.617 → 0.432) — counterintuitive, more
+load should mean more PRBs used, not fewer. Old arm's own UL
+utilization does not show this (0.858 → 0.601, still falling but from
+a much higher base and a different shape entirely — old's own trough is
+at mult1.5, 0.798, rising again after). Plausibly related to commit 5's
+own UE-8/9/10 mechanism, but not decomposed here (see the attribution
+paragraph above) — named as a standing question, not absorbed into that
+paragraph's attribution, since it is exactly the kind of pattern that
+turns out to be either a real property of the ported scheduler under
+overload or a bug nobody has looked for yet, and WP9 runs precisely
+this regime. `README.md` §8 carries the full four-data-point entry.
+
+**The 8 `-nomaxmin`/`-adaptive` variant-arm records are still
+constructible from the old package** (its own `scripts/regression_
+corpus.py`/`scripts/scheduler_study.py` need overlaying alongside
+`scheduler/` — row 77's procedure covers `scheduler/` only, extended
+here) — **freshly captured against current `sim/` this commit, and
+numerically IDENTICAL to §1's own already-captured table**, cross-
+checked directly, not assumed: `ue10_qfi2`'s `delivery_ratio`/
+`throughput_bps` match at every mult (e.g. mult1.0: `0.0785`/`581072`
+both times). §1's own table is confirmed still valid, unaffected by
+`sim/`'s own drift since `dc1ab6a` — cite it directly for what removing
+max-min/the adaptive penalty cost or saved; not re-derived here.
+
+**A second, distinct instance of the oracle-vs-real framing, added at
+commit 2**: the old scheduler's `demand_estimator` defaulted to
 `"oracle"` — every pre-Phase-2 `TwoTier` record ran Tier-1 with perfect
-knowledge of each flow's *future* offered rate, not merely an unfaithful
-estimate but one no real scheduler could ever produce (`README.md` §7).
-So commit 8's comparison is, on top of the `gbr_maxmin` point above,
-also partly old-scheduler-with-an-oracle vs. new-scheduler-without-one —
-a second, independent reason a reader should not default to "the rewrite
-introduced a regression" when the new arm performs differently, before
-first checking whether the old arm's number was ever achievable on real
-hardware in the first place. State both points together in commit 8's
-own framing, not just the `gbr_maxmin` one alone.
+knowledge of each flow's *future* offered rate (`README.md` §7). A
+second, independent reason not to default to "the rewrite introduced a
+regression" when the new arm performs differently, before checking
+whether the old arm's number was ever achievable on real hardware.
 
-**A third caveat for commit 8's own methodology, added at commit 2**:
+**A third caveat for this table's own methodology, added at commit 2**:
 `scheduler/tier1.py::solve_tier1` has a confirmed, non-porting-defect
 property — its SCA loop does not always converge to a smooth interior
 optimum for two same-direction, near-equal-SE flows with comparable
-weighted coefficients (`docs/oai-port-map.md` row 39). Once commit 3's
-VQ makes Tier-1's output observable in scheduling outcomes, a seed-to-
-seed or scenario-to-scenario old-vs-new delta on such a flow pair may
-show what looks like noise or instability that is actually this
-deterministic-but-non-smooth oscillation, not a comparison artifact or a
-bug in either arm — worth checking against this finding before
-attributing an odd delta to something else.
+weighted coefficients (`docs/oai-port-map.md` row 39). A seed-to-seed
+or scenario-to-scenario old-vs-new delta on such a flow pair may show
+what looks like noise or instability that is actually this
+deterministic-but-non-smooth oscillation, not a comparison artifact or
+a bug in either arm.
+
+**Five dormancy categories plus two shared unswept config parameters
+in the NEW arm, stated so the comparison above is not read as a
+full-capability contest in either direction**: (1) signal structurally
+absent (`has_srb`/`do_sched`/TA/PHR since WP1); (2) signal exists but no
+scenario constructs the situation (e.g. `mfbr_bps` never configured
+anywhere); (3) not applicable (e.g. DL fill order, the SRB LCP pass);
+(4) the UL floor's own BSR/SR-desync-fault dormancy, no scenario
+constructs the fault; (5) PHR, sim-only and confirmed inert on real
+hardware. Plus two shared, unswept parameters (`min_grant_prb`,
+`mfbr_bps`) pinned at values that keep real, already-ported mechanisms
+inactive in BOTH schedulers. None of these explain the deltas above —
+both old and new arms are compared as actually run — but a reader
+should not additionally read the new arm's own dormant capability as a
+further deficiency on top of the four privileges already named.
