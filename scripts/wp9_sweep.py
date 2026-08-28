@@ -113,25 +113,104 @@ def _build(seed: int, **axis_values):
 _HORIZON = [20_000]
 
 
+# Timeseries fields, stripped before a record is persisted. See _RecordSink.
+_TS_FLOW_FIELDS = (
+    "ts_backlog_bytes", "ts_hol_delay_s", "ts_delivered_bytes",
+    "ts_arrived_bytes", "ts_dropped_bytes",
+)
+_TS_SYSTEM_FIELDS = (
+    "ts_dl_prbs_used", "ts_ul_prbs_used", "ts_dl_prbs_avail",
+    "ts_ul_prbs_avail", "ts_cce_used", "ts_cce_budget",
+)
+
+# The scoring-parameter variations (§3), computed ONLINE. Each is free in
+# runs but not in bytes -- see _RecordSink's docstring.
+_SCORING_VARIATIONS = (
+    ("survival_miss_n", (2, 3, 5)),          # M04 -- "report H6 as f(N)"
+    ("t_live_s", (1.0, 2.0, 4.0)),           # M03/M14 -- T_live is [OPEN: HARDWARE]
+    ("gbr_contract_fraction", (0.90, 0.95, 0.99)),   # M07/M08
+    ("slo_green_dwell_s", (0.5, 1.0, 2.0)),  # M19
+)
+
+
 class _RecordSink:
-    """Build item B3. One JSONL per stage; records are what make M13/M16 and
-    the scoring-parameter variations computable without re-running."""
+    """Build item B3, with a size fix found by measurement before stage 1 ran.
+
+    The original design persisted every RunRecord whole. Measured, that is
+    **1.88 MB per record at horizon 4,000 / N=4, 17.9 MB at 20,000 / N=8 and
+    82.7 MB at 20,000 / N=32** -- stage 1's ~1,680 runs would have written
+    tens of gigabytes, and a smoke grid of 45 tiny records already produced
+    84 MB. The timeseries arrays are essentially all of it.
+
+    So anything needing the per-slot series is computed HERE, while the
+    record is in memory, and the persisted record has those arrays stripped:
+
+      - M16 (needs ts_hol_delay_s on both flows of the bearer pair);
+      - the four scoring-parameter variations, of which M04 and M19 read the
+        timeseries and M03/M14/M07/M08 do not.
+
+    What survives on the stripped record is everything else -- per-flow
+    byte/latency aggregates, message and frame ledgers, join events -- so
+    M13 (which needs only per-flow GBR data across an ordered load column)
+    and any later re-inspection still work without a re-run. That was B3's
+    actual purpose; persisting the series as well was not.
+    """
 
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self._fh = path.open("w")
+        self._sc = Scorecard()
         self.n = 0
+        self.online_rows: list[dict] = []
 
     def __call__(self, record: RunRecord, axis_values: dict) -> None:
-        self._fh.write(json.dumps(
-            {"axis_values": axis_values, "record": record.to_dict()}) + "\n")
+        self._online_metrics(record, axis_values)
+        self._fh.write(json.dumps({
+            "axis_values": axis_values,
+            "record": _strip_timeseries(record.to_dict()),
+        }) + "\n")
         self.n += 1
+
+    def _online_metrics(self, record: RunRecord, axis_values: dict) -> None:
+        tag = {**axis_values, "scheduler": record.scheduler_name,
+               "seed": record.seed}
+        try:
+            m16 = self._sc.correlate_flows(record, (1, 1), (1, 82))
+            self.online_rows.append(
+                {"metric": "M16", **tag, "status": m16.status, "value": m16.value})
+        except (KeyError, StopIteration):
+            pass
+        for name, values in _SCORING_VARIATIONS:
+            for v in values:
+                scores = self._sc.score(record, **{name: v})
+                for mid in ("M03", "M04", "M07", "M08", "M14", "M19"):
+                    r = scores.get(mid)
+                    if r is None:
+                        continue
+                    self.online_rows.append({
+                        "metric": mid, "variation": name, "variation_value": v,
+                        **tag, "status": r.status, "value": r.value,
+                    })
 
     def close(self):
         self._fh.close()
 
 
-def _study_layer_metrics(records: list[tuple[dict, RunRecord]], out_dir: Path) -> None:
+def _strip_timeseries(d: dict) -> dict:
+    """Null the per-slot arrays. Measured at 82.7 MB/record without this."""
+    for fr in d.get("flows", {}).values():
+        for f in _TS_FLOW_FIELDS:
+            if f in fr:
+                fr[f] = None
+    sysrec = d.get("system")
+    if isinstance(sysrec, dict):
+        for f in _TS_SYSTEM_FIELDS:
+            if f in sysrec:
+                sysrec[f] = None
+    return d
+
+
+def _study_layer_metrics(records: list[tuple[dict, RunRecord]]) -> list[dict]:
     """Build item B6: M13 and M16, which `Scorecard.score()` deliberately
     does NOT compute -- M13 is a cross-run load-ramp metric and M16 needs a
     named flow pair. A runner that forgets these silently under-reports two
@@ -158,22 +237,11 @@ def _study_layer_metrics(records: list[tuple[dict, RunRecord]], out_dir: Path) -
         rows.append({"metric": "M13", "n_ues": n_ues, "scheduler": arm,
                      "seed": seed, "status": res.status, "value": res.value})
 
-    # -- M16: the T1/T2 bearer pair -- UL telemetry (5QI 1) against DL
-    # -- command (5QI 82). NOT one bidirectional bearer: this simulator keys
-    # -- flows by (ue_id, qfi) with no direction term, so the hardware plan's
-    # -- shared-bearer construct cannot be represented (sim/parametric.py's
-    # -- _QFI_COMMAND note, docs/wp9-plan.md §5).
-    for axis_values, rec in records:
-        try:
-            res = sc.correlate_flows(rec, (1, 1), (1, 82))
-        except (KeyError, StopIteration):
-            continue
-        rows.append({"metric": "M16", **axis_values,
-                     "scheduler": rec.scheduler_name, "seed": rec.seed,
-                     "status": res.status, "value": res.value})
+    # M16 and the scoring-parameter variations are computed ONLINE by
+    # _RecordSink (they need the timeseries, which is stripped before a
+    # record is persisted) -- see that class's docstring.
 
-    (out_dir / "study_layer_metrics.json").write_text(json.dumps(rows, indent=2))
-    print(f"  study-layer metrics (M13/M16): {len(rows)} rows")
+    return rows
 
 
 def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
@@ -205,8 +273,11 @@ def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
     sink.close()
 
     write_csv(rows, str(out_dir / "stage1_rows.csv"))
-    print(f"  {len(rows)} rows, {sink.n} records -> {out_dir}")
-    _study_layer_metrics(kept, out_dir)
+    study_rows = _study_layer_metrics(kept) + sink.online_rows
+    (out_dir / "study_layer_metrics.json").write_text(json.dumps(study_rows, indent=2))
+    mb = (out_dir / "records.jsonl").stat().st_size / 1e6
+    print(f"  {len(rows)} rows, {sink.n} records ({mb:.1f} MB) -> {out_dir}")
+    print(f"  study-layer + scoring-variation rows: {len(study_rows)}")
 
     # -- the gate, run as committed code, output recorded verbatim ---------
     arm_pairs = [("PF", "Reservation"), ("PF", "TwoTier"), ("Reservation", "TwoTier")]
