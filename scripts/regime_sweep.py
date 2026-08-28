@@ -64,15 +64,44 @@ class SweepCell:
     scenario: ScenarioConfig
 
 
+def axis_aware(factory: Callable[..., Scheduler]) -> Callable[..., Scheduler]:
+    """Mark a scheduler factory as wanting the cell's axis values.
+
+    WP9 (docs/wp9-plan.md, build item B2) needs `min_rb` as an axis, and
+    `min_rb` is an *arm-config* value -- it reaches the scheduler through
+    its constructor, not through the ScenarioConfig `build_scenario`
+    produces. So some factories need the cell's axis values and some
+    don't.
+
+    This is an explicit opt-in rather than signature introspection on
+    purpose: `ProportionalFair` is passed as a bare class in existing
+    callers and its __init__ *does* accept parameters
+    (`ewma_window_slots`), so "call with axis values if the signature
+    accepts arguments" would call `ProportionalFair(min_rb=...)` and
+    raise. A marker attribute cannot guess wrong.
+
+        schedulers={
+            "PF": ProportionalFair,                                  # unchanged
+            "Reservation": axis_aware(lambda min_rb, **_: Reservation(min_rb=min_rb)),
+        }
+
+    The factory is called as `factory(**axis_values)`, so it should take
+    `**_` to ignore the axes it doesn't care about.
+    """
+    factory._regime_sweep_axis_aware = True  # type: ignore[attr-defined]
+    return factory
+
+
 def sweep(
     axes: dict[str, list],
     build_scenario: Callable[..., ScenarioConfig],
     schedulers: dict[str, Callable[[], Scheduler]],
     n_seeds: int = 10,
     base_seed: int = 0,
-    driver_kwargs: Optional[dict] = None,
+    driver_kwargs: Optional[dict] | Callable[..., dict] = None,
     scorecard: Optional[Scorecard] = None,
     metric_overrides: Optional[dict] = None,
+    record_sink: Optional[Callable[[RunRecord, dict[str, Any]], None]] = None,
 ) -> list[dict[str, Any]]:
     """Run every (cell, scheduler, seed) combination and return tidy rows.
 
@@ -84,12 +113,22 @@ def sweep(
 
     Each row: {**axis_values, "scheduler": name, "seed": seed,
                "record_id": ..., <flattened per-metric fields>}.
-    Metrics needing extra arguments (M13, M16) are not included -- call
-    them separately over the returned RunRecords (not returned by this
-    function to keep row size bounded; re-run build_scenario + run() with
-    the same seed if you need the full RunRecord back for those).
+
+    ``driver_kwargs`` may be a plain dict (the same kwargs for every cell,
+    as before) or a callable ``f(**axis_values) -> dict``, for axes that
+    are driver knobs rather than scenario properties (WP9's
+    ``sr_period_slots`` / ``k2_slots``). A dict is not callable, so the
+    two cases are distinguishable without a flag.
+
+    ``record_sink(record, axis_values)``, if given, is called once per run
+    with the full RunRecord. Metrics needing extra arguments (M13, M16)
+    are still not in the returned rows -- M13 is a cross-run metric and
+    M16 needs a named flow pair -- but with a sink the caller can compute
+    them, and re-score at different panel defaults, WITHOUT re-running:
+    ``Scorecard.score()`` takes overrides and ``RunRecord.to_dict()``
+    round-trips. Rows stay bounded; records go to the sink.
     """
-    driver_kwargs = driver_kwargs or {}
+    driver_kwargs = {} if driver_kwargs is None else driver_kwargs
     scorecard = scorecard or Scorecard()
     metric_overrides = metric_overrides or {}
     seeds = paired_seeds(n_seeds, base_seed)
@@ -98,15 +137,23 @@ def sweep(
     rows: list[dict[str, Any]] = []
     for combo in itertools.product(*axes.values()):
         axis_values = dict(zip(axis_names, combo))
+        dk = driver_kwargs(**axis_values) if callable(driver_kwargs) else driver_kwargs
         for seed in seeds:
             sc = build_scenario(seed=seed, **axis_values)
             for sched_name, factory in schedulers.items():
-                summary = run(sc, factory(), **driver_kwargs)
+                sched = (
+                    factory(**axis_values)
+                    if getattr(factory, "_regime_sweep_axis_aware", False)
+                    else factory()
+                )
+                summary = run(sc, sched, **dk)
                 rec = RunRecord.from_summary(
                     scenario_name=sc.name, scheduler_name=sched_name, seed=seed,
-                    flow_configs=sc.flows, summary=summary, arm=dict(driver_kwargs),
+                    flow_configs=sc.flows, summary=summary, arm=dict(dk),
                     meta=dict(axis_values),
                 )
+                if record_sink is not None:
+                    record_sink(rec, axis_values)
                 scores = scorecard.score(rec, **metric_overrides)
                 row: dict[str, Any] = {
                     **axis_values,

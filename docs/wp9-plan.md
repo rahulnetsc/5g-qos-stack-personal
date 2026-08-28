@@ -433,6 +433,25 @@ and the hardware campaign** and is filled in for real at commit 4.
 | **G11** *(3 seeds, no CI — see the inline-qualifier rule below)* | One soak cell with GT-7.1's actual KPI — monotonic drift in internals, a within-run check. Three runs reported individually | A shift-length claim (30 min sim ≠ 60 min RF), and **no cross-seed claim of any kind**: n=3 supports no bootstrap CI |
 | **G1/G5 absolute ms** | Shape, crossover, ordering | Certifiable latency — the rfsim OWD floor and real RF are both outside this model |
 
+**A simulator limitation found building the runner, and what it costs
+M16.** `sim/run_record.py::flow_key` keys a flow by `(ue_id, qfi)` with **no
+direction term**, so a UL and a DL flow sharing a 5QI collide and one
+silently disappears from every metric. The hardware plan §1's T1/T2
+construct — DL commands riding the UL telemetry bearer in reverse — is
+therefore **not representable here**. Caught by measurement, not review: the
+first base scenario configured 8 flows and reported 6.
+
+Consequence, stated rather than worked around: WP9 models T2 as its own
+5QI (82, delay-critical GBR — the same one `factory_robots` uses for its DL
+control loop), so **M16's "shared-bearer correlation" is a correlation
+between two bearers, not within one**. The UL/DL-degrade-together question
+(G1/G2/G3's shared-bearer half, and `IA_P5G_Guarantee_Validation_Suite.md`
+T2's "a robot both blind and unresponsive at once") is answered here only to
+that approximation, and the G1/G2/G3 rows above carry it. Fixing it properly
+means adding a direction term to flow keying, which touches `RunRecord`,
+`Metrics`, every scenario and the frozen corpus — out of scope for WP9, and
+its own commit if ever taken up.
+
 **Inline-qualifier rule for G11 (and any other reduced-seed row).** Every G11
 row — in this table, in commit 4's regime map, and in any roll-up derived from
 either — **states its own seed count and "no CI" inline**, exactly the way the
