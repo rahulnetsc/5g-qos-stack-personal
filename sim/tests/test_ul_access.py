@@ -52,9 +52,69 @@ def test_no_trigger_when_buffer_was_already_nonempty():
     ul._state[1].pending = False  # simulate: already resolved by a grant
     ul._state[1].gnb_sr_flag = False
 
+    # "A standing grant/BSR path in flight" is bytes_reported > 0 -- state
+    # this explicitly rather than leaving it at the BufferModel default.
+    # WP9: before that fix, this fixture left bytes_reported at 0, which is
+    # not the state the docstring describes but the STALL state (backlogged,
+    # nothing reportable, no grant possible). The old single-trigger code
+    # could not tell the two apart, so the fixture passed for the wrong
+    # reason -- CLAUDE.md's own "any new fixture must include a post-grant
+    # state" discipline, caught here on an existing one.
+    buffers.state(1, 1).bytes_reported = 100
     buffers.enqueue(1, 1, 50, 0.001)  # buffer was 100 > 0 before this arrival
     ul.on_arrivals({(1, 1): 50}, buffers)
     assert ul._state[1].pending is False
+
+
+def test_trigger_when_backlogged_but_nothing_reportable():
+    """The converse of the test above, and the WP9 trigger's unit-level
+    guard: same already-nonempty buffer, but bytes_reported == 0, so there
+    is NO standing BSR path -- a regular BSR is pending and no UL-SCH
+    resource is available (TS 38.321 sec5.4.4). An SR must arm, or the
+    flow is starved permanently (docs/wp9-plan.md sec8b).
+
+    Together these two tests pin the distinction the pre-WP9 code could not
+    make: "already nonempty" alone is not a reason to stay silent -- what
+    matters is whether anything is reportable.
+    """
+    buffers = BufferModel()
+    buffers.register(1, 1, is_ul=True, lcg=0)
+    ul = UlAccessModel([_flow(1)], _SLOT_S)
+
+    buffers.enqueue(1, 1, 100, 0.0)
+    ul.on_arrivals({(1, 1): 100}, buffers)
+    ul._state[1].pending = False
+    ul._state[1].gnb_sr_flag = False
+
+    buffers.state(1, 1).bytes_reported = 0   # the stall: nothing reportable
+    buffers.enqueue(1, 1, 50, 0.001)
+    ul.on_arrivals({(1, 1): 50}, buffers)
+    assert ul._state[1].pending is True
+
+
+def test_trigger_when_stalled_even_with_no_arrival_this_slot():
+    """The committed fix evaluates the second trigger EVERY slot, not only
+    on slots carrying an arrival -- deliberately broader than the worktree
+    diagnostic that first demonstrated the defect (docs/wp9-plan.md sec8c).
+
+    The spec conditions the SR on the pending BSR and the absent grant, not
+    on new data, so a flow that stalls and then goes quiet must still
+    recover. A diagnostic-shaped implementation (new test nested under the
+    `arrived <= 0` skip) passes every other test in this file and fails
+    this one.
+    """
+    buffers = BufferModel()
+    buffers.register(1, 1, is_ul=True, lcg=0)
+    ul = UlAccessModel([_flow(1)], _SLOT_S)
+
+    buffers.enqueue(1, 1, 100, 0.0)
+    ul.on_arrivals({(1, 1): 100}, buffers)
+    ul._state[1].pending = False
+    ul._state[1].gnb_sr_flag = False
+    buffers.state(1, 1).bytes_reported = 0
+
+    ul.on_arrivals({}, buffers)              # no arrival at all this slot
+    assert ul._state[1].pending is True
 
 
 def test_tick_fires_sr_on_the_next_occasion_and_sets_gnb_flag():
@@ -365,3 +425,61 @@ def test_sr_preserves_delivery_on_the_branch_s_main_scenario():
         f"shouldn't matter when PRBs, not access latency, are the limit"
     )
     assert mean_with_sr > 0.6, f"delivery {mean_with_sr:.1%} unexpectedly low for this scenario"
+
+
+# -- WP9: the never-empties stall -----------------------------------------
+
+
+def test_sr_rearms_for_a_flow_whose_backlog_never_empties():
+    """The deadlock WP9's arm-divergence investigation found
+    (docs/wp9-plan.md sec8b), and the reason this module needed a second
+    SR trigger.
+
+    `on_arrivals`' empty->non-empty test is the ONLY pre-WP9 trigger, so a
+    flow whose backlog never returns to zero can never raise another SR.
+    That matters because `bytes_reported` is
+    `max(0, estimated_ul_buffer - sched_ul_bytes)`: once `sched_ul_bytes`
+    overruns the estimate -- which the crumb-collapse gate is designed to
+    allow -- it clamps to 0, and `sched_ul_bytes` resets only inside
+    `BsrModel.on_ul_grant`, which needs a grant, which needs
+    `bytes_reported > 0`. `BsrModel.pending` re-arms correctly every 5ms
+    and cannot help: nothing can consume it.
+
+    TS 38.321 sec5.4.4 triggers an SR on a pending regular BSR with no
+    UL-SCH resource available -- exactly the missing valve.
+
+    Traced pre-fix at this configuration: the flow stalls at slot 14 and
+    never recovers, backlog growing monotonically to 184,989 bytes by slot
+    799 with zero further grants. Asserted on BACKLOG rather than on
+    utilisation, so the test states the failure the user would see (a flow
+    that stops being served) rather than a threshold that could drift.
+    """
+    from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+    from sim.baselines.pf import ProportionalFair
+
+    scenario = ScenarioConfig(
+        name="wp9_never_empties",
+        horizon_slots=800,
+        carrier=CarrierConfig(bandwidth_hz=40_000_000, numerology=2),
+        tdd=TDDConfig(pattern="DSUUU"),
+        ues=[UEConfig(ue_id=1, mean_snr_db=20.0, coherence_slots=2000)],
+        # 20 kB every 20 ms = 8 Mbps offered, on a ~110 Mbps carrier: the
+        # cell is nowhere near capacity, so anything but near-full delivery
+        # here is the access chain, not contention.
+        flows=[FlowConfig(
+            ue_id=1, qfi=9, direction="UL", flow_class="PF", pdb_ms=300.0,
+            traffic_kind="deterministic",
+            traffic_params={"period_ms": 20.0, "bytes_per_period": 20_000},
+        )],
+        seed=1,
+    )
+    summary = run(scenario, ProportionalFair(ewma_window_slots=200),
+                  cqi_delay_slots=8)
+    flow = summary["flows"]["ue1_qfi9"]
+
+    # Pre-fix this reads ~0.03; the flow is starved from slot 14 onward.
+    assert flow["delivery_ratio"] > 0.5, (
+        f"UL flow starved by the SR-trigger gap: delivered "
+        f"{flow['bytes_delivered']} of {flow['bytes_arrived']} bytes "
+        f"({flow['delivery_ratio']:.3f}) on an uncongested carrier"
+    )

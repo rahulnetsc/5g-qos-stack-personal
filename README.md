@@ -528,7 +528,14 @@ they survive it:
     sort tiers, target-based sizing, and follower budget do not visibly
     differentiate it from bare PF here, despite all three being live and
     (per the table above) genuinely exercised at this scenario.
-  - **Study 2 (PDCCH-limited)**: Reservation is visibly *worse* than PF
+  - **Study 2 (PDCCH-limited)**. **These figures are PRE-FIX -- produced
+    under the SR-trigger defect (see the `[RESOLVED]` entry in §8), which
+    moved every record in this study. Post-fix: PF 9.5M / 20 of 30 /
+    0.708 UL util; Reservation 7.4M / 15 of 30 / 0.479; TwoTier 8.8M /
+    23 of 30 / 0.930. Reservation being visibly worse than PF SURVIVES;
+    the utilization anomaly below does NOT -- it inverts, and was an
+    artifact of the defect.** As measured pre-fix:
+    Reservation is visibly *worse* than PF
     (4.1M total / 9 of 30 on-time vs PF's 4.8M / 14 of 30), UL PRB
     utilization *higher* than PF's (61.7% vs 41.1%) despite delivering
     fewer bytes, and a sharp bimodal per-UE p99 split (roughly half the
@@ -1233,7 +1240,7 @@ these five, add a new tag rather than forcing it into an existing one.
   Tier-1 boundary leak. The other unpredicted, larger-magnitude movements
   (non-GBR UL flows, Delay-class UL flows) are their own `[OPEN: WP9]`
   items above.
-- `[OPEN: SIM-DEFECT]` **A UL flow whose backlog never returns to zero is
+- `[RESOLVED]` **A UL flow whose backlog never returns to zero was
   permanently starved: `sim/ul_access.py` gates the SR on an
   empty->non-empty transition, so nothing can break the `sched_ul_bytes`
   gate's own deadlock. Found by WP9's paused arm-divergence investigation
@@ -1269,6 +1276,21 @@ these five, add a new tag rather than forcing it into an existing one.
   prediction, a port-map row, a guard test, and a **re-baseline decision
   that must record that the published Study 1-3 figures were produced
   under the defect** rather than silently replacing them.
+  **CLOSED by WP9's fix commit**: `sim/ul_access.py::on_arrivals` gained
+  TS 38.321 §5.4.4's real trigger (a pending regular BSR with no UL-SCH
+  resource available), evaluated every slot. Corpus re-captured -- the
+  first sanctioned re-baseline since `a5f6baa` -- at **5,689 mismatches
+  across 15 of 20 records** (not "22"; see the §9 correction below).
+  Prediction scored two hits, one miss: `study3` unmoved exactly as
+  predicted (no UL traffic), magnitude above the diagnostic's 5,470, but
+  `study1/overload_mult1.0/PF` did **not** move as predicted. Re-derived
+  before capturing rather than waved through: the new trigger fires once
+  in that entire run (vs 201 for Reservation at the same point), because
+  `study1` scales *capacity* and at its most-congested point PF's grants
+  are too scarce to overrun the estimate at all. The miss corroborates
+  the mechanism -- the arms differ in how fast grant sizing drives the
+  overrun -- rather than undermining it. `docs/oai-port-map.md` row 79,
+  `docs/wp9-plan.md` §8c.
 - `[OPEN: WP9]` **`min_rb=5` (reservation commit 4's follower budget) was
   chosen to prevent grant starvation and keep the SR/BSR chain reporting,
   not derived from any physical constant — and the follower budget's

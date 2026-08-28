@@ -151,6 +151,34 @@ class UlAccessModel:
         in the ground truth are simplified away (a judgment call -- see
         `docs/oai-port-map.md`).
 
+        Second trigger (WP9): a pending regular BSR with no UL-SCH resource
+        available -- TS 38.321 sec5.4.4, and the condition retxBSR-Timer
+        expiry itself sets. **This is a third divergence from
+        `nr_update_sr`, and unlike the two simplifications above it was not
+        conservative**: without it, a UL flow whose backlog never returns to
+        zero can never raise another SR, and the empty->non-empty test below
+        is the only other trigger. Combined with the `sched_ul_bytes` gate
+        (`bytes_reported = max(0, estimated_ul_buffer - sched_ul_bytes)`)
+        that is a permanent stall -- `sched_ul_bytes` resets only inside
+        `BsrModel.on_ul_grant`, which needs a grant, which needs
+        `bytes_reported > 0`, while `BsrModel.pending` re-arms every 5ms
+        with nothing able to consume it. Traced per-slot and measured
+        corpus-wide in `docs/wp9-plan.md` sec8b/sec8c.
+
+        `backlog > 0 and nothing reportable across every flow of this UE` is
+        the proxy for the spec's condition, and is faithful given this
+        simulator's structure: every scheduler's UL eligibility gate reads
+        `bytes_reported`, so all-zero means no grant can be issued, and live
+        backlog means a regular BSR is pending or due. `BsrModel.pending` is
+        deliberately NOT consulted -- `UlAccessModel` holds no reference to
+        `BsrModel`, and wiring one would couple two modules kept independent
+        on purpose. A judgment call, recorded rather than hidden.
+
+        Note the second trigger is evaluated EVERY slot, not only on slots
+        carrying an arrival: the spec conditions the SR on the pending BSR
+        and the absent grant, not on new data, and a flow that stalls and
+        then goes quiet must still recover.
+
         Call once per slot, after arrivals are enqueued but before `tick()`
         -- same ordering constraint as `BsrModel.on_arrivals`.
         """
@@ -158,11 +186,12 @@ class UlAccessModel:
             st = self._state[ue_id]
             if st.pending or st.gnb_sr_flag or st.rach_recovery_until is not None:
                 continue
+            states = [buffers.state(f.ue_id, f.qfi) for f in flows]
             arrived = sum(per_flow_arrived.get((f.ue_id, f.qfi), 0) for f in flows)
-            if arrived <= 0:
-                continue
-            total_now = sum(buffers.state(f.ue_id, f.qfi).bytes_queued for f in flows)
-            if total_now - arrived <= 0:
+            total_now = sum(s.bytes_queued for s in states)
+            if arrived > 0 and total_now - arrived <= 0:
+                st.pending = True
+            elif total_now > 0 and all(s.bytes_reported <= 0 for s in states):
                 st.pending = True
 
     def tick(self, slot_index: int) -> None:

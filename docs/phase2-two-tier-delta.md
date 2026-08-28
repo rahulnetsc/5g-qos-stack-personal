@@ -1,5 +1,37 @@
 # Two-tier Phase 2: old-vs-new delta
 
+> **PRE-FIX NUMBERS — read this first (added by WP9's SR-trigger fix).**
+> Every figure in this document was produced before the `sim/ul_access.py`
+> SR-trigger defect was found and fixed (`README.md` §8's `[RESOLVED]`
+> entry, `docs/oai-port-map.md` row 79, `docs/wp9-plan.md` §8b/§8c). That
+> fix moved 15 of the corpus's 20 records. **This is not a blanket
+> disclaimer** — the record split says precisely what is and is not still
+> known, and the load-bearing part survives:
+>
+> - **§2's `study3` near-parity control row (0.4665 vs 0.4481) SURVIVES,
+>   for a checkable reason**: `latency_bound_scenario` carries no UL
+>   traffic at all, so the fix moves **none** of its four records
+>   (confirmed: 0 mismatches). The control is the anchor of this table's
+>   whole argument — that the gaps track where the old arm's privileges
+>   applied, read as an *ordering* rather than as individual numbers — and
+>   that anchor is intact.
+> - **§2's `study2` row (0.9999 vs 0.3924) is UNVERIFIED.** It sits on the
+>   records the fix moves hardest (`study2/pdcch_limited/TwoTier` UE9 UL
+>   `delivery_ratio` 0.0486 → 0.9994). Both arms ran under the defect, so
+>   the gap may be unaffected or may have been partly this — **not assumed
+>   either way**, and not resolvable by reasoning. Settling it needs the
+>   old arm re-run via `docs/oai-port-map.md` row 77's overlay procedure,
+>   which was out of scope for the fix commit.
+> - **§2's `study1` rows are pre-fix**, on records that moved.
+> - §1's variant-arm comparison is a historical snapshot of arms that no
+>   longer exist and is unaffected by this in the sense that it cannot be
+>   re-run either way.
+>
+> The numbers below are left exactly as captured. Nothing here has been
+> restated post-fix, so no row should be compared against a post-fix figure
+> without re-running both arms.
+
+
 This document has two sections, landed at different points in the
 two-tier rewrite (`docs/phase2-plan.md`'s commit checklist):
 

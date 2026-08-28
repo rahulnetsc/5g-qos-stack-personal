@@ -763,7 +763,9 @@ patch was measuring the defect, not policy.
 ### Blast radius — this is not confined to WP9's new scenarios
 
 `regression_corpus.py --check` under the diagnostic: **5,470 mismatches
-across 15 of 22 records** — every UL-carrying study, all four arms.
+across 15 of 20 records** — every UL-carrying study, all four arms.
+(*Corrected: the corpus is 20 records, not the "22" README §9 and
+CLAUDE.md carried; see §8c.*)
 **96 flow-records move `delivery_ratio` by more than 0.5**, i.e. were
 near-totally starved and become served. The sharpest single case:
 `study2/pdcch_limited/TwoTier` UE9's UL flow, `delivery_ratio`
@@ -822,6 +824,106 @@ amendment with its reasoning stated, not a silent edit:
    re-baseline must say so rather than silently replacing them.
 4. A guard test reproducing the N=1 stall directly, verified to fail before
    the fix.
+
+---
+
+## 8c. The fix commit — prediction scored, re-baseline, corrections
+
+**Landed.** `sim/ul_access.py::on_arrivals` gains TS 38.321 §5.4.4's real
+trigger — a pending regular BSR with no UL-SCH resource available —
+evaluated **every slot**, deliberately broader than §8b's worktree
+diagnostic (which fired only on slots also carrying an arrival, enough to
+prove the mechanism but not the spec condition: a flow that stalls then goes
+quiet must still recover). Suite 519 passed (3 new tests, 1 existing fixture
+corrected).
+
+### Prediction, stated before running — two hits, one miss
+
+| Prediction | Outcome |
+|---|---|
+| All four `study3` records unmoved (no UL traffic at all) | **HIT — 0 mismatches.** Structural, and a stop condition had it moved |
+| ≥ 5,470 mismatches (superset of the diagnostic) | **HIT — 5,689** |
+| `study1/overload_mult1.0/PF` moves, unlike the diagnostic | **MISS — 0 mismatches** |
+
+**The miss, re-derived with numbers before capturing** (the pre-registered
+rule blocked the re-baseline until it was). Instrumenting how often the new
+trigger actually fires per run:
+
+| | PF | TwoTier | Reservation |
+|---|---|---|---|
+| mult1.0 | **1** | 14 | 201 |
+| mult1.5 | 48 | 129 | 257 |
+| mult2.0 | 378 | 271 | 308 |
+| mult3.0 | 570 | 538 | 587 |
+
+`study1` scales **capacity**, so mult1.0 is the *most congested* point. PF's
+grants there are scarce enough that `sched_ul_bytes` essentially never
+overruns the estimate — the trigger fires **once** in the whole run, so there
+is nothing for the broader form to fix. TwoTier (14) and Reservation (201)
+overrun even there, because their target/deficit-based sizing issues larger
+grants.
+
+So the predicted *reason* was wrong — it had nothing to do with arrival
+timing — while the superset argument itself is sound. **The miss corroborates
+the investigation rather than undermining it**: "the arms differ in how fast
+their grant sizing drives the overrun" was §8b's core claim, and this is a
+second, independent measurement of it.
+
+### Re-baseline — what it invalidates
+
+First sanctioned re-capture since `a5f6baa`; 20 records; `--check` clean
+after. Qualifies under CLAUDE.md's rule (the change is *intended* to move the
+numbers). What it invalidates, stated rather than silently replaced:
+
+**`README.md` §7's Study 2 characterisation is partly wrong post-fix.**
+Pre-fix vs post-fix:
+
+| | total | on-time | UL util |
+|---|---|---|---|
+| PF (pre-fix 4.8M / 14 of 30 / 41.1%) | 9.5M | 20/30 | 0.708 |
+| Reservation (pre-fix 4.1M / 9 of 30 / 61.7%) | 7.4M | 15/30 | 0.479 |
+| TwoTier | 8.8M | 23/30 | 0.930 |
+
+- **Survives**: Reservation is still visibly worse than PF on this scenario.
+- **Does not survive**: the specific anomaly §7 calls out — *"UL PRB
+  utilization higher than PF's despite delivering fewer bytes"* — **inverts**
+  (0.479 vs 0.708). That reading was an artifact of the defect.
+
+**D4-1 (Study 2's bimodal p99) must be re-scored, not carried forward.** §8b
+flagged it as plausibly downstream of this defect; the arm ordering it was
+measured against has now moved. It stays open with its §6.1 expectation
+intact but its *evidence* void.
+
+**`docs/phase2-two-tier-delta.md` gets a dated pre-fix header**, not a
+blanket one, because the record split says exactly what is and is not known:
+`study3`'s near-parity control row is on records the fix does not touch, so
+**the control survives for a checkable reason** and the ordering argument
+keeps its anchor; `study2`'s row is on a record that moves hard and is
+**unverified**; `study1`'s rows are pre-fix. Re-running the old arm needs
+row 77's overlay procedure and is out of scope here.
+
+### Corrections carried in this commit
+
+**The corpus is 20 records, not 22.** `README.md` §9 and `CLAUDE.md` both
+carried "22-record numeric snapshot"; the baseline file holds exactly 20 keys
+and `_cases()` builds 20. §8b's own "15 of 22" inherited it — the measured
+numerator was right, the denominator was not. **15 of 20 moved, 5 unmoved**,
+and the 5 are `study1/mult1.0/PF` plus all four `study3` records.
+
+**Commit 0b's boundedness argument is wrong; its headline stands.** The
+per-LCG array is not the route — it reads 28,581, frozen, never 0. But 0b
+claimed three re-arming paths bound the state, the third being "assembly on
+any grant once `pending` is set", asserting `sim/ul_access.py` always
+eventually supplies that grant. It did not; that was the defect.
+`bytes_reported` **can** stall at 0 over live backlog indefinitely, by the
+`sched_ul_bytes` route rather than the per-LCG one.
+
+**Tally**: this is the project's **third self-inflicted finding**, and the
+**second** where a forward-looking claim was checked and found wrong — after
+`_dl_stamp`'s stale *citation* and port-map row 46's wrong *plan*. 0b's is a
+third kind: a wrong *argument* about code that already existed and could have
+been read at the time. CLAUDE.md's invariant is extended to cover it, since
+its existing wording covers notes about code not yet written.
 
 ---
 

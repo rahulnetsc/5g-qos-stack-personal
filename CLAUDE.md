@@ -82,7 +82,11 @@ bare `python` invocation that works.
   `nr_ue_scheduler.c` (WP3) are vendored from a *different* upstream
   directory (`NR_MAC_COMMON`/`NR_MAC_UE`, not `NR_MAC_gNB`) than the rest —
   see `oai-branches/README.md` for per-file commit provenance.
-- `regression/baseline_studies_1_3.json` — 22-record numeric snapshot.
+- `regression/baseline_studies_1_3.json` — 20-record numeric snapshot.
+  (Described as "22-record" until WP9's fix commit; the file holds exactly
+  20 keys and `regression_corpus.py::_cases()` builds 20 — stale, most
+  likely from a pre-Phase-2 capture whose `TwoTier-nomaxmin`/
+  `TwoTier-adaptive` arms were deleted at Phase 2 two-tier commit 1.)
 - `docs/` — planning docs. `p5g-sim-plan.md` §9 has the per-WP technical spec.
 
 ## Non-obvious invariants
@@ -432,6 +436,21 @@ reasons, so don't treat "the note has always been right before" as
 evidence for either kind. When a future commit picks up a note like
 this, re-derive or re-read against ground truth directly; do not port
 the note's own claim on the strength of it having been written down.
+**A third kind, added by WP9: a wrong *argument* about code that already
+existed and could have been read at the time.** WP9 commit 0b concluded
+that `bytes_reported` could not stall at 0 over live backlog, on the
+grounds that three re-arming paths bound the state — the third being
+"assembly on any grant once `pending` is set", which assumed
+`sim/ul_access.py` always eventually supplies that grant. It did not:
+the SR was gated on an empty→non-empty transition, so a never-emptying
+flow stalled permanently (`docs/wp9-plan.md` §8b/§8c, port-map row 79).
+0b's *headline* answer survived — the per-LCG array really is not the
+route — but its reasoning was checkable against code that already
+existed, and was not checked. So this invariant is not only about notes
+describing code not yet written: **an argument about existing code is
+also a hypothesis until someone runs it.** The cheap discriminator that
+would have caught it is the one that eventually did — a per-slot trace,
+not more reading.
 
 ## Rules for the WP0 machinery
 
