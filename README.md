@@ -1233,6 +1233,42 @@ these five, add a new tag rather than forcing it into an existing one.
   Tier-1 boundary leak. The other unpredicted, larger-magnitude movements
   (non-GBR UL flows, Delay-class UL flows) are their own `[OPEN: WP9]`
   items above.
+- `[OPEN: SIM-DEFECT]` **A UL flow whose backlog never returns to zero is
+  permanently starved: `sim/ul_access.py` gates the SR on an
+  empty->non-empty transition, so nothing can break the `sched_ul_bytes`
+  gate's own deadlock. Found by WP9's paused arm-divergence investigation
+  (`docs/wp9-plan.md` §8b), traced per-slot, not inferred.** `on_arrivals`
+  sets `pending` only when `total_now - arrived <= 0`. Meanwhile
+  `bytes_reported = max(0, estimated_ul_buffer - sched_ul_bytes)`, and once
+  `sched_ul_bytes` overruns the estimate (which the crumb-collapse gate is
+  designed to allow) `bytes_reported` clamps to 0 forever: `sched_ul_bytes`
+  resets only in `BsrModel.on_ul_grant`, which needs a grant, which needs
+  `bytes_reported > 0`. The BSR side re-arms correctly and cannot help --
+  `pending` reads `True` with nothing able to consume it. Traced at N=1,
+  one flow, no contention: stalls at slot 14 and never recovers, backlog
+  growing to 184,989 bytes by slot 799. **TS 38.321 triggers SR on a
+  pending regular BSR with no UL grant available** (and retxBSR expiry is
+  itself a regular-BSR trigger) -- exactly the missing valve;
+  `sim/ul_access.py`'s docstring records two deliberate simplifications of
+  `nr_update_sr`, and this is an unrecorded third, which unlike those two
+  is not conservative. **Corpus-wide, not a corner case**: a worktree
+  diagnostic adding the real trigger moves `--check` by **5,470 mismatches
+  across 15 of 22 records**, with **96 flow-records gaining more than 0.5
+  in `delivery_ratio`** -- sharpest, `study2/pdcch_limited/TwoTier` UE9 UL
+  at 0.0486 -> 0.9994. **This also explains, and dissolves, an apparent
+  scheduler difference**: PF > Reservation > TwoTier UL utilization on
+  non-corpus workloads (0.123/0.038/0.015 at N=8) is this defect, not
+  policy -- the arms differ only in how fast their grant sizing drives the
+  overrun, and under the diagnostic they converge to
+  0.928/0.924/0.934 **and the ordering reverses**. **Flagged, not
+  asserted**: Study 2's unexplained bimodal per-UE p99 split has the shape
+  a some-flows-permanently-starved mechanism produces, and survived the
+  EWMA fix (which ruled out coefficient staleness, not this) -- re-score
+  that open thread only after the fix. Not fixed here, deliberately: it is
+  a `sim/` fidelity change needing its own commit, a stated large-movement
+  prediction, a port-map row, a guard test, and a **re-baseline decision
+  that must record that the published Study 1-3 figures were produced
+  under the defect** rather than silently replacing them.
 - `[OPEN: WP9]` **`min_rb=5` (reservation commit 4's follower budget) was
   chosen to prevent grant starvation and keep the SR/BSR chain reporting,
   not derived from any physical constant — and the follower budget's

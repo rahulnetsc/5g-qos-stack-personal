@@ -536,7 +536,8 @@ executes.
 |---|---|---|---|
 | 0 | `Reservation` `min_rb` plumbing (B1) | **None** — `OK — no drift` | **Landed. Prediction HIT**, on the stated grounds: `OK -- no drift`, 516 passed (3 new). Verified both directions — the corpus path is byte-identical, *and* `Reservation(min_rb=20)` through the driver now produces genuinely different output, so the fix does something rather than only being accepted. **One real trap found, not hypothetical**: `configure()`'s fallback must test `is None`, not truthiness — `test_reservation.py`'s two follower-budget fixtures pass `min_rb=0` deliberately, and the truthiness variant was written and run, failing 3 tests. `docs/oai-port-map.md` row 78. |
 | 0b | BSR-desync fault-model feasibility check (read-only, no code) | n/a — no code | **Landed. Result NEGATIVE** — quantisation ruled out empirically, short-BSR aliasing ruled out structurally (format keyed to active-LCG count, not grant size — the truncated-BSR route is unmodeled), frozen-array route real but bounded by three independent re-arming paths. §8a for the full trace and the two named candidate mechanisms. |
-| 1 | Sweep infrastructure (B2–B6), incl. the §6.4 rule as code | **None** — no `sim/`/`scheduler/` behaviour touched | |
+| — | **PAUSED (D6): arm-divergence investigation** | n/a — docs only | **Landed. Answer: DEFECT, in `sim/ul_access.py`, not either scheduler.** §8b. |
+| 1 | Sweep infrastructure (B2–B6), incl. the §6.4 rule as code | **None** — no `sim/`/`scheduler/` behaviour touched | Blocked on §8c's fix |
 | 2 | Stage 1 (screening), ≤ 4 h; **N=2 control read first** | n/a | |
 | 3 | Stage 2 (confirmatory), ≤ 24 h; + G9 cycles, G11 soak (3 seeds) | n/a | |
 | 4 | The regime map + §5's bridge table filled in; D4-1…D4-4 scored | n/a | |
@@ -683,6 +684,147 @@ of that failure mode.
 
 ---
 
+## 8b. Investigation — the arm divergence (D6 pause, no fix in this commit)
+
+**Question:** is `PF > Reservation > TwoTier` on non-corpus workloads a real
+scheduling property or a defect?
+
+**Answer: a defect, in `sim/`, not in either scheduler.** Traced to a
+confirmed mechanism by per-slot trace, not inferred from aggregates. **One
+root cause explains both effects this investigation was scoped to keep
+apart** — that is a finding in itself, since the scoping assumed two.
+
+### The mechanism
+
+`sim/ul_access.py::on_arrivals` (line ~165) gates the Scheduling Request on
+an **empty→non-empty transition**:
+
+```python
+total_now = sum(... .bytes_queued for f in flows)
+if total_now - arrived <= 0:
+    st.pending = True
+```
+
+A UL flow whose backlog never returns to zero therefore **can never raise
+another SR**. That matters because of what it interacts with: the
+`sched_ul_bytes` crumb-collapse gate reports
+`B = estimated_ul_buffer - sched_ul_bytes`, floored at 0. Once
+`sched_ul_bytes` overruns the estimate — which the gate is *designed* to
+allow — `bytes_reported` clamps to 0; and `sched_ul_bytes` is reset only
+inside `BsrModel.on_ul_grant`, which needs a grant, which needs
+`bytes_reported > 0`. The BSR's own re-arming works and is irrelevant:
+`pending` is `True` from the periodic timer onward with nothing able to
+consume it.
+
+Per-slot trace, N=1, one deterministic UL flow, no contention (so all three
+arms are byte-identical here):
+
+| slot | bytes_queued | bytes_reported | per-LCG estim | estimated_ul_buffer | sched_ul_bytes | pending |
+|---|---|---|---|---|---|---|
+| 13 | 6280 | 1291 | 28581 | 14861 | 13570 | False |
+| 14 | 4989 | **0** | 28581 | 13570 | 14861 | False |
+| 21 | 4989 | **0** | 28581 | 13570 | 14861 | True |
+| 799 | **184989** | **0** | 28581 | 13570 | 14861 | True |
+
+The flow is permanently starved from slot 14 to the end of the run; backlog
+grows to 184,989 bytes and never receives another grant.
+
+**Ground truth is unambiguous that this is wrong.** TS 38.321 triggers an SR
+on *a pending regular BSR with no UL grant available* — and retxBSR-Timer
+expiry is itself a regular-BSR trigger. That is exactly the safety valve
+this deadlock needs, and `BsrModel` already computes the state
+(`pending=True`); nothing connects it to the SR path. `sim/ul_access.py`'s
+own docstring records that it simplified away two per-LCID conditions from
+`nr_update_sr` as a judgment call; **this is a third, unrecorded
+divergence**, and unlike those two it is not conservative.
+
+### Why both effects are one cause
+
+- *Arm-independent low utilisation* (195 UL grants vs `factory_robots`' 3131
+  at identical mean grant size): flows starve as soon as the overrun
+  happens; only flows that keep emptying survive.
+- *The arm ordering*: the arms differ only in **how fast their grant sizing
+  drives `sched_ul_bytes` past the estimate**. TwoTier's deficit-accumulated
+  `B_eff` sizes largest, overruns soonest, starves most — hence lowest
+  utilisation. It was never a policy difference.
+
+**Confirmed by worktree diagnostic**, not argued. Adding the TS 38.321
+trigger as a throwaway patch (never committed; worktree removed):
+
+| N | PF | Reservation | TwoTier |
+|---|---|---|---|
+| 8, as-is | 0.123 | 0.038 | 0.015 |
+| 8, diagnostic | 0.928 | 0.924 | 0.934 |
+
+The 8x spread collapses to under 1%, and **the ordering reverses** (TwoTier
+becomes marginally highest) — a spread that inverts under a `sim/`-layer
+patch was measuring the defect, not policy.
+
+### Blast radius — this is not confined to WP9's new scenarios
+
+`regression_corpus.py --check` under the diagnostic: **5,470 mismatches
+across 15 of 22 records** — every UL-carrying study, all four arms.
+**96 flow-records move `delivery_ratio` by more than 0.5**, i.e. were
+near-totally starved and become served. The sharpest single case:
+`study2/pdcch_limited/TwoTier` UE9's UL flow, `delivery_ratio`
+**0.0486 → 0.9994**, with that record's `ul_prb_utilization` 0.597 → 0.930.
+
+**Hypothesis, flagged not asserted — D4-1 may be downstream of this.**
+Study 2's unexplained bimodal per-UE p99 split ("roughly half the UEs
++7.5-9.5 ms worse, half unchanged-to-better") has the shape a
+some-flows-permanently-starved mechanism produces. It survived the EWMA fix,
+which ruled out coefficient staleness but not this. Not traced — D4-1 stays
+open, and its expectation in §6.1 must be re-scored **after** the fix, not
+before.
+
+### Correction to commit 0b
+
+0b's headline answer stands: the per-LCG array is **not** the route — it
+reads 28,581 here, frozen, never 0. But **0b's boundedness reasoning was
+wrong**, and the trace above is the counterexample. 0b claimed three
+re-arming paths bound the state, the third being "assembly on any grant once
+`pending` is set", and asserted `sim/ul_access.py` always eventually
+supplies that grant. It does not — that is precisely the gap. The correct
+statement: `bytes_reported` **can** stall at 0 over live backlog
+indefinitely, via the `sched_ul_bytes` gate rather than via the per-LCG
+array. 0b's answer to the question it was asked survives; its argument for
+why does not.
+
+### Consequence for §1's base point — revised, not quietly
+
+**§1's base point does not survive as calibrated**, and this is a plan-doc
+amendment with its reasoning stated, not a silent edit:
+
+- Its **structure** survives: instruments at fixed profile rates, load
+  carried by a best-effort filler (`sim/parametric.py::_BE_PER_UE_BPS`).
+  That separation is right independently of this defect and matches how the
+  hardware campaign splits GT-3.2 from GT-7.3.
+- Its **calibration** is void. `_BE_PER_UE_BPS = 8 Mbps` and the load levels
+  in §3 were picked against measurements taken under the defect, so they
+  describe the starved regime. **They must be re-derived after the fix
+  lands, and until then no cell in §3 is meaningful.**
+- **Neither the fix nor the recalibration happens in this investigation
+  commit.** The fix is a `sim/` fidelity change and takes the full
+  discipline (§8c).
+
+### What the fix commit must carry (not done here)
+
+1. A falsifiable prediction of `--check` movement — and the honest one is
+   *large*, ~5,470 mismatches, stated before running.
+2. A citation to TS 38.321's SR trigger and `nr_ue_scheduler.c`'s
+   `nr_update_sr`, plus a `docs/oai-port-map.md` row recording this as a
+   third divergence in WP4's SR chain.
+3. **A re-baseline decision, and it is not automatic.** The corpus is frozen
+   at `a5f6baa`; this would be the first sanctioned re-capture since. It
+   qualifies under CLAUDE.md's rule — the change is *intended* to move the
+   numbers — but the published Study 1-3 figures in `README.md`/
+   `docs/phase2-two-tier-delta.md` were produced under the defect, and the
+   re-baseline must say so rather than silently replacing them.
+4. A guard test reproducing the N=1 stall directly, verified to fail before
+   the fix.
+
+---
+
 ## 9. Definition of done for WP9
 
 - `uv run pytest sim/tests -q` green after every commit.
@@ -707,6 +849,10 @@ of that failure mode.
 ---
 
 ## 10. Status
+
+**PAUSED at commit 1 under §7's D6 rule.** A `sim/`-layer defect
+(§8b) starves UL flows corpus-wide and would contaminate every sweep cell;
+the fix is its own commit and the base point recalibrates after it.
 
 **Commits 0 and 0b landed.** 0: prediction hit, `--check` clean, port-map
 row 78. 0b: negative result, written up in §8a — the fault is outside this
