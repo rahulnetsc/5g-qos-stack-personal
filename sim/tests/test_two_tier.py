@@ -1,4 +1,4 @@
-"""Phase 2, two-tier commits 1-4: scheduler/two_tier.py's rewrite.
+"""Phase 2, two-tier commits 1-4a: scheduler/two_tier.py's rewrite.
 
 Commit 1: Scheduler protocol conformance, a bootstrap PF coefficient as
 the only ranking criterion (explicitly NOT a ported mechanism), UL-
@@ -26,9 +26,25 @@ change to the code it describes, a new finding category distinct from
 this port's four OAI-inherited comment-vs-code mismatches and its one
 self-inflicted citation error. Grant-sizing (the GBR-PRB-reserve cap,
 the floor's own uncapped-to-bwpSize sizing, the PHR-based PRB ceiling)
-is commit 4a, not this commit -- this commit's own grant-sizing change
-is the minimum needed for the floor to have any observable effect at
-all (a fixed min_rb-sized rescue grant), not that fuller bypass.
+was deferred to commit 4a -- commit 4's own grant-sizing change was the
+minimum needed for the floor to have any observable effect at all (a
+fixed min_rb-sized rescue grant), not that fuller bypass.
+
+Commit 4a: FIX-2 (the GBR-PRB-reserve cap, `gbr_below`) and the floor's
+own uncapped-to-max_rbSize sizing, replacing commit 4's fixed min_rb
+rescue grant. Confirmed structurally inert on this corpus on TWO
+independent grounds -- the floor never fires (commit 4's own confirmed
+result) AND mfbr_bps is never configured on any flow in any scenario
+in this repo, so gbr_below's own reverse-scan condition never fires
+either (the identical fact reservation.py's own already-landed
+gbr_bytes_slot found for the same quantity). Both mechanisms ported as
+real, fully testable machinery anyway -- this port's standing practice
+for confirmed-currently-unreachable mechanisms. PHR-based capping
+stays structurally out of scope entirely (not merely deferred), the
+same disposition reservation.py's own commit 4a already recorded for
+the identical connection point. The B_eff deficit-accumulated grant-
+sizing target (real, GFBR-driven, NOT confirmed inert) is its own
+commit, 4b, named but not built here.
 
 See docs/phase2-plan.md's two-tier commit checklist and
 docs/oai-port-map.md's "Phase 2 -- two-tier" section for the full
@@ -334,8 +350,8 @@ def test_ul_gbr_deficit_gated_per_lcg_on_the_real_estimate():
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=0, estimated_ul_buffer_per_lcg=0)
 
-    has_gbr, pdb_ms, _guaranteed, _be, _urgency = sched._ul_gbr_and_pdb(
-        1, buffers, slot_index=0
+    has_gbr, pdb_ms, _guaranteed, _be, _urgency, _gbr_bytes_slot_positive = (
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
     )
     assert has_gbr is False
     assert pdb_ms == 9999
@@ -986,3 +1002,176 @@ def test_ul_floor_candidacy_rescue_only_adds_ues_that_actually_fired():
     granted_ues = {a.ue_id for a in out}
     assert 1 in granted_ues, "UE1's floor should have fired and rescued it"
     assert 2 not in granted_ues, "UE2 never armed -- must NOT be rescued just for being GBR-configured"
+
+
+# -- 11. commit 4a: gbr_bytes_slot -- max, not sum; no max(1,...) floor -----
+
+
+def test_ul_gbr_bytes_slot_positive_is_max_not_sum_and_has_no_floor_at_one():
+    """ia_p5g_scheduler.c:2710-2722 -- confirmed already ported once, in
+    reservation.py's own commit 4a: gbr_bytes_slot lacks the max(1,...)
+    floor _ul_gbr_and_pdb's own `obligation` applies fifty-ish lines
+    earlier in the real C. A tiny gfbr_bps truncates to 0 here even
+    though has_gbr (obligation-floored) reads True for the identical
+    flow -- a real, precise asymmetry, not a rounding accident."""
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=1_000, mfbr_bps=200_000, pdb_ms=100.0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
+
+    has_gbr, *_rest, gbr_bytes_slot_positive = sched._ul_gbr_and_pdb(
+        1, buffers, slot_index=0
+    )
+    # gfbr_bps=1000 / 8 / slots_per_sec(2000) = 0.0625 -> int() truncates
+    # to 0, uncontested by any floor.
+    assert gbr_bytes_slot_positive is False
+    assert has_gbr is True, "has_gbr's own max(1,...) floor should still fire here"
+
+
+def test_ul_gbr_bytes_slot_positive_false_without_mfbr_even_with_real_gfbr():
+    """The has_pending_gbr gate is MFBR-keyed (gbr_ul_max), not
+    GFBR-keyed -- a real, well-provisioned GBR flow with mfbr_bps == 0
+    (this repo's own default, and the value every scenario in this repo
+    actually configures) never activates gbr_bytes_slot regardless of
+    how large gfbr_bps is."""
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=1_000_000, mfbr_bps=0.0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
+
+    *_rest, gbr_bytes_slot_positive = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    assert gbr_bytes_slot_positive is False
+
+
+# -- 12. commit 4a: FIX-2, the GBR-PRB reserve -------------------------------
+
+
+def test_fix2_reserve_is_inert_without_a_live_obligation_gbr_ue_ranked_below():
+    """gbr_below[i] == 0 when no downstream candidate has both has_gbr
+    and gbr_bytes_slot_positive -- confirmed inert in the common case,
+    the same disposition this corpus has for every real scenario
+    (mfbr_bps never configured, module docstring)."""
+    sched = TwoTier(min_rb=5)
+    flow = FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, flow_class="PF")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+    channel = _FakeChannel({1: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    assert len(out) == 1
+    assert out[0].bytes_capacity == 1000, "uncapped by any reserve absent a downstream GBR UE"
+
+
+def test_fix2_reserve_protects_a_downstream_gbr_ue_from_a_saturating_leader():
+    """ia_p5g_scheduler.c:2987-3007's own cited incident, mirrored
+    directly: a saturating non-GBR UE ranked ahead of a live-obligation
+    GBR UE must not consume the PRBs FIX-2 reserves for that GBR UE."""
+    sched = TwoTier(min_rb=5)
+    flows = [
+        FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, flow_class="PF"),
+        FlowConfig(
+            ue_id=2, qfi=1, direction="UL", lcg=1,
+            flow_class="GBR", gfbr_bps=100_000, mfbr_bps=200_000, pdb_ms=100.0,
+        ),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._resolve_tier1 = lambda slot_index, buffers: None  # freeze Tier-1
+    # UE1 dominates the coefficient (huge VQ growth) so it ranks first
+    # despite not being the one FIX-2 exists to protect.
+    sched._targets_bps = {(1, 1): 5_000_000.0, (2, 1): 1.0}
+
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100_000, estimated_ul_buffer_per_lcg=100_000)
+    buffers.set(2, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=10, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+
+    by_ue = {a.ue_id for a in out}
+    assert by_ue == {1, 2}, f"the GBR UE must still get a grant, got {by_ue}"
+    ue1_prbs = sum(a.prbs for a in out if a.ue_id == 1)
+    assert ue1_prbs <= 5, (
+        f"the saturating leader must be capped by the FIX-2 reserve "
+        f"(min_rb=5 for the one live-obligation GBR UE ranked below it), "
+        f"got {ue1_prbs} PRBs"
+    )
+
+
+# -- 13. commit 4a: floor-fire sizing now uses max_rbSize, not fixed min_rb -
+
+
+def test_ul_floor_fire_grant_is_bounded_by_max_rbSize_not_fixed_min_rb():
+    """Commit 4a: a fired floor's grant is sized to max_rbSize (the
+    whole slot, absent any GBR-PRB reserve), replacing commit 4's own
+    fixed min_rb rescue grant."""
+    sched = TwoTier(min_rb=5)
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    channel = _FakeChannel({1: 20.0})
+
+    state = sched._ue_state[1]
+    state.floor_alive_slot = 0
+    state.floor_last_move_slot = 0
+    state.floor_rx_lastseen = 100  # matches _floor_desynced_buffers's delivered_cum
+
+    slot = _FakeSlot(
+        slot_index=20, dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48,
+    )  # theta=20 for pdb_ms=80.0
+    out = sched.allocate(slot, buffers, channel)
+
+    assert len(out) == 1
+    assert out[0].ue_grant is True
+    assert out[0].prbs > 5, (
+        f"a fired floor's grant should use the whole slot (max_rbSize), "
+        f"not be capped at min_rb=5; got {out[0].prbs} PRBs"
+    )
+
+
+def test_ul_floor_fire_grant_also_respects_the_fix2_reserve():
+    """ia_p5g_scheduler.c:3114-3117, "FIX-C": floor grants take the
+    DATA-class path FIX-2 already protects, so they must also respect
+    the reserve -- a fired floor must not consume PRBs reserved for a
+    different, still-unserved GBR UE ranked below it."""
+    sched = TwoTier(min_rb=5)
+    flows = [
+        _floor_flow(ue_id=1),
+        FlowConfig(
+            ue_id=2, qfi=1, direction="UL", lcg=1,
+            flow_class="GBR", gfbr_bps=100_000, mfbr_bps=200_000, pdb_ms=100.0,
+        ),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched._resolve_tier1 = lambda slot_index, buffers: None
+    sched._targets_bps = {}
+
+    buffers = _floor_desynced_buffers(ue_id=1)
+    buffers.set(2, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+
+    state1 = sched._ue_state[1]
+    state1.floor_alive_slot = 0
+    state1.floor_last_move_slot = 0
+    state1.floor_rx_lastseen = 100
+
+    slot = _FakeSlot(
+        slot_index=20, dl_symbols=0, ul_symbols=14, prb_count=10, pdcch_cce_budget=48,
+    )
+    out = sched.allocate(slot, buffers, channel)
+
+    ue1_grant = next((a for a in out if a.ue_id == 1), None)
+    assert ue1_grant is not None and ue1_grant.ue_grant is True
+    assert ue1_grant.prbs <= 5, (
+        f"a fired floor's grant must still respect the FIX-2 reserve for "
+        f"a downstream live-obligation GBR UE, got {ue1_grant.prbs}"
+    )

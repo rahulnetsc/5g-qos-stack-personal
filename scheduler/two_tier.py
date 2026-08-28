@@ -31,19 +31,114 @@ describes only a *fixed*-constant soft-slack penalty,
 negative result (``design-docs/scheduler-study.md`` sec8.4) before this
 commit removed them from the live scheduler.
 
-Explicitly NOT here yet, each landing in its own later commit: the UL
-floor's grant-sizing bypass -- the GBR-PRB-reserve cap, the
-uncapped-to-bwpSize sizing for a fired floor, the PHR-based PRB ceiling
-(commit 4a, split from this commit -- see below), the real single-pass
-SRB-exempt DL LCP fill (commit 5, replacing ``_dl_fill``'s placeholder
-below -- see this commit's own note on why that makes commit 5 a
-*joint* VQ-correction commit, not a pure LCP one), MCS selection via
-OLLA (commit 6), and a re-port of ``reset_ue``/``SchedulerContextReset``
-against the new field layout (commit 7) -- this class implements no
-``reset_ue`` at all until then; ``sim/driver.py`` discovers it via
-``getattr(scheduler, "reset_ue", None)``, so its absence simply means
-TwoTier is treated like PF (no context reset) in the interim, not an
-oversight.
+Explicitly NOT here yet, each landing in its own later commit: the
+`B_eff` deficit-accumulated UL grant-sizing target (commit 4b -- see
+this commit's own note on why it's separable from what's built here),
+the PHR-based PRB ceiling (structurally out of scope entirely, see
+below -- not merely deferred), the real single-pass SRB-exempt DL LCP
+fill (commit 5, replacing ``_dl_fill``'s placeholder below -- see this
+commit's own note on why that makes commit 5 a *joint* VQ-correction
+commit, not a pure LCP one), MCS selection via OLLA (commit 6), and a
+re-port of ``reset_ue``/``SchedulerContextReset`` against the new field
+layout (commit 7) -- this class implements no ``reset_ue`` at all until
+then; ``sim/driver.py`` discovers it via ``getattr(scheduler, "reset_ue",
+None)``, so its absence simply means TwoTier is treated like PF (no
+context reset) in the interim, not an oversight.
+
+**Commit 4a (this commit) lands the UL floor's grant-sizing bypass: the
+GBR-PRB-reserve cap (`gbr_below`, "FIX-2") and the floor's own
+uncapped-to-`max_rbSize` sizing, replacing commit 4's fixed `min_rb`
+rescue grant.** FIX-2 (`:2987-3030,3105-3124`) is a **general
+anti-monopolization cap on every UL DATA-class grant, not floor-specific
+machinery the floor merely also respects** -- its own motivating
+incident: before this fix, a saturating UE was granted the whole BWP
+every slot, so a DIFFERENT UE holding an unmet GBR guarantee never got
+PRBs at all (MCS never recovered, SE stayed pinned low, the composite
+metric kept ranking it last -- a self-perpetuating lockout). The fix
+reserves ``min_rb`` PRBs per still-unserved, live-obligation GBR UE
+ranked below the current candidate, via a reverse scan over the sorted
+UL candidate list. Applies to every UL candidate, floor-fired or not --
+floor-fired grants need it noted only because they were newly routed
+onto the same uncapped baseline this fix already protects.
+
+**Genuinely NOT the same shape as ``reservation.py``'s own UL follower
+budget -- two confirmed structural differences.** (1) **Baseline**:
+reservation's own follower budget reserves against ``bwp_size`` -- a
+per-UE STATIC width, its own docstring warns callers never to pass a
+running ``prbs_left``. Two-tier's FIX-2 reserves against the slot's
+ACTUAL REMAINING PRB count at this candidate's turn -- exactly the
+running-budget quantity reservation's own docstring warns against.
+(2) **Scope**: reservation's follower budget protects ANY still-needy
+follower (backlog, SRB, or GBR). Two-tier's ``gbr_below`` protects GBR
+UEs specifically, from monopolization by any UE. Two different
+schedulers' answers to a similar-sounding problem.
+
+**Confirmed structurally inert on this corpus, on two independent
+grounds -- not a floor-firing question at all for this part.**
+``gbr_below``'s own reverse-scan condition requires ``gbr_bytes_slot >
+0`` for a downstream UE, which requires ``has_pending_gbr`` (commit 4's
+MFBR-keyed gate). **``mfbr_bps`` is never configured on any flow in any
+scenario in this repo** -- confirmed directly this commit
+(``grep -rn "mfbr_bps" sim/scenarios/ scripts/scheduler_study.py``
+returns zero matches), the identical fact ``reservation.py``'s own
+already-landed ``gbr_bytes_slot`` port found and documented for the
+same quantity (port-map row 25). So ``gbr_below`` is always all-zeros
+on this corpus, and FIX-2's cap never binds for ordinary DATA UEs
+either -- ported as real, fully testable machinery anyway (this port's
+standing practice for confirmed-currently-unreachable mechanisms), not
+skipped.
+
+**A correction owed to commit 4, found scoping this commit: the
+floor's own dormancy has TWO independent reasons, and commit 4's own
+docs stated only one.** Commit 4 attributed the floor's ``--check``
+inertness solely to "no in-corpus scenario constructs a BSR/SR desync
+fault" -- true, and still the genuinely novel fourth dormancy category.
+But ``_ul_has_pending_gbr``'s own MFBR gate means the floor would fail
+to arm even if a desync fault WERE constructed, since ``mfbr_bps`` is
+never configured anywhere -- and that second reason is NOT novel, it's
+this port's own existing category (2), "the signal exists but no
+scenario constructs the situation" (the same shape as ``gbr_bytes_
+slot``'s own dormancy in ``reservation.py``). Both reasons are real and
+independent: fix ``mfbr_bps`` and the floor still needs a fault to fire;
+construct a fault and the floor still needs ``mfbr_bps`` configured.
+Corrected in ``README.md`` §7/§8 and ``docs/phase2-plan.md``'s own
+commit-4 row as part of this commit's doc pass, not a separate commit,
+since it was found scoping this one directly.
+
+**PHR-based capping (the ``N_max_prb`` ceiling, and the power-safety
+shrink loop a fired floor's grant would otherwise need) is structurally
+out of scope -- the same disposition ``reservation.py``'s own commit 4a
+already recorded for the identical connection point, confirmed to
+transfer rather than assumed.** No PHR-related field exists anywhere in
+``scheduler/interfaces.py``'s protocol -- the ``Scheduler`` protocol
+structurally cannot see PHR data, the same category of structurally-
+absent signal as ``do_sched``/``has_srb``/TA (category 1, not category
+2 the way ``mfbr_bps`` is above: ``sim/power.py`` exists but is dormant
+*by convention*, and no field crosses the protocol boundary regardless
+of what a scenario configures). ``README.md``'s own citation goes
+further than "we don't have the signal": "PHR noted sim-only (inert on
+hardware)" -- ground truth's own calibration campaign didn't observe
+this path bind in practice either. Both C mechanisms' own gates
+collapse to permanently-false here with no new code needed. A fifth
+``README.md`` §7 dormancy-category entry.
+
+**Deferred, not built here: `B_eff`, the deficit-accumulated UL
+grant-sizing target -- two-tier's own counterpart to
+``reservation.py``'s already-landed commit-4a ``_ul_grant_target``.**
+Ground truth (`:3195-3204`): ``ul_target = max(ul_total_target_bytes,
+B); if has_gbr and gbr_bytes_slot>0: ul_target = max(ul_target,
+gbr_bytes_slot); B_eff = ul_target`` -- feeding ``nr_find_nb_rb``'s
+demand-based sizing for ordinary (non-floor-fired) DATA UEs only (the
+floor-fire bypass ignores ``B_eff`` entirely). ``gbr_bytes_slot``'s own
+contribution is confirmed inert here (same ``mfbr_bps`` finding as
+above) -- but ``ul_total_target_bytes`` is NOT: it's ``_ul_gbr_and_
+pdb``'s own ``guaranteed_bytes + be_bytes``, already computed and
+explicitly flagged unconsumed since commit 3 (port-map row 46), and
+GFBR-based deficit target-spreading IS exercised by this corpus's real
+GBR flows. Wiring it is expected to move ``--check`` on GBR UL
+scenarios, unlike everything actually built in this commit -- a
+genuinely separable fidelity change, named as its own future commit
+(4b) rather than bundled in here, per user decision.
 
 **Commit 4 (this commit) lands the UL service-interval floor's arm/fire
 state machine and a new comparator tier it structurally requires.** The
@@ -141,7 +236,17 @@ every slot once landed, and arming/firing are fully testable in
 isolation -- what's missing, in this corpus's own scenarios, is the
 *fault* (a BSR/SR desync), which is a radio-link failure mode, not a
 traffic pattern or a missing signal/scenario the way the other three
-categories are.
+categories are. **Correction, commit 4a: this is only HALF of why the
+floor never arms on this corpus, not the whole reason.**
+``_ul_has_pending_gbr``'s own MFBR gate means the floor would fail to
+arm even if a desync fault WERE constructed, since ``mfbr_bps`` is
+never configured on any flow in any scenario in this repo (confirmed
+directly, commit 4a) -- and THAT reason is not novel at all, it's this
+port's own existing category (2), "the signal exists but no scenario
+constructs the situation" (the identical shape ``gbr_bytes_slot``'s own
+dormancy in ``reservation.py`` already has). Both reasons are real and
+independent: fixing one alone does not arm the floor. See commit 4a's
+own module-docstring section for the full restatement.
 
 **Commit 3a (this commit) lands the windowed-ceiling virtual queue
 itself -- growth, ceiling, drain, and the real ranking coefficients --
@@ -462,7 +567,9 @@ class _Candidate:
     snr_db: float
     coef: float
     # DL sort tiers (ia_p5g_dl_cmp, ia_p5g_scheduler.c:1397-1411) -- real
-    # for DL, computed but unused by ranking for UL (see _ul_rank_key).
+    # for DL, unused by UL's own ranking (see _ul_rank_key). As of
+    # commit 4a, also set for UL candidates -- not for ranking, but as
+    # gbr_below's own reverse-scan input (module docstring).
     has_gbr: bool = False
     pdb_ms: int = 9999
     # UL's own top tier (ia_p5g_ul_cmp, :2112-2125) -- structurally
@@ -482,6 +589,12 @@ class _Candidate:
     # Tier 1.5 in _ul_rank_key (commit 4). Unused by DL.
     floor_fire: bool = False
     floor_sil: int = 0
+    # UL only, commit 4a -- has_pending_gbr-gated MAX-over-backlogged-
+    # GBR-LCGs(gfbr_bps/8/slots_per_sec) > 0 (ia_p5g_scheduler.c:2710-
+    # 2722). gbr_below's own reverse-scan input, alongside has_gbr
+    # above. Confirmed always False on this corpus (module docstring --
+    # mfbr_bps never configured), ported anyway.
+    gbr_bytes_slot_positive: bool = False
 
 
 class TwoTier:
@@ -739,12 +852,15 @@ class TwoTier:
                 self._update_vq_ul(ue_id, buffers)
                 # UL's own has_gbr/pdb_ms aren't sort tiers (see module
                 # docstring's design-revision finding) -- called for the
-                # deficit-tracking + urgency side effect; has_gbr/pdb_ms
-                # themselves aren't stored on the candidate since nothing
-                # reads them yet.
-                _has_gbr, _pdb_ms, _guaranteed, _be, urgency01 = (
+                # deficit-tracking + urgency side effect. As of commit
+                # 4a, has_gbr IS stored (not for ranking -- for
+                # gbr_below's own reverse-scan input below); pdb_ms
+                # stays unread.
+                has_gbr, _pdb_ms, _guaranteed, _be, urgency01, gbr_bytes_slot_positive = (
                     self._ul_gbr_and_pdb(ue_id, buffers, slot.slot_index)
                 )
+                candidate.has_gbr = has_gbr
+                candidate.gbr_bytes_slot_positive = gbr_bytes_slot_positive
                 candidate.urgency01 = urgency01
                 # ia_p5g_ul_metric, :3696-3726 -- base_q only; the
                 # urgency term and the SE multiply happen in
@@ -771,15 +887,57 @@ class TwoTier:
         rank_key = self._dl_rank_key if direction == "DL" else self._ul_rank_key
         candidates.sort(key=rank_key)
 
+        # [FIX-2] UL only. ia_p5g_scheduler.c:3016-3030 -- gbr_below[i]
+        # = count of still-unserved, live-obligation GBR UEs ranked
+        # STRICTLY AFTER candidate i in the sorted (served) order.
+        # sched_inactive is always False here, so the C's own exclusion
+        # of it from both sides of the count is a no-op -- kept in the
+        # condition anyway per this port's "port even when currently a
+        # no-op" convention. Confirmed always all-zero on this corpus
+        # (module docstring -- mfbr_bps never configured, so
+        # gbr_bytes_slot_positive is never True) -- computed anyway as
+        # real, testable machinery.
+        gbr_below: list[int] = [0] * len(candidates)
+        if direction == "UL":
+            running = 0
+            for i in range(len(candidates) - 1, -1, -1):
+                gbr_below[i] = running
+                c = candidates[i]
+                if (
+                    not c.sched_inactive
+                    and c.has_gbr
+                    and c.gbr_bytes_slot_positive
+                ):
+                    running += 1
+
         prbs_left = slot.prb_count
         cce_left = slot.pdcch_cce_budget
         out: list[Allocation] = []
-        for c in candidates:
+        for i, c in enumerate(candidates):
             if prbs_left <= 0:
                 break
             cce_cost = cce_aggregation_level(c.snr_db)
             if cce_left < cce_cost:
                 continue
+
+            # [FIX-2] UL only -- max_rbSize baseline is the whole slot
+            # (this simulator's single-BWP deployment has no narrower
+            # per-UE BWP concept, matching the C's own "grant width is
+            # the sole lever" framing), then the GBR-PRB reserve for
+            # still-unserved GBR UEs ranked below this one. DL is
+            # unaffected -- max_rbSize stays the slot's own remaining
+            # budget, same as before commit 4a. The max(cap, min_rb)
+            # floor can never let max_rbSize exceed what prbs_left
+            # alone would have allowed: the final sizing step below
+            # always wraps this in min(prbs_left, max_rbSize, ...), so
+            # a cap raised above prbs_left is harmless by construction,
+            # not merely by this specific corpus's own numbers.
+            max_rbSize = slot.prb_count
+            if direction == "UL":
+                reserve_rb = gbr_below[i] * self.min_rb
+                cap = prbs_left - reserve_rb
+                cap = max(cap, self.min_rb)
+                max_rbSize = min(max_rbSize, cap)
 
             ue_backlog = sum(
                 buffers.state(f.ue_id, f.qfi).bytes_reported for f in c.flows
@@ -787,27 +945,25 @@ class TwoTier:
             if ue_backlog <= 0:
                 if not c.floor_fire:
                     continue
-                # [FLOOR] Minimal rescue grant -- ground truth's own v1
-                # disposition (a fixed-size grant regardless of the
-                # corrupted demand estimate that made ue_backlog read 0
-                # here in the first place), sized to exactly self.min_rb
-                # PRBs: enough to carry a fresh BSR and resync the
-                # estimate (ia_p5g_scheduler.c:555-644's own stated
-                # mechanism). The FULL uncapped-to-bwpSize sizing (v2's
-                # own enhancement, FIX-C, tied to the GBR-PRB-reserve
-                # this simulator doesn't have yet) is commit 4a's job --
-                # this is the minimum needed for the floor to have any
-                # observable effect at all, not that bypass.
-                prbs_used = min(prbs_left, self.min_rb)
+                # [FLOOR] ia_p5g_scheduler.c:3232-3253 -- a fired floor
+                # bypasses nr_find_nb_rb's demand-based sizing entirely
+                # (the demand estimate is exactly what the fault
+                # corrupted), taking the full max_rbSize (already
+                # bounded by the FIX-2 reserve above) instead of commit
+                # 4's own fixed min_rb rescue grant.
+                prbs_used = min(prbs_left, max_rbSize)
                 tbs_bytes = (prbs_used * c.bits_per_rb) // 8
                 if tbs_bytes <= 0:
                     continue
             else:
                 prbs_needed = -(-(ue_backlog * 8) // c.bits_per_rb)  # ceil div
-                # No GBR-PRB-reserve/follower budget yet (commit 4a) --
-                # unbounded by anything but this slot's own remaining
-                # PRBs.
-                prbs_used = min(prbs_left, max(1, prbs_needed))
+                # GBR-PRB-reserve landed (commit 4a, confirmed inert on
+                # this corpus -- mfbr_bps never configured, module
+                # docstring). Sizing itself is still backlog-only, not
+                # target-based -- B_eff's ul_total_target_bytes wiring
+                # (real, GFBR-deficit-driven, NOT confirmed inert) is
+                # deferred to commit 4b.
+                prbs_used = min(prbs_left, max_rbSize, max(1, prbs_needed))
                 tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
                 if tbs_bytes <= 0:
                     continue
@@ -970,10 +1126,11 @@ class TwoTier:
 
     def _ul_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
-    ) -> tuple[bool, int, int, int, float]:
+    ) -> tuple[bool, int, int, int, float, bool]:
         """UL GBR deficit accumulate/cap/target-spread/overflow-to-BE,
-        remaining-PDB, and (as of commit 3a) worst-case priority-weighted
-        urgency -- gNB_scheduler_ulsch.c:2196-2280 (two-tier's own file)
+        remaining-PDB, (as of commit 3a) worst-case priority-weighted
+        urgency, and (as of commit 4a) gbr_below's own reverse-scan
+        input -- gNB_scheduler_ulsch.c:2196-2280 (two-tier's own file)
         and ia_p5g_scheduler.c's own inlined UL ranking loop (:2570-2674,
         commented "unchanged from original pf_ul()" -- checked, not
         trusted: byte-diffed the deficit/PDB/target arithmetic
@@ -1005,14 +1162,30 @@ class TwoTier:
         than a second duplicate walk. worst_urgency01 is the max of
         u_lcg * priority_weight * delta over this UE's active LCGs.
 
-        Returns a 5-tuple now: (has_gbr, remaining_pdb_ms,
-        guaranteed_bytes, be_bytes, worst_urgency01) -- guaranteed_bytes/
-        be_bytes still real but unconsumed (grant sizing is commit 4);
-        worst_urgency01 feeds _finalize_ul_coef directly.
+        gbr_bytes_slot_positive (ia_p5g_scheduler.c:2710-2722, commit 4a):
+        has_pending_gbr-gated MAX (not sum) over GBR-configured,
+        currently-backlogged LCGs of floor(gfbr_bps/8/slots_per_sec) --
+        the SAME per-LCG quantity this method's own `obligation` local
+        already computes, tracked by MAX instead of accumulated, and
+        WITHOUT `obligation`'s own max(1, ...) floor (ported bug-for-bug,
+        matching reservation.py's own already-landed identical port,
+        commit 4a there). Confirmed always False on this corpus --
+        mfbr_bps is never configured on any flow in any scenario in this
+        repo (module docstring) -- ported anyway as real, testable
+        machinery, not skipped.
+
+        Returns a 6-tuple now: (has_gbr, remaining_pdb_ms,
+        guaranteed_bytes, be_bytes, worst_urgency01,
+        gbr_bytes_slot_positive) -- guaranteed_bytes/be_bytes still real
+        but unconsumed (the B_eff wiring that would consume them is
+        commit 4b); worst_urgency01 feeds _finalize_ul_coef directly;
+        gbr_bytes_slot_positive feeds gbr_below's reverse scan
+        (_allocate_direction, commit 4a).
         """
         state = self._ue_state[ue_id]
         slots_per_sec = 1.0 / self.slot_duration_s
         slot_ms = self.slot_duration_s * 1000.0
+        has_pending_gbr = self._ul_has_pending_gbr(ue_id, buffers)
 
         seen_lcgs: set[int] = set()
         has_gbr = False
@@ -1020,6 +1193,7 @@ class TwoTier:
         guaranteed_bytes = 0
         be_bytes = 0
         worst_urgency01 = 0.0
+        gbr_bytes_slot_max = 0
 
         for f in self._flows:
             if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
@@ -1058,6 +1232,13 @@ class TwoTier:
             if deficit > 0:
                 has_gbr = True
 
+            # gbr_bytes_slot (:2710-2722) -- same per-LCG rate as
+            # obligation above, MAX-tracked (not accumulated), WITHOUT
+            # obligation's own max(1, ...) floor -- ported bug-for-bug.
+            gbr_bytes_slot_max = max(
+                gbr_bytes_slot_max, int((f.gfbr_bps / 8.0) / slots_per_sec)
+            )
+
             delta = _URG_GBR_FLOOR + (1.0 - _URG_GBR_FLOOR) * (
                 min(1.0, deficit / window) if window > 0 else 0.0
             )
@@ -1080,7 +1261,11 @@ class TwoTier:
             if overflow > 0:
                 be_bytes += overflow
 
-        return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes, worst_urgency01
+        gbr_bytes_slot_positive = has_pending_gbr and gbr_bytes_slot_max > 0
+        return (
+            has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes,
+            worst_urgency01, gbr_bytes_slot_positive,
+        )
 
     def _dl_stamp(
         self, fills: list[tuple[int, int]], ue_id: int, slot_index: int,

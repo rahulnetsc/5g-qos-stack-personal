@@ -356,6 +356,19 @@ they survive it:
   incident, `ia_p5g_scheduler.c:555-644`), and if no in-corpus scenario
   can trigger it, the regime map compares two schedulers with one of
   them's own signature starvation guard permanently unexercised.
+  **Correction, found scoping commit 4a: this was only HALF of why the
+  floor never arms on this corpus, not the whole reason.** The floor's
+  own arming precondition, `has_pending_gbr`, gates on `mfbr_bps > 0` —
+  and `mfbr_bps` is never configured on any flow in any scenario in
+  this repo (confirmed directly, commit 4a: `grep -rn "mfbr_bps" sim/
+  scenarios/ scripts/scheduler_study.py` returns zero matches). So the
+  floor would fail to arm even if a desync fault WERE constructed. That
+  second reason is NOT novel like the fault is — it's this port's own
+  existing category (2), "the signal exists but no scenario constructs
+  the situation," the identical shape `gbr_bytes_slot`'s own dormancy
+  in `reservation.py` already has. Both reasons are real and
+  independent: fixing `mfbr_bps` alone does not arm the floor without a
+  fault; constructing a fault alone does not arm it without `mfbr_bps`.
 - **A related, separate finding, same commit: the floor's own arming
   precondition reads the exact signal it exists to route around.**
   `has_pending_gbr` (`gNB_scheduler_ulsch.c:42-71`, confirmed only in
@@ -374,6 +387,23 @@ they survive it:
   slot, timing that keeps the estimate briefly nonzero) that never
   gets modeled here. Ported as written, not "fixed" — see
   `docs/oai-port-map.md` row 57 for the full citation.
+- **A fifth dormancy category, found landing two-tier commit 4a: PHR-
+  based UL grant-size capping is out of scope in a stronger sense than
+  the fourth category above — category (1), not (2).** The floor's
+  own uncapped-to-`max_rbSize` sizing (commit 4a) would, in ground
+  truth, additionally be capped by a PHR-derived PRB ceiling
+  (`N_max_prb`) and a power-safety shrink loop. Confirmed no PHR-
+  related field exists anywhere in `scheduler/interfaces.py`'s protocol
+  — the `Scheduler` protocol structurally cannot see PHR data at all,
+  regardless of what any scenario configures (unlike `mfbr_bps` above,
+  which exists as a real, settable `FlowConfig` field that simply isn't
+  set — category 2). `reservation.py`'s own commit 4a already hit the
+  identical connection point (`nr_ue_max_mcs_min_rb`'s power-shrink
+  input) and recorded the same disposition — confirmed to transfer
+  here directly, not assumed. This repo's own citation goes further
+  than "we don't have the signal": "PHR noted sim-only (inert on
+  hardware)" (§7's WP1 table entry) — ground truth's own calibration
+  campaign didn't observe this path bind in practice either.
 - **A previously-fixed sort bug**, visible in a live comment: sched-
   inactive UEs used to sort to the *front* of the queue ("a bug"), now
   fixed to sort last. Relevant for provenance if any existing hardware
@@ -1207,6 +1237,24 @@ these five, add a new tag rather than forcing it into an existing one.
   either one's own sensitivity to it** — a WP9 sweep design constraint
   this entry didn't previously carry, since `TwoTier` had no `min_rb`-
   dependent mechanism before commit 4.
+- `[OPEN: WP9]` **A second shared, unswept parameter, same shape as
+  `min_rb` above, found landing two-tier commit 4a: `mfbr_bps`.**
+  `FlowConfig.mfbr_bps` is a real field with a real, already-ported
+  mechanism behind it in BOTH schedulers now — `reservation.py`'s own
+  `ul_target`/`gbr_bytes_slot` floor (already landed, its own commit
+  4a) and two-tier's `gbr_below` GBR-PRB reserve (this commit). The
+  only reason either mechanism reads inert today is that **no scenario
+  in this repo sets `mfbr_bps` above its `0.0` default** — config-
+  contingent dormancy, not structural (category 2 in `§7`'s own
+  taxonomy, not category 1). Setting `mfbr_bps` on a GBR flow is a
+  one-line scenario change that would activate `gbr_bytes_slot` in
+  BOTH schedulers simultaneously — neither arm has ever run with it
+  live. If a future WP9 sweep configures it, both arms move at once
+  and neither's captured baseline covers it, the identical risk the
+  `min_rb` entry above already states for that parameter. Two shared,
+  unswept parameters now, both affecting both schedulers, both
+  currently pinned at values that keep real, already-ported mechanisms
+  dormant.
 - `[OPEN: WP9]` **What would close the fourth dormancy category `§7`
   now records for two-tier's UL floor**: a scenario that drives
   `estimated_ul_buffer_per_lcg` to zero for a GBR-configured UE while
@@ -1358,10 +1406,10 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage (updated
-two-tier commit 4, `docs/phase2-plan.md`, for the new UL-floor-fault
-`[OPEN: WP9]` entry and the updated `min_rb`-sweep entry — this count is
-a snapshot, re-grep rather than trust it stale): **22 open entries**
-remain (8 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
+two-tier commit 4a, `docs/phase2-plan.md`, for the new `mfbr_bps`
+shared-unswept-parameter `[OPEN: WP9]` entry — this count is a
+snapshot, re-grep rather than trust it stale): **23 open entries**
+remain (9 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
 cluster counted once; 8 `[OPEN: PHASE2]`; 2 `[OPEN: HARDWARE]`; 3
 `[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/DECISION]`) plus whatever
 new items Phase 2/3 add
