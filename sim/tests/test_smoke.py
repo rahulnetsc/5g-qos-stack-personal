@@ -303,6 +303,33 @@ def test_gradient_protects_gbr_under_overload():
     )
 
 
+def test_two_tier_beats_gradient_on_gbr_overload():
+    """Restored at Phase 2 two-tier commit 9, closing commit 1's own
+    disposition-table group "3 to commit 4-6/verified-at-9" (commit 5
+    restored one of the three; this commit closes the other two). The
+    only change from the deleted original is the constructor call
+    (TwoTier(tier1_period_slots=2000) -> TwoTier(), no longer a kwarg) --
+    nothing about the test's own mechanism needed rewriting, since it is
+    a DL-only GBR comparison with no SPS or UL dependency.
+
+    Under overload, TwoTier should deliver more of the GBR target than
+    the Gradient scheduler with hardcoded weights."""
+    grad = run(
+        _overload_scenario(),
+        GradientScheduler(ewma_window_slots=200, gbr_urgency_weight=5.0),
+    )
+    tt = run(_overload_scenario(), TwoTier())
+    grad_gbr = grad["flows"]["ue2_qfi2"]["throughput_bps"]
+    tt_gbr = tt["flows"]["ue2_qfi2"]["throughput_bps"]
+    target = 4_000_000.0
+    assert tt_gbr > grad_gbr, (
+        f"TwoTier ({tt_gbr/1e6:.2f}) should beat Gradient ({grad_gbr/1e6:.2f})"
+    )
+    assert tt_gbr / target > 0.9, (
+        f"TwoTier should hit > 90% of GFBR; got {tt_gbr/1e6:.2f} Mbps"
+    )
+
+
 def test_gradient_matches_pf_when_all_pf():
     """With no GBR/Delay flows, gradient should behave roughly like PF.
     Throughput per flow should be within a small tolerance."""

@@ -13,25 +13,35 @@
 # for humans only. `load_two_tier_config` validates every key against the
 # constructor signature and rejects unknowns.
 #
-# Phase 2 (docs/phase2-plan.md): TwoTier is being rewritten in place,
-# commit by commit (docs/phase2-plan.md sec4's checklist), and its
-# constructor currently takes NO kwargs -- commit 1 deleted every knob
-# below (SPS entirely, the whole pre-Phase-2 Tier-1 apparatus) and none
-# has been re-added yet. This file is intentionally near-empty until a
-# later commit reintroduces a real, ground-truth-backed knob; each
-# section below states which commit (if any) is expected to bring an
-# equivalent key back, and two -- the max-min GBR stage and the adaptive
-# dual-ascent penalty -- are not coming back at all (no citation in
-# docs/phase2-plan.md sec2.1's ground truth; already a documented
-# negative result, design-docs/scheduler-study.md sec8.4; see README.md
-# sec7). Restore this file's structure incrementally as each commit
-# lands its own real config surface, not by copying the old file back.
+# Phase 2 (docs/phase2-plan.md): TwoTier's rewrite is COMPLETE as of
+# two-tier commit 9 -- this file's own final state, not a mid-port
+# snapshot. The constructor takes exactly ONE kwarg, `min_rb` (below,
+# added commit 4); commit 1 deleted every other knob (SPS entirely, the
+# whole pre-Phase-2 Tier-1 apparatus) and none of them came back. The
+# section headers below name the commit that landed each mechanism and
+# record, as a settled fact rather than a provisional one, that four of
+# the five landed WITHOUT any configurable surface -- every constant
+# they need is ground-truth-derived (a C macro, a spec table, or a value
+# derived at configure() time from the grid), so exposing it as a knob
+# would invite overriding it away from what the deployed scheduler
+# actually runs. Two mechanisms are permanently gone, not merely
+# unconfigured -- the max-min GBR stage and the adaptive dual-ascent
+# penalty (no citation in docs/phase2-plan.md sec2.1's ground truth;
+# already a documented negative result, design-docs/scheduler-study.md
+# sec8.4; see README.md sec7).
 #
 # ─── Tier-1 (SCA/GLPK, 0.1s cadence) -- commit 2 ─────────────────────────
-# (no keys yet)
+# No keys. The period is derived at configure() time from
+# _TIER1_PERIOD_S=0.1 (ia_p5g_scheduler.c:74-76, the deployed macro)
+# divided by the grid's own slot_duration_s -- numerology-robust by
+# construction, and deliberately NOT a knob: the pre-Phase-2 file's own
+# tier1_period_slots=2000 default encoded a stale header comment's
+# "1.0 s" rather than the real 0.1 s (CLAUDE.md's own invariant).
 #
-# ─── Tier-2 windowed-ceiling VQ -- commit 3 ──────────────────────────────
-# (no keys yet)
+# ─── Tier-2 windowed-ceiling VQ -- commit 3a ─────────────────────────────
+# No keys. Every constant (the DL arrival-delta ceiling, UL's own
+# backlog/catchup form, _VQ_UL_CATCHUP_N=5) is read directly from
+# ia_p5g_scheduler.c.
 #
 # ─── UL floor (fruitless-shift / ADQ) -- commit 4 ────────────────────────
 # min_rb: mac->min_grant_prb (ia_p5g_scheduler.c:2210) -- the SAME
@@ -41,11 +51,22 @@
 # campaign's own deployed value.
 min_rb: 5
 #
-# ─── DL LCP fill -- commit 5 ─────────────────────────────────────────────
-# (no keys yet)
+# ─── DL LCP fill + post-grant deficit drain -- commit 5 ──────────────────
+# No keys. The fill order is (priority ASC, vq_dl DESC), both terms
+# derived from already-configured FlowConfig/VQ state.
 #
 # ─── MCS selection / OLLA -- commit 6 ────────────────────────────────────
-# (no keys yet)
+# No keys. _OLLA_OFFSET is pinned at 0 -- provably, not by default: the
+# ratchet's own trigger (rounds[0]/[1]) is structurally unobservable to
+# any scheduler here, since WP5 Decision 4 routes retry grants entirely
+# through sim/driver.py's HARQ seam. Exposing an offset knob would let a
+# host configure a value the deployed scheduler cannot produce.
+# reservation.py carries the identical disposition, so a two-tier-vs-
+# reservation comparison measures scheduling policy, not link adaptation.
+#
+# ─── reset_ue / SchedulerContextReset -- commit 7 ────────────────────────
+# No keys. Scope semantics ("mac" vs "full") come from the caller
+# (sim/driver.py's own join/RLF-recovery edge), not from config.
 #
 # ─── SPS / Configured Grants -- permanently removed ──────────────────────
 # Confirmed absent from OAI C entirely (docs/phase2-plan.md sec2.1);

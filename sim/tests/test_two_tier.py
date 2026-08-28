@@ -1640,9 +1640,10 @@ def test_latency_bound_two_tier_protects_deadlines():
     """Restored, essentially as-is, from test_smoke.py (deleted commit 1,
     80609f5) -- the only change is TwoTier(tier1_period_slots=2000) ->
     TwoTier(). This test's own body never referenced SPS (unlike its
-    sibling test_two_tier_beats_pf_under_pdcch_pressure, still deferred)
-    and directly exercises this commit's own new DL LCP fill + deficit
-    drain (latency_bound_scenario is DL-only).
+    sibling test_two_tier_beats_pf_under_pdcch_pressure, RETIRED at
+    commit 9 -- see that commit's own note below) and directly exercises
+    commit 5's DL LCP fill + deficit drain (latency_bound_scenario is
+    DL-only).
 
     In the DL-congested latency-bound scenario, TwoTier must hold the
     medium-rate interactive (Delay) flows within their PDB while PF,
@@ -1675,6 +1676,46 @@ def test_latency_bound_two_tier_protects_deadlines():
     )
     assert tt_worst_p99 <= pdb_ms, (
         f"TwoTier worst p99 HoL {tt_worst_p99} ms exceeds PDB {pdb_ms} ms"
+    )
+
+
+def test_latency_bound_two_tier_holds_every_deadline():
+    """Restored at commit 9 as a REAL test, no longer xfail -- and this
+    is a RESULT, not just a restoration.
+
+    The original was split out of its sibling above at WP5 commit 4a and
+    marked `xfail(strict=True)` because the PRE-Phase-2 scheduler held
+    only 5 of 8 deadlines under a WP5-era HARQ-loss condition ("whether
+    'holds every deadline' is still the right bar post-HARQ is an open
+    decision," that marker's own reason). Run directly against the Phase
+    2 rewrite: 8/8, every deadline held. **The condition that motivated
+    the xfail does not reproduce on this port** -- confirmed
+    empirically, not assumed still true, and the marker is removed
+    rather than left masking a now-passing assertion.
+
+    This is the counterweight to `docs/phase2-two-tier-delta.md` §2,
+    where the old arm delivers more bytes on three of four scenarios:
+    the old arm wins on throughput where its ungrounded mechanisms and
+    oracle demand estimator applied, and the new arm holds deadlines the
+    old one dropped. Different metrics, not a contradiction -- WP9's own
+    regime map weighs both against G1-G12, not against each other
+    (`docs/phase2-plan.md` §7's Phase 2 closing summary)."""
+    from sim.scenarios import latency_bound_scenario
+    from sim.driver import run
+
+    sc = latency_bound_scenario()
+    pdb_ms = next(f.pdb_ms for f in sc.flows if f.flow_class == "Delay")
+    delay_keys = [
+        f"ue{f.ue_id}_qfi{f.qfi}" for f in sc.flows if f.flow_class == "Delay"
+    ]
+    tt = run(sc, TwoTier())
+    on_time = sum(
+        1 for k in delay_keys
+        if tt["flows"][k]["delivery_ratio"] >= 0.99
+        and tt["flows"][k]["hol_p99_ms"] <= pdb_ms
+    )
+    assert on_time == len(delay_keys), (
+        f"TwoTier should hold every deadline; got {on_time}/{len(delay_keys)}"
     )
 
 
@@ -2006,3 +2047,33 @@ def test_reset_ue_mac_scope_leaves_stale_floor_state_and_no_immediate_fire_follo
     state2.floor_last_move_slot = 0
     fired2, _sil2 = sched2._update_ul_floor(1, buffers, far_future_slot)
     assert fired2 is True
+
+
+# -- 24. commit 9: closing commit 1's own disposition table ----------------
+#
+# test_two_tier_beats_pf_under_pdcch_pressure -- RETIRED at commit 9, not
+# restored. It was the last unresolved entry in commit 1's own "3 to
+# commit 4-6/verified-at-9" group (commit 5 restored
+# test_latency_bound_two_tier_protects_deadlines; commit 9 restored
+# test_latency_bound_two_tier_holds_every_deadline as a real passing test
+# and test_two_tier_beats_gradient_on_gbr_overload in test_smoke.py).
+#
+# Ran directly against current code before deciding: tt_min_delivery =
+# 0.005, against the original's own `>= 0.99` bar; tt_worst_p99 TIES PF's
+# 15.0ms rather than beating it. **A corrected classification, not a new
+# finding about the scheduler**: this test's premise was SPS-dependent
+# from the start -- its own deleted docstring says so outright ("TwoTier
+# with SPS should deliver every sensor's full demand with low latency;
+# PF, lacking SPS, hits the DCI cap and drops packets"). It should have
+# joined commit 1's own 14 permanent-loss SPS tests at that commit, not
+# the "restore at commit 4-6" group; the misclassification is only
+# visible now that every other entry in the group is resolved. SPS is
+# confirmed absent from OAI C entirely (CLAUDE.md's own standing
+# invariant against reintroducing it), so there is no successor
+# mechanism and nothing to rewrite this against.
+#
+# What IS still covered, so the retirement is not a silent coverage gap:
+# study2/pdcch_limited (sensor_dense_scenario) remains a live regression-
+# corpus record for TwoTier, PF, RoundRobin and Reservation alike --
+# its numbers are captured and --check-guarded from commit 9 onward,
+# they are simply no longer asserted against an SPS-era absolute bar.
