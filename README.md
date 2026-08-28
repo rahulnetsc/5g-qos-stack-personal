@@ -448,6 +448,15 @@ they survive it:
   combined with the previous point it means the per-LCG breakdown can
   drift arbitrarily from the scalar until the next BSR resets both.
   Preserved deliberately in the port, not fixed.
+  **Confirmed live through a scheduler path, not just a described
+  property, at Phase 2's two-tier commit 4b**: `B_eff`'s own
+  `ul_total_target_bytes` term sums the frozen per-LCG array directly,
+  while the sizing floor it's compared against (`ue_backlog`) derives
+  from the BSR-independent-draining scalar — on `sensor_dense_scenario`
+  (30 UL flows, 0 GBR, so the commit's other, GFBR-driven movement
+  source is structurally absent there) this desync alone was enough to
+  move `--check`, confirmed by direct trace, not attributed by default
+  (`docs/phase2-plan.md` §7, `docs/oai-port-map.md` row 64).
 - **At N=2 UEs, the two schedulers do not differentiate on admissible
   load — settled by the original measurement's own author, not just
   argued from absence of evidence.** `oai-branches/Sweep_Orig_vs_TwoTier.

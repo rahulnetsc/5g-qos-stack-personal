@@ -411,6 +411,28 @@ deployment/operator choice for the calibration campaign (made so no UE
 is starved of a grant and BSRs keep being reported) — not a config
 default that happened to go unoverridden, and not an invented number.
 
+**A forward-looking note left in this port's own docs (a port-map row,
+a module docstring) is a hypothesis for the commit that takes it up to
+verify, not an instruction it should execute unchecked.** Two such notes
+have been checked so far, when their own commit arrived, and both were
+wrong — two different failure modes, not the same one twice. `_dl_stamp`
+(Phase 2 two-tier commit 3a) was a wrong *citation*: it pointed at
+something readable, and pointed at the wrong lines. Port-map row 46
+(Phase 2 two-tier commit 4b) was a wrong *plan*: commit 3 wrote "reused
+directly here, not re-derived" as forward guidance for a consumption it
+had not yet verified — `guaranteed_bytes + be_bytes` — and commit 4b
+found the two quantities genuinely differ from what `B_eff` actually
+needed (`ul_total_target_bytes`, a third accumulator, excludes the
+GBR-LCG overflow term `be_bytes` includes). A citation points at code
+that already exists to be checked; a plan asserts something about code
+not yet written, and code not yet written can still turn out to want
+something different once it's actually read against ground truth. Both
+are wrong in the same direction — optimistic — but for different
+reasons, so don't treat "the note has always been right before" as
+evidence for either kind. When a future commit picks up a note like
+this, re-derive or re-read against ground truth directly; do not port
+the note's own claim on the strength of it having been written down.
+
 ## Rules for the WP0 machinery
 
 **M18/M19 (WP-Join) are the panel's first additions since WP0

@@ -712,7 +712,7 @@ is the corpus-breaking commit, name it as such)
 | 4 | **Landed.** UL floor: the arm/fire state machine (delivery-history arming, `theta`, fruitless decay/shift, ADQ crumb-run/backoff, candidacy-rescue) plus **Tier 1.5** (`floor_fire`), a new comparator tier the design-revision comment quoted at commit 3 turned out not to describe (`docs/oai-port-map.md` rows 45/55/56 — a comment accurate when written, overtaken by a later change to the code, a third finding category distinct from this port's four OAI-inherited comment-vs-code mismatches and its one self-inflicted citation error). Checklist numbers reconciled against the C directly (this row's own prior text was accurate, confirmed rather than corrected): `FRUITLESS_SHIFT_MAX=4` and "16x cap" are the SAME fact; `FRUITLESS_DECAY_MS=500` exact; `ADQ_CRUMB_RUN=8` exact but necessary-not-sufficient (`adq_age>=adq_period` also required, a SECOND independently-capped backoff compounding on the already-shifted `theta_eff`). `has_pending_gbr` (the floor's own arming gate, confirmed in the full OAI checkout, `gNB_scheduler_ulsch.c:42-71`) found to read the SAME per-LCG estimate the floor exists to route around — ported faithfully, not "fixed," tested directly (row 57), outcome recorded in `README.md` §7 with the two possible claims kept distinct (a faithful port reproducing a real gap vs. one reproducing something real hardware additionally guards against). Grant-sizing split to commit 4a per user decision — this commit lands only a fixed `min_rb`-sized rescue grant (v1's own disposition), not v2's full uncapped-to-`available_rb` bypass. `cp_floor`/`reconfig_floor`/`srb_floor` (three separate, unrelated "floor" concepts) confirmed structurally absent, same disposition as `reservation.py`'s own `has_srb` — out of scope, not built (row 58). `min_rb` confirmed the same `mac->min_grant_prb` field `reservation.py`'s follower budget reads — new as a `TwoTier.__init__(min_rb: int = 5)` kwarg, `README.md` §8's `[OPEN: WP9]` entry updated (row 59). | **Predicted zero-or-small movement was a legitimate live possibility, stated before running, not after** — no in-corpus scenario constructs a real BSR/SR desync fault (the condition the floor exists to rescue). **Confirmed exactly**: `--check` against a commit-3a worktree baseline reports `OK — no drift` across all 20 records. A genuine negative result, not evidence of a broken port — the floor's own state machine is fully implementable and fully tested in isolation (property tests below), what's absent is the *fault*, a fourth dormancy category distinct from the three already on `README.md`'s record (`README.md` §7's own new entry). Full suite: 470 passed (31 new tests in `test_two_tier.py`, one pre-existing rank-key assertion updated for the new 4-tuple shape, `test_smoke.py`'s signature-drift guard updated for the new `min_rb` kwarg per its own standing instruction). **Correction, found scoping commit 4a: this fourth-category explanation was only HALF the reason, not stated as such at the time.** `_ul_has_pending_gbr`'s own MFBR gate means the floor would fail to arm even if a desync fault WERE constructed, since `mfbr_bps` is never configured on any flow in any scenario in this repo — and that second reason is not novel at all, it's this port's own existing category (2), "the signal exists but no scenario constructs the situation" (the identical shape `reservation.py`'s own `gbr_bytes_slot` dormancy already has). Both reasons are real and independent; see commit 4a's own row. |
 | 4a | Grant-sizing bypass for a fired floor: the GBR-PRB-reserve cap (`gbr_below`, `:3105-3124`, "FIX-2" — the follower-budget-style cap commit 4's own placeholder comment already anticipated), the uncapped-to-`available_rb` sizing for `floor_fire` (replacing commit 4's fixed `min_rb` rescue grant), and the PHR-based PRB ceiling (`:3126-3163`, "FIX-D" — applies to every DATA-class grant, not just floor fires; likely structurally absent pending `sim/power.py`'s own dormant PHR machinery, to be confirmed when this commit is actually planned). Rows 5-9 not renumbered (reservation's own 3a/4a/10a precedent). | Not yet planned. |
 | 4a | **Landed.** UL floor's grant-sizing bypass: FIX-2 (`gbr_below`, the GBR-PRB-reserve cap — a general anti-monopolization safeguard on every UL DATA-class grant, not floor-specific, `docs/oai-port-map.md` row 60) and the floor's own uncapped-to-`max_rbSize` sizing (row 62), replacing commit 4's fixed `min_rb` rescue grant. **Confirmed NOT the same shape as `reservation.py`'s own UL follower budget** — two real structural differences (baseline: remaining-PRB-count vs. static `bwp_size`; scope: GBR-specific vs. any-needy-follower), not a naming coincidence (row 60's own Divergence cell). PHR-based capping confirmed structurally out of scope entirely, same disposition `reservation.py`'s own commit 4a already recorded for the identical connection point (row 63). The `B_eff` deficit-accumulated grant-sizing target is deliberately NOT built here — named as its own commit, 4b, per user decision (row 64) — since `ul_total_target_bytes` is real and GFBR-exercised on this corpus, unlike everything actually built in this commit. | **Predicted zero movement, on two independent confirmed grounds, stated before running**: (1) the floor's own sizing change is gated on `floor_fire`, confirmed never to fire on this corpus (commit 4's own result); (2) `gbr_below`'s reserve is gated on `gbr_bytes_slot > 0`, which never fires either — `mfbr_bps` is never configured on any flow in any scenario in this repo, the identical fact `reservation.py`'s own already-landed `gbr_bytes_slot` found for the same quantity (`docs/oai-port-map.md` row 61). **Confirmed exactly**: `--check` against a commit-4 worktree baseline reports `OK — no drift` across all 20 records — every mechanism actually built in this commit is inert on the current corpus by construction, not by coincidence, a repeat of commit 4's own "predicted inert, confirmed inert" result on different (but related) grounds. Full suite: 476 passed (6 new tests). |
-| 4b | `B_eff` — the deficit-accumulated UL grant-sizing target, two-tier's own counterpart to `reservation.py`'s already-landed commit-4a `_ul_grant_target`. `ul_target = max(ul_total_target_bytes, B); if has_gbr and gbr_bytes_slot>0: ul_target = max(ul_target, gbr_bytes_slot); B_eff = ul_target` — feeds `nr_find_nb_rb`'s demand-based sizing for ordinary (non-floor-fired) DATA UEs (`docs/oai-port-map.md` row 64). `gbr_bytes_slot`'s own contribution confirmed inert (same `mfbr_bps` finding as 4a); `ul_total_target_bytes` (`_ul_gbr_and_pdb`'s own `guaranteed_bytes + be_bytes`, flagged unconsumed since commit 3, row 46) is NOT — GFBR-based deficit target-spreading IS exercised by this corpus's real GBR flows. Not yet planned in detail. | Unlike everything in commit 4a, expected to move `--check` on GBR UL scenarios — not yet scored, since this commit hasn't been planned. |
+| 4b | **Landed.** `B_eff`, the deficit-accumulated UL grant-sizing target, wired into ordinary (non-floor-fired) DATA sizing (`docs/oai-port-map.md` row 64). **Row 46's own flag did not hold, confirmed by direct read**: `ul_total_target_bytes` is `_ul_gbr_and_pdb`'s own third accumulator, not `guaranteed_bytes + be_bytes`'s sum — the divergence is `be_bytes`'s own GBR-LCG overflow term, which `ul_total_target_bytes` excludes (row 65, this port's second self-inflicted finding, a new `CLAUDE.md` invariant). **`reservation.py`'s own `_ul_grant_target` confirmed NOT a template** — a genuine sum in a different C file, plus an extra `has_srb`-cap step two-tier's own `B_eff` lacks (row 66); D1 (PRB-vs-bytes sizing) transferred directly regardless. | **Predicted movement, and it moved — scored, not assumed.** `study1`/factory_robots (GBR): moved, the GFBR mechanism. `study2`/sensor_dense (0 GBR): also moved, confirmed traced to the non-GBR frozen-BSR mechanism specifically (`has_gbr` always `False` there), not assumed. `study3`/latency_bound (0 UL): zero movement, as predicted. Only `TwoTier` records moved. Full suite: 480 passed (4 new tests). |
 | 5 | DL LCP: single greedy DRB pass + SRB-exempt fill (the corrected, non-two-pass structure — see §6 Flags for the README correction this implies). **Now confirmed a *joint* VQ-correction commit, not a pure LCP commit (found landing commit 3a, `docs/oai-port-map.md` row 50)**: commit 3a's own DL drain runs against `_dl_fill`'s placeholder split, not the real `(priority ASC, vq_dl DESC)` order `ia_p5g_compute_lcp_budget` produces — landing the real fill here will *also* change which LCID each TB's bytes drain from, changing `vq_dl`'s own trajectory and DL ranking downstream, on top of whatever the LCP fill itself changes about grant composition. Read this commit's own `--check` movement with both effects in mind, not as an LCP-only diff. | DL per-flow byte-fill patterns shift modestly; SRB-adjacent flows (if any in-corpus) most affected — **plus** a second-order `vq_dl`/DL-ranking shift from the drain finally consuming the correct split (see left column). |
 | 6 | MCS-selection call site + OLLA follow-on (D2) — reuse the shared helper from reservation commits 8/9 if the staircase/ratchet wiring is scheduler-agnostic. | Per D2(i): predicted drift for `periodic_control`/`condition_monitor` flows, checked against actual output. Run D2(ii)'s compounding test; record result. |
 | 7 | `reset_ue`/`SchedulerContextReset` — **required re-port**, not a copy-forward: the existing implementation (`two_tier.py:295-375`) resets VQ/deficit/demand fields whose names and structure change under commits 2-5 above. | Inert on its own (only fires on a join-event reconnection edge; no WP-Join scenario runs in the base corpus). |
@@ -828,11 +828,12 @@ landed — reservation's Phase 2 port is complete. Two-tier commits 1
 3 (the GBR-deficit/PDB-remaining sort tiers), 3a (the windowed-ceiling
 VQ, replacing the bootstrap PF coefficient in both directions), 4 (the
 UL service-interval floor's state machine plus the new Tier 1.5
-comparator slot it requires), and 4a (the floor's grant-sizing bypass,
-FIX-2 plus the real uncapped-to-`max_rbSize` sizing) have now landed —
-see this table's own row 1/row 2/row 3/row 3a/row 4/row 4a entries
-above for what each did and confirmed; commit 4b and commits 5-9 not
-started. Two user decisions (D1, D2) obtained directly and recorded
+comparator slot it requires), 4a (the floor's grant-sizing bypass,
+FIX-2 plus the real uncapped-to-`max_rbSize` sizing), and 4b (`B_eff`,
+the deficit-accumulated UL grant-sizing target) have now landed — see
+this table's own row 1/row 2/row 3/row 3a/row 4/row 4a/row 4b entries
+above for what each did and confirmed; commits 5-9 not started. Two
+user decisions (D1, D2) obtained directly and recorded
 above before any code, matching
 `docs/wp-join-plan.md`'s D0a/D0b precedent. Sequencing (D4): reservation
 first, two-tier second.
@@ -1027,6 +1028,50 @@ future commit (4b) per user decision, with the stale "No GBR-PRB-
 reserve/follower budget yet (commit 4a)" comment in `two_tier.py`'s own
 grant-sizing loop corrected to point at it rather than left to go stale
 a second time. Full suite: 476 passed (6 new tests).
+
+**Commit 4b landed `B_eff`, the deficit-accumulated UL grant-sizing
+target, wiring it into ordinary (non-floor-fired) DATA sizing in place
+of plain `ue_backlog`.** Two findings, both confirmed by direct read
+before writing any code, not assumed from the similar naming or the
+similar-looking already-landed reservation mechanism: **(1) row 46's
+own forward-looking flag was wrong** — `ul_total_target_bytes` is
+`_ul_gbr_and_pdb`'s own THIRD accumulator in the same per-LCG loop,
+not `guaranteed_bytes + be_bytes`'s sum; the divergence is specifically
+`be_bytes`'s own GBR-LCG overflow term (a GBR flow's live backlog
+exceeding its per-slot target), which `ul_total_target_bytes` excludes
+(`docs/oai-port-map.md` row 65). This is this port's **second
+self-inflicted finding**, distinct in kind from `_dl_stamp`'s stale
+citation at commit 3a — a citation points at something readable and
+pointed at the wrong lines; row 46's note asserted something about a
+consumption not yet written, and was wrong about that. A new `CLAUDE.md`
+invariant now generalizes across both: a forward-looking note in this
+port's own docs is a hypothesis for the commit that takes it up to
+verify, not an instruction to execute unchecked. **(2) `reservation.py`'s
+own already-landed `_ul_grant_target` is confirmed NOT a template** —
+a third instance of "a similar-looking mechanism differs structurally,"
+after FIX-2's own two divergences at commit 4a (row 60). Reservation's
+real ground truth lives in a different C file with a genuine sum
+(no separate accumulator) and an extra `has_srb`-cap step two-tier's
+own `B_eff` block lacks (row 66). D1 (reservation's own sizing decision
+— the target sizes PRBs, not delivered bytes) transferred directly, the
+one piece of the template that did. **This is the first commit since
+3a predicted to move `--check`, and it did — scored, not assumed
+clean.** Worktree-verified against a commit-4a (`1d2a714`) baseline:
+`study1`/factory_robots (10 GBR UL flows) moved substantially, the
+GFBR-driven mechanism predicted; `study2`/sensor_dense (30 UL flows,
+0 GBR) also moved, confirmed by direct trace to the non-GBR mechanism
+specifically — `has_gbr` is always `False` there (`scenario_config_4.yml`:
+every UL flow is `flow_class: Delay`), so the only route left is
+`ul_total_target_bytes`'s frozen-between-BSRs per-LCG contribution
+exceeding `ue_backlog`'s BSR-independent-drain scalar, confirming the
+frozen-BSR mechanism live through a scheduler path (a real finding for
+WP9's own UL-sizing reasoning), not folded into "GBR flows only" by
+default; `study3`/latency_bound (0 UL flows) showed zero movement,
+exactly as predicted, nothing to size. Only `TwoTier`-prefixed records
+moved — PF/RoundRobin/Reservation records stayed bit-for-bit identical,
+confirming the change stayed scheduler-scoped. Full suite: 480 passed
+(4 new tests, 3 existing call sites updated for `_ul_gbr_and_pdb`'s
+new 7-tuple return).
 
 4a landed ahead of commit 4 (follower budget) — the stronger sequence
 argued for below turned out to be the one taken. `guaranteed_bytes`/

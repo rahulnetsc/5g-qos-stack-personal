@@ -1,4 +1,4 @@
-"""Phase 2, two-tier commits 1-4a: scheduler/two_tier.py's rewrite.
+"""Phase 2, two-tier commits 1-4b: scheduler/two_tier.py's rewrite.
 
 Commit 1: Scheduler protocol conformance, a bootstrap PF coefficient as
 the only ranking criterion (explicitly NOT a ported mechanism), UL-
@@ -42,9 +42,26 @@ real, fully testable machinery anyway -- this port's standing practice
 for confirmed-currently-unreachable mechanisms. PHR-based capping
 stays structurally out of scope entirely (not merely deferred), the
 same disposition reservation.py's own commit 4a already recorded for
-the identical connection point. The B_eff deficit-accumulated grant-
-sizing target (real, GFBR-driven, NOT confirmed inert) is its own
-commit, 4b, named but not built here.
+the identical connection point.
+
+Commit 4b: B_eff, the deficit-accumulated UL grant-sizing target,
+wired into ordinary (non-floor-fired) DATA sizing. ul_total_target_
+bytes -- confirmed to NOT equal guaranteed_bytes+be_bytes despite the
+similar shape (the GBR-LCG overflow term be_bytes includes,
+ul_total_target_bytes excludes) -- is a real, testable third
+accumulator inside _ul_gbr_and_pdb's own loop. This port's own port-map
+row 46 said guaranteed_bytes+be_bytes would be "reused directly" for
+this consumption -- checked here, not executed unchecked, and found
+wrong: this port's SECOND self-inflicted finding, distinct in kind from
+_dl_stamp's own stale citation at commit 3a (a wrong citation vs. a
+wrong plan). reservation.py's own already-landed _ul_grant_target
+confirmed NOT a template either (different baseline formula, and a
+has_srb control-only cap two-tier's own C genuinely lacks) -- a third
+instance of "a similar-looking mechanism differs structurally," after
+FIX-2's own two divergences at commit 4a. D1 (reservation's own sizing
+decision -- size PRBs off the target, cap delivered bytes at true
+backlog) IS reused directly, the one piece of the "template" that does
+transfer.
 
 See docs/phase2-plan.md's two-tier commit checklist and
 docs/oai-port-map.md's "Phase 2 -- two-tier" section for the full
@@ -350,7 +367,7 @@ def test_ul_gbr_deficit_gated_per_lcg_on_the_real_estimate():
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=0, estimated_ul_buffer_per_lcg=0)
 
-    has_gbr, pdb_ms, _guaranteed, _be, _urgency, _gbr_bytes_slot_positive = (
+    has_gbr, pdb_ms, _guaranteed, _be, _urgency, _gbr_bytes_slot, _target = (
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
     )
     assert has_gbr is False
@@ -1023,12 +1040,12 @@ def test_ul_gbr_bytes_slot_positive_is_max_not_sum_and_has_no_floor_at_one():
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
 
-    has_gbr, *_rest, gbr_bytes_slot_positive = sched._ul_gbr_and_pdb(
-        1, buffers, slot_index=0
+    has_gbr, _pdb, _guar, _be, _urg, gbr_bytes_slot, _target = (
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
     )
     # gfbr_bps=1000 / 8 / slots_per_sec(2000) = 0.0625 -> int() truncates
     # to 0, uncontested by any floor.
-    assert gbr_bytes_slot_positive is False
+    assert gbr_bytes_slot == 0
     assert has_gbr is True, "has_gbr's own max(1,...) floor should still fire here"
 
 
@@ -1047,8 +1064,10 @@ def test_ul_gbr_bytes_slot_positive_false_without_mfbr_even_with_real_gfbr():
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
 
-    *_rest, gbr_bytes_slot_positive = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    assert gbr_bytes_slot_positive is False
+    _has_gbr, _pdb, _guar, _be, _urg, gbr_bytes_slot, _target = (
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    )
+    assert gbr_bytes_slot == 0
 
 
 # -- 12. commit 4a: FIX-2, the GBR-PRB reserve -------------------------------
@@ -1174,4 +1193,115 @@ def test_ul_floor_fire_grant_also_respects_the_fix2_reserve():
     assert ue1_grant.prbs <= 5, (
         f"a fired floor's grant must still respect the FIX-2 reserve for "
         f"a downstream live-obligation GBR UE, got {ue1_grant.prbs}"
+    )
+
+
+# -- 14. commit 4b: ul_total_target_bytes vs. guaranteed_bytes+be_bytes -----
+
+
+def test_ul_total_target_bytes_diverges_from_guaranteed_plus_be_on_gbr_overflow():
+    """ia_p5g_scheduler.c:2649-2670 vs. the deficit loop's own
+    guaranteed_bytes/be_bytes -- confirmed a real divergence, not a
+    rounding artifact: ul_total_target_bytes excludes the GBR-LCG
+    overflow term be_bytes includes. This port's own port-map row 46
+    said these values would be "reused directly" for this consumption
+    -- checked here, not executed unchecked, and found wrong (this
+    port's second self-inflicted finding, distinct from _dl_stamp's
+    stale citation at commit 3a)."""
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=16_000, mfbr_bps=0.0, pdb_ms=100.0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1000, estimated_ul_buffer_per_lcg=1000)
+
+    _has_gbr, _pdb, guaranteed, be, _urg, _gbr_slot, ul_total_target_bytes = (
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    )
+    assert guaranteed == 1
+    assert be == 999  # the overflow: backlog(1000) - target(1)
+    assert ul_total_target_bytes == 1  # target only -- NOT guaranteed+be (1000)
+    assert ul_total_target_bytes != guaranteed + be
+
+
+def test_ul_total_target_bytes_equals_guaranteed_plus_be_without_overflow():
+    """The two DO coincide when a GBR flow's backlog never exceeds its
+    computed target -- the divergence above is specifically about
+    overflow, not a permanent inequality between the two quantities."""
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=16_000, mfbr_bps=0.0, pdb_ms=100.0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=1, estimated_ul_buffer_per_lcg=1)
+
+    _has_gbr, _pdb, guaranteed, be, _urg, _gbr_slot, ul_total_target_bytes = (
+        sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
+    )
+    assert be == 0  # no overflow -- backlog(1) <= target(1)
+    assert ul_total_target_bytes == guaranteed + be
+
+
+# -- 15. commit 4b: B_eff sizes PRBs off the target, not raw backlog --------
+
+
+def test_b_eff_uses_ul_total_target_bytes_when_it_exceeds_reported_backlog():
+    """The non-GBR contribution to ul_total_target_bytes is the raw,
+    per-LCG estimated_ul_buffer_per_lcg (frozen between BSRs, WP3/WP4's
+    own confirmed invariant), not bytes_reported (drained on grant
+    regardless of BSR timing) -- so ul_total_target_bytes can exceed
+    ue_backlog even for a UE with NO GBR flows at all, sizing MORE PRBs
+    than raw-backlog sizing would."""
+    from scheduler.link import bits_per_prb
+
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, flow_class="PF")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=5000)
+    channel = _FakeChannel({1: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    assert len(out) == 1
+    assert out[0].bytes_capacity == 100  # D1: tbs_bytes capped at true backlog
+
+    bits_per_rb, _bler = bits_per_prb(20.0, symbols=14)
+    expected_prbs_for_backlog_alone = -(-(100 * 8) // bits_per_rb)
+    expected_prbs_for_target = -(-(5000 * 8) // bits_per_rb)
+    assert out[0].prbs > expected_prbs_for_backlog_alone
+    assert out[0].prbs == min(50, expected_prbs_for_target)
+
+
+def test_b_eff_gbr_target_exceeding_backlog_sizes_more_prbs_but_caps_bytes_at_backlog():
+    """D1 (reservation.py's own commit-4a decision, reused directly):
+    the target sizes PRBs, not delivered bytes. A deficit-carrying GBR
+    flow's target can exceed its own true (reported) backlog -- more
+    PRBs get granted than raw-backlog sizing would give, but tbs_bytes
+    never manufactures bytes beyond what's actually queued."""
+    from scheduler.link import bits_per_prb
+
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=800_000_000, mfbr_bps=0.0, pdb_ms=100.0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
+    channel = _FakeChannel({1: 20.0})
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=200, pdcch_cce_budget=48)
+
+    out = sched.allocate(slot, buffers, channel)
+    assert len(out) == 1
+    assert out[0].bytes_capacity == 100  # never manufactured beyond true backlog
+
+    bits_per_rb, _bler = bits_per_prb(20.0, symbols=14)
+    expected_prbs_for_backlog_alone = -(-(100 * 8) // bits_per_rb)
+    assert out[0].prbs > expected_prbs_for_backlog_alone, (
+        "a deficit-driven target should size more PRBs than raw backlog alone"
     )

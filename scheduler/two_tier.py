@@ -32,18 +32,101 @@ negative result (``design-docs/scheduler-study.md`` sec8.4) before this
 commit removed them from the live scheduler.
 
 Explicitly NOT here yet, each landing in its own later commit: the
-`B_eff` deficit-accumulated UL grant-sizing target (commit 4b -- see
-this commit's own note on why it's separable from what's built here),
-the PHR-based PRB ceiling (structurally out of scope entirely, see
-below -- not merely deferred), the real single-pass SRB-exempt DL LCP
-fill (commit 5, replacing ``_dl_fill``'s placeholder below -- see this
-commit's own note on why that makes commit 5 a *joint* VQ-correction
-commit, not a pure LCP one), MCS selection via OLLA (commit 6), and a
-re-port of ``reset_ue``/``SchedulerContextReset`` against the new field
-layout (commit 7) -- this class implements no ``reset_ue`` at all until
-then; ``sim/driver.py`` discovers it via ``getattr(scheduler, "reset_ue",
+PHR-based PRB ceiling (structurally out of scope entirely -- not
+merely deferred, see commit 4a's own module-docstring section below),
+the real single-pass SRB-exempt DL LCP fill (commit 5, replacing
+``_dl_fill``'s placeholder below -- see this commit's own note on why
+that makes commit 5 a *joint* VQ-correction commit, not a pure LCP
+one), MCS selection via OLLA (commit 6), and a re-port of
+``reset_ue``/``SchedulerContextReset`` against the new field layout
+(commit 7) -- this class implements no ``reset_ue`` at all until then;
+``sim/driver.py`` discovers it via ``getattr(scheduler, "reset_ue",
 None)``, so its absence simply means TwoTier is treated like PF (no
 context reset) in the interim, not an oversight.
+
+**Commit 4b (this commit) lands `B_eff`, the deficit-accumulated UL
+grant-sizing target, replacing `ue_backlog`-only sizing for ordinary
+(non-floor-fired) DATA UEs.** Ground truth (`ia_p5g_scheduler.c:3195-
+3204`): `ul_target = ul_total_target_bytes; if ul_target < B: ul_target
+= B; if has_gbr and gbr_bytes_slot > 0: ul_target = max(ul_target,
+gbr_bytes_slot); B_eff = ul_target` -- computed independently of
+commit 4a's own `max_rbSize`/`available_rb` (the two combine only at
+the sizing step: `max_rbSize` bounds the PRB search space, `B_eff` is
+the byte demand searched for within it -- confirmed no reordering
+needed, `max_rbSize` already computed first in this file's own loop).
+Floor-fire sizing is untouched -- it bypasses `B_eff` entirely, per
+ground truth.
+
+**`ul_total_target_bytes` does NOT equal `guaranteed_bytes + be_bytes`
+-- confirmed by reading both accumulations side by side in the same
+per-LCG loop, not assumed from the similar naming. This is a real,
+self-inflicted finding: commit 3's own port-map row 46 said these
+values would be "reused directly here, not re-derived" once a future
+commit took up this consumption -- checked here, not executed
+unchecked, and found wrong.** For a GBR LCG, both accumulate the same
+capped `target` -- no divergence there. For a non-GBR LCG, both
+accumulate the same raw `estimated_ul_buffer_per_lcg` -- no divergence
+there either. **The divergence is specifically the GBR-LCG overflow
+term**: `be_bytes` additionally accumulates `overflow = lcg_estimate -
+target` when a GBR flow's current backlog exceeds its computed target
+this slot; `ul_total_target_bytes` does NOT include this term at all --
+only the capped `target` counts toward it. `ul_total_target_bytes` is
+therefore its own, third accumulator inside `_ul_gbr_and_pdb`'s
+existing loop (matching the established "extend the existing loop"
+precedent from `worst_urgency01`/`gbr_bytes_slot`), not a sum of the
+two return values already there.
+
+**This is this port's SECOND self-inflicted finding, distinct in kind
+from `_dl_stamp`'s own (commit 3a's stale citation).** `_dl_stamp`'s
+was a wrong *citation* -- a citation points at something readable, and
+it pointed at the wrong lines. Row 46's was a wrong *plan* -- forward
+guidance for a consumption not yet verified, written before the
+quantities involved had actually been compared. A plan asserts
+something about code not yet written; a citation points at code that
+already exists to be checked. Both wrong, differently -- see
+`CLAUDE.md`'s new invariant generalizing across both instances.
+
+**`reservation.py`'s own already-landed `_ul_grant_target` is
+confirmed NOT a template for `B_eff` -- a third instance of "a
+similar-looking mechanism differs structurally," after FIX-2's own two
+divergences from the follower budget at commit 4a.** Confirmed via the
+full OAI checkout, not assumed: reservation's real ground truth
+(`gNB_scheduler_ulsch.c:2492-2513`, a *different* C file from
+two-tier's `ia_p5g_scheduler.c`) computes `ul_target = ul_guaranteed_
+bytes + ul_be_bytes` directly -- a genuine sum, since reservation's own
+real C has no separate `ul_total_target_bytes`-style accumulator at
+all. A second, smaller, also-confirmed divergence: reservation's own
+`B_eff` has a THIRD step two-tier's genuinely lacks -- an `has_srb`
+control-only cap. Two-tier's own `B_eff` block ends at `B_eff =
+ul_target` with no such step -- confirmed absent from the source, not
+omitted by oversight, so not ported (`has_srb` is a permanent no-op in
+both schedulers regardless, so this makes no practical difference, but
+copying reservation's shape here would have been porting reservation's
+mechanism, not two-tier's own).
+
+**D1's sizing decision (reservation's own commit 4a) IS directly
+reusable -- the one piece of the "template" that does transfer,
+confirmed by the same direct read.** "The target sizes PRBs, not
+delivered bytes": `prbs_needed` derives from `B_eff` (which may exceed
+true backlog when a deficit-carrying GBR flow pushes the target up),
+but `tbs_bytes` stays `min(ue_backlog, capacity)` -- grants PRBs for
+bytes not yet in the buffer without manufacturing delivered bytes. This
+decision is about the sizing MECHANISM's own shape, independent of the
+`B_eff` FORMULA divergence above -- reused directly, not re-derived.
+
+**Movement prediction refined beyond "GBR flows only," found checking
+scenario UL composition directly.** `factory_robots_scenario`: 13 UL
+flows, 10 GBR -- expect real movement (GFBR-based deficit
+target-spreading now floors sizing above raw backlog). `sensor_dense_
+scenario`: 30 UL flows, but 0 GBR -- MAY ALSO move, via a second,
+distinct source: `ul_total_target_bytes`'s non-GBR contribution is the
+raw `estimated_ul_buffer_per_lcg` (frozen between BSRs, WP3/WP4's own
+confirmed invariant), not `bytes_reported` (drained on grant
+regardless of BSR timing) -- whenever a grant has been issued but the
+per-LCG array hasn't refreshed yet, `Σ(estimated_ul_buffer_per_lcg) >
+bytes_reported` is a real, expected state, independent of any GBR
+mechanism. `latency_bound_scenario`: 0 UL flows -- confirmed no
+movement possible.
 
 **Commit 4a (this commit) lands the UL floor's grant-sizing bypass: the
 GBR-PRB-reserve cap (`gbr_below`, "FIX-2") and the floor's own
@@ -122,23 +205,18 @@ this path bind in practice either. Both C mechanisms' own gates
 collapse to permanently-false here with no new code needed. A fifth
 ``README.md`` §7 dormancy-category entry.
 
-**Deferred, not built here: `B_eff`, the deficit-accumulated UL
-grant-sizing target -- two-tier's own counterpart to
-``reservation.py``'s already-landed commit-4a ``_ul_grant_target``.**
-Ground truth (`:3195-3204`): ``ul_target = max(ul_total_target_bytes,
-B); if has_gbr and gbr_bytes_slot>0: ul_target = max(ul_target,
-gbr_bytes_slot); B_eff = ul_target`` -- feeding ``nr_find_nb_rb``'s
-demand-based sizing for ordinary (non-floor-fired) DATA UEs only (the
-floor-fire bypass ignores ``B_eff`` entirely). ``gbr_bytes_slot``'s own
-contribution is confirmed inert here (same ``mfbr_bps`` finding as
-above) -- but ``ul_total_target_bytes`` is NOT: it's ``_ul_gbr_and_
-pdb``'s own ``guaranteed_bytes + be_bytes``, already computed and
-explicitly flagged unconsumed since commit 3 (port-map row 46), and
-GFBR-based deficit target-spreading IS exercised by this corpus's real
-GBR flows. Wiring it is expected to move ``--check`` on GBR UL
-scenarios, unlike everything actually built in this commit -- a
-genuinely separable fidelity change, named as its own future commit
-(4b) rather than bundled in here, per user decision.
+`B_eff`, the deficit-accumulated UL grant-sizing target, was
+deliberately NOT built in this commit (4a) -- named as its own future
+commit (4b) rather than bundled in here, per user decision, since
+`gbr_bytes_slot`'s own contribution was already confirmed inert
+(`mfbr_bps` never configured) but `ul_total_target_bytes` was not
+(GFBR-based deficit target-spreading IS exercised by this corpus's
+real GBR flows). **See commit 4b's own module-docstring section above
+for what landed, including a correction to this port's own row-46
+plan** (``reservation.py``'s already-landed `_ul_grant_target` turned
+out NOT to be a reusable template, and `guaranteed_bytes + be_bytes`
+turned out NOT to equal `ul_total_target_bytes` -- neither was known
+at commit 4a's own landing).
 
 **Commit 4 (this commit) lands the UL service-interval floor's arm/fire
 state machine and a new comparator tier it structurally requires.** The
@@ -589,12 +667,20 @@ class _Candidate:
     # Tier 1.5 in _ul_rank_key (commit 4). Unused by DL.
     floor_fire: bool = False
     floor_sil: int = 0
-    # UL only, commit 4a -- has_pending_gbr-gated MAX-over-backlogged-
-    # GBR-LCGs(gfbr_bps/8/slots_per_sec) > 0 (ia_p5g_scheduler.c:2710-
-    # 2722). gbr_below's own reverse-scan input, alongside has_gbr
-    # above. Confirmed always False on this corpus (module docstring --
-    # mfbr_bps never configured), ported anyway.
-    gbr_bytes_slot_positive: bool = False
+    # UL only -- has_pending_gbr-gated MAX-over-backlogged-GBR-LCGs
+    # (gfbr_bps/8/slots_per_sec) (ia_p5g_scheduler.c:2710-2722). Real
+    # value as of commit 4b (was a bool, commit 4a -- only gbr_below's
+    # own reverse scan needed the boolean then; B_eff's own floor
+    # (commit 4b) needs the numeric value too). gbr_below's condition
+    # reads `> 0` on this field now, same effect as the old bool.
+    # Confirmed always 0 on this corpus (module docstring -- mfbr_bps
+    # never configured), ported anyway.
+    gbr_bytes_slot: int = 0
+    # UL only, commit 4b -- _ul_gbr_and_pdb's OWN third accumulator,
+    # NOT guaranteed_bytes+be_bytes (module docstring's row-46
+    # correction). Feeds B_eff for ordinary (non-floor-fired) DATA
+    # sizing.
+    ul_total_target_bytes: int = 0
 
 
 class TwoTier:
@@ -852,15 +938,16 @@ class TwoTier:
                 self._update_vq_ul(ue_id, buffers)
                 # UL's own has_gbr/pdb_ms aren't sort tiers (see module
                 # docstring's design-revision finding) -- called for the
-                # deficit-tracking + urgency side effect. As of commit
-                # 4a, has_gbr IS stored (not for ranking -- for
-                # gbr_below's own reverse-scan input below); pdb_ms
-                # stays unread.
-                has_gbr, _pdb_ms, _guaranteed, _be, urgency01, gbr_bytes_slot_positive = (
-                    self._ul_gbr_and_pdb(ue_id, buffers, slot.slot_index)
-                )
+                # deficit-tracking + urgency side effect. has_gbr IS
+                # stored (not for ranking -- for gbr_below's own
+                # reverse-scan input below); pdb_ms stays unread.
+                (
+                    has_gbr, _pdb_ms, _guaranteed, _be, urgency01,
+                    gbr_bytes_slot, ul_total_target_bytes,
+                ) = self._ul_gbr_and_pdb(ue_id, buffers, slot.slot_index)
                 candidate.has_gbr = has_gbr
-                candidate.gbr_bytes_slot_positive = gbr_bytes_slot_positive
+                candidate.gbr_bytes_slot = gbr_bytes_slot
+                candidate.ul_total_target_bytes = ul_total_target_bytes
                 candidate.urgency01 = urgency01
                 # ia_p5g_ul_metric, :3696-3726 -- base_q only; the
                 # urgency term and the SE multiply happen in
@@ -895,8 +982,8 @@ class TwoTier:
         # condition anyway per this port's "port even when currently a
         # no-op" convention. Confirmed always all-zero on this corpus
         # (module docstring -- mfbr_bps never configured, so
-        # gbr_bytes_slot_positive is never True) -- computed anyway as
-        # real, testable machinery.
+        # gbr_bytes_slot is never > 0) -- computed anyway as real,
+        # testable machinery.
         gbr_below: list[int] = [0] * len(candidates)
         if direction == "UL":
             running = 0
@@ -906,7 +993,7 @@ class TwoTier:
                 if (
                     not c.sched_inactive
                     and c.has_gbr
-                    and c.gbr_bytes_slot_positive
+                    and c.gbr_bytes_slot > 0
                 ):
                     running += 1
 
@@ -956,14 +1043,25 @@ class TwoTier:
                 if tbs_bytes <= 0:
                     continue
             else:
-                prbs_needed = -(-(ue_backlog * 8) // c.bits_per_rb)  # ceil div
-                # GBR-PRB-reserve landed (commit 4a, confirmed inert on
-                # this corpus -- mfbr_bps never configured, module
-                # docstring). Sizing itself is still backlog-only, not
-                # target-based -- B_eff's ul_total_target_bytes wiring
-                # (real, GFBR-deficit-driven, NOT confirmed inert) is
-                # deferred to commit 4b.
+                # [B_eff] UL only -- ia_p5g_scheduler.c:3195-3204.
+                # ul_total_target_bytes is DL-irrelevant (0 by default
+                # on _Candidate) and gbr_bytes_slot likewise, so this
+                # reduces to plain ue_backlog sizing for DL exactly as
+                # before. Independent of max_rbSize above (computed
+                # separately in the C too) -- combined only here, at
+                # the sizing call, matching ground truth's own order.
+                b_eff = ue_backlog
+                if direction == "UL":
+                    b_eff = max(c.ul_total_target_bytes, ue_backlog)
+                    if c.has_gbr and c.gbr_bytes_slot > 0:
+                        b_eff = max(b_eff, c.gbr_bytes_slot)
+                prbs_needed = -(-(b_eff * 8) // c.bits_per_rb)  # ceil div
                 prbs_used = min(prbs_left, max_rbSize, max(1, prbs_needed))
+                # D1 (reservation.py's own commit-4a decision, reused
+                # directly): the target sizes PRBs, not delivered bytes
+                # -- b_eff may exceed true backlog when a deficit-
+                # carrying GBR flow pushes the target up, but tbs_bytes
+                # never manufactures bytes beyond real backlog.
                 tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
                 if tbs_bytes <= 0:
                     continue
@@ -1126,11 +1224,12 @@ class TwoTier:
 
     def _ul_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
-    ) -> tuple[bool, int, int, int, float, bool]:
+    ) -> tuple[bool, int, int, int, float, int, int]:
         """UL GBR deficit accumulate/cap/target-spread/overflow-to-BE,
         remaining-PDB, (as of commit 3a) worst-case priority-weighted
-        urgency, and (as of commit 4a) gbr_below's own reverse-scan
-        input -- gNB_scheduler_ulsch.c:2196-2280 (two-tier's own file)
+        urgency, (as of commit 4a) gbr_below's own reverse-scan input,
+        and (as of commit 4b) B_eff's own grant-sizing target --
+        gNB_scheduler_ulsch.c:2196-2280 (two-tier's own file)
         and ia_p5g_scheduler.c's own inlined UL ranking loop (:2570-2674,
         commented "unchanged from original pf_ul()" -- checked, not
         trusted: byte-diffed the deficit/PDB/target arithmetic
@@ -1162,25 +1261,46 @@ class TwoTier:
         than a second duplicate walk. worst_urgency01 is the max of
         u_lcg * priority_weight * delta over this UE's active LCGs.
 
-        gbr_bytes_slot_positive (ia_p5g_scheduler.c:2710-2722, commit 4a):
-        has_pending_gbr-gated MAX (not sum) over GBR-configured,
-        currently-backlogged LCGs of floor(gfbr_bps/8/slots_per_sec) --
-        the SAME per-LCG quantity this method's own `obligation` local
-        already computes, tracked by MAX instead of accumulated, and
-        WITHOUT `obligation`'s own max(1, ...) floor (ported bug-for-bug,
-        matching reservation.py's own already-landed identical port,
-        commit 4a there). Confirmed always False on this corpus --
-        mfbr_bps is never configured on any flow in any scenario in this
-        repo (module docstring) -- ported anyway as real, testable
+        gbr_bytes_slot (ia_p5g_scheduler.c:2710-2722): has_pending_gbr-
+        gated MAX (not sum) over GBR-configured, currently-backlogged
+        LCGs of floor(gfbr_bps/8/slots_per_sec) -- the SAME per-LCG
+        quantity this method's own `obligation` local already computes,
+        tracked by MAX instead of accumulated, and WITHOUT
+        `obligation`'s own max(1, ...) floor (ported bug-for-bug,
+        matching reservation.py's own already-landed identical port).
+        Returns the real int value as of commit 4b (was a bare bool at
+        commit 4a -- gbr_below's own reverse scan only needed the
+        boolean then; B_eff's own floor, commit 4b, needs the numeric
+        value too). Confirmed always 0 on this corpus -- mfbr_bps is
+        never configured on any flow in any scenario in this repo
+        (module docstring) -- ported anyway as real, testable
         machinery, not skipped.
 
-        Returns a 6-tuple now: (has_gbr, remaining_pdb_ms,
-        guaranteed_bytes, be_bytes, worst_urgency01,
-        gbr_bytes_slot_positive) -- guaranteed_bytes/be_bytes still real
-        but unconsumed (the B_eff wiring that would consume them is
-        commit 4b); worst_urgency01 feeds _finalize_ul_coef directly;
-        gbr_bytes_slot_positive feeds gbr_below's reverse scan
-        (_allocate_direction, commit 4a).
+        ul_total_target_bytes (ia_p5g_scheduler.c:2574,2649-2670,
+        commit 4b): a THIRD accumulator, distinct from guaranteed_
+        bytes/be_bytes above despite the similar shape -- confirmed by
+        reading both side by side, not assumed. For a GBR LCG, adds the
+        SAME capped `target` guaranteed_bytes already accumulates -- no
+        divergence there. For a non-GBR LCG, adds the SAME raw
+        `lcg_estimate` be_bytes already accumulates -- no divergence
+        there either. The divergence is specifically the GBR-LCG
+        overflow term: be_bytes additionally adds `overflow =
+        lcg_estimate - target` when positive; ul_total_target_bytes
+        does NOT -- only the capped target counts toward it. This port's
+        own port-map row 46 said guaranteed_bytes+be_bytes would be
+        "reused directly" for this consumption -- checked here, not
+        executed unchecked, and found wrong (module docstring's own
+        self-inflicted-finding note).
+
+        Returns a 7-tuple now: (has_gbr, remaining_pdb_ms,
+        guaranteed_bytes, be_bytes, worst_urgency01, gbr_bytes_slot,
+        ul_total_target_bytes) -- guaranteed_bytes/be_bytes still real
+        but unconsumed by B_eff specifically (their own correctness is
+        unaffected by anything since commit 3 -- checked, not assumed);
+        worst_urgency01 feeds _finalize_ul_coef; gbr_bytes_slot feeds
+        gbr_below's reverse scan AND B_eff's own floor;
+        ul_total_target_bytes feeds B_eff's own base term
+        (_allocate_direction, commit 4b).
         """
         state = self._ue_state[ue_id]
         slots_per_sec = 1.0 / self.slot_duration_s
@@ -1194,6 +1314,7 @@ class TwoTier:
         be_bytes = 0
         worst_urgency01 = 0.0
         gbr_bytes_slot_max = 0
+        ul_total_target_bytes = 0
 
         for f in self._flows:
             if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
@@ -1221,6 +1342,11 @@ class TwoTier:
 
             if f.flow_class != "GBR" or f.gfbr_bps <= 0:
                 be_bytes += lcg_estimate
+                # ul_total_target_bytes (:2667-2669) -- the non-GBR
+                # branch adds the SAME raw lcg_estimate be_bytes does;
+                # no divergence here (module docstring's own note --
+                # the divergence is GBR-only, below).
+                ul_total_target_bytes += lcg_estimate
                 worst_urgency01 = max(worst_urgency01, u_lcg * priority_weight)
                 continue
 
@@ -1257,14 +1383,20 @@ class TwoTier:
                 target = max_burst
 
             guaranteed_bytes += target
+            # ul_total_target_bytes (:2666) -- the GBR branch adds only
+            # the capped `target`, matching guaranteed_bytes's own
+            # contribution exactly -- NOT the overflow term below,
+            # which be_bytes alone accumulates. This is the confirmed
+            # divergence (module docstring's own row-46 correction).
+            ul_total_target_bytes += target
             overflow = lcg_estimate - target
             if overflow > 0:
                 be_bytes += overflow
 
-        gbr_bytes_slot_positive = has_pending_gbr and gbr_bytes_slot_max > 0
+        gbr_bytes_slot = gbr_bytes_slot_max if has_pending_gbr else 0
         return (
             has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes,
-            worst_urgency01, gbr_bytes_slot_positive,
+            worst_urgency01, gbr_bytes_slot, ul_total_target_bytes,
         )
 
     def _dl_stamp(
