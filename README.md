@@ -1283,7 +1283,38 @@ these five, add a new tag rather than forcing it into an existing one.
   this state at all, not assumed either way; if it can, the floor's own
   arm/fire behavior (and the `has_pending_gbr` tension `§7` also flags)
   become directly checkable against a real scenario rather than only
-  the unit-level fixtures in `sim/tests/test_two_tier.py`. If no
+  the unit-level fixtures in `sim/tests/test_two_tier.py`.
+  **That sub-question is now ANSWERED — negatively — by WP9 commit 0b
+  (`docs/wp9-plan.md` §8a), a read-only check that wrote no code. The
+  item itself stays `[OPEN: WP9]`: the fault model is still unbuilt, and
+  only the "can the existing model express it?" half is closed.**
+  Three routes were checked separately, not as one impression.
+  *Quantisation*: ruled out empirically, not by reading — across every
+  backlog in 1..20,000 against both transcribed tables, zero cases map to
+  a 0 estimate (`_locate_bsr_index` returns index 0 only at
+  `true_bytes == 0`; `_overestim_index` only increases). *Short-BSR
+  aliasing*: the `[0] * LCG_COUNT` memset really does zero unreported
+  LCGs, but the format is selected by `len(active_lcgs) == 1`, so it is
+  used **exactly when only one LCG has backlog at all** — every entry it
+  zeroes is genuinely empty. **The real-hardware route is a *truncated*
+  BSR (several LCGs with data, a grant too small for a Long BSR, only a
+  prefix reported), and format selection here reads the active-LCG count
+  and never the grant size — that mechanism is simply not modeled.**
+  *Frozen array between BSRs*: real, and it does produce a zero entry
+  over live backlog, but bounded by three independent re-arming paths
+  (the arrival's own regular trigger; `tick_timers`' 5 ms periodic /
+  80 ms retx re-arm; assembly on **any** grant once `pending` is set,
+  crumb included), with `sim/ul_access.py` supplying the grant and
+  modelling SR *timing* but no SR *loss*. **What this establishes is
+  that THIS SIMULATOR cannot produce the fault — a fact about
+  `sim/bsr.py`'s expressive range — NOT that the fault is unreachable in
+  principle or absent on hardware, which the 2026-08-04 incident behind
+  the floor already contradicts.** So the future fault-model WP is
+  scoped as *"add a mechanism `sim/bsr.py` lacks"*, not *"enable a path
+  it has"*, with two candidates named in `docs/wp9-plan.md` §8a:
+  grant-size-keyed truncated-BSR format selection, or SR loss/PUCCH
+  failure (independently motivated — GT-2.3 is RF-essential precisely
+  because SR fragility does not manifest in rfsim). If no
   in-corpus scenario can trigger the floor, `§10`'s regime map compares
   two schedulers with one of them's own signature starvation guard
   permanently unexercised — worth stating in that study's own

@@ -535,7 +535,7 @@ executes.
 | # | Commit | Predicted `--check` movement | Outcome |
 |---|---|---|---|
 | 0 | `Reservation` `min_rb` plumbing (B1) | **None** — `OK — no drift` | **Landed. Prediction HIT**, on the stated grounds: `OK -- no drift`, 516 passed (3 new). Verified both directions — the corpus path is byte-identical, *and* `Reservation(min_rb=20)` through the driver now produces genuinely different output, so the fix does something rather than only being accepted. **One real trap found, not hypothetical**: `configure()`'s fallback must test `is None`, not truthiness — `test_reservation.py`'s two follower-budget fixtures pass `min_rb=0` deliberately, and the truthiness variant was written and run, failing 3 tests. `docs/oai-port-map.md` row 78. |
-| 0b | BSR-desync fault-model feasibility check (read-only, no code) | n/a — no code | |
+| 0b | BSR-desync fault-model feasibility check (read-only, no code) | n/a — no code | **Landed. Result NEGATIVE** — quantisation ruled out empirically, short-BSR aliasing ruled out structurally (format keyed to active-LCG count, not grant size — the truncated-BSR route is unmodeled), frozen-array route real but bounded by three independent re-arming paths. §8a for the full trace and the two named candidate mechanisms. |
 | 1 | Sweep infrastructure (B2–B6), incl. the §6.4 rule as code | **None** — no `sim/`/`scheduler/` behaviour touched | |
 | 2 | Stage 1 (screening), ≤ 4 h; **N=2 control read first** | n/a | |
 | 3 | Stage 2 (confirmatory), ≤ 24 h; + G9 cycles, G11 soak (3 seeds) | n/a | |
@@ -589,6 +589,100 @@ GT-2 on hardware remains the only test of that failure mode.**
 
 ---
 
+## 8a. Commit 0b — the BSR-desync feasibility check (result)
+
+**Read-only. No code was written. Result: NEGATIVE — and §8's discipline
+about which of two things that establishes is applied below, not assumed.**
+
+**Question** (README §7's own open item): can `sim/bsr.py`'s existing
+quantisation / aliasing / event-triggering model express
+`estimated_ul_buffer_per_lcg[L] == 0` while the true backlog on LCG `L`
+stays non-zero — the BSR/SR desync the UL service-interval floor exists to
+rescue?
+
+### The three candidate routes, checked individually
+
+**Route A — quantisation. Ruled out, empirically rather than by reading.**
+`_locate_bsr_index` returns index 0 only for `true_bytes == 0` (a
+`bisect_left` on a table whose first entry is 0), and `_overestim_index`
+only ever increases an index. Checked directly across every backlog in
+1..20,000 against both transcribed tables: **zero cases** map to a 0
+estimate. `quantise_short(1) = 14`, `quantise_long(1) = 11`. Quantisation
+structurally cannot zero a live backlog.
+
+**Route B — short-BSR aliasing (the `[0] * LCG_COUNT` memset). Ruled out,
+and this is the load-bearing finding.** The memset genuinely does leave
+every unreported LCG at 0. But the format is selected by
+**`len(active_lcgs) == 1`** (`sim/bsr.py`, `on_ul_grant`) — the short form
+is used *exactly when only one LCG has any backlog at all*, so every entry
+it zeroes belongs to a genuinely empty LCG. **The real-hardware route to
+this state is a *truncated* BSR** — several LCGs hold data, the grant is too
+small to carry a Long BSR, so only a prefix of them is reported and the rest
+stay zero with live backlog. **That mechanism is not modeled**: format
+selection here reads the active-LCG count and **never the grant size**.
+`Truncated` appears in this module only inside two docstrings noting that
+the tables are shared with the truncated formats — there is no selection
+branch for them.
+
+**Route C — the frozen array between BSRs. Real, but bounded, and that is
+the whole difference.** The array genuinely is stale between reports, so an
+arrival onto an LCG that was empty at the last BSR *does* produce
+`entry == 0` with live backlog. But its duration is bounded by three
+independent re-arming paths, any one of which closes it:
+1. that same arrival sets `pending` (the regular trigger's
+   previously-empty-LCG condition, `on_arrivals`);
+2. `tick_timers` re-arms `pending` every slot past the periodic (5 ms) or
+   retx (80 ms) deadline, idempotently;
+3. `on_ul_grant` assembles the report on **any** grant once `pending` is set
+   — a `min_rb` crumb does it as well as a full grant.
+And the grant those paths need is supplied by `sim/ul_access.py`'s SR path,
+which models SR *timing* (prohibit timer, `sr-TransMax`, RACH-fallback
+timing) but **no SR loss** — the request is always eventually delivered.
+
+### What this establishes, and what it does not
+
+- **(i) It establishes that THIS SIMULATOR cannot produce the fault** — a
+  fact about `sim/bsr.py`'s **expressive range**. The state is reachable but
+  only transiently; the model contains no mechanism whose *duration* is
+  unbounded, and the persistent desync the floor exists for (the incident's
+  own "zero grants for 55 s") has no route here.
+- **(ii) It does NOT establish that the fault is unreachable in principle,
+  or that hardware does not have it.** That reading is contradicted by
+  evidence already on record: the hardware campaign observed this failure
+  mode, and it is what produced the UL floor in the first place
+  (`ia_p5g_scheduler.c:555-644`, the documented 2026-08-04 incident).
+
+**The sentence this commit commits to:** *`sim/bsr.py` lacks a mechanism
+that would produce this state; the fault is real on hardware and outside
+this model's expressive range.*
+
+### Consequence for scoping the future fault-model WP
+
+That WP is **"add a mechanism `sim/bsr.py` does not have"**, not **"enable a
+path it already has"** — the materially larger of the two shapes. This check
+also names the two candidate mechanisms concretely, which is the part a
+later reader can size work from:
+
+1. **Grant-size-keyed truncated-BSR format selection** (TS 38.321's Short
+   Truncated / Long Truncated). The closest to ground truth, and the
+   cheapest in one respect — the quantisation tables are already
+   transcribed and byte-checked. It needs the *grant size* threaded into
+   the BSR-assembly decision, which today reads only the active-LCG count.
+2. **SR loss / PUCCH failure**, suppressing Route C's bounding path so the
+   transient state can persist. Independently motivated: GT-2.3 is tagged
+   **RF-essential** precisely because "SR fragility does not manifest in
+   rfsim" (Test Plan §7), so this is a known-real effect this branch models
+   the timing of but not the failure of.
+
+Either mechanism, plus `mfbr_bps > 0`, is what §4's floor-arm revisit
+condition requires — **the conjunction, not either half**.
+
+**Standing consequence, unchanged:** WP9's regime map does not exercise
+two-tier's signature mechanism, and GT-2 on hardware remains the only test
+of that failure mode.
+
+---
+
 ## 9. Definition of done for WP9
 
 - `uv run pytest sim/tests -q` green after every commit.
@@ -614,6 +708,9 @@ GT-2 on hardware remains the only test of that failure mode.**
 
 ## 10. Status
 
-**Commit 0 landed** (prediction hit, `--check` clean, port-map row 78).
-Next: 0b (read-only feasibility check) → 1 (infrastructure + the §6.4 rule as
-code) → stage 1, N=2 control read first → stage 2 → the map.
+**Commits 0 and 0b landed.** 0: prediction hit, `--check` clean, port-map
+row 78. 0b: negative result, written up in §8a — the fault is outside this
+model's expressive range, and the future WP is scoped as "add a mechanism
+`sim/bsr.py` lacks", with two candidates named.
+Next: commit 1 (infrastructure + the §6.4 rule as code) → stage 1, N=2
+control read first → stage 2 → the map.
