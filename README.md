@@ -326,6 +326,54 @@ they survive it:
   record captured before Phase 2's commit 2 ran with this oracle — not
   just an unfaithful number, a number no real scheduler could ever
   produce. Fixed in commit 2 (`scheduler/two_tier.py::_compute_demand_bps`).
+- **A fourth dormancy category, found landing two-tier commit 4's UL
+  service-interval floor, distinct from the three already inventoried
+  above for `reservation.py`** (`§7`'s own dormancy list: (1) the
+  *signal itself* is structurally absent — `has_srb`, `do_sched`/
+  liveness, TA, beam pre-checks — nothing in this simulator could ever
+  set them, regardless of scenario; (2) the signal *exists* but no
+  *scenario* currently constructs the situation that would exercise it
+  — `gbr_bytes_slot`'s dormancy reasons, the shared-LCG H5 gap; (3)
+  not-applicable, no signal to port at all). **The floor is none of
+  these.** Every input it reads is real (`estimated_ul_buffer_per_lcg`,
+  delivery-byte counters, deficit, PDB), the state machine runs every
+  slot once landed, and arming/firing are fully implementable and fully
+  testable in isolation (`sim/tests/test_two_tier.py`'s own property
+  tests exercise every transition directly, and `--check` confirms `OK
+  — no drift` against a commit-3a baseline). What's missing, in this
+  corpus's own scenarios, is the **fault**: a BSR/SR desync
+  (`estimated_ul_buffer_per_lcg` reading 0 while real backlog persists)
+  is a radio-link failure mode, not a traffic pattern or a missing
+  signal/scenario the way categories (1)-(3) are — closing it means
+  modeling a *fault*, not adding a flow or extending an interface.
+  **What would close it**: a scenario that drives
+  `estimated_ul_buffer_per_lcg` to zero while a UE's true backlog
+  (`sim/buffer.py`) stays nonzero — open whether `sim/bsr.py`'s
+  existing model can even express that state, not assumed either way
+  (`§8`'s new `[OPEN: WP9]`-adjacent entry). **Consequence for the
+  regime map (§10)**: the floor is the mechanism most specific to
+  two-tier's own design (born from a documented 2026-08-04 production
+  incident, `ia_p5g_scheduler.c:555-644`), and if no in-corpus scenario
+  can trigger it, the regime map compares two schedulers with one of
+  them's own signature starvation guard permanently unexercised.
+- **A related, separate finding, same commit: the floor's own arming
+  precondition reads the exact signal it exists to route around.**
+  `has_pending_gbr` (`gNB_scheduler_ulsch.c:42-71`, confirmed only in
+  the full OAI checkout — the vendored two-tier subset never assigns
+  it) gates on `estimated_ul_buffer_per_lcg > 0` — the SAME per-LCG
+  estimate the floor was built to catch a desync of. If a UE's only
+  GBR LCG is the one whose BSR has desynced to 0, `has_pending_gbr`
+  reads `false` that slot and the floor never arms in exactly the
+  fault it exists to catch. `sim/tests/test_two_tier.py::test_ul_
+  floor_has_pending_gbr_gate_reads_the_same_estimate_it_exists_to_
+  route_around` confirms this is what the port does, faithfully to the
+  C — **this establishes only that the port follows ground truth, not
+  that real hardware has the gap.** A real gNB may have a path this
+  simulator cannot produce (another LCG staying genuinely backlogged
+  for unrelated reasons, an SR-triggered BSR refresh landing the same
+  slot, timing that keeps the estimate briefly nonzero) that never
+  gets modeled here. Ported as written, not "fixed" — see
+  `docs/oai-port-map.md` row 57 for the full citation.
 - **A previously-fixed sort bug**, visible in a live comment: sched-
   inactive UEs used to sort to the *front* of the queue ("a bug"), now
   fixed to sort last. Relevant for provenance if any existing hardware
@@ -1150,7 +1198,29 @@ these five, add a new tag rather than forcing it into an existing one.
   starvation-suppressing setting, not a generic one. Cross-reference:
   this is the configuration-side view of the same mechanism the
   UL-access-chain dominance cluster above (Facets 1-4) already
-  investigates from the traffic/timing side.
+  investigates from the traffic/timing side. **Updated, two-tier commit
+  4**: `min_rb`/`mac->min_grant_prb` is confirmed the SAME deployment-
+  configured field on both schedulers now — `TwoTier`'s own UL floor
+  ADQ crumb-run detector depends on it too (`TwoTier.__init__(min_rb:
+  int = 5)`, `docs/oai-port-map.md` row 59). **A `min_rb` sweep therefore
+  moves BOTH schedulers' arms simultaneously and can no longer isolate
+  either one's own sensitivity to it** — a WP9 sweep design constraint
+  this entry didn't previously carry, since `TwoTier` had no `min_rb`-
+  dependent mechanism before commit 4.
+- `[OPEN: WP9]` **What would close the fourth dormancy category `§7`
+  now records for two-tier's UL floor**: a scenario that drives
+  `estimated_ul_buffer_per_lcg` to zero for a GBR-configured UE while
+  its true backlog (`sim/buffer.py`) stays nonzero — a BSR/SR desync
+  fault, not a traffic-pattern or config change. Open whether
+  `sim/bsr.py`'s existing quantization/loss/aliasing model can express
+  this state at all, not assumed either way; if it can, the floor's own
+  arm/fire behavior (and the `has_pending_gbr` tension `§7` also flags)
+  become directly checkable against a real scenario rather than only
+  the unit-level fixtures in `sim/tests/test_two_tier.py`. If no
+  in-corpus scenario can trigger the floor, `§10`'s regime map compares
+  two schedulers with one of them's own signature starvation guard
+  permanently unexercised — worth stating in that study's own
+  limitations section, not just here.
 - `[OPEN: WP9]` **The follower budget's regime boundary is
   `n_followers_need × min_rb` (previous item) — this entry is the
   scenario-side input to that same product, checked while scoping
@@ -1288,12 +1358,13 @@ satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
 table (§5) fully populated with sim-answerable G1–G12 results, and every
 `[OPEN]` item in §8 either closed or explicitly carried to the hardware
 campaign. Checkable by grep against §8's tags as of the Phase 1→2 triage (updated
-two-tier commit 3a, `docs/phase2-plan.md`, for the new UL OR-gate/
-candidacy-pre-filter entry — this count is a snapshot, re-grep rather
-than trust it stale): **21 open entries** remain (7 `[OPEN: WP9]`,
-including the 4-facet UL-access-chain dominance cluster counted once;
-8 `[OPEN: PHASE2]`; 2 `[OPEN: HARDWARE]`; 3 `[OPEN: DECISION]`; 1 dual
-`[OPEN: HARDWARE/DECISION]`) plus whatever new items Phase 2/3 add
+two-tier commit 4, `docs/phase2-plan.md`, for the new UL-floor-fault
+`[OPEN: WP9]` entry and the updated `min_rb`-sweep entry — this count is
+a snapshot, re-grep rather than trust it stale): **22 open entries**
+remain (8 `[OPEN: WP9]`, including the 4-facet UL-access-chain dominance
+cluster counted once; 8 `[OPEN: PHASE2]`; 2 `[OPEN: HARDWARE]`; 3
+`[OPEN: DECISION]`; 1 dual `[OPEN: HARDWARE/DECISION]`) plus whatever
+new items Phase 2/3 add
 using the same open-ended tag vocabulary (§8 preamble). "Closed" means flipped to
 `[RESOLVED]` with a citation of what closed it; "carried to the hardware
 campaign" means still tagged `[OPEN: HARDWARE]` (or the hardware half of

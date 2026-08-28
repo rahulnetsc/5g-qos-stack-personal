@@ -34,7 +34,12 @@
 # (no keys yet)
 #
 # ─── UL floor (fruitless-shift / ADQ) -- commit 4 ────────────────────────
-# (no keys yet)
+# min_rb: mac->min_grant_prb (ia_p5g_scheduler.c:2210) -- the SAME
+# deployment-configured field reservation.py's own follower budget
+# reads (CLAUDE.md's own invariant); the UL floor's ADQ crumb-run
+# detector depends on it too. Default 5 matches the calibration
+# campaign's own deployed value.
+min_rb: 5
 #
 # ─── DL LCP fill -- commit 5 ─────────────────────────────────────────────
 # (no keys yet)

@@ -32,16 +32,116 @@ negative result (``design-docs/scheduler-study.md`` sec8.4) before this
 commit removed them from the live scheduler.
 
 Explicitly NOT here yet, each landing in its own later commit: the UL
-floor's fruitless-shift/ADQ anti-starvation state machine (commit 4),
-the real single-pass SRB-exempt DL LCP fill (commit 5, replacing
-``_dl_fill``'s placeholder below -- see this commit's own note on why
-that makes commit 5 a *joint* VQ-correction commit, not a pure LCP one),
-MCS selection via OLLA (commit 6), and a re-port of ``reset_ue``/
-``SchedulerContextReset`` against the new field layout (commit 7) --
-this class implements no ``reset_ue`` at all until then; ``sim/
-driver.py`` discovers it via ``getattr(scheduler, "reset_ue", None)``,
-so its absence simply means TwoTier is treated like PF (no context
-reset) in the interim, not an oversight.
+floor's grant-sizing bypass -- the GBR-PRB-reserve cap, the
+uncapped-to-bwpSize sizing for a fired floor, the PHR-based PRB ceiling
+(commit 4a, split from this commit -- see below), the real single-pass
+SRB-exempt DL LCP fill (commit 5, replacing ``_dl_fill``'s placeholder
+below -- see this commit's own note on why that makes commit 5 a
+*joint* VQ-correction commit, not a pure LCP one), MCS selection via
+OLLA (commit 6), and a re-port of ``reset_ue``/``SchedulerContextReset``
+against the new field layout (commit 7) -- this class implements no
+``reset_ue`` at all until then; ``sim/driver.py`` discovers it via
+``getattr(scheduler, "reset_ue", None)``, so its absence simply means
+TwoTier is treated like PF (no context reset) in the interim, not an
+oversight.
+
+**Commit 4 (this commit) lands the UL service-interval floor's arm/fire
+state machine and a new comparator tier it structurally requires.** The
+checklist row's "fruitless-shift (16x cap, 500ms decay) + ADQ (8-grant
+trigger)" undersold the mechanism badly -- it is a persistent per-UE
+state machine (delivery-history arming, evidence-based deficit
+forgiveness, two independently-capped exponential backoffs that
+compound) motivated by a real 2026-08-04 production incident (a 5QI-1
+MAVLink probe suffering 300-400ms UL blackouts from a BSR/SR desync --
+``estimated_ul_buffer`` reading 0 while the UE still holds data).
+Numbers reconciled against the C directly: ``FRUITLESS_SHIFT_MAX=4``
+and "16x cap" are the *same* fact (``theta_eff = theta << shift``,
+``2**4 = 16``), not two disagreeing ones; ``FRUITLESS_DECAY_MS=500``
+confirmed exact; ``ADQ_CRUMB_RUN=8`` confirmed exact but **necessary,
+not sufficient** -- the real gate is ``crumb_run>=8 AND
+adq_age>=adq_period``, where ``adq_period`` compounds the
+already-shifted ``theta_eff`` with a *second*, independent backoff
+shift (``floor_adq_backoff``, also capped at 4).
+
+**The design-revision comment commit 3 quoted in full ("Revised form
+has exactly TWO tiers") is immediately followed by comparator code
+implementing THREE** (``ia_p5g_ul_cmp``, ``:2112-2156``): ``sched_
+inactive`` → **``floor_fire`` (Tier 1.5, new)** → ``coef``. This is a
+third, distinct category of finding on this port's tally -- not one of
+the four comment-vs-code mismatches inherited from OAI (comments wrong
+about the code they sat next to when *written*), not the self-inflicted
+``_dl_stamp`` citation (a citation this project wrote and got wrong).
+**This comment was accurate when written and was overtaken by a later
+change to the code it describes** -- the *argument* in the same comment
+(Tier-1's targets already carry the GBR guarantee into the VQ deficit)
+held up under commit 3a's own constructed test; the *tier count* did
+not. ``docs/oai-port-map.md`` row 45 is corrected accordingly.
+
+**Tier 1.5 is not optional and cannot be deferred to a later commit --
+the C's own comment (``:2122-2143``) states why directly**: a
+floor-fired UE is, by construction, in the exact fault state where both
+composite inputs read ~0 (the urgency loop is gated on the same
+corrupted per-LCG estimate; ``vq_ul`` stopped accruing for the same
+reason) -- under Tier 2 alone the rescued UE would sort dead last,
+behind every ordinary flow, and never reach a grant. The state machine
+is inert without the tier; this is why they land together.
+
+**A related, separate signal found while reading the arming
+precondition, confirmed in the full OAI checkout** (not the vendored
+subset, which never assigns it): ``has_pending_gbr``
+(``gNB_scheduler_ulsch.c:42-71``) is a simpler, different test from
+commit 3's ``has_gbr`` -- true if ANY LCG with *current*
+``estimated_ul_buffer_per_lcg > 0`` is configured with ``gbr_ul_max >
+0`` (MFBR-keyed, not GFBR; existence-based, not deficit-accumulated).
+**Flagged, not resolved -- this port's first opportunity to find a bug
+in ground truth itself, not in a port of it**: this gate reads the SAME
+per-LCG estimate the floor exists to route around. If a UE's only GBR
+LCG is the one whose BSR has desynced to 0, ``has_pending_gbr`` reads
+``false`` that slot and the floor never arms in exactly the fault it
+was built to catch. Ported faithfully (not "fixed"), and tested
+directly -- see ``test_ul_floor_has_pending_gbr_gate_reads_the_same_
+estimate_it_exists_to_route_around`` and ``README.md`` §7's own new
+entry for which of two distinct claims the test result actually
+establishes (a faithful port reproducing a real gap, vs. a faithful
+port reproducing something real hardware additionally guards against
+that this simulator doesn't model).
+
+``mac->min_grant_prb`` (``:2210``) is confirmed the same deployment-
+configured field ``reservation.py``'s own follower budget reads
+(``CLAUDE.md``'s existing invariant) -- new as a ``TwoTier.__init__``
+kwarg here (``min_rb: int = 5``, same default/citation), since the ADQ
+crumb-run detector needs it. ``README.md`` §8's ``[OPEN: WP9]`` entry
+updated: the sweep parameter is now shared across both schedulers, so a
+``min_grant_prb`` sweep can no longer isolate either scheduler's own
+sensitivity to it. (``ia_p5g_scheduler.c:1632``'s ``min_rbSize = 5`` is
+a *separate*, hardcoded DL-side literal inside ``ia_p5g_pf_dl`` --
+unrelated, not to be conflated, the same trap ``CLAUDE.md``'s own
+``min_rb`` invariant already documents ``reservation.py``'s commit 4
+hitting.)
+
+**``cp_floor``/``reconfig_floor``/``srb_floor`` (``:2743-2796``) are
+three separate, unrelated "floor" concepts -- out of scope, not
+built.** None touch ``theta``/``fruitless``/``ADQ``/``floor_fire`` at
+all. ``cp_floor`` (a UE whose only backlog is control-plane),
+``reconfig_floor`` (RRC-reconfig-pending), ``srb_floor`` (explicit SRB
+protection) are all structurally absent from this simulator -- no
+SRB/RRC-signaling traffic model exists at all, the same finding
+``reservation.py``'s own ``has_srb`` tier already made. They feed
+``sched_inactive`` (``:2782-2796``), whose full formula (``((B==0 &&
+do_sched) || cp_floor) && !has_gbr``) still collapses to permanently
+``False`` here since every one of ``do_sched``/``cp_floor``/``srb_
+floor``/``reconfig_floor`` is structurally absent -- confirming, more
+rigorously than before, commit 3's own hardcoded disposition rather
+than changing it.
+
+**A fourth dormancy category, distinct from the three already on
+record in `README.md` §7/§8** (see that document for the full
+statement): the floor's every input is real, the state machine runs
+every slot once landed, and arming/firing are fully testable in
+isolation -- what's missing, in this corpus's own scenarios, is the
+*fault* (a BSR/SR desync), which is a radio-link failure mode, not a
+traffic pattern or a missing signal/scenario the way the other three
+categories are.
 
 **Commit 3a (this commit) lands the windowed-ceiling virtual queue
 itself -- growth, ceiling, drain, and the real ranking coefficients --
@@ -296,17 +396,44 @@ _URG_BARRIER_CAP = 0.97
 _URG_BARRIER_EPS = 0.03
 _URG_GBR_FLOOR = 0.15
 
+# ia_p5g_scheduler.c:80-107 -- UL service-interval floor constants,
+# confirmed by direct grep this commit. theta = min-PDB / PDB_DIV,
+# floored at MIN_SLOTS. FRUITLESS_MAX gates evidence-based deficit
+# forgiveness (a DIFFERENT threshold from FRUITLESS_SHIFT_MAX -- see
+# module docstring's "16x cap" reconciliation). FRUITLESS_SHIFT_MAX
+# also caps the independent ADQ backoff shift (floor_adq_backoff).
+_UL_FLOOR_PDB_DIV = 8
+_UL_FLOOR_ALIVE_MS = 2000.0
+_UL_FLOOR_MIN_SLOTS = 2
+_UL_FLOOR_FRUITLESS_MAX = 3
+_UL_FLOOR_FRUITLESS_SHIFT_MAX = 4
+_UL_FLOOR_FRUITLESS_DECAY_MS = 500.0
+_UL_FLOOR_ADQ_CRUMB_RUN = 8
+
+# gNB_scheduler_ulsch.c:46 (update_ul_qos_priority) -- the floor's own
+# theta-input PDB fallback. Confirmed a DIFFERENT constant from
+# _PDB_FALLBACK_MS (300ms, used by _dl_gbr_and_pdb/_ul_gbr_and_pdb for a
+# different purpose) -- two independently-chosen fallbacks in the same
+# C file, not a copy-paste of one into the other.
+_UL_FLOOR_PDB_FALLBACK_MS = 100
+
 
 @dataclass
 class _UeState:
     """Per-UE state: commit 3's GBR-deficit/last-grant-slot tracking
     (real ground truth, adapted directly from ``reservation.py``'s own
     ``_UeState``, same field shapes, since the underlying C is confirmed
-    byte-identical between branches for this mechanism), plus this
-    commit's own virtual queues -- ``vq_dl`` keyed by DL flow ``qfi``
-    (≈ LCID), ``vq_ul`` keyed by UL LCG, matching ``ia_p5g_scheduler.c``'s
-    own ``vq_dl[UE][LCID]``/``vq_ul[UE][LCG]`` shapes (module docstring's
-    D1 note: UL state is LCG-aggregate, never per-flow).
+    byte-identical between branches for this mechanism), commit 3a's
+    virtual queues -- ``vq_dl`` keyed by DL flow ``qfi`` (≈ LCID),
+    ``vq_ul`` keyed by UL LCG, matching ``ia_p5g_scheduler.c``'s own
+    ``vq_dl[UE][LCID]``/``vq_ul[UE][LCG]`` shapes (module docstring's
+    D1 note: UL state is LCG-aggregate, never per-flow) -- plus this
+    commit's UL floor state. Floor fields are persistent, NOT reset per
+    slot or per window (``ia_p5g_ul_summary_t``'s own comment: "NOT
+    reset by the window flush"). Pure telemetry fields (``floor_fires_w``/
+    ``floor_adq_fires_w``/``floor_silence_snap``) are not ported --
+    they feed no regression metric, matching this port's convention of
+    skipping C logging infrastructure that doesn't.
     """
 
     ul_lcg_deficit_bytes: dict[int, int] = field(default_factory=dict)
@@ -315,6 +442,15 @@ class _UeState:
     dl_flow_last_grant_slot: dict[int, int] = field(default_factory=dict)
     vq_dl: dict[int, float] = field(default_factory=dict)
     vq_ul: dict[int, float] = field(default_factory=dict)
+    floor_rx_lastseen: int = 0
+    floor_last_move_slot: int | None = None
+    floor_alive_slot: int | None = None
+    floor_fruitless: int = 0
+    floor_fruitless_slot: int | None = None
+    floor_adq_backoff: int = 0
+    floor_adq_slot: int | None = None
+    floor_crumb_run: int = 0
+    floor_disarmed: bool = False
 
 
 @dataclass
@@ -342,6 +478,10 @@ class _Candidate:
     # leaves this at the default since ia_p5g_dl_metric folds in no
     # urgency term at all.
     urgency01: float = 0.0
+    # UL only (ia_p5g_ul_ue_t.floor_fire/.floor_sil, :2082-2089) --
+    # Tier 1.5 in _ul_rank_key (commit 4). Unused by DL.
+    floor_fire: bool = False
+    floor_sil: int = 0
 
 
 class TwoTier:
@@ -352,7 +492,14 @@ class TwoTier:
     what lands in later commits.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, min_rb: int = 5) -> None:
+        # mac->min_grant_prb, ia_p5g_scheduler.c:2210 -- confirmed the
+        # SAME deployment-configured field reservation.py's own follower
+        # budget reads (CLAUDE.md's existing invariant), new here as a
+        # constructor kwarg since the UL floor's ADQ crumb-run detector
+        # needs it (module docstring). NOT ia_p5g_scheduler.c:1632's
+        # separate, hardcoded min_rbSize=5 DL-side literal.
+        self.min_rb = min_rb
         self._flows: list[FlowConfig] = []
         self._ue_state: dict[int, _UeState] = {}
         self._snr_avg: dict[int, float] = {}
@@ -523,6 +670,34 @@ class TwoTier:
             if buffers.state(f.ue_id, f.qfi).bytes_reported <= 0:
                 continue
             ue_flows.setdefault(f.ue_id, []).append(f)
+
+        # [FLOOR] UL only. ia_p5g_scheduler.c:2306-2538 -- the floor's
+        # own arming/firing must be evaluated for EVERY UL UE, including
+        # ones the bytes_reported>0 filter above just excluded (B==0 is
+        # exactly do_sched's structurally-absent-implied "_empty", the
+        # condition the floor exists to route around -- module
+        # docstring). Runs once per UE, in self._flows' own order, not a
+        # second independently-ordered scan -- see module docstring's
+        # note on why this pre-pass is itself a candidate source of
+        # iteration-order-driven movement, distinct from the floor
+        # mechanism actually firing.
+        floor_fire_for: dict[int, int] = {}
+        if direction == "UL":
+            seen_ue: set[int] = set()
+            for f in self._flows:
+                if f.direction != "UL" or f.ue_id in seen_ue:
+                    continue
+                seen_ue.add(f.ue_id)
+                fired, sil = self._update_ul_floor(f.ue_id, buffers, slot.slot_index)
+                if not fired:
+                    continue
+                floor_fire_for[f.ue_id] = sil
+                if f.ue_id not in ue_flows:
+                    ue_flows[f.ue_id] = [
+                        ff for ff in self._flows
+                        if ff.ue_id == f.ue_id and ff.direction == "UL"
+                    ]
+
         if not ue_flows:
             return []
 
@@ -577,6 +752,14 @@ class TwoTier:
                 # UL candidates is known. coef temporarily holds base_q
                 # until then.
                 candidate.coef = self._ul_base_q(ue_id, buffers)
+                # [FLOOR] Tier 1.5 -- ia_p5g_ul_ue_t.floor_fire/.floor_sil
+                # (:2082-2089). A fired floor still gets a real coef
+                # computed above (ground truth's own UE_sched[] does
+                # too); it's simply irrelevant to this candidate's final
+                # rank position once _ul_rank_key's new tier applies.
+                if ue_id in floor_fire_for:
+                    candidate.floor_fire = True
+                    candidate.floor_sil = floor_fire_for[ue_id]
             candidates.append(candidate)
 
         if not candidates:
@@ -602,14 +785,32 @@ class TwoTier:
                 buffers.state(f.ue_id, f.qfi).bytes_reported for f in c.flows
             )
             if ue_backlog <= 0:
-                continue
-            prbs_needed = -(-(ue_backlog * 8) // c.bits_per_rb)  # ceil div
-            # No follower budget yet (commit 4) -- unbounded by anything
-            # but this slot's own remaining PRBs.
-            prbs_used = min(prbs_left, max(1, prbs_needed))
-            tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
-            if tbs_bytes <= 0:
-                continue
+                if not c.floor_fire:
+                    continue
+                # [FLOOR] Minimal rescue grant -- ground truth's own v1
+                # disposition (a fixed-size grant regardless of the
+                # corrupted demand estimate that made ue_backlog read 0
+                # here in the first place), sized to exactly self.min_rb
+                # PRBs: enough to carry a fresh BSR and resync the
+                # estimate (ia_p5g_scheduler.c:555-644's own stated
+                # mechanism). The FULL uncapped-to-bwpSize sizing (v2's
+                # own enhancement, FIX-C, tied to the GBR-PRB-reserve
+                # this simulator doesn't have yet) is commit 4a's job --
+                # this is the minimum needed for the floor to have any
+                # observable effect at all, not that bypass.
+                prbs_used = min(prbs_left, self.min_rb)
+                tbs_bytes = (prbs_used * c.bits_per_rb) // 8
+                if tbs_bytes <= 0:
+                    continue
+            else:
+                prbs_needed = -(-(ue_backlog * 8) // c.bits_per_rb)  # ceil div
+                # No GBR-PRB-reserve/follower budget yet (commit 4a) --
+                # unbounded by anything but this slot's own remaining
+                # PRBs.
+                prbs_used = min(prbs_left, max(1, prbs_needed))
+                tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
+                if tbs_bytes <= 0:
+                    continue
             prbs_left -= prbs_used
             cce_left -= cce_cost
 
@@ -657,20 +858,39 @@ class TwoTier:
         return (0 if candidate.has_gbr else 1, candidate.pdb_ms, -candidate.coef)
 
     def _ul_rank_key(self, candidate: _Candidate) -> tuple:
-        """ia_p5g_ul_cmp, ia_p5g_scheduler.c:2112-2125 -- the *revised*
-        two-tier form: sched_inactive (top, structurally absent here,
-        hardcoded False -- see module docstring), then the composite
-        coefficient -- as of commit 3a, the real VQ-plus-urgency
-        composite (_finalize_ul_coef), not the bootstrap placeholder.
-        Deliberately does NOT include has_gbr/pdb_ms -- ground truth's
-        own comment explains why (Tier-1's targets already encode the
-        GBR guarantee, so the VQ deficit already carries it; a separate
-        tier would double-count it) -- this is the mechanism
-        reservation.py's own UL comparator never had a reason to drop,
-        since reservation has
-        no VQ to carry the guarantee instead.
+        """ia_p5g_ul_cmp, ia_p5g_scheduler.c:2112-2156 -- the *revised*
+        comparator. Commit 3 quoted the design-revision comment's own
+        "Revised form has exactly TWO tiers" as authoritative; reading
+        the comparator code directly this commit (4) found it
+        immediately implements THREE. A comment accurate when written,
+        overtaken by a later change to the code it describes -- not one
+        of the four OAI-inherited comment-vs-code mismatches, not the
+        self-inflicted _dl_stamp citation; a third, distinct category
+        (module docstring). The *argument* in the same comment (Tier-1's
+        targets already encode the GBR guarantee, so has_gbr/pdb_ms
+        would double-count it) still held up under commit 3a's own
+        test -- only the tier count was stale.
+
+        Tier 1 -- sched_inactive (structurally absent here, hardcoded
+        False -- see module docstring). Tier 1.5 -- floor_fire (new,
+        commit 4): a fired floor outranks every ordinary data UE
+        regardless of coef, tie-broken on floor_sil (longer silence
+        served first, -floor_sil sorts that way; inert 0 when
+        floor_fire is False on both sides, so it never perturbs Tier 2).
+        The C's own comment (:2122-2143) states why this tier can't be
+        skipped: a floor-fired UE's composite reads ~0 by construction
+        of the fault it rescues, so without this tier the rescue would
+        sort dead last under Tier 2 and never reach a grant. Tier 2 --
+        the composite coefficient (_finalize_ul_coef). Deliberately does
+        NOT include has_gbr/pdb_ms as their own tier -- the argument
+        above.
         """
-        return (0 if candidate.sched_inactive else 1, -candidate.coef)
+        return (
+            0 if candidate.sched_inactive else 1,
+            0 if candidate.floor_fire else 1,
+            -candidate.floor_sil if candidate.floor_fire else 0,
+            -candidate.coef,
+        )
 
     def _dl_gbr_and_pdb(
         self, ue_id: int, buffers: BufferView, slot_index: int,
@@ -1018,11 +1238,16 @@ class TwoTier:
         UE's candidate flow list upstream, by the bytes_reported > 0
         pre-filter in _allocate_direction) must still contribute here
         if its vq_ul is still positive. NOTE: that upstream pre-filter
-        is itself NOT OR-gate-aware -- a UE with zero bytes_reported on
-        EVERY UL flow never becomes a candidate at all regardless of
-        vq_ul, so this fix only reaches a UE that has already cleared
-        that gate via some other flow. Flagged as a known caveat
-        (README.md sec8), not fixed here -- out of this commit's scope.
+        is itself NOT OR-gate-aware in general -- a UE with zero
+        bytes_reported on EVERY UL flow never becomes a candidate via
+        this method's own OR-gate, only via some OTHER flow clearing the
+        gate. As of commit 4, a narrower path exists for exactly this
+        case too: the UL floor's own candidacy-rescue pre-pass
+        (_allocate_direction) can add such a UE back in when the floor
+        fires -- gated on has_pending_gbr/theta/arming, not on this
+        method's OR-gate. Still flagged as a known caveat (README.md
+        sec8) for the GENERAL case (a non-GBR UE, or a GBR UE the floor
+        hasn't armed for yet), not fully closed.
         """
         state = self._ue_state[ue_id]
         seen_lcgs: set[int] = set()
@@ -1037,6 +1262,215 @@ class TwoTier:
                 continue
             total += vq
         return total
+
+    def _ul_has_pending_gbr(self, ue_id: int, buffers: BufferView) -> bool:
+        """update_ul_qos_priority, gNB_scheduler_ulsch.c:42-71 (found in
+        the full OAI checkout -- the vendored two-tier subset never
+        assigns this field). A UE-level EXISTENCE check, recomputed
+        fresh every call: true if ANY LCG with CURRENT
+        estimated_ul_buffer_per_lcg > 0 is configured with gbr_ul_max >
+        0 (MFBR-keyed, i.e. mfbr_bps here) -- a simpler, different test
+        from _ul_gbr_and_pdb's has_gbr (GFBR-keyed, deficit-accumulated
+        over time). This is the floor's own arming gate, and it reads
+        the SAME per-LCG estimate the floor exists to route around --
+        see module docstring and _update_ul_floor's own docstring for
+        the flagged, not-resolved consequence.
+        """
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL":
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            if f.mfbr_bps > 0:
+                return True
+        return False
+
+    def _ul_rx_bytes(self, ue_id: int, buffers: BufferView) -> int:
+        """ia_p5g_scheduler.c:2329-2331 -- Sigma UL data-LCID MAC bytes
+        delivered (cumulative), one representative flow per LCG (D1's
+        LCG-aggregate convention, same dedup pattern _ul_stamp/
+        _ul_drain already use). The floor's own delivery-evidence
+        signal -- movement here is what re-arms/resets the state
+        machine, independent of any BSR/estimate-derived quantity.
+        """
+        seen_lcgs: set[int] = set()
+        total = 0
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+                continue
+            seen_lcgs.add(f.lcg)
+            total += buffers.delivered_cum(f.ue_id, f.qfi)
+        return total
+
+    def _ul_best_pending_pdb_ms(self, ue_id: int, buffers: BufferView) -> int:
+        """update_ul_qos_priority, gNB_scheduler_ulsch.c:42-71 -- the
+        PDB of the HIGHEST-PRIORITY currently-backlogged LCG (not
+        literally "lowest PDB" despite the C struct field's own inline
+        comment). Own 100ms fallback (_UL_FLOOR_PDB_FALLBACK_MS),
+        confirmed a DIFFERENT constant from _PDB_FALLBACK_MS (300ms,
+        used elsewhere in this file for a different purpose) -- two
+        independently-chosen fallbacks in the same C file.
+        """
+        best_priority: int | None = None
+        best_pdb = 9999
+        for f in self._flows:
+            if f.ue_id != ue_id or f.direction != "UL":
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            if best_priority is None or f.priority_level < best_priority:
+                best_priority = f.priority_level
+                best_pdb = int(f.pdb_ms) if f.pdb_ms > 0 else 9999
+        if best_pdb <= 0 or best_pdb >= 9999:
+            best_pdb = _UL_FLOOR_PDB_FALLBACK_MS
+        return best_pdb
+
+    def _update_ul_floor(
+        self, ue_id: int, buffers: BufferView, slot_index: int,
+    ) -> tuple[bool, int]:
+        """ia_p5g_scheduler.c:2306-2530 -- the UL service-interval
+        floor's per-UE arm/fire logic (v2). Gated on has_pending_gbr --
+        if that fails, the C skips the WHOLE block, so no arming state
+        advances this slot either; ported the same way (early return,
+        nothing touched). transm_interrupt has no simulator analogue
+        (structurally absent, same category as do_sched) -- its guard
+        is always-true here, so it's omitted rather than modeled as an
+        inert variable.
+
+        B (backlog evidence) is this UE's bytes_reported summed across
+        UL flows -- the same quantity _allocate_direction's own
+        top-level candidacy pre-filter already treats as "empty" when
+        <= 0 (D1's bytes_reported<->B correspondence). do_sched is
+        structurally absent (commit 3's finding), so ground truth's
+        `_empty = (B==0 && !do_sched)` collapses to exactly `B==0` --
+        exactly the candidacy pre-filter's own gate. This is the fact
+        the candidacy-rescue pre-pass in _allocate_direction depends on.
+
+        Absolute-slot wraparound (real hardware wraps at 1024 frames)
+        is dropped -- this simulator's slot_index has no such limit, a
+        hardware-counter artifact, not a fidelity loss (same
+        simplification category _ul_gbr_and_pdb's own age arithmetic
+        already uses). A never-yet-armed UE's silence is treated as 0
+        rather than the C's huge zero-init sentinel -- observably
+        equivalent, since `armed` is also False until first delivery is
+        observed, so neither form can fire on a UE's first-ever visit.
+
+        Returns (fired, silence_slots_at_fire).
+        """
+        state = self._ue_state[ue_id]
+        if not self._ul_has_pending_gbr(ue_id, buffers):
+            return False, 0
+
+        slot_ms = self.slot_duration_s * 1000.0
+        rx = self._ul_rx_bytes(ue_id, buffers)
+        b = sum(
+            buffers.state(f.ue_id, f.qfi).bytes_reported
+            for f in self._flows
+            if f.ue_id == ue_id and f.direction == "UL"
+        )
+
+        sil = (
+            0 if state.floor_last_move_slot is None
+            else max(0, slot_index - state.floor_last_move_slot)
+        )
+        if rx != state.floor_rx_lastseen:
+            state.floor_rx_lastseen = rx
+            state.floor_last_move_slot = slot_index
+            state.floor_alive_slot = slot_index
+            state.floor_fruitless = 0
+            state.floor_disarmed = False
+            sil = 0
+
+        alive_max = _UL_FLOOR_ALIVE_MS / slot_ms
+        armed = (
+            state.floor_alive_slot is not None
+            and (slot_index - state.floor_alive_slot) <= alive_max
+        )
+
+        if b > 0:
+            state.floor_disarmed = False
+            state.floor_fruitless = 0
+        if not armed:
+            state.floor_last_move_slot = slot_index
+            sil = 0
+
+        pdb_ms = self._ul_best_pending_pdb_ms(ue_id, buffers)
+        theta = max(
+            _UL_FLOOR_MIN_SLOTS,
+            round((pdb_ms / _UL_FLOOR_PDB_DIV) / slot_ms),
+        )
+
+        fr_decay = max(1, round(_UL_FLOOR_FRUITLESS_DECAY_MS / slot_ms))
+        if state.floor_fruitless > 0:
+            fr_age = (
+                0 if state.floor_fruitless_slot is None
+                else max(0, slot_index - state.floor_fruitless_slot)
+            )
+            steps = fr_age // fr_decay
+            if steps > 0:
+                state.floor_fruitless = max(0, state.floor_fruitless - steps)
+                state.floor_fruitless_slot = slot_index
+                if state.floor_fruitless == 0:
+                    state.floor_disarmed = False
+
+        shift = min(state.floor_fruitless, _UL_FLOOR_FRUITLESS_SHIFT_MAX)
+        theta_eff = theta << shift
+
+        adq_age = (
+            0 if state.floor_adq_slot is None
+            else max(0, slot_index - state.floor_adq_slot)
+        )
+        if state.floor_adq_backoff > 0 and adq_age >= fr_decay:
+            asteps = adq_age // fr_decay
+            state.floor_adq_backoff = max(0, state.floor_adq_backoff - asteps)
+
+        adq_shift = min(state.floor_adq_backoff, _UL_FLOOR_FRUITLESS_SHIFT_MAX)
+        adq_period = theta_eff << adq_shift
+
+        adq_fire = (
+            armed and b > 0
+            and state.floor_crumb_run >= _UL_FLOOR_ADQ_CRUMB_RUN
+            and adq_age >= adq_period
+        )
+        empty_fire = armed and b == 0 and sil >= theta_eff
+
+        if not (empty_fire or adq_fire):
+            return False, 0
+
+        if (
+            state.floor_fruitless >= _UL_FLOOR_FRUITLESS_MAX
+            and not state.floor_disarmed
+        ):
+            state.floor_disarmed = True
+            state.ul_lcg_deficit_bytes = {
+                lcg: 0 for lcg in state.ul_lcg_deficit_bytes
+            }
+
+        state.floor_last_move_slot = slot_index
+        if adq_fire:
+            state.floor_adq_slot = slot_index
+            state.floor_crumb_run = 0
+            if state.floor_adq_backoff <= _UL_FLOOR_FRUITLESS_SHIFT_MAX:
+                state.floor_adq_backoff += 1
+        else:
+            if state.floor_fruitless <= _UL_FLOOR_FRUITLESS_SHIFT_MAX:
+                state.floor_fruitless += 1
+            state.floor_fruitless_slot = slot_index
+
+        return True, sil
+
+    def _ul_floor_track_crumb_run(self, ue_id: int, prbs_used: int) -> None:
+        """ia_p5g_scheduler.c:3315-3323 -- ADQ's trickle detector: a RUN
+        of consecutive <=min_rb grants is the crumb signature; any
+        larger grant resets it. Runs at grant-COMMIT time (the actual
+        PRBs granted this slot), not selection time -- same "stamp/drain
+        at grant-emission time" pattern _ul_stamp/_ul_drain already use.
+        """
+        state = self._ue_state[ue_id]
+        if prbs_used <= self.min_rb:
+            state.floor_crumb_run += 1
+        else:
+            state.floor_crumb_run = 0
 
     def _emit_grant(
         self,
@@ -1054,6 +1488,7 @@ class TwoTier:
         if direction == "UL":
             self._ul_stamp(ue_id, buffers, slot_index)
             self._ul_drain(ue_id, buffers, tbs_bytes)
+            self._ul_floor_track_crumb_run(ue_id, prbs_used)
             # The gNB sizes the block; the UE fills it (TS 38.321
             # sec5.4.3.1). sim/ue_lcp.py performs the real split on the
             # driver side -- unchanged from the pre-rewrite file's own

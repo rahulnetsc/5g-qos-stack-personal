@@ -1,4 +1,4 @@
-"""Phase 2, two-tier commits 1-3a: scheduler/two_tier.py's rewrite.
+"""Phase 2, two-tier commits 1-4: scheduler/two_tier.py's rewrite.
 
 Commit 1: Scheduler protocol conformance, a bootstrap PF coefficient as
 the only ranking criterion (explicitly NOT a ported mechanism), UL-
@@ -15,6 +15,20 @@ barrier function) -- replacing the bootstrap PF coefficient outright.
 The bootstrap throughput-EWMA (dl_thr_bytes_per_slot/
 ul_thr_bytes_per_slot/_THR_EWMA_ALPHA) no longer exists as of commit
 3a; tests that exercised it directly are retired, not adapted.
+
+Commit 4: the UL service-interval floor's arm/fire state machine
+(delivery-history arming, evidence-based deficit forgiveness, two
+independently-capped exponential backoffs) plus a THIRD comparator
+tier (floor_fire, between sched_inactive and coef) the design-revision
+comment commit 3 quoted ("exactly TWO tiers") turned out not to
+describe -- a comment accurate when written, overtaken by a later
+change to the code it describes, a new finding category distinct from
+this port's four OAI-inherited comment-vs-code mismatches and its one
+self-inflicted citation error. Grant-sizing (the GBR-PRB-reserve cap,
+the floor's own uncapped-to-bwpSize sizing, the PHR-based PRB ceiling)
+is commit 4a, not this commit -- this commit's own grant-sizing change
+is the minimum needed for the floor to have any observable effect at
+all (a fixed min_rb-sized rescue grant), not that fuller bypass.
 
 See docs/phase2-plan.md's two-tier commit checklist and
 docs/oai-port-map.md's "Phase 2 -- two-tier" section for the full
@@ -37,7 +51,7 @@ import pytest
 
 from scheduler.flow import FlowConfig
 from scheduler.interfaces import Allocation
-from scheduler.two_tier import TwoTier, _PF_COEF_HYPOTHETICAL_SYMBOLS
+from scheduler.two_tier import TwoTier, _Candidate, _PF_COEF_HYPOTHETICAL_SYMBOLS
 
 
 # -- lightweight, Protocol-conforming fakes -- same pattern
@@ -331,20 +345,21 @@ def test_ul_gbr_deficit_gated_per_lcg_on_the_real_estimate():
 # -- 5. commit 3: UL's sched_inactive tier is a documented, permanent no-op
 
 def test_ul_sched_inactive_never_fires_ranking_stays_coefficient_only():
-    """ia_p5g_ul_cmp's revised form (ia_p5g_scheduler.c:2092-2111):
+    """ia_p5g_ul_cmp's revised Tier-1 form (ia_p5g_scheduler.c:2117-2120):
     sched_inactive is structurally absent here (no do_sched-equivalent
-    signal), so _ul_rank_key collapses to (1, -coef) for every
-    candidate, every time -- verified directly on the key, not inferred
-    from a ranking outcome that could coincidentally match either way."""
+    signal), so this tier position collapses to always-1 (never the
+    top) for every candidate -- verified directly on the key, not
+    inferred from a ranking outcome that could coincidentally match
+    either way. Tier 1.5 (floor_fire, commit 4) also defaults inert
+    here since this candidate never fired."""
     sched = TwoTier()
     flow = FlowConfig(ue_id=1, qfi=1, direction="UL")
     sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
-    from scheduler.two_tier import _Candidate
 
     c = _Candidate(ue_id=1, flows=[flow], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=5.0)
-    assert sched._ul_rank_key(c) == (1, -5.0)
+    assert sched._ul_rank_key(c) == (1, 1, 0, -5.0)
     c.sched_inactive = True  # never actually set by this scheduler, but
-    assert sched._ul_rank_key(c) == (0, -5.0)  # the key itself is real
+    assert sched._ul_rank_key(c) == (0, 1, 0, -5.0)  # the key itself is real
 
 
 # -- 6. commit 3: _dl_rank_key/_ul_rank_key stay independently sourced -----
@@ -540,3 +555,434 @@ def test_ul_gbr_flow_held_near_gfbr_by_vq_alone_no_tier_assists():
         "composite coefficient -- commit 3's design-revision expectation "
         "(VQ alone protects UL GBR flows, no tier assists) does not hold"
     )
+
+
+# -- 8. commit 4: the UL service-interval floor -----------------------------
+# Fixtures below arm the floor with one _update_ul_floor(...slot_index=0)
+# call (delivered_cum != the default floor_rx_lastseen=0 triggers the
+# "movement" branch, which arms), then manipulate _UeState's floor_*
+# fields directly to isolate one state-transition boundary per test --
+# matching this port's own "one fixture per tier/transition boundary"
+# discipline, not a single fully-simulated multi-slot run per test.
+#
+# Shared arithmetic used throughout (slot_duration_s=0.0005 -> slot_ms=0.5):
+#   pdb_ms=80.0  ->  theta = max(2, round((80/8)/0.5)) = 20 slots
+#   _UL_FLOOR_ALIVE_MS=2000  ->  alive_max = 2000/0.5 = 4000 slots
+#   _UL_FLOOR_FRUITLESS_DECAY_MS=500  ->  fr_decay = 500/0.5 = 1000 slots
+
+
+def _floor_flow(ue_id: int = 1, lcg: int = 1, pdb_ms: float = 80.0) -> FlowConfig:
+    return FlowConfig(
+        ue_id=ue_id, qfi=1, direction="UL", lcg=lcg,
+        flow_class="GBR", gfbr_bps=100_000, mfbr_bps=200_000, pdb_ms=pdb_ms,
+    )
+
+
+def _floor_desynced_buffers(ue_id: int = 1) -> _FakeBuffers:
+    """A UE with real backlog (arms has_pending_gbr) but bytes_reported
+    == 0 (the B==0 blackout condition the floor exists to catch)."""
+    buffers = _FakeBuffers()
+    buffers.set(ue_id, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+    buffers._states[(ue_id, 1)].bytes_reported = 0
+    buffers.set_delivered_cum(ue_id, 1, 100)
+    return buffers
+
+
+def test_ul_floor_does_not_arm_or_touch_state_without_has_pending_gbr():
+    """gNB_scheduler_ulsch.c:42-71 -- has_pending_gbr false (no LCG with
+    both current backlog AND mfbr_bps>0) means the C skips the WHOLE
+    block; ported the same way -- no state advances at all, not even
+    the delivery-history bookkeeping."""
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, flow_class="PF")
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    state = sched._ue_state[1]
+    state.floor_fruitless = 5  # pre-seeded -- must survive untouched
+
+    fired, sil = sched._update_ul_floor(1, buffers, slot_index=100)
+    assert fired is False
+    assert sil == 0
+    assert state.floor_fruitless == 5
+    assert state.floor_alive_slot is None
+
+
+def test_ul_has_pending_gbr_is_mfbr_keyed_not_gfbr_keyed():
+    """gNB_scheduler_ulsch.c:65-66 -- gates on gbr_ul_max (mfbr_bps),
+    NOT gbr_ul_guaranteed (gfbr_bps) -- a GBR flow with gfbr_bps>0 but
+    mfbr_bps==0 must NOT count, even though it clearly has a GBR
+    classification and _ul_gbr_and_pdb's OWN has_gbr would react to it."""
+    sched = TwoTier()
+    flow = FlowConfig(
+        ue_id=1, qfi=1, direction="UL", lcg=1,
+        flow_class="GBR", gfbr_bps=100_000, mfbr_bps=0.0,
+    )
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+
+    assert sched._ul_has_pending_gbr(1, buffers) is False
+
+
+def test_ul_best_pending_pdb_ms_picks_highest_priority_backlogged_lcg():
+    """gNB_scheduler_ulsch.c:42-71 -- the PDB of the HIGHEST-PRIORITY
+    currently-backlogged LCG, not literally the lowest PDB value (the
+    C struct field's own comment is misleading -- this method's
+    docstring corrects it)."""
+    sched = TwoTier()
+    flows = [
+        FlowConfig(
+            ue_id=1, qfi=1, direction="UL", lcg=1, priority_level=50,
+            pdb_ms=10.0,  # lower PDB, but LOWER priority (higher number)
+        ),
+        FlowConfig(
+            ue_id=1, qfi=2, direction="UL", lcg=2, priority_level=5,
+            pdb_ms=90.0,  # higher PDB, but HIGHER priority (lower number)
+        ),
+    ]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
+    buffers.set(1, 2, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
+
+    assert sched._ul_best_pending_pdb_ms(1, buffers) == 90
+
+
+def test_ul_best_pending_pdb_ms_own_fallback_is_100ms_not_300ms():
+    """Confirmed a DIFFERENT constant from _PDB_FALLBACK_MS (300ms,
+    used by _dl_gbr_and_pdb/_ul_gbr_and_pdb for a different purpose)."""
+    sched = TwoTier()
+    flow = FlowConfig(ue_id=1, qfi=1, direction="UL", lcg=1, pdb_ms=0.0)
+    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=100, estimated_ul_buffer_per_lcg=100)
+
+    assert sched._ul_best_pending_pdb_ms(1, buffers) == 100
+
+
+def test_ul_floor_fires_after_theta_slots_of_silence_on_a_backlogged_ue():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=0)
+    assert fired is False  # first sight only arms
+
+    fired, sil = sched._update_ul_floor(1, buffers, slot_index=20)  # theta=20
+    assert fired is True
+    assert sil == 20
+
+
+def test_ul_floor_fruitless_shift_caps_at_16x_not_beyond():
+    """FRUITLESS_SHIFT_MAX=4 -- the checklist's "16x cap" and "caps at
+    exactly 4" are the same fact (theta_eff = theta << shift, 2**4=16),
+    not two disagreeing numbers."""
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_fruitless = 10  # far past the shift cap
+    state.floor_fruitless_slot = 0
+    state.floor_last_move_slot = 0
+
+    # Capped theta_eff = 20 << 4 = 320. Below it: must not fire even
+    # though an UNCAPPED theta<<10 would put the threshold far higher.
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=300)
+    assert fired is False
+
+    fired, sil = sched._update_ul_floor(1, buffers, slot_index=320)
+    assert fired is True
+    assert sil == 320
+
+
+def test_ul_floor_fruitless_decays_one_step_per_500ms_of_no_further_fires():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_fruitless = 3
+    state.floor_fruitless_slot = 0
+    state.floor_last_move_slot = 990  # small sil at slot 1000 -- isolates decay from a refire
+    state.floor_alive_slot = 0
+
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=1000)  # exactly one fr_decay period
+    assert fired is False
+    assert state.floor_fruitless == 2
+    assert state.floor_fruitless_slot == 1000
+
+
+def test_ul_floor_forgiveness_gate_is_exactly_fruitless_max_not_off_by_one():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_fruitless = 2  # one below FRUITLESS_MAX=3
+    state.floor_fruitless_slot = 0
+    state.floor_last_move_slot = 0
+    state.floor_alive_slot = 0
+    state.ul_lcg_deficit_bytes[1] = 500
+
+    theta_eff = 20 << 2  # 80
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=theta_eff)
+    assert fired is True
+    assert state.floor_disarmed is False
+    assert state.ul_lcg_deficit_bytes[1] == 500
+
+
+def test_ul_floor_forgiveness_fires_exactly_at_fruitless_max_and_clears_deficit():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_fruitless = 3  # == FRUITLESS_MAX
+    state.floor_fruitless_slot = 0
+    state.floor_last_move_slot = 0
+    state.floor_alive_slot = 0
+    state.ul_lcg_deficit_bytes[1] = 500
+
+    theta_eff = 20 << 3  # shift = min(3, 4) = 3 -> 160
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=theta_eff)
+    assert fired is True
+    assert state.floor_disarmed is True
+    assert state.ul_lcg_deficit_bytes[1] == 0
+
+
+def test_ul_floor_forgiveness_is_one_time_while_already_disarmed():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_fruitless = 3
+    state.floor_disarmed = True  # already disarmed by an earlier fire
+    state.floor_fruitless_slot = 0
+    state.floor_last_move_slot = 0
+    state.floor_alive_slot = 0
+    state.ul_lcg_deficit_bytes[1] = 777  # accrued again since the earlier clear
+
+    theta_eff = 20 << 3
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=theta_eff)
+    assert fired is True
+    assert state.ul_lcg_deficit_bytes[1] == 777  # NOT re-cleared -- guard skips
+
+
+def test_ul_floor_adq_requires_both_crumb_run_and_elapsed_period():
+    """crumb_run>=8 is necessary, not sufficient -- the real gate is
+    crumb_run>=8 AND adq_age>=adq_period."""
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+    buffers._states[(1, 1)].bytes_reported = 1000  # trickle, not blackout: B>0
+    buffers.set_delivered_cum(1, 1, 100)
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_crumb_run = 8  # >= ADQ_CRUMB_RUN
+    state.floor_last_move_slot = 0
+    state.floor_alive_slot = 0
+    state.floor_adq_slot = 0
+
+    # adq_period at floor_adq_backoff=0: theta_eff(20) << 0 = 20.
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=10)
+    assert fired is False  # crumb_run satisfied, period not yet elapsed
+
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=20)
+    assert fired is True
+
+
+def test_ul_floor_adq_does_not_fire_below_the_crumb_run_threshold():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+    buffers._states[(1, 1)].bytes_reported = 1000
+    buffers.set_delivered_cum(1, 1, 100)
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_crumb_run = 7  # one below ADQ_CRUMB_RUN
+    state.floor_last_move_slot = 0
+    state.floor_alive_slot = 0
+    state.floor_adq_slot = 0
+
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=100_000)
+    assert fired is False
+
+
+def test_ul_floor_real_delivery_immediately_resets_fruitless_and_disarm():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    state = sched._ue_state[1]
+    state.floor_fruitless = 4
+    state.floor_disarmed = True
+    state.floor_rx_lastseen = 100
+
+    buffers.set_delivered_cum(1, 1, 250)  # real bytes moved
+    fired, sil = sched._update_ul_floor(1, buffers, slot_index=500)
+    assert fired is False  # silence resets to 0 on movement, can't fire this call
+    assert sil == 0
+    assert state.floor_fruitless == 0
+    assert state.floor_disarmed is False
+    assert state.floor_rx_lastseen == 250
+
+
+def test_ul_floor_never_armed_ue_does_not_fire_regardless_of_elapsed_slots():
+    """A UE whose delivered_cum has ALWAYS been exactly 0 never
+    triggers the "movement" branch (0 != 0 is false), so it never arms
+    -- a real property of the zero-init comparison, not a Python
+    artifact (the C's own zero-initialized floor_rx_lastseen has the
+    identical property when _rx is genuinely always 0)."""
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    buffers.set(1, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+    buffers._states[(1, 1)].bytes_reported = 0
+    # delivered_cum left at the default 0.
+
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=10_000)
+    assert fired is False
+    assert sched._ue_state[1].floor_alive_slot is None
+
+
+def test_ul_floor_idle_beyond_alive_window_does_not_fire():
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _floor_desynced_buffers()
+    sched._update_ul_floor(1, buffers, slot_index=0)  # arm
+
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=4001)  # > ALIVE_MS
+    assert fired is False
+
+
+def test_ul_floor_has_pending_gbr_gate_reads_the_same_estimate_it_exists_to_route_around():
+    """Flagged, not resolved (module docstring / README.md sec7): the
+    floor's own arming precondition (has_pending_gbr) is gated on
+    estimated_ul_buffer_per_lcg > 0 -- the SAME per-LCG estimate the
+    floor exists to route around. This test establishes only that the
+    PORT follows the C faithfully (has_pending_gbr reads False, so the
+    floor never arms) when a UE's only GBR LCG has desynced to 0 -- it
+    does NOT establish that real hardware has this gap: a real gNB may
+    have a path this simulator cannot produce (another LCG staying
+    genuinely backlogged, an SR-triggered BSR refresh landing the same
+    slot, timing that keeps the estimate briefly nonzero)."""
+    sched = TwoTier()
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    # The desync itself: estimated_ul_buffer_per_lcg reads 0 even though
+    # the UE holds real data (bytes_queued > 0, the TRUE backlog).
+    buffers.set(1, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=0)
+    buffers._states[(1, 1)].bytes_reported = 0
+
+    assert sched._ul_has_pending_gbr(1, buffers) is False
+    fired, _ = sched._update_ul_floor(1, buffers, slot_index=100_000)
+    assert fired is False
+
+
+def test_ul_floor_track_crumb_run_increments_on_min_rb_grants_resets_above():
+    sched = TwoTier(min_rb=5)
+    sched.configure([_floor_flow()], slot_duration_s=0.0005, grid=_grid())
+    state = sched._ue_state[1]
+
+    sched._ul_floor_track_crumb_run(1, prbs_used=5)  # == min_rb
+    sched._ul_floor_track_crumb_run(1, prbs_used=3)  # < min_rb
+    assert state.floor_crumb_run == 2
+
+    sched._ul_floor_track_crumb_run(1, prbs_used=6)  # > min_rb
+    assert state.floor_crumb_run == 0
+
+
+# -- 9. commit 4: _ul_rank_key's new Tier 1.5 --------------------------------
+
+
+def test_ul_floor_fire_outranks_ordinary_coefficient_regardless_of_value():
+    sched = TwoTier()
+    loser = _Candidate(
+        ue_id=1, flows=[], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=1_000_000.0,
+    )
+    winner = _Candidate(
+        ue_id=2, flows=[], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=0.0,
+        floor_fire=True, floor_sil=5,
+    )
+    ranked = sorted([loser, winner], key=sched._ul_rank_key)
+    assert ranked[0].ue_id == 2
+
+
+def test_ul_floor_fire_ties_break_on_longer_silence_first():
+    sched = TwoTier()
+    shorter = _Candidate(
+        ue_id=1, flows=[], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=5.0,
+        floor_fire=True, floor_sil=50,
+    )
+    longer = _Candidate(
+        ue_id=2, flows=[], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=5.0,
+        floor_fire=True, floor_sil=200,
+    )
+    ranked = sorted([shorter, longer], key=sched._ul_rank_key)
+    assert ranked[0].ue_id == 2
+
+
+def test_ul_floor_fire_still_ranks_below_sched_inactive():
+    sched = TwoTier()
+    inactive = _Candidate(
+        ue_id=1, flows=[], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=0.0,
+        sched_inactive=True,
+    )
+    floor_ue = _Candidate(
+        ue_id=2, flows=[], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=1000.0,
+        floor_fire=True, floor_sil=999,
+    )
+    ranked = sorted([floor_ue, inactive], key=sched._ul_rank_key)
+    assert ranked[0].ue_id == 1
+
+
+# -- 10. commit 4: the candidacy-rescue pre-pass -----------------------------
+
+
+def test_ul_floor_candidacy_rescue_only_adds_ues_that_actually_fired():
+    """Watch-item from plan approval: the pre-pass must not become a
+    periodic wake-up for every GBR-configured UE -- only a UE whose
+    floor genuinely fires (armed AND past its own theta/adq_period)
+    gets added back to the candidate set. UE 2 here is GBR-configured
+    and equally excluded by the bytes_reported>0 pre-filter, but has
+    NO delivery history at all (never armed) -- it must stay excluded."""
+    sched = TwoTier()
+    flows = [_floor_flow(ue_id=1), _floor_flow(ue_id=2)]
+    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    buffers = _FakeBuffers()
+    channel = _FakeChannel({1: 20.0, 2: 20.0})
+
+    buffers.set(1, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+    buffers._states[(1, 1)].bytes_reported = 0
+    buffers.set(2, 1, bytes_queued=5000, estimated_ul_buffer_per_lcg=5000)
+    buffers._states[(2, 1)].bytes_reported = 0
+
+    # UE 1: pre-armed as if a delivery happened at slot 0 -- silence
+    # will have reached theta=20 by the slot this test allocates at.
+    state1 = sched._ue_state[1]
+    state1.floor_alive_slot = 0
+    state1.floor_last_move_slot = 0
+    state1.floor_rx_lastseen = 100
+    buffers.set_delivered_cum(1, 1, 100)  # matches floor_rx_lastseen -- no fresh movement
+    # UE 2: delivered_cum left at 0 == default floor_rx_lastseen -- never arms.
+
+    slot = _FakeSlot(
+        slot_index=20, dl_symbols=0, ul_symbols=14, prb_count=6, pdcch_cce_budget=48,
+    )
+    out = sched.allocate(slot, buffers, channel)
+
+    granted_ues = {a.ue_id for a in out}
+    assert 1 in granted_ues, "UE1's floor should have fired and rescued it"
+    assert 2 not in granted_ues, "UE2 never armed -- must NOT be rescued just for being GBR-configured"

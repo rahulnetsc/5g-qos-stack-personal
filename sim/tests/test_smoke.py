@@ -731,23 +731,26 @@ def test_documented_defaults_match_the_code():
     set here every commit that changes ``TwoTier.__init__``, rather than
     letting this test go stale or deleting it.
 
-    Phase 2 commit 1: the constructor takes no kwargs at all -- every
+    Phase 2 commit 1: the constructor took no kwargs at all -- every
     pre-Phase-2 knob was deleted (SPS entirely; the old Tier-1 apparatus
-    pending commit 2's rewrite). ``design-docs/scheduler-study.md``
-    sec4.5's knob table is correspondingly stale until commits 2+
-    reintroduce real, ground-truth-backed knobs -- not updated here since
-    there is nothing left to tabulate yet; update it alongside whichever
-    future commit adds the first real kwarg back. The rest of this
-    function (sec5.1's CQI/BSR fidelity defaults) is untouched by Phase 2
-    and still guards its own, unrelated claims.
+    pending commit 2's rewrite). Commit 4 adds the first real one back:
+    ``min_rb`` (``mac->min_grant_prb``, ``ia_p5g_scheduler.c:2210`` --
+    confirmed the SAME deployment-configured field ``reservation.py``'s
+    own follower budget reads, ``CLAUDE.md``'s existing invariant), since
+    the UL floor's ADQ crumb-run detector needs it. ``design-docs/
+    scheduler-study.md`` sec4.5's knob table is correspondingly still
+    stale for every OTHER knob -- update it alongside whichever future
+    commit adds the next real kwarg. The rest of this function (sec5.1's
+    CQI/BSR fidelity defaults) is untouched by Phase 2 and still guards
+    its own, unrelated claims.
     """
     import inspect
     from pathlib import Path
 
     actual = inspect.signature(TwoTier.__init__).parameters
-    assert set(actual) - {"self"} == set(), (
-        "TwoTier gained a knob -- update this test's expected set (and "
-        "design-docs/scheduler-study.md sec4.5 once a knob has real "
+    assert set(actual) - {"self"} == {"min_rb"}, (
+        "TwoTier's knob set changed -- update this test's expected set "
+        "(and design-docs/scheduler-study.md sec4.5 once a knob has real "
         "ground truth behind it, docs/phase2-plan.md)"
     )
 
