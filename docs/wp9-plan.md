@@ -1698,3 +1698,124 @@ Contiguity before effect sizes; paired seeds within-seed; all 19 metrics;
 no single-metric high-N claims (§0.1); the stage-1 gate is **not** applied
 (these axes were chosen by argument, not score — §11); corpus frozen at
 `9963be1`, `--check` clean before and after.
+
+
+---
+
+## 15. Stage 4 — results, scored against the pre-registered expectations
+
+**1,440 rows across 48 cells, all exactly 30, in 40.6 min** at 10 workers
+against the probe's ~36 min prediction — §13's measured cost model held.
+Expectations were registered in `2ea4040`, **before the runner existed**,
+so this scoring is checkable from history rather than asserted.
+
+### 15.1 Control — PASS, read first
+
+N=4 / `sensor_dense` / tier 0.5: **zero M02 loss on all three arms** (mean
+and max 0.000000 over 30 rows). Uninformative exactly as designed, so the
+workload is correctly scaled and the grid is readable. Had it shown loss,
+nothing else would have been read.
+
+### 15.2 Methodological finding — `check_contiguity` assumes ORDERED axes
+
+`regime_sweep.check_contiguity` walks each axis by **index ±1**. That is
+correct for an ordered axis (N, load, tier) and **meaningless for a
+categorical one**: applied across `composition` it would treat
+`drone_heavy` and `sensor_dense` as adjacent purely because they are
+neighbours in a list, and would then "support" each other's winner.
+
+**This is a property of the tool that was not stated when it was written**
+(WP0), because every grid until now had only ordered axes. **Stage 4 is
+the first grid with a categorical axis.** Contiguity here is therefore
+computed **per composition, over the ordered axes only** (N × tier).
+
+Recorded so the next categorical axis does not rediscover it.
+
+| metric | isolated / scored | reliability |
+|---|---|---|
+| **M07.met** | 0–2 of 12 | clean — can carry a boundary claim |
+| M08.fraction | 3 of 12 in three compositions | noisier |
+| M02 | 1–4 of 12 (33% in `mixed`) | noisiest — do not quote equally |
+
+`sensor_dense` scores only 6 of 12 cells; half are uninformative, which is
+consistent with it being a genuinely light workload.
+
+### 15.3 E1 — composition is worth being a primary axis: **HIT**
+
+Onset ranges from **N=16** (`ugv_heavy`) to **never within the grid**
+(`sensor_dense`), and winners differ by composition. At fixed N the
+compositions do not behave alike.
+
+### 15.4 E2 — onset tracks flow count, not UE count: **PARTIAL**
+
+| composition | flows/UE | onset N | flows at onset |
+|---|---|---|---|
+| `sensor_dense` | 2.0 | none ≤32 | — |
+| `mixed` | 3.2 | 32 | 96 |
+| `drone_heavy` | 3.8 | 32 | 111 |
+| `ugv_heavy` | 4.0 | **16** | **63** |
+
+**Ordering half HOLDS:** `ugv_heavy` separates at N=16 while
+`sensor_dense` never does — onset is not a function of N alone, which is
+what promoting composition was for.
+
+**Stronger half FALSIFIED:** I predicted onsets would align at comparable
+flow counts. They do not — **63 flows (`ugv_heavy`) vs 111
+(`drone_heavy`)**, nearly 2× apart. Flow count alone does not explain
+onset either.
+
+### 15.5 An OBSERVATION with a candidate mechanism — not a result
+
+`ugv_heavy` separates at *fewer* flows than `drone_heavy`. The UGV profile
+carries three tight-PDB flows — odometry (10 ms), drive control (10 ms),
+e-stop (**5 ms**) — **co-located on LCG 3**, where the drone's flows are
+looser and spread across LCGs. So onset may be driven by **tight-PDB
+density and LCG co-location** rather than by candidate count.
+
+**This is an observation, not a finding, and the distinction is load-
+bearing:**
+
+- it was **not pre-registered**;
+- it comes from **one grid**;
+- the two compositions differ in **several ways at once** — flow count,
+  GBR fraction, UL share, tight-PDB density, LCG occupancy — so the story
+  fits the data without being isolated by it.
+
+**The discriminating experiment**, named because naming it is what
+separates an open hypothesis from a story that fits: **a composition set
+that holds flow count and GBR fraction FIXED while varying tight-PDB
+density and LCG co-location independently.** Two profiles with identical
+flow counts and GBR ratios, one with its tight-PDB flows co-located on a
+single LCG and one with them spread, would separate the two candidate
+mechanisms. Until that runs, this is a hypothesis.
+
+### 15.6 E3 — H6 re-established: **HIT**
+
+Tier 1.0, N=32, mean over 10 seeds:
+
+| composition | M07 contracts (PF/Res/TT) | M08 worst-flow GFBR (PF/Res/TT) |
+|---|---|---|
+| `ugv_heavy` | **0.0** / 0.6 / 4.9 | **0.453** / 0.000 / 0.000 |
+| `mixed` | 0.3 / 0.0 / 3.4 | 0.549 / 0.400 / 0.116 |
+
+**PF meets ZERO GBR contracts while winning the max-min floor outright.**
+H6 reproduces on a structurally different workload — heterogeneous device
+profiles, no synthetic filler — so §0.1's construction lesson
+**generalises** rather than being an artefact of stage 2's uniform fleet.
+That was the result most at risk from the clean break (§6 decision 2), and
+it survived. At N=16 all three arms are indistinguishable
+(13.0/12.9/12.7), so the divergence is specifically high-N.
+
+### 15.7 The winner FLIPPED, and that sharpens §0.1
+
+Stage 2: **Reservation** led on contracts met. Stage 4: **TwoTier** leads
+(4.9 and 3.4). Same structural result — one QoS-aware arm concentrates and
+meets contracts while PF spreads, meets none, and wins the floor — **with
+the arms swapped.**
+
+**The LESSON generalises; the RANKING does not.** That is a sharper
+statement than either result alone, and it strengthens §0.1 directly: any
+single-metric claim about who wins at high N is false by construction, and
+now **demonstrably so across two workloads whose winners are opposite**.
+A reader who took "Reservation wins on contracts" from stage 2 would have
+been wrong on stage 4's workload, having quoted a real number.

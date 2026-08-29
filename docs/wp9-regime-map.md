@@ -39,6 +39,25 @@ together, every time either is quoted.** A "PF wins at high N" claim built
 on M08 alone, or a "PF collapses at high N" claim built on M07 alone, is
 false in the same cell.
 
+### 0.1.1 The winner flipped between workloads — the lesson generalises, the ranking does not
+
+| | leads on M07 contracts | PF's M07 | PF's M08 |
+|---|---|---|---|
+| **stage 2** (uniform fleet) | **Reservation** | 0.0 at N≥24 | 0.636 / 0.470 |
+| **stage 4** (`ugv_heavy`, N=32) | **TwoTier** (4.9) | **0.0** | **0.453** |
+
+Same structural result both times — one QoS-aware arm concentrates and
+meets contracts while PF spreads, meets none, and wins the max-min floor —
+**with the arms swapped.**
+
+**So the LESSON generalises and the RANKING does not.** This is a sharper
+statement than either result alone, and it is the strongest available
+support for §0.1's rule: a reader who took "Reservation wins on contracts"
+from stage 2 would have been **wrong on stage 4's workload while quoting a
+real number**. Any single-metric claim about who wins at high N is false
+by construction, now demonstrated across two workloads with **opposite
+winners**.
+
 ### 0.2 H5 is untestable as configured — which is not the same as unconfirmed
 
 Stage 2 varied `shared_lcg` and found **no measurable effect on any arm**
@@ -147,6 +166,36 @@ campaign's own N=2 null result (`README.md` §7). N=2 sits 4× below either
 bound; that measurement could not have differentiated the schedulers
 however carefully it was run.
 
+### 1.1a Onset by composition (stage 4) — and an OPEN hypothesis
+
+Separation onset is **not** a function of fleet size alone (tier 1.0):
+
+| composition | flows/UE | onset N | flows at onset |
+|---|---|---|---|
+| `sensor_dense` | 2.0 | none ≤32 | — |
+| `mixed` | 3.2 | 32 | 96 |
+| `drone_heavy` | 3.8 | 32 | 111 |
+| `ugv_heavy` | 4.0 | **16** | **63** |
+
+Two arms of a "denser fleets separate earlier" reading both fail to
+survive: onset is not a function of N (else `sensor_dense` and `ugv_heavy`
+would agree), **and it is not a function of flow count either** —
+`ugv_heavy` separates at 63 flows where `drone_heavy` needs 111.
+
+**OPEN HYPOTHESIS, not a finding.** The UGV profile carries three
+tight-PDB flows — odometry (10 ms), drive control (10 ms), e-stop
+(**5 ms**) — **co-located on LCG 3**, where the drone's are looser and
+spread. Onset may be driven by **tight-PDB density and LCG co-location**
+rather than candidate count.
+
+It is logged as open because it was **not pre-registered**, comes from
+**one grid**, and the two compositions differ in **several ways at once**
+(flow count, GBR fraction, UL share, tight-PDB density, LCG occupancy) —
+so it fits the data without being isolated by it. **What would test it: a
+composition set holding flow count and GBR fraction FIXED while varying
+tight-PDB density and LCG co-location independently.** Naming that
+experiment is what separates an open hypothesis from a story that fits.
+
 ### 1.2 Who wins where — with §0.1 applied
 
 - **N ≤ 4**: nobody. Zero loss on all arms at low load; at N=4 loads 1.5–3.0
@@ -193,7 +242,7 @@ rather than papered over.
 | **H3** (two-tier wins as channel spreads) | **Not tested** | `snr_spread_db` qualified (4.689) and was dropped by the cap. |
 | **H4** (Tier-1 mismatched to factory deadlines) | **Re-tagged — not an environmental question** | Driven by `pdb_ms`, which is **Cat 1** (5QI-derived, `ad6ba54`). Testable only as a **deployment variant**, not as an axis in this map. It did qualify (2.927) and was dropped by the cap, but that framing implied a gap the map could close; it cannot. |
 | **H5** (two-tier degrades as flows-per-LCG grows) | **Now TESTABLE BY COMPOSITION** | Shared-LCG arises from the UGV profile's own `FIVE_QI_LCG` assignment — odometry (83), drive control (82), e-stop (85) all on **LCG 3** — rather than a synthetic override. **A stronger test than stage 1's**: co-location follows from a realistic device's QoS classes, not a flag set to make the mechanism fire. Still conditional on `FIVE_QI_LCG`, which remains invented (`[OPEN: HARDWARE/DECISION]`); §0.2's `mfbr_bps > 0` half is now supplied by base config. |
-| **H6** (overload outcome is metric-dependent) | **CONFIRMED** | §0.1 — the clearest positive result in the sweep, and it was *not* predicted in advance. |
+| **H6** (overload outcome is metric-dependent) | **CONFIRMED ON TWO STRUCTURALLY DIFFERENT WORKLOADS** | §0.1. Stage 2 (uniform 3-flow fleet, synthetic filler) and stage 4 (heterogeneous device profiles, no filler, per-device load) both show it. Not predicted in advance either time. **The winner flipped between them — see §0.1.1 — which is what makes the lesson, not the ranking, the result.** |
 | **H7** (liveness decided by the UL access path) | **Re-tagged — not a regime-map hypothesis** | Driven by `sr_period_slots`, a **Cat-1** parameter, so it is a fixed property of the deployment. To be re-scoped or retired, **not** left as an untested hypothesis implying a gap this map could close. |
 
 Five of seven hypotheses are untested because the cap admitted two
