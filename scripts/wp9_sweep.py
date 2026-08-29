@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import itertools
 import json
+import multiprocessing as mp
 import sys
 from pathlib import Path
 from typing import Any
@@ -181,25 +183,10 @@ class _RecordSink:
         self.n += 1
 
     def _online_metrics(self, record: RunRecord, axis_values: dict) -> None:
-        tag = {**axis_values, "scheduler": record.scheduler_name,
-               "seed": record.seed}
-        try:
-            m16 = self._sc.correlate_flows(record, (1, 1), (1, 82))
-            self._emit({"metric": "M16", **tag,
-                        "status": m16.status, "value": m16.value})
-        except (KeyError, StopIteration):
-            pass
-        for name, values in _SCORING_VARIATIONS:
-            for v in values:
-                scores = self._sc.score(record, **{name: v})
-                for mid in ("M03", "M04", "M07", "M08", "M14", "M19"):
-                    r = scores.get(mid)
-                    if r is None:
-                        continue
-                    self._emit({
-                        "metric": mid, "variation": name, "variation_value": v,
-                        **tag, "status": r.status, "value": r.value,
-                    })
+        # Shared with the parallel worker (_online_rows_for) so both paths
+        # compute identically -- the determinism claim depends on it.
+        for row in _online_rows_for(self._sc, record, axis_values):
+            self._emit(row)
 
     def _emit(self, row: dict) -> None:
         self._online_fh.write(json.dumps(row) + "\n")
@@ -299,6 +286,126 @@ def _study_layer_metrics(records: list[tuple[dict, RunRecord]]) -> list[dict]:
     return rows
 
 
+def _run_one_cell(task: tuple) -> tuple:
+    """Run one grid cell in a worker process and return only compact results.
+
+    Parallelising over CELLS is what makes stage 2 fit its budget at all
+    (docs/wp9-plan.md §6.3b): measured serially, stage 1 is ~7.1 h against a
+    4 h ceiling and stage 2 ~35-55 h against 24 h.
+
+    **This changes no result.** Cells are independent; within a cell seeds
+    and arms stay ordered; `paired_seeds` is drawn up front from a fixed
+    base seed; and every run is a pure function of (scenario, seed). The
+    worker returns rows, streamed-row payloads and the M13 projection rather
+    than writing anything, so the parent stays the single writer.
+    """
+    axis_values, n_seeds, horizon = task
+    _HORIZON[0] = horizon
+    collected: list[tuple[dict, Any]] = []
+    online: list[dict] = []
+    sc_card = Scorecard()
+
+    def sink(record, av):
+        online.extend(_online_rows_for(sc_card, record, av))
+        collected.append((dict(av), record))
+
+    rows = sweep(
+        axes={k: [v] for k, v in axis_values.items()},
+        build_scenario=_build, schedulers=_arms(), n_seeds=n_seeds,
+        driver_kwargs=_driver_kwargs, record_sink=sink,
+    )
+    payload = []
+    keep_m13 = not (set(axis_values) - {"n_ues", "load_mult"})
+    for av, rec in collected:
+        payload.append((
+            av,
+            _strip_timeseries(rec.to_dict()),
+            m13_projection(rec).to_dict() if keep_m13 else None,
+        ))
+    return rows, online, payload
+
+
+def _online_rows_for(sc_card: Scorecard, record: RunRecord,
+                     axis_values: dict) -> list[dict]:
+    """M16 + the 12 scoring-parameter variations. Extracted from
+    _RecordSink so the worker and the serial path compute identically."""
+    tag = {**axis_values, "scheduler": record.scheduler_name,
+           "seed": record.seed}
+    out: list[dict] = []
+    try:
+        m16 = sc_card.correlate_flows(record, (1, 1), (1, 82))
+        out.append({"metric": "M16", **tag,
+                    "status": m16.status, "value": m16.value})
+    except (KeyError, StopIteration):
+        pass
+    for name, values in _SCORING_VARIATIONS:
+        for v in values:
+            scores = sc_card.score(record, **{name: v})
+            for mid in ("M03", "M04", "M07", "M08", "M14", "M19"):
+                r = scores.get(mid)
+                if r is None:
+                    continue
+                out.append({"metric": mid, "variation": name,
+                            "variation_value": v, **tag,
+                            "status": r.status, "value": r.value})
+    return out
+
+
+def _cell_tasks(core: dict, excursions: dict, n_seeds: int,
+                horizon: int) -> list[tuple]:
+    """One task per grid cell: the core plane's full product, then each
+    excursion level as its own single-cell task."""
+    tasks = []
+    names = list(core.keys())
+    for combo in itertools.product(*core.values()):
+        tasks.append((dict(zip(names, combo)), n_seeds, horizon))
+    for axis, levels in excursions.items():
+        for level in levels:
+            tasks.append(({axis: level}, n_seeds, horizon))
+    return tasks
+
+
+def run_stage_1_parallel(out_dir: Path, n_seeds: int, horizon: int,
+                         smoke: bool, workers: int) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    core = CORE_PLANE if not smoke else {"n_ues": [2, 4], "load_mult": [1.0, 2.0]}
+    excursions = EXCURSIONS if not smoke else {"min_rb": [20]}
+    tasks = _cell_tasks(core, excursions, n_seeds, horizon)
+    print(f"stage 1: {len(tasks)} cells on {workers} workers")
+
+    rows: list[dict] = []
+    kept: list[tuple[dict, RunRecord]] = []
+    rec_fh = (out_dir / "records.jsonl").open("w")
+    onl_fh = (out_dir / "online_rows.jsonl").open("w")
+    n_rec = n_onl = 0
+    try:
+        with mp.get_context("spawn").Pool(workers) as pool:
+            for i, (crows, conline, payload) in enumerate(
+                    pool.imap_unordered(_run_one_cell, tasks), 1):
+                rows.extend(crows)
+                for r in conline:
+                    onl_fh.write(json.dumps(r) + "\n")
+                    n_onl += 1
+                for av, recd, m13d in payload:
+                    rec_fh.write(json.dumps(
+                        {"axis_values": av, "record": recd}) + "\n")
+                    n_rec += 1
+                    if m13d is not None:
+                        kept.append((av, RunRecord.from_dict(m13d)))
+                print(f"  cell {i}/{len(tasks)} done ({n_rec} records)", flush=True)
+    finally:
+        rec_fh.close()
+        onl_fh.close()
+
+    write_csv(rows, str(out_dir / "stage1_rows.csv"))
+    study_rows = _study_layer_metrics(kept)
+    (out_dir / "study_layer_metrics.json").write_text(json.dumps(study_rows, indent=2))
+    mb = (out_dir / "records.jsonl").stat().st_size / 1e6
+    print(f"  {len(rows)} rows, {n_rec} records ({mb:.1f} MB) -> {out_dir}")
+    print(f"  M13 rows: {len(study_rows)}; online rows streamed: {n_onl}")
+    _run_gate(rows, core, excursions, out_dir)
+
+
 def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
     _HORIZON[0] = horizon
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -338,8 +445,13 @@ def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
     print(f"  {len(rows)} rows, {sink.n} records ({mb:.1f} MB) -> {out_dir}")
     print(f"  M13 rows: {len(study_rows)}; online rows streamed: {sink.n_online}")
 
-    # -- the gate, run as committed code, output recorded verbatim ---------
-    arm_pairs = [("PF", "Reservation"), ("PF", "TwoTier"), ("Reservation", "TwoTier")]
+    _run_gate(rows, core, excursions, out_dir)
+
+
+def _run_gate(rows, core, excursions, out_dir: Path) -> None:
+    """The gate, run as committed code, output recorded verbatim."""
+    arm_pairs = [("PF", "Reservation"), ("PF", "TwoTier"),
+                 ("Reservation", "TwoTier")]
     verdicts = []
     for axis, levels in {**core, **excursions}.items():
         base_level = BASE.get(axis)
@@ -357,12 +469,18 @@ def main() -> None:
     p.add_argument("--out", default="sweeps/wp9/stage1")
     p.add_argument("--seeds", type=int, default=10)
     p.add_argument("--horizon", type=int, default=20_000)
+    p.add_argument("--workers", type=int, default=12,
+                   help="cell-level parallelism; memory-bound, see "
+                        "docs/wp9-plan.md §6.3b (0 = serial)")
     p.add_argument("--smoke", action="store_true",
                    help="tiny grid, for exercising the machinery only")
     a = p.parse_args()
     if a.stage != 1:
         raise SystemExit("stage 2 is gated on stage 1's verdict -- not runnable yet")
-    run_stage_1(Path(a.out), a.seeds, a.horizon, a.smoke)
+    if a.workers and a.workers > 1:
+        run_stage_1_parallel(Path(a.out), a.seeds, a.horizon, a.smoke, a.workers)
+    else:
+        run_stage_1(Path(a.out), a.seeds, a.horizon, a.smoke)
 
 
 if __name__ == "__main__":
