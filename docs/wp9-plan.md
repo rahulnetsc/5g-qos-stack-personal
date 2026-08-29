@@ -1635,3 +1635,66 @@ cost (~2.2 s) from scoring cost (~2.0 s across all 13 passes) and showed
 the workload is linear. But the "two orders of magnitude pathological"
 call it was chasing was an artifact of buffering, not a property of the
 run.
+
+
+---
+
+## 14. Stage 4 — the Category-2 grid (expectations registered before launch)
+
+**Grid.** N ∈ {4, 8, 16, 32} × composition ∈ {drone_heavy, ugv_heavy,
+sensor_dense, mixed} × video_tier ∈ {0.5, 1.0, 1.5} = **48 cells**, 10
+paired seeds, 3 arms, horizon 20,000 (5 s). ~0.6 h at 10 workers from
+§13's measured model.
+
+### 14.1 The control, read FIRST — and a stop condition
+
+**The low-load corner (N=4, `sensor_dense`, tier 0.5) must be
+UNINFORMATIVE** — zero loss on all three arms, therefore excluded by
+`is_informative`.
+
+This is the design control, the analogue of stage 1's N=2 cell. A fleet of
+four sensors and actuators offering a few hundred kbps against a ~100 Mbps
+cell **cannot** lose anything; if it does, the workload is mis-scaled and
+**every other cell's interpretation is suspect**. **Stop condition: if the
+control shows loss on any arm, the rest of the grid is not read** until
+the scaling is explained.
+
+### 14.2 Falsifiable expectations
+
+**E1 — composition is worth being a primary axis.** At fixed N, different
+compositions produce materially different arm behaviour: different
+separation onset, or a different winner.
+*Falsifier:* at every N all four compositions give the same arm ordering
+and the same separation verdict → composition was not worth promoting, N
+alone would have sufficed, and §12.2's justification is wrong.
+
+**E2 — separation onset tracks FLOW COUNT, not UE count.** The sharp one,
+and it follows from two independent things: §1.1's PDCCH bound is about
+*candidates per slot*, and §13's measured cost model scales with flows
+(`flows^1.09`), not N.
+*Expectation:* `ugv_heavy` (~4 flows/UE) separates at **lower N** than
+`sensor_dense` (~2 flows/UE), and onsets line up at **comparable flow
+counts** across compositions rather than at comparable N.
+*Falsifier:* onset at the same N regardless of composition → the binding
+constraint is per-UE after all, and composition is a weaker index than
+claimed. **This is the expectation most likely to be wrong**, because
+stage 2's boundary was found on a workload with uniform flows-per-UE,
+where N and flow count are indistinguishable.
+
+**E3 — H6 must be re-established, not assumed.** Stage 2 found PF meets
+**zero** GBR contracts at N≥24 while still winning M08 (§0.1). The clean
+break (§6 decision 2) means that result does **not** transfer.
+*Expectation:* the metric-dependent split reappears at the high-N end of
+at least one composition.
+*Falsifier:* it does not → H6 was specific to stage 2's synthetic
+workload. That would be a significant finding **about the earlier
+result**, not a null: §0.1 is currently the regime map's headline
+construction lesson, and it would need re-scoping to "true of uniform
+fleets" rather than stated generally.
+
+### 14.3 Standing rules
+
+Contiguity before effect sizes; paired seeds within-seed; all 19 metrics;
+no single-metric high-N claims (§0.1); the stage-1 gate is **not** applied
+(these axes were chosen by argument, not score — §11); corpus frozen at
+`9963be1`, `--check` clean before and after.
