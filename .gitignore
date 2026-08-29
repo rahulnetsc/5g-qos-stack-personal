@@ -42,4 +42,8 @@ htmlcov/
 # WP9 sweep outputs: scored CSVs and the gate verdict are committed per
 # docs/wp9-plan.md sec7; raw per-cell RunRecord JSONL is not (size), and the
 # exact re-run command is recorded in the stage's own commit message.
-sweeps/**/records.jsonl
+# Derived from the CATEGORY sec7 describes ("raw per-cell JSONL is not
+# committed"), not from one filename: online_rows.jsonl was 121 MB and
+# would have been committed because the original pattern named only
+# records.jsonl. Same species as the count-in-prose rule.
+sweeps/**/*.jsonl
