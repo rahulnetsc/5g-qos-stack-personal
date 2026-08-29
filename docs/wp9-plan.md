@@ -1382,3 +1382,84 @@ model's expressive range, and the future WP is scoped as "add a mechanism
 `sim/bsr.py` lacks", with two candidates named.
 Next: commit 1 (infrastructure + the §6.4 rule as code) → stage 1, N=2
 control read first → stage 2 → the map.
+
+
+---
+
+## 10. Stage 3 — the two named runs (plan, approved before any cell ran)
+
+Stage 3 addresses **two of the eight dropped axes** (`docs/wp9-regime-map.md`
+§0.4). **It does not close §0.4's coverage gap**: H2/H3/H4/H7 stay untested,
+G2/G4/G6/G12 uncomputed, G7 unanswerable, G9/G11 unrun. §0's four
+qualifiers travel with every stage-3 claim.
+
+**The stage-1 gate is deliberately NOT applied.** It exists to *select*
+axes when you do not know which matter; these two were selected by named
+argument (§0.2, §0.3), and §0.4 showed the threshold does not discriminate
+anyway (11 of 12 cleared). Running `select_for_stage_2` would answer a
+question nobody asked. Reused instead, as *descriptive statistics for the
+stated predictions*: `evaluate_cell`'s paired within-seed effect size,
+bootstrap CI and `is_informative`, plus `check_contiguity` before any
+boundary claim.
+
+### Grid and budget (from §6.3a's MEASURED timings)
+
+| sub-grid | axes | cells |
+|---|---|---|
+| **Q1** `min_rb` crossover | N {2,3,4,6,8,12,16} x `min_rb` {1,3,5,7,10,20} x load {1.0,2.0} | **84** |
+| **Q2** mfbr / H5 | `mfbr_multiple` {0,1,2,4} x `shared_lcg` {F,T} x N {8,16,32} x load {1.0,2.0} | **48** |
+
+Q1 ~22,548 s + Q2 ~31,456 s = **15.0 h serial -> ~2.2 h wall** at 10
+workers (stage 1's measured 6.75x).
+
+### Q2's null control is a STOP CONDITION, read first
+
+`max_burst = int((mfbr_bps/8)/slots_per_sec)*2`, floored at
+`obligation*2`. At GFBR 4 Mbps, mu=2: obligation ~125 B/slot, floor 250 B.
+So **`mfbr_multiple=1.0` gives `max_burst = int((4e6/8)/4000)*2 = 250` --
+exactly the floor, hence a no-op**; x2.0 -> 500 B and x4.0 -> 1000 B raise
+the catch-up ceiling.
+
+**x1.0 must be BIT-IDENTICAL to x0** -- byte-equal rows on shared seeds,
+not "within tolerance", which the paired-seed determinism property makes
+the right test. **Checked before a single effect size is read.** If it
+differs, the model of `max_burst` is wrong and every other Q2 cell is
+uninterpretable; the run stops rather than being reported.
+
+### Falsifiable expectations, stated before running
+
+**Q1 (`min_rb`).** §1.1 gives `N_crit = min(55/min_rb, 8)`. The boundary is
+**pinned at 8 for `min_rb` <= 6** (PDCCH-bound) and **falls above ~7**:
+7 -> ~7.9, 10 -> ~5.5, 20 -> ~2.75. *Falsified by* any boundary movement
+across `min_rb` in {1,3,5}, or by no movement at 10/20.
+
+**Q2 (`mfbr`).** (i) x1.0 == x0 bit-identical (above). (ii) x2/x4 raise the
+cap in **both** arms, so M07/M08 improve where deficits accumulate (high N,
+high load) with **arm ordering largely preserved** -- it is a shared
+parameter. (iii) `gbr_bytes_slot` becomes live in Reservation for the first
+time.
+
+**(iv) The UL floor: predicted ZERO fires, and why that is a test rather
+than an absence.** The floor's dormancy has two independent reasons
+(README §7): it needs `mfbr_bps > 0` to **arm**, and a BSR/SR-desync fault
+to **fire**. Every run in this project has failed the first, so "no fires"
+has never distinguished *never armed* from *armed but never fired*.
+**Stage 3 is the first run where the arming half is satisfied**, so it
+separates them for the first time. Commit 0b established `sim/bsr.py`
+cannot express the desync state, so the prediction is `gate_passes > 0`
+with `fires == 0` -- which would **confirm** the two-reason dormancy as a
+positive result about the fourth dormancy category, not report an absence.
+
+> **Recorded before the real run: the machinery smoke test already
+> contradicts (iv).** A 16-cell smoke grid (horizon 1000) returned
+> `gate_passes=73285, fires=9`. The prediction is left AS STATED rather
+> than revised, per this project's own rule against editing a prediction
+> after seeing data -- even implementation-test data. The likely error is
+> now identifiable: **I conflated the floor's arming gate with its firing
+> condition.** Arming reads the per-LCG estimate (`_ul_has_pending_gbr`);
+> firing keys on `floor_rx_lastseen` -- *delivery not moving* -- so a UE
+> starved by ordinary contention can fire the floor without any BSR/SR
+> desync. If the full run confirms this, the finding is that **the floor's
+> firing condition was never actually gated on the desync fault**, which
+> is a correction to README §7's own framing of the fourth dormancy
+> category, not merely a missed prediction.

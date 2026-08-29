@@ -513,6 +513,132 @@ def run_stage_2(out_dir: Path, n_seeds: int, horizon: int, smoke: bool,
     print("  contiguity is read BEFORE effect sizes -- see analyse_stage2.py")
 
 
+# ---------------------------------------------------------------- stage 3
+# Two TARGETED sub-grids, not a re-run. Both axes were selected by a named
+# argument (docs/wp9-regime-map.md §0.2/§0.3), not by a gate score, so the
+# stage-1 promotion machinery is deliberately NOT applied here -- see
+# docs/wp9-plan.md §10.
+STAGE3_Q1: dict[str, list[Any]] = {          # min_rb crossover
+    "n_ues": [2, 3, 4, 6, 8, 12, 16],
+    "min_rb": [1, 3, 5, 7, 10, 20],
+    "load_mult": [1.0, 2.0],
+}
+STAGE3_Q2: dict[str, list[Any]] = {          # mfbr / H5
+    "mfbr_multiple": [0.0, 1.0, 2.0, 4.0],
+    "shared_lcg": [False, True],
+    "n_ues": [8, 16, 32],
+    "load_mult": [1.0, 2.0],
+}
+
+
+def _instrumented_two_tier(min_rb: int, tally: dict):
+    """TwoTier with the UL floor's two halves counted separately.
+
+    The floor's dormancy has TWO independent reasons (README §7): it needs
+    `mfbr_bps > 0` to ARM, and a BSR/SR-desync fault to FIRE. Every run in
+    this project so far failed the first, so "no fires" has never
+    distinguished *never armed* from *armed but never fired*. Stage 3 is the
+    first run where the arming half can be satisfied, so both counters are
+    needed for the result to mean anything.
+
+    `_ul_has_pending_gbr` is the arming gate (it returns early at mfbr=0);
+    `_update_ul_floor` returns (fired, silence). Wrapped on the instance so
+    no scheduler code changes.
+    """
+    sched = load_two_tier(_TT_CONFIG, min_rb=min_rb)
+    real_gate = sched._ul_has_pending_gbr
+    real_floor = sched._update_ul_floor
+
+    def gate(ue_id, buffers):
+        ok = real_gate(ue_id, buffers)
+        tally["gate_calls"] = tally.get("gate_calls", 0) + 1
+        if ok:
+            tally["gate_passes"] = tally.get("gate_passes", 0) + 1
+        return ok
+
+    def floor(ue_id, buffers, slot_index, *a, **k):
+        fired, sil = real_floor(ue_id, buffers, slot_index, *a, **k)
+        if fired:
+            tally["fires"] = tally.get("fires", 0) + 1
+        return fired, sil
+
+    sched._ul_has_pending_gbr = gate
+    sched._update_ul_floor = floor
+    return sched
+
+
+def _run_one_cell_s3(task: tuple) -> tuple:
+    """Stage-3 worker: same shape as _run_one_cell, plus the floor tally."""
+    axis_values, n_seeds, horizon = task
+    _HORIZON[0] = horizon
+    online: list[dict] = []
+    payload: list[tuple] = []
+    sc_card = Scorecard()
+    tally: dict = {}
+
+    def sink(record, av):
+        online.extend(_online_rows_for(sc_card, record, av))
+        payload.append((dict(av), _strip_timeseries(record.to_dict()), None))
+
+    arms = {
+        "PF": lambda: ProportionalFair(ewma_window_slots=200),
+        "Reservation": axis_aware(
+            lambda min_rb=5, **_: Reservation(min_rb=min_rb)),
+        "TwoTier": axis_aware(
+            lambda min_rb=5, **_: _instrumented_two_tier(min_rb, tally)),
+    }
+    rows = sweep(
+        axes={k: [v] for k, v in axis_values.items()},
+        build_scenario=_build, schedulers=arms, n_seeds=n_seeds,
+        driver_kwargs=_driver_kwargs, record_sink=sink,
+    )
+    return rows, online, payload, {**axis_values, **tally}
+
+
+def run_stage_3(out_dir: Path, grid_name: str, n_seeds: int, horizon: int,
+                workers: int, smoke: bool) -> None:
+    grid = {"q1": STAGE3_Q1, "q2": STAGE3_Q2}[grid_name]
+    if smoke:
+        grid = {k: v[:2] for k, v in grid.items()}
+    out_dir.mkdir(parents=True, exist_ok=True)
+    names = list(grid)
+    tasks = [(dict(zip(names, c)), n_seeds, horizon)
+             for c in itertools.product(*grid.values())]
+    print(f"stage 3 [{grid_name}]: {len(tasks)} cells on {workers} workers")
+
+    rows: list[dict] = []
+    tallies: list[dict] = []
+    rec_fh = (out_dir / "records.jsonl").open("w")
+    onl_fh = (out_dir / "online_rows.jsonl").open("w")
+    n_rec = n_onl = 0
+    try:
+        with mp.get_context("spawn").Pool(workers) as pool:
+            for i, (crows, conline, payload, tally) in enumerate(
+                    pool.imap_unordered(_run_one_cell_s3, tasks), 1):
+                rows.extend(crows)
+                tallies.append(tally)
+                for r in conline:
+                    onl_fh.write(json.dumps(r) + "\n")
+                    n_onl += 1
+                for av, recd, _ in payload:
+                    rec_fh.write(json.dumps(
+                        {"axis_values": av, "record": recd}) + "\n")
+                    n_rec += 1
+                print(f"  cell {i}/{len(tasks)} done ({n_rec} records)", flush=True)
+    finally:
+        rec_fh.close()
+        onl_fh.close()
+
+    write_csv(rows, str(out_dir / f"stage3_{grid_name}_rows.csv"))
+    (out_dir / "floor_tally.json").write_text(json.dumps(tallies, indent=2))
+    mb = (out_dir / "records.jsonl").stat().st_size / 1e6
+    print(f"  {len(rows)} rows, {n_rec} records ({mb:.1f} MB) -> {out_dir}")
+    tot_pass = sum(t.get("gate_passes", 0) for t in tallies)
+    tot_fire = sum(t.get("fires", 0) for t in tallies)
+    print(f"  UL floor: gate_passes={tot_pass} fires={tot_fire}  "
+          f"(arming half vs firing half -- see docs/wp9-plan.md §10)")
+
+
 def _run_gate(rows, core, excursions, out_dir: Path) -> None:
     """The gate, run as committed code, output recorded verbatim."""
     arm_pairs = [("PF", "Reservation"), ("PF", "TwoTier"),
@@ -533,7 +659,8 @@ def _run_gate(rows, core, excursions, out_dir: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--stage", type=int, default=1, choices=(1, 2))
+    p.add_argument("--stage", type=int, default=1, choices=(1, 2, 3))
+    p.add_argument("--grid", default="q1", choices=("q1", "q2"))
     p.add_argument("--out", default="sweeps/wp9/stage1")
     p.add_argument("--seeds", type=int, default=10)
     p.add_argument("--horizon", type=int, default=20_000)
@@ -543,6 +670,10 @@ def main() -> None:
     p.add_argument("--smoke", action="store_true",
                    help="tiny grid, for exercising the machinery only")
     a = p.parse_args()
+    if a.stage == 3:
+        run_stage_3(Path(a.out), a.grid, a.seeds, a.horizon,
+                    max(1, a.workers), a.smoke)
+        return
     if a.stage == 2:
         run_stage_2(Path(a.out), a.seeds, a.horizon, a.smoke, max(1, a.workers))
         return
