@@ -67,11 +67,56 @@ recomputed to two) is what narrowed the grid. Stage 2 therefore confirms
 that differences **reproduce** on a dense contiguous grid — it does **not**
 establish that the promoted axes were the most important ones.
 
-**The eight dropped axes are live candidates, not tested-and-rejected**:
-`sr_period_slots` (152.579), `min_rb` (152.579), `snr_spread_db` (4.689),
-`pdb_ms` (2.927), `duty_cycle` (2.663), `bg` (2.648), `mfbr_multiple`
-(1.778), `inf_scenario` (did not qualify). **`mfbr_multiple` and `min_rb`
-now carry specific named reasons to run next** — §0.2 and §0.3.
+**Of the eight dropped axes, FOUR were never live candidates** — they are
+Category 1 (§0.5), deployment conditions rather than environmental
+variables: `min_rb` (152.579), `sr_period_slots` (152.579), `pdb_ms`
+(2.927, 5QI-derived as of `ad6ba54`) and `mfbr_multiple` (1.778, a
+provisioned QoS-profile field, now set as base config).
+
+**Genuinely untested Category-2 axes: `snr_spread_db` (4.689),
+`duty_cycle` (2.663), `bg` (2.648), `inf_scenario` (did not qualify).**
+
+**What this correction does NOT change.** The cap still did the narrowing
+rather than the score; **11 of 12 axes cleared the 1.0 threshold**; and a
+stage-2 result on a cap-selected axis remains **weaker evidence than §6.4
+assumed**. Reclassifying four axes **shrinks the coverage gap; it does not
+repair the selection mechanism that produced it.** Read only as "the
+qualifier was overstated" this would be the wrong lesson — the qualifier
+was **mis-shaped**, and those are different corrections.
+
+---
+
+## 0.5 The three-category taxonomy (added by the re-scope)
+
+The scoping error this corrects: three categories were treated as one axis
+space.
+
+- **Cat 1 — fixed by the deployment.** Core/gNB config, not chosen at run
+  time. A **condition** of the map, not an axis in it.
+- **Cat 2 — what the environment does.** Encountered, not chosen. What the
+  map should be indexed by: it varies in the field, and an operator can
+  observe it.
+- **Cat 3 — scheduler internals.** Meaningful only as arms.
+
+| stage-1 axis | cat | justification |
+|---|---|---|
+| `n_ues` | 2 | fleet size |
+| `load_mult` | 2 | offered load |
+| `duty_cycle` | 2 | burstiness (H2) |
+| `snr_spread_db` | 2 | channel spread (H3) |
+| `bg` | 2 | elephant / background traffic |
+| `inf_scenario` | 2 | deployment RF environment |
+| `shared_lcg` | 2* | a **consequence** of composition, not a knob — see H5 |
+| `min_rb` | **1** | `nrmac->min_grant_prb` = 5, gNB config |
+| `mfbr_multiple` | **1** | QoS-profile field, provisioned per bearer |
+| `pdb_ms` | **1** | 5QI-derived (`ad6ba54`); not free to choose |
+| `sr_period_slots` | **1** | RRC / gNB config |
+| `k2_slots` | **1** | TDA table / numerology |
+
+**Consequence:** a Category-1 parameter is a *deployment variant*, not an
+axis in a regime map. Sweeping one answers a counterfactual about a
+different deployment. That is why §2's `min_rb` crossover is recorded as
+untested **by choice**, and why H4 and H7 are re-tagged below.
 
 ---
 
@@ -146,10 +191,10 @@ rather than papered over.
 | **H1** (reservation collapses above a UE count) | **Confirmed, bound identified** | Boundary at N=8 / N=16, matching the PDCCH bound. §0.3 limits it to `min_rb=5`. |
 | **H2** (two-tier wins as traffic becomes bursty) | **Not tested** | `duty_cycle` qualified (2.663) and was dropped by the cap. |
 | **H3** (two-tier wins as channel spreads) | **Not tested** | `snr_spread_db` qualified (4.689) and was dropped by the cap. |
-| **H4** (Tier-1 mismatched to factory deadlines) | **Not tested** | `pdb_ms` qualified (2.927) and was dropped by the cap. |
-| **H5** (two-tier degrades as flows-per-LCG grows) | **Untestable as configured** | §0.2. |
+| **H4** (Tier-1 mismatched to factory deadlines) | **Re-tagged — not an environmental question** | Driven by `pdb_ms`, which is **Cat 1** (5QI-derived, `ad6ba54`). Testable only as a **deployment variant**, not as an axis in this map. It did qualify (2.927) and was dropped by the cap, but that framing implied a gap the map could close; it cannot. |
+| **H5** (two-tier degrades as flows-per-LCG grows) | **Now TESTABLE BY COMPOSITION** | Shared-LCG arises from the UGV profile's own `FIVE_QI_LCG` assignment — odometry (83), drive control (82), e-stop (85) all on **LCG 3** — rather than a synthetic override. **A stronger test than stage 1's**: co-location follows from a realistic device's QoS classes, not a flag set to make the mechanism fire. Still conditional on `FIVE_QI_LCG`, which remains invented (`[OPEN: HARDWARE/DECISION]`); §0.2's `mfbr_bps > 0` half is now supplied by base config. |
 | **H6** (overload outcome is metric-dependent) | **CONFIRMED** | §0.1 — the clearest positive result in the sweep, and it was *not* predicted in advance. |
-| **H7** (liveness decided by the UL access path) | **Not tested** | `sr_period_slots` qualified (152.579) and was dropped by the cap. |
+| **H7** (liveness decided by the UL access path) | **Re-tagged — not a regime-map hypothesis** | Driven by `sr_period_slots`, a **Cat-1** parameter, so it is a fixed property of the deployment. To be re-scoped or retired, **not** left as an untested hypothesis implying a gap this map could close. |
 
 Five of seven hypotheses are untested because the cap admitted two
 excursion axes out of eleven qualifying ones. That is §0.4's consequence

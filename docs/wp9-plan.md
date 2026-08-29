@@ -1386,7 +1386,7 @@ control read first → stage 2 → the map.
 
 ---
 
-## 10. Stage 3 — the two named runs (plan, approved before any cell ran)
+## 11. Stage 3 — the two named runs (plan, approved before any cell ran)
 
 Stage 3 addresses **two of the eight dropped axes** (`docs/wp9-regime-map.md`
 §0.4). **It does not close §0.4's coverage gap**: H2/H3/H4/H7 stay untested,
@@ -1463,3 +1463,83 @@ positive result about the fourth dormancy category, not report an absence.
 > firing condition was never actually gated on the desync fault**, which
 > is a correction to README §7's own framing of the fourth dormancy
 > category, not merely a missed prediction.
+
+
+---
+
+## 12. The re-scope — taxonomy and two findings
+
+### 12.1 The three-category taxonomy
+
+The scoping error corrected here: three categories had been treated as one
+axis space.
+
+- **Cat 1 — fixed by the deployment.** Core/gNB config. A **condition** of
+  the map, not an axis in it.
+- **Cat 2 — what the environment does.** Encountered, not chosen. What the
+  map is indexed by.
+- **Cat 3 — scheduler internals.** Meaningful only as arms.
+
+| stage-1 axis | cat | justification |
+|---|---|---|
+| `n_ues` | 2 | fleet size |
+| `load_mult` | 2 | offered load |
+| `duty_cycle` | 2 | burstiness (H2) |
+| `snr_spread_db` | 2 | channel spread (H3) |
+| `bg` | 2 | elephant / background traffic |
+| `inf_scenario` | 2 | deployment RF environment |
+| `shared_lcg` | 2* | a consequence of composition, not a knob (§12.3) |
+| `min_rb` | **1** | `nrmac->min_grant_prb` = 5, gNB config |
+| `mfbr_multiple` | **1** | QoS-profile field, provisioned per bearer |
+| `pdb_ms` | **1** | 5QI-derived (`ad6ba54`) |
+| `sr_period_slots` | **1** | RRC / gNB config |
+| `k2_slots` | **1** | TDA table / numerology |
+
+Four of the eight axes the stage-1 cap dropped are Cat 1 and were **never
+live candidates**; H4 and H7 are re-tagged accordingly
+(`docs/wp9-regime-map.md` §0.4, §3). **What that does not change:** the cap
+still did the narrowing rather than the score, 11 of 12 axes cleared the
+threshold, and a stage-2 result on a cap-selected axis is still weaker
+evidence than §6.4 assumed. The gap is **mis-shaped, not overstated**.
+
+### 12.2 Finding — the composition flow-count claim, corrected
+
+**Claimed** in the re-scope: fleet compositions "differ by an order of
+magnitude in flow count". **Measured:** the spread is **1.8× across
+realistic mixtures** (35–63 flows at N=16) and **3× across pure fleets**
+(32 for 16 sensors vs 96 for 16 UGVs). Not ten.
+
+**The compositions were not inflated to fit the claim; the claim was
+corrected**, and `sim/tests/test_fleet.py` now asserts the true property
+instead of the overstated one.
+
+The replacement argument is stronger, and differently shaped: composition
+moves **several dimensions at once**.
+
+| dimension | spread at N=16 |
+|---|---|
+| GBR fraction | 9% → 23% (**2.6×**) |
+| tight-PDB share (≤30 ms) | 38% → 60% |
+| UL share | 51% → 68% |
+| flow count | 35 → 63 (1.8×) |
+
+Four dimensions moving together is a **better** justification than one
+moving 10× would have been, because the joint change is what alters the
+scheduling problem. The original claim was not merely overstated — it was
+measuring the wrong thing.
+
+### 12.3 Finding — shared-LCG is emergent, and H5's status changes
+
+Stage 1 forced shared-LCG with a synthetic per-flow `lcg` override,
+specifically to route around `FIVE_QI_LCG` being invented and unvalidated.
+The re-scoped **UGV profile produces the same condition with no override**:
+odometry (5QI 83), drive control (82) and e-stop (85) all map to **LCG 3**.
+
+1. **H5 moves from "untestable as configured" to "testable by
+   composition"**, and the test is stronger — co-location follows from a
+   realistic device's QoS classes rather than a flag set to make the
+   mechanism fire.
+2. **The result stays conditional on `FIVE_QI_LCG`**, still invented
+   (`[OPEN: HARDWARE/DECISION]`). That item does not close. What changes is
+   that H5 now inherits a *realistic* mapping's consequence instead of an
+   arbitrary one.
