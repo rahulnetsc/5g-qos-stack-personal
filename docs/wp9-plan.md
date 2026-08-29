@@ -595,7 +595,55 @@ rule proves the grid reached real loss — and it is reported as the finding.
   **Low-N cells therefore carry weaker claims than high-N cells**, and every
   bound-stating row carries its own n and its own bound — never a tighter one.
 
-### 6.3 The run-count arithmetic, stated before committing to axes
+### 6.3a AMENDMENT — the arithmetic below was wrong by 5-7x (measured)
+
+**§6.3's table is superseded.** It produced a 1.27 h stage-1 projection;
+the real run reached 756 of ~1,680 records before dying, and re-measured
+post-fix (`6b31af3`, on a machine with no swap pressure) the true costs are:
+
+| N | driver.run (PF/Res/TT) | score (19 metrics) | 12 variations | **cell (3 arms x 10 seeds)** | §6.3 predicted |
+|---|---|---|---|---|---|
+| 2 | 1.10 / 1.34 / 3.41 s | 0.06 s | 0.66-0.72 s | **81 s** | — |
+| 8 | 3.63 / 5.74 / 10.88 s | 0.25 s | ~3.1 s | **303 s** | ~62 s (**4.9x low**) |
+| 32 | 16.82 / 22.39 / 27.18 s | ~1.1 s | ~13 s | **1093 s** | ~150 s (**7.3x low**) |
+
+Corroboration that these are sound and that the dead run's early data was
+clean: the pre-thrash rate measured during the first (N=2) cells was
+0.367 rec/s ⇒ **~82 s/cell**, against **81 s/cell** measured here.
+
+**Stage 1, re-derived: ~7.1 h serial** (core plane ~5.9 h interpolating
+N=4/16/24 between the measured points, plus ~1.2 h for the 14 excursion
+cells at the N=8 base) — **against its own 4 h ceiling**. Stage 1 was never
+going to fit serially, leak or no leak.
+
+#### How this was measured — and how the original failed
+
+Recorded as a category, because any future budget in this project will be
+built the same way unless the failure mode is written down. Three causes,
+all of which generalise:
+
+1. **Measured at one horizon, scaled linearly to another.** The original
+   timings were taken at horizon 4,000 and multiplied by 5 for 20,000.
+   Allocation and GC cost do not scale with the slot loop; at N=8 TwoTier
+   the real 20,000-slot run is 10.88 s against the ~3.6 s that scaling
+   predicted.
+2. **Measured with a flag off that the real run has on.**
+   `record_timeseries=True` was checked once, on one scenario at horizon
+   4,000, and recorded in §1 as "measured free: 1.39 s vs 1.58 s". At the
+   real horizon with up to 32 flows the arrays are 5x longer and there are
+   4x more of them, and it is not free.
+3. **A cost model that counted `driver.run()` and nothing else.** Scoring
+   was omitted entirely — yet `Scorecard.score()` runs **13 times per
+   record** (once for the panel, plus 12 scoring-parameter variations), and
+   at N=8 that is 3.4 s against the run's 10.9 s, i.e. ~24% of per-record
+   cost. `sim/tests/test_wp9_sweep_memory.py` pins the variation count at 12
+   so this term cannot drift silently and invalidate the budget again.
+
+**The rule this leaves behind: time the thing you are actually going to
+run — same horizon, same flags, same post-processing — or state explicitly
+that the number is a lower bound.**
+
+### 6.3 The run-count arithmetic (SUPERSEDED by §6.3a — kept for the record)
 
 Measured on this machine, `record_timeseries=True`, at 20,000 slots (cost is
 linear in slots and near-linear in N, both measured, not assumed):
@@ -608,7 +656,8 @@ linear in slots and near-linear in N, both measured, not assumed):
 - **Stage 1: 50 cells ≈ 1.3 h single-core** — inside the ≤ 4 h ceiling with
   room for a full re-run after a fix.
 - **Stage 2: ≤ 3 axes, ~256 cells ≈ 7 h** — inside the ≤ 24 h ceiling, leaving
-  budget for both sub-campaigns below.
+  budget for both sub-campaigns below. **SUPERSEDED: at §6.3a's measured
+  costs this is ~35-55 h serial, far outside 24 h — see §6.3b.**
 - Cells are embarrassingly parallel; `multiprocessing` (stdlib, no new
   dependency) over cells gives roughly N-core headroom. **Every budget above
   is stated single-core**, so the plan does not depend on that headroom
@@ -625,6 +674,29 @@ linear in slots and near-linear in N, both measured, not assumed):
   drift in internals — a within-run check — not a cross-seed mean. **Any
   cross-seed claim from the soak is out of bounds**, and the qualifier travels
   with the number per §5's inline-qualifier rule, not with this section.
+
+### 6.3b Stage 2's budget, re-derived — parallelism is a precondition
+
+§6.3's ≤24 h stage-2 ceiling was computed from the same superseded table, so
+it is void. At §6.3a's measured costs, ~256 cells at an average around
+500 s/cell is **~35 h serial, and up to ~55 h** if the surviving subgrid
+skews toward high N. Stage 1 is ~7.1 h serial against a 4 h ceiling.
+
+**So parallelism is a precondition for either stage fitting its budget at
+all, not an optimisation**, and §6.3's "every budget above is stated
+single-core so the plan does not depend on that headroom existing" no longer
+holds — the plan now does depend on it.
+
+This machine has **24 cores and 30 GB RAM**, and memory is the binding
+constraint rather than CPU: each worker holds one record in flight
+(~33 MB at N=32) plus its own simulator state. At **12 workers** — chosen to
+leave headroom rather than saturate — stage 1 is **~35 min** and stage 2
+**~3 h**, both comfortably inside their ceilings. The worker count is set
+from measured per-worker RSS at the largest N, not assumed.
+
+Cells are independent, so parallelising over cells changes no result: within
+a cell, seeds and arms stay ordered, `paired_seeds` is drawn up front, and
+every run is a pure function of `(scenario, seed)`.
 
 ### 6.4 The stage-1 → stage-2 go/no-go rule
 
