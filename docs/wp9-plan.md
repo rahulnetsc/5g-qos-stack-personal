@@ -1543,3 +1543,95 @@ odometry (5QI 83), drive control (82) and e-stop (85) all map to **LCG 3**.
    (`[OPEN: HARDWARE/DECISION]`). That item does not close. What changes is
    that H5 now inherits a *realistic* mapping's consequence instead of an
    arbitrary one.
+
+
+---
+
+## 13. The measured probe, and two decisions it settled
+
+Run before any grid, at the real horizon with the real flags and the real
+post-processing — §6.3a's rule, whose violation caused the 5–7× miss.
+
+| cell | flows | cell cost (3 arms × 10 seeds) |
+|---|---|---|
+| N=8 mixed, 5 s | 26 | 163.6 s (2.7 min) |
+| N=32 ugv_heavy, 5 s | 124 | 928.6 s (15.5 min) |
+| N=32 sensor_dense, 5 s | 69 | 379.4 s (6.3 min) |
+| **N=16 lidar activation, 5 s** | 65 | 498.6 s (8.3 min) |
+| **N=16 lidar activation, 20 s** | 65 | **4415.2 s (73.6 min)** |
+
+**Cost model, fitted to the three steady-state points: `4.48 × flows^1.09`
+s/cell.** Cost scales with **flow count**, near-linearly — so §6.3a's
+N-based timings genuinely do not transfer, and N=32 ugv_heavy is expensive
+because it is 124 flows, not because it is 32 UEs.
+
+### 13.1 The lidar cell does not interpolate — measuring it was right
+
+At **7.7 s/flow** the activation cell costs ~40% more per flow than
+steady-state `sensor_dense` (5.5 s/flow) **despite having fewer flows**. A
+transient with one or two large GBR flows arriving at once moves the
+deficit spread, VQ growth and follower budget simultaneously, and that
+density of code paths does not show up in a steady fleet. Deriving this
+cell's cost from the steady-state timings would have under-budgeted it.
+
+### 13.2 The 20 s horizon: REJECTED, and my threshold rule was answering
+the wrong question
+
+**Measured 8.86×, not the predicted 4×** — superlinear, because both the
+message ledgers and the timeseries the panel walks grow with horizon.
+
+**Decision: keep 5 s.**
+
+**And the rule I wrote to make this decision was itself wrong.** I had
+said: take 20 s unless excursion cells exceed about a fifth of the grid.
+That rule presumed a 4× cost, where a modest cell fraction makes 4×
+affordable. At **8.86×** the trade fails **at any grid fraction** — 73.6
+min/cell is unaffordable for a token number of cells, let alone a fifth of
+them. The threshold was not a close call decided by measurement; **the
+measurement dissolved the question the threshold was asking.**
+
+Recorded because it is the same shape as §12.2's composition correction: a
+claim of mine that measurement replaced with a better answer. The value is
+in showing the measurement was **allowed to overturn it** rather than
+being fitted around it.
+
+**Consequence, as an EXCLUSION not a caveat.** At 5 s a 2 s activation is
+40% of the run, so for lidar-activation cells:
+
+- **Interpretable:** M01, M02 evaluated **during the activation window** —
+  which is what the operator question ("at what fleet size does one lidar
+  activation start breaking other flows' PDBs?") actually asks.
+- **NOT interpretable:** M10 and every other run-aggregate metric. A
+  throughput or utilisation figure from a transient cell mixes two regimes
+  and must not be quoted. This is an exclusion list, not a warning.
+
+### 13.3 Grid budget
+
+Core plane N ∈ {4, 8, 16, 32} × 4 compositions × 3 video tiers = **48
+cells, 4.0 h serial → ~0.6 h at 10 workers**. **No cap on the heavy
+profiles is needed**: the earlier feasibility worry was about offered
+load, which duty-cycling dissolved (§5), and the runtime is affordable.
+
+### 13.4 Finding — the observation channel lied, for the second time
+
+I killed the probe at 615 s believing it had stalled, because its output
+file read empty. **It had completed normally**; `python -c` block-buffers
+stdout to a file, so the file said nothing about the process.
+
+This is the **second time this session that a READING of instrumentation
+produced a false conclusion**, after the `pgrep` false positive that made
+a dead run look alive for a full monitor tick. In both cases **the
+observation channel, not the run, was the thing that lied** — once saying
+"alive" when dead, once "stalled" when finishing.
+
+**Rule (also added to CLAUDE.md, next to the pgrep/spawn-worker entry,
+because it is the same class and the same mitigation): an empty or
+unchanging output file is evidence about the FILE, not about the process.
+Check process state directly — `ps` on the PID, CPU time, RSS — before
+concluding anything about liveness.**
+
+The diagnostic I ran in response was still worth having: it separated run
+cost (~2.2 s) from scoring cost (~2.0 s across all 13 passes) and showed
+the workload is linear. But the "two orders of magnitude pathological"
+call it was chasing was an artifact of buffering, not a property of the
+run.

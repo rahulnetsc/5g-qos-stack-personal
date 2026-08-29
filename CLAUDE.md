@@ -400,6 +400,22 @@ suite.** Note also that `pkill -f <script>` does not reach
 so stopping a pool leaves orphans holding memory that `pgrep -f` cannot
 see; kill the children by PID.
 
+**An empty or unchanging output file is evidence about the FILE, not about
+the process — check process state directly before concluding anything
+about liveness.** Twice in WP9 a *reading* of instrumentation produced a
+false conclusion while the run itself was fine or already finished: a
+`pgrep -f` match on a leftover shell made a dead sweep look alive for a
+full monitor tick, and a block-buffered `python -c` stdout made a probe
+that had completed normally look stalled at 615 s (it was killed for it).
+Both are the same class — **the observation channel lied, not the run** —
+and both have the same mitigation: `ps` the actual PID and look at CPU
+time and RSS, rather than trusting a proxy. Related and already recorded
+above: `pgrep -f`/`pkill -f` on a command-line pattern misses
+`multiprocessing` **spawn** workers (their argv is the bootstrap), matches
+any `watch`/monitor whose own command line contains the pattern, and will
+match the *shell running the check itself* — which killed a relaunch
+mid-session when a cleanup loop matched its own command line.
+
 **A value crossing a serialization boundary must be coerced back to its
 declared type at that boundary, and any aggregate over a selection must
 assert the selection is non-empty and the expected size.** WP9's stage-1
