@@ -645,7 +645,13 @@ these five, add a new tag rather than forcing it into an existing one.
 - `[OPEN: DECISION]` The uplink capacity constant (`p5g-sim-plan.md`
   §4.2) — resolve against GT-3.2's ceiling re-measurement, or sweep it as
   an axis. Your call which path.
-- `[OPEN: WP9]` InF sub-scenario (SL/DL/SH/DH/HH — corrected below) for
+- `[OPEN: WP9 — SWEPT, DID NOT QUALIFY]` **WP9 stage 1 swept
+  `inf_scenario` ∈ {none, InF-DL, InF-DH}; it was the ONLY axis of twelve
+  that did not clear the gate** (max observed effect size 5.494, but no
+  result satisfying all three conditions). So the sub-scenario choice is
+  not scheduler-differentiating at the base point; the deployment choice
+  itself remains open on other grounds.
+  **Original entry:** InF sub-scenario (SL/DL/SH/DH/HH — corrected below) for
   the headline configuration — deployment-dependent, sweep in WP9 rather
   than picking blind. (WP6 fixed the sub-scenario *naming* below, not
   this choice — still open.)
@@ -705,7 +711,16 @@ these five, add a new tag rather than forcing it into an existing one.
   uptick, with a scheduler crossover in the middle (§7) — not a specific
   millisecond value at either endpoint, and not a scheduler-differentiation
   signal, since the source itself says there isn't one at this N.
-- `[OPEN: WP9]` H5 (`p5g-sim-plan.md` line 338, "two-tier degrades as
+- `[OPEN: WP9 — UNTESTABLE AS CONFIGURED]` **H5 was swept in WP9 stage 2
+  via a `shared_lcg` axis and showed NO measurable effect on any arm**
+  (paired within-seed: 0/42 cells PF, 0/42 Reservation, 1/42 TwoTier and
+  that one marginal). **This is not a refutation**: `gbr_bytes_slot`, the
+  sub-mechanism most likely to carry H5, needs shared-LCG **and**
+  `mfbr_bps > 0` (§7's cause D), and stage 2 held `mfbr_multiple` at 0.
+  **What would test it: cells crossing `shared_lcg=True` with
+  `mfbr_multiple > 0`** — a combination no cell in either stage ran.
+  See `docs/wp9-regime-map.md` §0.2.
+  **Original entry:** H5 (`p5g-sim-plan.md` line 338, "two-tier degrades as
   flows-per-LCG grows") is not demonstrable on any current scenario. WP3's
   default 5QI→LCG mapping (`scheduler/flow.py::FIVE_QI_LCG`) deliberately
   separates QoS classes into different LCGs, matching real deployment
@@ -1291,7 +1306,14 @@ these five, add a new tag rather than forcing it into an existing one.
   the mechanism -- the arms differ in how fast grant sizing drives the
   overrun -- rather than undermining it. `docs/oai-port-map.md` row 79,
   `docs/wp9-plan.md` §8c.
-- `[OPEN: WP9]` **`min_rb=5` (reservation commit 4's follower budget) was
+- `[OPEN: WP9 — SWEPT, DROPPED BY THE CAP]` **WP9 stage 1 swept `min_rb`
+  ∈ {1, 5, 20}; it separated the arms strongly (gate score 152.579, the
+  joint-highest finite score) but was NOT promoted to stage 2** — the
+  "at most one excursion axis" cap took `shared_lcg`/`k2_slots` instead.
+  So the boundary above is located at the deployed value only, and this
+  item stays open with a specific next step: `min_rb` as a stage-2 axis,
+  which the recomputed budget can now afford (`docs/wp9-plan.md` §6.4a).
+  **Original entry:** `min_rb=5` (reservation commit 4's follower budget) was
   chosen to prevent grant starvation and keep the SR/BSR chain reporting,
   not derived from any physical constant — and the follower budget's
   boundary is exactly where that choice matters.** `budget = bwpSize −
@@ -1314,7 +1336,12 @@ these five, add a new tag rather than forcing it into an existing one.
   either one's own sensitivity to it** — a WP9 sweep design constraint
   this entry didn't previously carry, since `TwoTier` had no `min_rb`-
   dependent mechanism before commit 4.
-- `[OPEN: WP9]` **A second shared, unswept parameter, same shape as
+- `[OPEN: WP9 — SWEPT, DROPPED BY THE CAP]` **WP9 stage 1 swept
+  `mfbr_multiple` ∈ {0, 2×GFBR}; it qualified (score 1.778) and was dropped
+  by the cap.** It is now the single highest-value axis to run next, for a
+  reason beyond its own score: it is required to make H5 testable at all
+  (see the H5 entry above) and to arm two-tier's UL floor.
+  **Original entry:** A second shared, unswept parameter, same shape as
   `min_rb` above, found landing two-tier commit 4a: `mfbr_bps`.**
   `FlowConfig.mfbr_bps` is a real field with a real, already-ported
   mechanism behind it in BOTH schedulers now — `reservation.py`'s own
@@ -1413,8 +1440,20 @@ these five, add a new tag rather than forcing it into an existing one.
   present) before the fade begins, so a real deficit exists at the
   reconnection moment for `"mac"` scope to retain — a scenario-design
   change, not a code change, and its own commit if picked up.
-- `[OPEN: WP9]` **TwoTier's own UL PRB utilization FALLS as offered load
-  rises through `study1`'s (`factory_robots_scenario`) mult2.0→3.0
+- `[RESOLVED]` **TwoTier's own UL PRB utilization FALLS as offered load
+  rises — DOES NOT REPRODUCE on the real load axis; closed by WP9 stage 2
+  (`docs/wp9-plan.md` §8d, `docs/wp9-regime-map.md`).** Measured across
+  `load_mult` 0.5→3.0 at N=8/16/32 for all three arms, UL utilization is
+  **flat at ~0.93 everywhere** — no fall, on any arm, at any N. Two
+  confounds explain the original 0.617→0.432 observation, both since
+  identified: it was taken on the **capacity** axis (`_scale_capacity`
+  changes `prb_count`, so it is not a load axis at all — WP9 excludes it
+  for exactly this reason), and it was taken **before** the SR-trigger
+  defect was fixed (`docs/oai-port-map.md` row 79), which moved 15 of the
+  corpus's 20 records including every `study1` record. The prediction
+  registered before running was that non-reproduction would itself be the
+  answer; it was.
+  **Original entry, for history:** TwoTier's UL utilization through `study1`'s (`factory_robots_scenario`) mult2.0→3.0
   sweep — counterintuitive, an open question, not an explained one,
   found producing commit 8's old-vs-new delta table
   (`docs/phase2-two-tier-delta.md` §2).** Four data points: new arm
@@ -1432,7 +1471,17 @@ these five, add a new tag rather than forcing it into an existing one.
   genuine finding) or a bug nobody has looked for yet, and WP9's own
   regime sweep runs exactly this range, so it will surface either way
   if picked up as its own investigation rather than assumed benign.
-- `[OPEN: WP9]` **The follower budget's regime boundary is
+- `[RESOLVED]` **The follower budget's regime boundary — LOCATED by WP9
+  stage 2 (`docs/wp9-regime-map.md` §1.1): N=8 at load ≥1.0, N=16 at load
+  0.5–0.75**, matching the predicted PDCCH bound (`U-slot CCE / AL` =
+  32/4 = 8) rather than the follower-budget bound (55/`min_rb` = 11). The
+  load dependence is mechanistic: `n_followers_need` counts
+  *simultaneously backlogged* UEs, so at low load the effective follower
+  count is below nominal N. **Conditioned on `min_rb=5`** — §1.1's sharper
+  claim (that `min_rb` has no effect below ≈7) is untested, since `min_rb`
+  was dropped from stage 2 by the cap. Below N=8 the arms are
+  indistinguishable, which explains the hardware N=2 null.
+  **Original entry:** The follower budget's regime boundary is
   `n_followers_need × min_rb` (previous item) — this entry is the
   scenario-side input to that same product, checked while scoping
   reservation commit 8.** `scripts/scheduler_study.py`'s Study 4
