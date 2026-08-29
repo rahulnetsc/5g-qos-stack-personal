@@ -57,6 +57,65 @@ def priority_for_5qi(qfi: int) -> int:
     return FIVE_QI_PRIORITY.get(int(qfi), DEFAULT_PRIORITY_LEVEL)
 
 
+# Standardised 5QI -> Packet Delay Budget, TS 23.501 Table 5.7.4-1.
+#
+# PROVENANCE, stated precisely because the standing rule requires it and
+# because this table was NOT read from the spec PDF. Transcribed from
+# ShareTechnote's rendering of Table 5.7.4-1
+# (https://www.sharetechnote.com/html/5G/5G_5QI.html), cross-checked
+# against Devopedia (https://devopedia.org/5g-quality-of-service), which
+# independently states 5QI 1 = 100 ms, 5QI 3 = 50 ms and 5QI 82 = 10 ms --
+# all three agree. The strongest corroboration is internal: that source's
+# *priority* column matches this file's own independently-transcribed
+# FIVE_QI_PRIORITY on all 13 values the two share. **Re-verify against the
+# actual spec text if it becomes available**, as WP6 did for TR 38.901's
+# path-loss tables.
+#
+# PDB is a property of the QoS CLASS, so it is derived here rather than
+# authored per flow. GFBR is NOT: it is a per-bearer negotiated value and
+# stays scenario-authored (see FlowConfig.gfbr_bps). FIVE_QI_LCG remains an
+# invented mapping, as its own comment already says. Those three different
+# provenances are why every device profile states each field's source.
+FIVE_QI_PDB_MS: dict[int, float] = {
+    1: 100.0,    # GBR, conversational voice
+    2: 150.0,    # GBR, conversational video (live)
+    3: 50.0,     # GBR, real-time gaming / V2X
+    4: 300.0,    # GBR, non-conversational buffered video
+    5: 100.0,    # non-GBR, IMS signalling
+    6: 300.0,    # non-GBR, buffered video (TCP)
+    7: 100.0,    # non-GBR, voice / live video / gaming
+    8: 300.0,    # non-GBR, buffered video (TCP)
+    9: 300.0,    # non-GBR, default bearer
+    79: 50.0,    # non-GBR, V2X messages
+    80: 10.0,    # non-GBR, low-latency eMBB
+    82: 10.0,    # delay-critical GBR, discrete automation (MDBV 255 B)
+    83: 10.0,    # delay-critical GBR, discrete automation (MDBV 1354 B)
+    84: 30.0,    # delay-critical GBR, intelligent transport
+    85: 5.0,     # delay-critical GBR, electricity distribution
+    86: 5.0,     # delay-critical GBR, V2X advanced driving
+}
+
+# Sentinel: FlowConfig.pdb_ms == DERIVE_PDB_FROM_5QI resolves from the
+# table above in __post_init__, exactly as lcg == -1 resolves via
+# lcg_for_5qi.
+DERIVE_PDB_FROM_5QI = -1.0
+
+
+def pdb_for_5qi(qfi: int) -> float:
+    """Standardised PDB (ms) for a 5QI. Raises for an unlisted 5QI rather
+    than inventing a default: a flow asking for a *standardised* budget on a
+    class the standard does not define is a scenario-authoring error, and a
+    silent fallback would encode the author's opinion as if it were the
+    spec's -- the exact failure this table exists to prevent."""
+    try:
+        return FIVE_QI_PDB_MS[int(qfi)]
+    except KeyError:
+        raise ValueError(
+            f"5QI {qfi} has no standardised PDB in TS 23.501 Table 5.7.4-1; "
+            f"set pdb_ms explicitly and record why"
+        ) from None
+
+
 LCG_COUNT = 8
 
 # Default 5QI -> logical channel group mapping for uplink flows (WP3, BSR
@@ -90,6 +149,12 @@ class FlowConfig:
     qfi: int
     direction: Literal["DL", "UL"]
     flow_class: Literal["PF", "GBR", "Delay"] = "PF"
+    # Packet Delay Budget, ms. The 100.0 default is RETAINED DELIBERATELY
+    # rather than switched to 5QI-derivation: the regression corpus is
+    # frozen (CLAUDE.md), and deriving would move every flow whose 5QI's
+    # standardised PDB differs from 100 -- a 5QI-9 flow would jump 100 ->
+    # 300 ms and shift every record. New work passes
+    # DERIVE_PDB_FROM_5QI to get the standardised value; see pdb_for_5qi.
     pdb_ms: float = 100.0
     gfbr_bps: float = 0.0
     # Maximum flow bit rate (MFBR), 3GPP QoS-profile convention: the
@@ -190,6 +255,8 @@ class FlowConfig:
     traffic_params: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.pdb_ms == DERIVE_PDB_FROM_5QI:
+            self.pdb_ms = pdb_for_5qi(self.qfi)
         if self.lcg == -1:
             self.lcg = lcg_for_5qi(self.qfi)
         if not (0 <= self.lcg < LCG_COUNT):
