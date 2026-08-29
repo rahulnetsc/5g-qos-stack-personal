@@ -1229,6 +1229,124 @@ its existing wording covers notes about code not yet written.
 
 ---
 
+## 8d. Stage 2 — results (252 cells, 7,560 runs, ~70 min at 10 workers)
+
+Re-run: `uv run python scripts/wp9_sweep.py --stage 2 --seeds 10 --horizon
+20000 --workers 10 --out sweeps/wp9/stage2`, then `uv run python
+scripts/analyse_stage2.py sweeps/wp9/stage2`.
+
+**Grid integrity first**: 0 missing, 0 wrong-sized cells.
+
+### Contiguity, read before any effect size (rule 5)
+
+| metric | scored | isolated | winners |
+|---|---|---|---|
+| M07.met | 186 | 1 (0.5%) | PF 102, TwoTier 49, Reservation 35 |
+| M08.fraction | 186 | 1 (0.5%) | PF 175, Reservation 8, TwoTier 3 |
+| M01.p98 | 186 | 2 (1.1%) | PF 104, TwoTier 81, Reservation 1 |
+| M02 | 186 | 0 | PF 158, TwoTier 28 |
+| M09.worst | 186 | 0 | PF 100, Reservation 58, TwoTier 28 |
+
+66 of 252 cells are uninformative (zero loss on every arm) and carry no
+winner. Isolation is 0-1.1%, so the winning regions are contiguous regimes
+rather than noise.
+
+### D4-3 — HIT, including the load refinement
+
+PF-vs-Reservation separation by (N, load), base slice
+(`shared_lcg=False`, `k2_slots=2`):
+
+| N | 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 2.0 | 3.0 |
+|---|---|---|---|---|---|---|---|
+| 2, 4 | . | . | . | . | . | . | . |
+| 8 | . | . | **q** | **q** | **q** | **q** | **q** |
+| 16, 24, 32 | **q** | **q** | **q** | **q** | **q** | **q** | **q** |
+
+The boundary is **N=8 at load >= 1.0 and N=16 at load 0.5-0.75** — exactly
+the predicted shift, and predicted for the stated reason:
+`n_followers_need` counts *simultaneously backlogged* UEs, so at low load
+the effective follower count is below nominal N and the boundary moves up.
+N=8 matches §1.1's PDCCH bound of `32/4 = 8`.
+
+**Qualifier that travels with this claim**: `min_rb` is held at base 5, so
+this locates the boundary *at the deployed value only*. §1.1's sharper
+claim — that `min_rb` has no effect on the boundary below ~7, because the
+PDCCH bound binds first — is **untested**, and testing it needs `min_rb`
+as a stage-2 axis.
+
+### D4-3 correction — the winner is METRIC-DEPENDENT (H6 confirmed)
+
+A first reading of the table above credited PF with a 0.5-1.0 lead at
+N>=8. That was `M08.fraction` only, and it is misleading. Split by metric,
+at load 1.0:
+
+| N | M07.met (PF/Res/TT) | M08.fraction (PF/Res/TT) |
+|---|---|---|
+| 8 | 8.0 / 7.2 / 5.4 | 0.962 / 0.288 / 0.243 |
+| 16 | 13.9 / 10.9 / 6.3 | 0.931 / 0.000 / 0.000 |
+| 24 | **0.0** / 10.4 / 6.7 | 0.636 / 0.000 / 0.000 |
+| 32 | **0.0** / 6.2 / 6.4 | 0.470 / 0.000 / 0.000 |
+
+**At N >= 24, PF meets ZERO GBR contracts while Reservation meets 10.4/6.2
+and TwoTier 6.7/6.4 — yet PF still wins the max-min floor.** PF spreads
+capacity so every flow gets some and none reaches 95% of GFBR; the
+QoS-aware arms concentrate it so some flows meet contract and others get
+nothing. **This is H6 ("contract count and max-min floor pick different
+winners in the same cell") confirmed directly**, and it means any
+single-metric statement about who wins at high N is wrong by construction.
+
+### D4-4 at N=4 — HIT, and stronger than the N=2 control
+
+Zero qualifying M07/M08 separations at N=4, max effect size 0.30-0.36
+against a 1.0 bar. Crucially **loads 1.5 and 3.0 at N=4 ARE informative**
+(non-zero loss), so unlike the N=2 control this is a real absence rather
+than an excluded cell. Combined with D4-3: **the boundary lies in (4, 8]**,
+which is the branch the pre-stage-1 amendment (`eb04266`) named and it
+lands on §1.1's predicted PDCCH bound.
+
+### H5 via `shared_lcg` — MISS, traced
+
+Predicted: TwoTier degrades at `shared_lcg=True`, Reservation less so.
+Actual, paired **within-seed** across all 42 (N, load) cells per arm:
+
+| arm | cells with a real effect |
+|---|---|
+| PF | 0 / 42 |
+| Reservation | 0 / 42 |
+| TwoTier | **1 / 42** (mean -1.1 contracts at N=32/load 0.75, es 1.11 — marginal) |
+
+**The trace mattered.** An unpaired first look showed Reservation dropping
+2.4 contracts at N=32/load 1.0, which read as "Reservation degrades most" —
+the opposite of H5. Paired within-seed, that effect vanishes: it was
+cross-seed variance in unpaired means, not a shared-LCG effect. Had it been
+absorbed rather than traced it would have produced a confident and wrong
+refutation of H5's direction.
+
+**What this establishes, stated carefully**: at `mfbr_bps = 0`, forcing two
+UL flows onto one LCG has **no measurable effect on any arm**. H5 is
+therefore **not confirmed and not refuted** — because the sub-mechanism
+most likely to carry it, `gbr_bytes_slot`, requires shared-LCG **and**
+`mfbr_bps > 0` (README §7's cause D), and stage 2 held `mfbr_multiple` at
+its 0 base. My own pre-registered note said row 25's `gbr_bytes_slot` would
+stay dormant for exactly this reason; what I failed to draw from it is that
+**this makes H5 untestable in stage 2 as configured**. Testing H5 needs
+`shared_lcg=True` crossed with `mfbr_multiple>0`, which no cell in either
+stage ran.
+
+### Standing qualifier on all of the above
+
+11 of 12 axes cleared the stage-1 threshold, so the **cap** did the
+narrowing, not the score (§6.4a). These results confirm that differences
+reproduce on a dense contiguous grid; they do **not** establish that the
+promoted axes were the most important ones. The eight dropped axes —
+`sr_period_slots` (152.579), `snr_spread_db` (4.689), `pdb_ms` (2.927),
+`duty_cycle` (2.663), `bg` (2.648), `mfbr_multiple` (1.778), `min_rb`
+(152.579), `inf_scenario` (did not qualify) — remain live candidates, not
+tested-and-rejected ones. `mfbr_multiple` and `min_rb` are now the two with
+a named, specific reason to run next.
+
+---
+
 ## 9. Definition of done for WP9
 
 - `uv run pytest sim/tests -q` green after every commit.

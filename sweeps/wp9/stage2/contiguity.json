@@ -1,0 +1,51 @@
+{
+  "M07.met": {
+    "metric": "M07.met",
+    "n_scored": 186,
+    "n_isolated": 1,
+    "winners_by_arm": {
+      "PF": 102,
+      "TwoTier": 49,
+      "Reservation": 35
+    }
+  },
+  "M08.fraction": {
+    "metric": "M08.fraction",
+    "n_scored": 186,
+    "n_isolated": 1,
+    "winners_by_arm": {
+      "Reservation": 8,
+      "PF": 175,
+      "TwoTier": 3
+    }
+  },
+  "M01.p98": {
+    "metric": "M01.p98",
+    "n_scored": 186,
+    "n_isolated": 2,
+    "winners_by_arm": {
+      "PF": 104,
+      "TwoTier": 81,
+      "Reservation": 1
+    }
+  },
+  "M02": {
+    "metric": "M02",
+    "n_scored": 186,
+    "n_isolated": 0,
+    "winners_by_arm": {
+      "PF": 158,
+      "TwoTier": 28
+    }
+  },
+  "M09.worst": {
+    "metric": "M09.worst",
+    "n_scored": 186,
+    "n_isolated": 0,
+    "winners_by_arm": {
+      "PF": 100,
+      "TwoTier": 28,
+      "Reservation": 58
+    }
+  }
+}
