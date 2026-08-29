@@ -698,6 +698,67 @@ Cells are independent, so parallelising over cells changes no result: within
 a cell, seeds and arms stay ordered, `paired_seeds` is drawn up front, and
 every run is a pure function of `(scenario, seed)`.
 
+### 6.4a AMENDMENT — the tie, the cap, and what stage 2's result is worth
+
+Written **before any stage-2 cell runs**, prompted by stage 1's verdict.
+
+**What stage 1 actually showed about its own rule.** **11 of 12 axes cleared
+the bar** at the pre-registered threshold of 1.0. The threshold therefore did
+not discriminate in practice — nearly everything separates the arms
+*somewhere*, on *some* primary metric, once ten paired seeds make small
+differences significant. Reported per rule 7, **not re-cut**. The consequence
+is structural: with almost every axis qualifying, **the "at most one
+excursion" cap was doing all of the narrowing, not the score.**
+
+**And at the top, the ranking was not a ranking.** `shared_lcg` and
+`k2_slots` both scored `inf` (a perfectly consistent `M07.met` difference,
+`sd=0` across ten seeds). `shared_lcg` won solely because it appears earlier
+in the `EXCURSIONS` dict literal. Dict insertion order is not a selection
+criterion, and stage 2's entire excursion axis rested on it.
+
+**Resolution: both tied axes are promoted, and the cap is RECOMPUTED, not
+relaxed.** Rule 3's cap was never a primitive — its stated justification is
+the compute ceiling, and the ceiling it was derived from came from §6.3's
+timing table, which §6.3a superseded as wrong by 5-7x. Recomputing it against
+measured cost is the same correction, applied to the same stale source:
+
+| stage 2 grid | cells | serial | wall @10 workers | ceiling |
+|---|---|---|---|---|
+| `shared_lcg` only | 84 | 11.8 h | 1.7 h | 24 h |
+| `k2_slots` only | 126 | 17.7 h | 2.6 h | 24 h |
+| **both** | **252** | **35.3 h** | **5.2 h** | **24 h** |
+
+(Serial costs from §6.3a's measured per-cell figures; the 6.75x effective
+speedup is stage 1's own measured wall time — 7.32 h serial-equivalent
+completed in ~65 min on 10 workers — not an assumed efficiency.)
+
+So the cap is **not binding** and the tie dissolves rather than being broken.
+Stage 2 is `n_ues`(6) x `load_mult`(7) x `shared_lcg`(2) x `k2_slots`(3) =
+**252 cells**.
+
+**Tie rule, stated now so it is not invented next time:** *all axes tied at
+the maximum score are promoted, provided the recomputed budget admits them;
+if it does not, fall back to a stated substantive criterion — prior
+expectation, preferring an axis with a pre-registered hypothesis and a named
+mechanism (`shared_lcg` is H5) over a sensitivity sweep (`k2_slots`).*
+
+**The honesty risk in this, named rather than left implicit.** Recomputing a
+budget cap *after* seeing which axes tied can look like motivated reasoning.
+Two things bound it: the recomputation is driven by stage 1's measured wall
+time, which is independent of which axes tied and would have produced the
+same number whatever they were; and the outcome **removes** an arbitrary
+choice rather than making one. Had the budget not admitted both, the
+fallback above — not a re-derived cap — is what would have applied.
+
+**What this means for reading stage 2, which the plan previously did not
+account for.** A confirmatory result on an axis selected by a *cap* rather
+than by a discriminating *score* is weaker evidence than §6.4 assumed. Stage
+2 confirms that a difference reproduces on a denser grid with contiguity; it
+does **not** establish that the promoted axes were the most important ones,
+because the selection step did not rank them credibly. Any stage-2 claim
+must carry that qualifier, and the eight dropped axes (§6.4's own record,
+with scores) remain live candidates rather than tested-and-rejected ones.
+
 ### 6.4 The stage-1 → stage-2 go/no-go rule
 
 **Pre-registered, implemented as code (B5), and committed before stage 1

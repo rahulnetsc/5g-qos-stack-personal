@@ -400,6 +400,21 @@ suite.** Note also that `pkill -f <script>` does not reach
 so stopping a pool leaves orphans holding memory that `pgrep -f` cannot
 see; kill the children by PID.
 
+**A value crossing a serialization boundary must be coerced back to its
+declared type at that boundary, and any aggregate over a selection must
+assert the selection is non-empty and the expected size.** WP9's stage-1
+verdict was recomputed from a CSV; boolean axis levels came back as the
+string `'True'` and never matched the bool `True`, so the `shared_lcg` and
+`bg` cells silently selected **zero** rows. **What made this one catchable
+is that it produced an impossible number rather than a plausible one** — a
+score of exactly `0.000` is the signature of an empty selection, not of a
+real result. The two earlier versions of the same class of bug in this WP
+(the gate's `None`-base contamination selecting 1,710 rows; the "22-record"
+corpus) both produced plausible numbers and survived longer as a result.
+Do not rely on implausibility: coerce at the boundary against the declared
+levels, and assert cell sizes (`len(cell) == n_arms * n_seeds`) before
+scoring anything.
+
 **Any count that describes a structure must be computed from that
 structure at the point of use, never restated in prose.** Three instances
 in this project, each of which cost real confusion: the regression corpus
