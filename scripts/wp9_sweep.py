@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -122,6 +123,11 @@ _TS_SYSTEM_FIELDS = (
     "ts_dl_prbs_used", "ts_ul_prbs_used", "ts_dl_prbs_avail",
     "ts_ul_prbs_avail", "ts_cce_used", "ts_cce_budget",
 )
+# RunRecord's own top-level per-slot arrays. Commit 1a MISSED these: they are
+# not under `flows` or `system`, so the strip left two 20,000-element lists on
+# every persisted record -- measured at 0.76 MB of each record's 1.087 MB,
+# i.e. ~70% of what 1a believed it had already removed.
+_TS_RECORD_FIELDS = ("timeseries_time_s", "timeseries_slot_index")
 
 # The scoring-parameter variations (§3), computed ONLINE. Each is free in
 # runs but not in bytes -- see _RecordSink's docstring.
@@ -156,12 +162,15 @@ class _RecordSink:
     actual purpose; persisting the series as well was not.
     """
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, online_path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self._fh = path.open("w")
+        # Streamed, not accumulated: ~73 rows per record is ~123k dicts at
+        # full scale, held to the end of the run for no reason.
+        self._online_fh = online_path.open("w")
         self._sc = Scorecard()
         self.n = 0
-        self.online_rows: list[dict] = []
+        self.n_online = 0
 
     def __call__(self, record: RunRecord, axis_values: dict) -> None:
         self._online_metrics(record, axis_values)
@@ -176,8 +185,8 @@ class _RecordSink:
                "seed": record.seed}
         try:
             m16 = self._sc.correlate_flows(record, (1, 1), (1, 82))
-            self.online_rows.append(
-                {"metric": "M16", **tag, "status": m16.status, "value": m16.value})
+            self._emit({"metric": "M16", **tag,
+                        "status": m16.status, "value": m16.value})
         except (KeyError, StopIteration):
             pass
         for name, values in _SCORING_VARIATIONS:
@@ -187,17 +196,27 @@ class _RecordSink:
                     r = scores.get(mid)
                     if r is None:
                         continue
-                    self.online_rows.append({
+                    self._emit({
                         "metric": mid, "variation": name, "variation_value": v,
                         **tag, "status": r.status, "value": r.value,
                     })
 
+    def _emit(self, row: dict) -> None:
+        self._online_fh.write(json.dumps(row) + "\n")
+        self.n_online += 1
+
     def close(self):
         self._fh.close()
+        self._online_fh.close()
 
 
 def _strip_timeseries(d: dict) -> dict:
-    """Null the per-slot arrays. Measured at 82.7 MB/record without this."""
+    """Null the per-slot arrays. Measured at 82.7 MB/record without this, and
+    still 1.087 MB/record with commit 1a's incomplete version (which missed
+    _TS_RECORD_FIELDS)."""
+    for f in _TS_RECORD_FIELDS:
+        if f in d:
+            d[f] = None
     for fr in d.get("flows", {}).values():
         for f in _TS_FLOW_FIELDS:
             if f in fr:
@@ -208,6 +227,42 @@ def _strip_timeseries(d: dict) -> dict:
             if f in sysrec:
                 sysrec[f] = None
     return d
+
+
+def m13_projection(record: RunRecord) -> RunRecord:
+    """The ONLY thing worth retaining across a whole stage run.
+
+    THE LEAK THIS EXISTS TO CLOSE. `run_stage_1` used to keep every live
+    `RunRecord` in a list so M13 could read them at the end. `_RecordSink`
+    strips a *copy* (`record.to_dict()`), so the retained objects still held
+    their per-slot arrays -- ~33 MB each, 25 GB across a stage, which
+    thrashed the machine into swap and stalled stage 1 at 756 of ~1,680
+    records. Commit 1a fixed the persisted size and introduced this in the
+    same commit; the in-memory side was never addressed.
+
+    M13 (`Scorecard.first_violation_order`) reads exactly: each record's
+    GBR flows, and for each `.key`, `.qfi` and `.meets_gbr_contract()`
+    (which needs only `throughput_bps` / `gfbr_bps`). So retain a real
+    `RunRecord` -- so no scorecard logic is duplicated or reimplemented --
+    carrying only GBR flows with every array and ledger dropped. A few KB
+    instead of tens of MB.
+    """
+    flows = {}
+    for key, fr in record.flows.items():
+        if fr.flow_class != "GBR":
+            continue
+        nulls = {f: None for f in _TS_FLOW_FIELDS}
+        nulls["completion_ts_by_role_s"] = None
+        nulls["frame_completions"] = None
+        flows[key] = dataclasses.replace(fr, **nulls)
+    system = record.system
+    if system is not None:
+        system = dataclasses.replace(
+            system, **{f: None for f in _TS_SYSTEM_FIELDS})
+    return dataclasses.replace(
+        record, flows=flows, system=system,
+        timeseries_time_s=None, timeseries_slot_index=None, join_events=[],
+    )
 
 
 def _study_layer_metrics(records: list[tuple[dict, RunRecord]]) -> list[dict]:
@@ -250,12 +305,16 @@ def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
     core = CORE_PLANE if not smoke else {"n_ues": [2, 4], "load_mult": [1.0, 2.0]}
     excursions = EXCURSIONS if not smoke else {"min_rb": [20]}
 
-    sink = _RecordSink(out_dir / "records.jsonl")
+    sink = _RecordSink(out_dir / "records.jsonl",
+                       out_dir / "online_rows.jsonl")
+    # Only the M13 projection is retained -- see m13_projection's docstring
+    # for the 25 GB leak that made this necessary.
     kept: list[tuple[dict, RunRecord]] = []
 
     def keeping_sink(rec, axis_values):
         sink(rec, axis_values)
-        kept.append((dict(axis_values), rec))
+        if not (set(axis_values) - {"n_ues", "load_mult"}):
+            kept.append((dict(axis_values), m13_projection(rec)))
 
     print(f"stage 1: core plane {core}")
     rows = sweep(
@@ -273,11 +332,11 @@ def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
     sink.close()
 
     write_csv(rows, str(out_dir / "stage1_rows.csv"))
-    study_rows = _study_layer_metrics(kept) + sink.online_rows
+    study_rows = _study_layer_metrics(kept)
     (out_dir / "study_layer_metrics.json").write_text(json.dumps(study_rows, indent=2))
     mb = (out_dir / "records.jsonl").stat().st_size / 1e6
     print(f"  {len(rows)} rows, {sink.n} records ({mb:.1f} MB) -> {out_dir}")
-    print(f"  study-layer + scoring-variation rows: {len(study_rows)}")
+    print(f"  M13 rows: {len(study_rows)}; online rows streamed: {sink.n_online}")
 
     # -- the gate, run as committed code, output recorded verbatim ---------
     arm_pairs = [("PF", "Reservation"), ("PF", "TwoTier"), ("Reservation", "TwoTier")]
