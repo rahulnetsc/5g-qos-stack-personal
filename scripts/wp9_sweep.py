@@ -25,6 +25,7 @@ import itertools
 import json
 import multiprocessing as mp
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -595,6 +596,58 @@ def _run_one_cell_s3(task: tuple) -> tuple:
     return rows, online, payload, {**axis_values, **tally}
 
 
+# ---------------------------------------------------------------- stage 4
+# The Category-2 grid (docs/wp9-plan.md §14). Indexed by what the
+# ENVIRONMENT does -- fleet size, composition, load intensity -- not by
+# deployment config (Cat 1) or scheduler internals (Cat 3).
+STAGE4_GRID: dict[str, list[Any]] = {
+    "n_ues": [4, 8, 16, 32],
+    "composition": ["drone_heavy", "ugv_heavy", "sensor_dense", "mixed"],
+    "video_tier": [0.5, 1.0, 1.5],
+}
+
+
+def _build_fleet_scenario(seed: int, **axis_values):
+    """Stage-4 scenario: a heterogeneous fleet, not the stage-1/2 synthetic
+    workload. Load intensity comes from per-device rates (video_tier), NOT
+    a synthetic best-effort filler -- the clean break of §6 decision 2."""
+    from sim.fleet import build_fleet
+    from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+
+    n = axis_values["n_ues"]
+    flows, seq = build_fleet(
+        n, axis_values["composition"],
+        video_tier=axis_values.get("video_tier", 1.0),
+    )
+    ues = [UEConfig(ue_id=i + 1, mean_snr_db=20.0, coherence_slots=2000)
+           for i in range(n)]
+    return ScenarioConfig(
+        name=f"fleet_{axis_values['composition']}_n{n}",
+        horizon_slots=_HORIZON[0],
+        carrier=CarrierConfig(bandwidth_hz=40_000_000, numerology=2),
+        tdd=TDDConfig(pattern="DSUUU"), ues=ues, flows=flows, seed=seed,
+    )
+
+
+def _run_one_cell_s4(task: tuple) -> tuple:
+    axis_values, n_seeds, horizon = task
+    _HORIZON[0] = horizon
+    online: list[dict] = []
+    payload: list[tuple] = []
+    sc_card = Scorecard()
+
+    def sink(record, av):
+        online.extend(_online_rows_for(sc_card, record, av))
+        payload.append((dict(av), _strip_timeseries(record.to_dict()), None))
+
+    rows = sweep(
+        axes={k: [v] for k, v in axis_values.items()},
+        build_scenario=_build_fleet_scenario, schedulers=_arms(),
+        n_seeds=n_seeds, driver_kwargs=_driver_kwargs, record_sink=sink,
+    )
+    return rows, online, payload, dict(axis_values)
+
+
 def cell_id(axis_values: dict) -> str:
     """Stable identity for a grid cell.
 
@@ -653,6 +706,14 @@ def _load_completed(rows_path: Path, expected_per_cell: int
     return keep, done
 
 
+def run_stage_4(out_dir: Path, n_seeds: int, horizon: int, workers: int,
+                smoke: bool, fresh: bool = False) -> None:
+    """Stage 4, resumable, reusing stage 3's proven loop."""
+    grid = {k: (v[:2] if smoke else v) for k, v in STAGE4_GRID.items()}
+    _run_resumable(out_dir, grid, "s4", _run_one_cell_s4, n_seeds, horizon,
+                   workers, fresh)
+
+
 def run_stage_3(out_dir: Path, grid_name: str, n_seeds: int, horizon: int,
                 workers: int, smoke: bool, fresh: bool = False) -> None:
     """Stage 3, resumable.
@@ -666,87 +727,92 @@ def run_stage_3(out_dir: Path, grid_name: str, n_seeds: int, horizon: int,
     grid = {"q1": STAGE3_Q1, "q2": STAGE3_Q2}[grid_name]
     if smoke:
         grid = {k: v[:2] for k, v in grid.items()}
+    _run_resumable(out_dir, grid, grid_name, _run_one_cell_s3, n_seeds,
+                   horizon, workers, fresh)
+
+
+def _run_resumable(out_dir: Path, grid: dict, tag: str, worker, n_seeds: int,
+                   horizon: int, workers: int, fresh: bool) -> None:
+    """The resumable cell loop, shared by stages 3 and 4.
+
+    Cost is proportional to time LOST, not time ELAPSED: two WP9 runs died
+    mid-flight for unrelated reasons (an OOM from the retention leak, a
+    laptop restart), and power loss or a full disk would do the same.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     names = list(grid)
     all_tasks = [(dict(zip(names, c)), n_seeds, horizon)
                  for c in itertools.product(*grid.values())]
-    expected_per_cell = 3 * n_seeds          # 3 arms x seeds
+    expected_per_cell = 3 * n_seeds
 
     rows_path = out_dir / "rows.jsonl"
     if fresh:
         for f in ("rows.jsonl", "records.jsonl", "online_rows.jsonl"):
             (out_dir / f).unlink(missing_ok=True)
     rows, done = _load_completed(rows_path, expected_per_cell)
-    # Rewrite once so the append path below can never double-write: after
-    # this the file contains exactly the complete cells.
     with rows_path.open("w") as fh:
-        for cid in sorted(done):
-            pass
         for r in rows:
             fh.write(json.dumps({"cell": r["__cell"], "row": r}) + "\n")
 
     tasks = [t for t in all_tasks if cell_id(t[0]) not in done]
-    print(f"stage 3 [{grid_name}]: {len(all_tasks)} cells, "
-          f"{len(done)} already complete, {len(tasks)} to run "
-          f"on {workers} workers")
+    print(f"stage {tag}: {len(all_tasks)} cells, {len(done)} complete, "
+          f"{len(tasks)} to run on {workers} workers", flush=True)
 
-    tallies: list[dict] = []
-    if (out_dir / "floor_tally.json").exists() and not fresh:
-        tallies = json.loads((out_dir / "floor_tally.json").read_text())
     rows_fh = rows_path.open("a")
     rec_fh = (out_dir / "records.jsonl").open("a" if not fresh else "w")
     onl_fh = (out_dir / "online_rows.jsonl").open("a" if not fresh else "w")
-    n_rec = 0
+    t0 = time.time()
+    durations: list[float] = []
     try:
         with mp.get_context("spawn").Pool(workers) as pool:
+            last = time.time()
             for i, (crows, conline, payload, tally) in enumerate(
-                    pool.imap_unordered(_run_one_cell_s3, tasks), 1):
+                    pool.imap_unordered(worker, tasks), 1):
                 cid = cell_id({k: v for k, v in tally.items() if k in names})
                 for r in crows:
                     r["__cell"] = cid
                     rows.append(r)
                     rows_fh.write(json.dumps({"cell": cid, "row": r}) + "\n")
                 rows_fh.flush()
-                tallies.append(tally)
                 for r in conline:
                     onl_fh.write(json.dumps(r) + "\n")
                 for av, recd, _ in payload:
                     rec_fh.write(json.dumps(
                         {"axis_values": av, "record": recd}) + "\n")
-                    n_rec += 1
-                print(f"  cell {i}/{len(tasks)} done ({n_rec} new records)",
+                durations.append(time.time() - last)
+                last = time.time()
+                # ETA from a ROLLING MEAN of completed cells, not a linear
+                # extrapolation from elapsed -- composition makes per-cell
+                # cost wildly uneven, and a naive ETA misleads exactly the
+                # way N-major ordering did in stage 2. Reported as a RANGE.
+                w = durations[-8:]
+                lo, hi = min(w), max(w)
+                left = len(tasks) - i
+                print(f"  cell {i}/{len(tasks)} done | elapsed "
+                      f"{(time.time()-t0)/60:.1f}m | eta "
+                      f"{left*lo/60:.0f}-{left*hi/60:.0f}m | {tally}",
                       flush=True)
     finally:
         rows_fh.close()
         rec_fh.close()
         onl_fh.close()
 
-    # -- completion assertion: every expected cell present EXACTLY once ---
     counts: dict[str, int] = {}
     for r in rows:
         counts[r["__cell"]] = counts.get(r["__cell"], 0) + 1
     expected_ids = {cell_id(t[0]) for t in all_tasks}
     missing = expected_ids - set(counts)
     wrong = {c: n for c, n in counts.items() if n != expected_per_cell}
-    extra = set(counts) - expected_ids
-    if missing or wrong or extra:
+    if missing or wrong or (set(counts) - expected_ids):
         raise SystemExit(
-            f"RESUME INTEGRITY FAILURE: {len(missing)} missing cell(s), "
-            f"{len(wrong)} wrong-sized, {len(extra)} unexpected. A resume "
-            f"that double-writes or drops a cell is worse than no resume, "
-            f"so this aborts rather than writing a CSV. "
-            f"examples wrong={list(wrong.items())[:3]}")
+            f"RESUME INTEGRITY FAILURE: {len(missing)} missing, "
+            f"{len(wrong)} wrong-sized. Aborting rather than writing a CSV.")
 
     for r in rows:
         r.pop("__cell", None)
-    write_csv(rows, str(out_dir / f"stage3_{grid_name}_rows.csv"))
-    (out_dir / "floor_tally.json").write_text(json.dumps(tallies, indent=2))
+    write_csv(rows, str(out_dir / f"stage{tag}_rows.csv"))
     print(f"  {len(rows)} rows across {len(counts)} cells "
-          f"(all exactly {expected_per_cell}) -> {out_dir}")
-    tot_pass = sum(t.get("gate_passes", 0) for t in tallies)
-    tot_fire = sum(t.get("fires", 0) for t in tallies)
-    print(f"  UL floor: gate_passes={tot_pass} fires={tot_fire}  "
-          f"(arming half vs firing half -- see docs/wp9-plan.md §10)")
+          f"(all exactly {expected_per_cell}) -> {out_dir}", flush=True)
 
 
 def _run_gate(rows, core, excursions, out_dir: Path) -> None:
@@ -769,7 +835,7 @@ def _run_gate(rows, core, excursions, out_dir: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--stage", type=int, default=1, choices=(1, 2, 3))
+    p.add_argument("--stage", type=int, default=1, choices=(1, 2, 3, 4))
     p.add_argument("--grid", default="q1", choices=("q1", "q2"))
     p.add_argument("--out", default="sweeps/wp9/stage1")
     p.add_argument("--seeds", type=int, default=10)
@@ -782,6 +848,10 @@ def main() -> None:
     p.add_argument("--smoke", action="store_true",
                    help="tiny grid, for exercising the machinery only")
     a = p.parse_args()
+    if a.stage == 4:
+        run_stage_4(Path(a.out), a.seeds, a.horizon, max(1, a.workers),
+                    a.smoke, a.fresh)
+        return
     if a.stage == 3:
         run_stage_3(Path(a.out), a.grid, a.seeds, a.horizon,
                     max(1, a.workers), a.smoke, a.fresh)
