@@ -187,6 +187,26 @@ def evaluate_cell(
     )
 
 
+def carries_axis(row: dict[str, Any], axis: str) -> bool:
+    """Whether this row's cell actually varies `axis`.
+
+    `sweep()` writes only the axes its own cell varied, so a row from a
+    different cell simply has no key for `axis` -- or, once round-tripped
+    through CSV, an empty string. Membership therefore has to be tested
+    explicitly.
+
+    THE BUG THIS EXISTS TO KILL: `evaluate_axis` used to select cells with
+    `r.get(axis) == level`, which conflates "this axis at its base level"
+    with "this row does not carry this axis at all" whenever the base level
+    is None. `pdb_ms` and `inf_scenario` both have a None base, so their
+    cells selected **1,710 of stage 1's 1,770 rows, including all 1,260
+    core-plane rows** -- and `pdb_ms` was promoted into stage 2 on that
+    basis, over axes that had qualified legitimately.
+    """
+    v = row.get(axis, None)
+    return v is not None and v != ""
+
+
 def evaluate_axis(
     rows: list[dict[str, Any]],
     axis: str,
@@ -194,10 +214,16 @@ def evaluate_axis(
     arm_pairs: list[tuple[str, str]],
     metrics: tuple[str, ...] = PRIMARY_METRIC_COLUMNS,
 ) -> AxisVerdict:
-    """Rule 2: the axis qualifies if ANY (level, metric, arm-pair) does."""
+    """Rule 2: the axis qualifies if ANY (level, metric, arm-pair) does.
+
+    A row belongs to this axis's cell at `level` only if it CARRIES the
+    axis (see carries_axis) and matches the level -- never by value
+    equality alone.
+    """
     results: list[PairResult] = []
     for level in levels:
-        cell_rows = [r for r in rows if r.get(axis) == level]
+        cell_rows = [r for r in rows
+                     if carries_axis(r, axis) and r.get(axis) == level]
         if not cell_rows:
             continue
         for arm_a, arm_b in arm_pairs:

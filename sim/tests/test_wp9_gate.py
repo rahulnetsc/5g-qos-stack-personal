@@ -161,3 +161,66 @@ def test_primary_metric_set_is_exactly_the_five_pre_registered():
         "M07.met", "M08.fraction", "M01.p98", "M02", "M09.worst",
     )
     assert EFFECT_SIZE_THRESHOLD == 1.0
+
+
+# -- cell selection: the defect that promoted a contaminated axis ---------
+
+
+def _synthetic_sweep_rows(n_seeds=10):
+    """Rows shaped exactly as `regime_sweep.sweep()` emits them: each row
+    carries ONLY the axes its own cell varied. Synthesised rather than read
+    from a sweep artefact so the test does not depend on one existing."""
+    from wp9_sweep import CORE_PLANE, EXCURSIONS
+
+    rows = []
+    arms = ("PF", "Reservation", "TwoTier")
+    for n in CORE_PLANE["n_ues"]:
+        for lm in CORE_PLANE["load_mult"]:
+            for arm in arms:
+                for seed in range(n_seeds):
+                    rows.append({"n_ues": n, "load_mult": lm,
+                                 "scheduler": arm, "seed": seed,
+                                 "M07.met": 1.0, "M02": 0.1})
+    for axis, levels in EXCURSIONS.items():
+        for level in levels:
+            for arm in arms:
+                for seed in range(n_seeds):
+                    rows.append({axis: level, "scheduler": arm, "seed": seed,
+                                 "M07.met": 1.0, "M02": 0.1})
+    return rows
+
+
+def test_no_excursion_cell_can_select_core_plane_rows():
+    """The invariant. `pdb_ms` and `inf_scenario` have a None base level, and
+    the old selection (`r.get(axis) == level`) could not tell "this axis at
+    its base" from "this row does not carry this axis" -- so their cells
+    selected 1,710 of stage 1's 1,770 rows, all 1,260 core-plane rows
+    included, and `pdb_ms` was promoted into a 3-hour stage 2 on that basis.
+
+    Checked for EVERY excursion axis, not just the two that were caught, so
+    it generalises to any future axis with a None/False-ish base.
+    """
+    from wp9_gate import carries_axis
+    from wp9_sweep import CORE_PLANE, EXCURSIONS
+
+    rows = _synthetic_sweep_rows()
+    n_arms, n_seeds = 3, 10
+    for axis, levels in EXCURSIONS.items():
+        for level in levels:
+            cell = [r for r in rows
+                    if carries_axis(r, axis) and r.get(axis) == level]
+            assert len(cell) == n_arms * n_seeds, (
+                f"{axis}={level} selected {len(cell)} rows, expected 30")
+            core = [r for r in cell if any(k in r for k in CORE_PLANE)]
+            assert not core, (
+                f"{axis}={level} selected {len(core)} CORE-PLANE rows")
+
+
+def test_carries_axis_distinguishes_absent_from_base_valued():
+    from wp9_gate import carries_axis
+
+    assert not carries_axis({"n_ues": 8}, "pdb_ms")        # absent
+    assert not carries_axis({"pdb_ms": ""}, "pdb_ms")      # CSV round-trip
+    assert not carries_axis({"pdb_ms": None}, "pdb_ms")    # explicit None
+    assert carries_axis({"pdb_ms": 10.0}, "pdb_ms")        # real level
+    assert carries_axis({"shared_lcg": False}, "shared_lcg")  # falsy but real

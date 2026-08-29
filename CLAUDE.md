@@ -381,6 +381,39 @@ third clean instance. When adding any new stochastic mechanism, give it
 its own XOR'd seed rather than reusing an existing RNG object, even one
 that looks unrelated to what you're adding.
 
+**A guard test written at the moment of a fix pins the thing you were
+looking at, not the pipeline around it — live instrumentation is what
+catches the recurrence one layer out.** WP9 commit 1b fixed a 25 GB
+retention leak in the sweep runner's parent and landed memory tests with
+it. Commit 1c then reintroduced the identical leak inside the parallel
+worker it added, and **1b's tests stayed green throughout** — they pinned
+`m13_projection()` and the parent's retention, and the parent genuinely
+was clean; the bug was one layer below, in the code that actually runs the
+sweep. What caught it was the run monitor's memory trend plus a `ps`
+check, at 20 of 59 cells, not the test suite. The lesson is narrower than
+"write guard tests at the moment of the fix" (still true, but it is not
+what worked here): **a test proves the helper you just fixed stays fixed;
+it does not prove the pipeline that calls it is clean, so long runs need
+live resource instrumentation with a kill threshold, not just a green
+suite.** Note also that `pkill -f <script>` does not reach
+`multiprocessing` **spawn** workers — their argv is the spawn bootstrap —
+so stopping a pool leaves orphans holding memory that `pgrep -f` cannot
+see; kill the children by PID.
+
+**Any count that describes a structure must be computed from that
+structure at the point of use, never restated in prose.** Three instances
+in this project, each of which cost real confusion: the regression corpus
+was described as "22-record" in `README.md` §9 and this file while
+`_cases()` built 20 (WP9's fix commit); `docs/wp9-plan.md` §6.3's per-cell
+timing table was carried as prose and was wrong by 5-7x (§6.3a); and the
+stage-1 grid was described as 56 cells while `EXCURSIONS` summed to 59.
+The third was caught **only because the runner printed its own count and
+disagreed with the document** — nothing else would have surfaced it. A
+count in prose is a claim about code that drifts silently the moment the
+code changes, and unlike a wrong citation it does not point anywhere that
+would reveal the error. Derive it (`len(_cases())`, `sum(len(v) for v in
+EXCURSIONS.values())`), or print it from the thing that produces it.
+
 **Spec/hardware-derived numeric tables get transcribed from the actual
 source text, never reconstructed from memory or re-derived by formula —
 this applies to any such table, not just BSR's.** `sim/bsr.py`'s

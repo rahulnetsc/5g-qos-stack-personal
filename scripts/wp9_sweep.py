@@ -464,9 +464,12 @@ def _run_gate(rows, core, excursions, out_dir: Path) -> None:
                  ("Reservation", "TwoTier")]
     verdicts = []
     for axis, levels in {**core, **excursions}.items():
-        base_level = BASE.get(axis)
-        all_levels = list(levels) + ([base_level] if base_level not in levels else [])
-        verdicts.append(wp9_gate.evaluate_axis(rows, axis, all_levels, arm_pairs))
+        # Evaluate an axis on ITS OWN levels only. The base level is not a
+        # cell of an excursion axis -- the base point lives in the core
+        # plane, and appending it here is what let `pdb_ms`/`inf_scenario`
+        # (base None) swallow the whole sweep. Core-plane axes already carry
+        # their base value among their levels.
+        verdicts.append(wp9_gate.evaluate_axis(rows, axis, list(levels), arm_pairs))
     selection = wp9_gate.select_for_stage_2(verdicts)
     report = wp9_gate.format_verdicts(verdicts, selection)
     (out_dir / "gate_verdict.txt").write_text(report + "\n")
