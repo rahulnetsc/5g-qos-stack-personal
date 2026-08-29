@@ -134,3 +134,36 @@ def test_scoring_variations_are_the_four_pre_registered_ones():
         "slo_green_dwell_s",
     )
     assert sum(len(v) for _, v in _SCORING_VARIATIONS) == 12
+
+
+def test_worker_does_not_retain_records_across_a_cell():
+    """The leak commit 1c reintroduced inside the parallel worker, caught
+    mid-run: `_run_one_cell` accumulated every live RunRecord for a cell and
+    converted only at the end, holding 30 x ~33 MB per worker -- measured at
+    1.4-2.1 GiB per worker across 12 workers before it was killed.
+
+    1b's tests missed it because they pinned `m13_projection` and the
+    PARENT's retention -- one layer above the bug. This one exercises the
+    worker itself, which is the layer that actually runs the sweep.
+    """
+    import tracemalloc
+    from wp9_sweep import _run_one_cell
+
+    tracemalloc.start()
+    try:
+        base = tracemalloc.get_traced_memory()[0]
+        _run_one_cell(({"n_ues": 4, "load_mult": 1.0}, 2, 1000))
+        after_2 = tracemalloc.get_traced_memory()[0]
+        _run_one_cell(({"n_ues": 4, "load_mult": 1.0}, 6, 1000))
+        after_6 = tracemalloc.get_traced_memory()[0]
+    finally:
+        tracemalloc.stop()
+
+    # Tripling the seeds must not triple retention: the worker returns
+    # stripped payload, so cost scales with payload size, not record size.
+    growth = (after_6 - after_2) / 1e6
+    absolute = (after_6 - base) / 1e6
+    assert growth < 5.0, (
+        f"worker retention grew {growth:.2f} MB when seeds went 2 -> 6; it is "
+        f"holding live records again")
+    assert absolute < 20.0, f"worker absolute retention {absolute:.2f} MB"

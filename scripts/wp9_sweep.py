@@ -301,27 +301,37 @@ def _run_one_cell(task: tuple) -> tuple:
     """
     axis_values, n_seeds, horizon = task
     _HORIZON[0] = horizon
-    collected: list[tuple[dict, Any]] = []
     online: list[dict] = []
+    payload: list[tuple] = []
     sc_card = Scorecard()
+    keep_m13 = not (set(axis_values) - {"n_ues", "load_mult"})
 
     def sink(record, av):
+        # Strip and project IMMEDIATELY, never retain the live record.
+        #
+        # This is the same leak commit 1b fixed in the parent, reintroduced
+        # here in 1c and caught in flight: the worker used to append every
+        # live RunRecord to a `collected` list and convert only at the end,
+        # so it held 30 records x ~33 MB per cell. Measured mid-run at
+        # 1.4-2.1 GiB per worker across 12 workers (~20 GiB) with the
+        # largest cells (N=24, 32) still queued.
+        #
+        # 1b's memory test did not catch it because it pinned
+        # m13_projection() and the parent's retention, not the worker's --
+        # the test was one layer above the bug. test_wp9_sweep_memory.py now
+        # covers _run_one_cell directly.
         online.extend(_online_rows_for(sc_card, record, av))
-        collected.append((dict(av), record))
+        payload.append((
+            dict(av),
+            _strip_timeseries(record.to_dict()),
+            m13_projection(record).to_dict() if keep_m13 else None,
+        ))
 
     rows = sweep(
         axes={k: [v] for k, v in axis_values.items()},
         build_scenario=_build, schedulers=_arms(), n_seeds=n_seeds,
         driver_kwargs=_driver_kwargs, record_sink=sink,
     )
-    payload = []
-    keep_m13 = not (set(axis_values) - {"n_ues", "load_mult"})
-    for av, rec in collected:
-        payload.append((
-            av,
-            _strip_timeseries(rec.to_dict()),
-            m13_projection(rec).to_dict() if keep_m13 else None,
-        ))
     return rows, online, payload
 
 
