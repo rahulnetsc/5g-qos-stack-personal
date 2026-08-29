@@ -194,6 +194,27 @@ class TrafficModel:
         kind = cfg.traffic_kind
         p = cfg.traffic_params
 
+        # ACTIVATION WINDOW (WP9 re-scope): a flow that is only on for part
+        # of a run. Applied here, before the kind dispatch, so it composes
+        # with EVERY generator rather than being reimplemented per kind.
+        #
+        # Motivating case: factory lidar is duty-cycled, not continuous --
+        # an operator enables it per task (docking, tight-tolerance
+        # traverse, mapping), so it is an event, not a background load. A
+        # gate is the honest way to model that; scaling the rate down to a
+        # continuous average would misrepresent a large transient as a small
+        # steady demand, which is precisely the behaviour the excursion
+        # exists to stress.
+        #
+        # Additive by construction: no existing scenario sets these keys, so
+        # every pre-WP9 flow is unaffected and the frozen corpus cannot move.
+        af = p.get("active_from_s")
+        au = p.get("active_until_s")
+        if af is not None and now_s < float(af):
+            return []
+        if au is not None and now_s >= float(au):
+            return []
+
         if kind == "deterministic":
             period_slots = max(1, int(p["period_ms"] / 1000.0 / self.slot_duration_s))
             if slot_index % period_slots == 0:
