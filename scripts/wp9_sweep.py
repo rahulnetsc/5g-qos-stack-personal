@@ -458,6 +458,61 @@ def run_stage_1(out_dir: Path, n_seeds: int, horizon: int, smoke: bool) -> None:
     _run_gate(rows, core, excursions, out_dir)
 
 
+# Stage 2 (docs/wp9-plan.md §6.4a): a FULL FACTORIAL over the promoted
+# axes, unlike stage 1's star. The factorial is the point -- rule 5 requires
+# contiguity, and check_contiguity needs grid-ADJACENT cells, which stage
+# 1's one-axis-at-a-time excursions structurally cannot supply.
+#
+# Both tied-at-inf excursion axes are promoted (§6.4a): the cap was
+# RECOMPUTED against §6.3a's measured costs, not relaxed, and at 252 cells /
+# ~5.2 h wall it is not binding.
+STAGE2_GRID: dict[str, list[Any]] = {
+    "n_ues": [2, 4, 8, 16, 24, 32],
+    "load_mult": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0],
+    "shared_lcg": [False, True],      # base + excursion: H5
+    "k2_slots": [1, 2, 4],            # base + excursions
+}
+
+
+def run_stage_2(out_dir: Path, n_seeds: int, horizon: int, smoke: bool,
+                workers: int) -> None:
+    grid = STAGE2_GRID if not smoke else {
+        "n_ues": [2, 4], "load_mult": [1.0, 2.0],
+        "shared_lcg": [False, True], "k2_slots": [1, 2],
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    names = list(grid.keys())
+    tasks = [(dict(zip(names, combo)), n_seeds, horizon)
+             for combo in itertools.product(*grid.values())]
+    print(f"stage 2: {len(tasks)} cells (full factorial) on {workers} workers")
+
+    rows: list[dict] = []
+    rec_fh = (out_dir / "records.jsonl").open("w")
+    onl_fh = (out_dir / "online_rows.jsonl").open("w")
+    n_rec = n_onl = 0
+    try:
+        with mp.get_context("spawn").Pool(workers) as pool:
+            for i, (crows, conline, payload) in enumerate(
+                    pool.imap_unordered(_run_one_cell, tasks), 1):
+                rows.extend(crows)
+                for r in conline:
+                    onl_fh.write(json.dumps(r) + "\n")
+                    n_onl += 1
+                for av, recd, _m13 in payload:
+                    rec_fh.write(json.dumps(
+                        {"axis_values": av, "record": recd}) + "\n")
+                    n_rec += 1
+                print(f"  cell {i}/{len(tasks)} done ({n_rec} records)", flush=True)
+    finally:
+        rec_fh.close()
+        onl_fh.close()
+
+    write_csv(rows, str(out_dir / "stage2_rows.csv"))
+    mb = (out_dir / "records.jsonl").stat().st_size / 1e6
+    print(f"  {len(rows)} rows, {n_rec} records ({mb:.1f} MB) -> {out_dir}")
+    print("  contiguity is read BEFORE effect sizes -- see analyse_stage2.py")
+
+
 def _run_gate(rows, core, excursions, out_dir: Path) -> None:
     """The gate, run as committed code, output recorded verbatim."""
     arm_pairs = [("PF", "Reservation"), ("PF", "TwoTier"),
@@ -488,8 +543,9 @@ def main() -> None:
     p.add_argument("--smoke", action="store_true",
                    help="tiny grid, for exercising the machinery only")
     a = p.parse_args()
-    if a.stage != 1:
-        raise SystemExit("stage 2 is gated on stage 1's verdict -- not runnable yet")
+    if a.stage == 2:
+        run_stage_2(Path(a.out), a.seeds, a.horizon, a.smoke, max(1, a.workers))
+        return
     if a.workers and a.workers > 1:
         run_stage_1_parallel(Path(a.out), a.seeds, a.horizon, a.smoke, a.workers)
     else:
