@@ -595,44 +595,154 @@ def _run_one_cell_s3(task: tuple) -> tuple:
     return rows, online, payload, {**axis_values, **tally}
 
 
+def cell_id(axis_values: dict) -> str:
+    """Stable identity for a grid cell.
+
+    Deliberately the SAME identity the analysis uses to select a cell (the
+    axis-values mapping), serialised canonically -- not a separate scheme
+    that could drift from it and make "already done" mean something
+    different from "selected by the analysis".
+    """
+    return json.dumps({k: axis_values[k] for k in sorted(axis_values)},
+                      sort_keys=True)
+
+
+def _load_completed(rows_path: Path, expected_per_cell: int
+                    ) -> tuple[list[dict], set[str]]:
+    """Read prior rows; return (rows to keep, ids of COMPLETE cells).
+
+    Two failure modes, deliberately treated DIFFERENTLY:
+
+    - **Partial** (fewer rows than expected) is an ordinary interruption:
+      drop the rows and re-run the cell. Appending instead would produce a
+      cell of the right size assembled from two different runs' fragments,
+      which a naive count check would happily accept.
+    - **Oversized** (more rows than expected) should be IMPOSSIBLE -- it
+      means something double-wrote -- so it ABORTS rather than being
+      silently healed. Healing it would produce a correct final answer
+      while hiding the bug that caused it, and the resume path's whole
+      purpose is defeated if it can quietly paper over corruption.
+    """
+    if not rows_path.exists():
+        return [], set()
+    by_cell: dict[str, list[dict]] = {}
+    with rows_path.open() as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            by_cell.setdefault(rec["cell"], []).append(rec["row"])
+    keep: list[dict] = []
+    done: set[str] = set()
+    partial = 0
+    for cid, rws in by_cell.items():
+        if len(rws) == expected_per_cell:
+            done.add(cid)
+            keep.extend(rws)
+        elif len(rws) > expected_per_cell:
+            raise SystemExit(
+                f"RESUME STATE CORRUPT: cell {cid} has {len(rws)} rows, "
+                f"expected {expected_per_cell}. An oversized cell means "
+                f"something double-wrote; this aborts rather than healing "
+                f"it silently. Re-run with --fresh to discard prior output.")
+        else:
+            partial += 1
+    if partial:
+        print(f"  resume: dropping {partial} partial cell(s) to re-run")
+    return keep, done
+
+
 def run_stage_3(out_dir: Path, grid_name: str, n_seeds: int, horizon: int,
-                workers: int, smoke: bool) -> None:
+                workers: int, smoke: bool, fresh: bool = False) -> None:
+    """Stage 3, resumable.
+
+    WHY RESUMABLE. A long run's cost should be proportional to time LOST,
+    not to time ELAPSED. Two runs in this WP have already died mid-flight
+    for unrelated reasons -- the OOM/thrash from the retention leak, and a
+    laptop restart at cell 35/84 -- and power loss, a full disk or a kernel
+    panic would do the same. This is not a reboot mitigation.
+    """
     grid = {"q1": STAGE3_Q1, "q2": STAGE3_Q2}[grid_name]
     if smoke:
         grid = {k: v[:2] for k, v in grid.items()}
     out_dir.mkdir(parents=True, exist_ok=True)
     names = list(grid)
-    tasks = [(dict(zip(names, c)), n_seeds, horizon)
-             for c in itertools.product(*grid.values())]
-    print(f"stage 3 [{grid_name}]: {len(tasks)} cells on {workers} workers")
+    all_tasks = [(dict(zip(names, c)), n_seeds, horizon)
+                 for c in itertools.product(*grid.values())]
+    expected_per_cell = 3 * n_seeds          # 3 arms x seeds
 
-    rows: list[dict] = []
+    rows_path = out_dir / "rows.jsonl"
+    if fresh:
+        for f in ("rows.jsonl", "records.jsonl", "online_rows.jsonl"):
+            (out_dir / f).unlink(missing_ok=True)
+    rows, done = _load_completed(rows_path, expected_per_cell)
+    # Rewrite once so the append path below can never double-write: after
+    # this the file contains exactly the complete cells.
+    with rows_path.open("w") as fh:
+        for cid in sorted(done):
+            pass
+        for r in rows:
+            fh.write(json.dumps({"cell": r["__cell"], "row": r}) + "\n")
+
+    tasks = [t for t in all_tasks if cell_id(t[0]) not in done]
+    print(f"stage 3 [{grid_name}]: {len(all_tasks)} cells, "
+          f"{len(done)} already complete, {len(tasks)} to run "
+          f"on {workers} workers")
+
     tallies: list[dict] = []
-    rec_fh = (out_dir / "records.jsonl").open("w")
-    onl_fh = (out_dir / "online_rows.jsonl").open("w")
-    n_rec = n_onl = 0
+    if (out_dir / "floor_tally.json").exists() and not fresh:
+        tallies = json.loads((out_dir / "floor_tally.json").read_text())
+    rows_fh = rows_path.open("a")
+    rec_fh = (out_dir / "records.jsonl").open("a" if not fresh else "w")
+    onl_fh = (out_dir / "online_rows.jsonl").open("a" if not fresh else "w")
+    n_rec = 0
     try:
         with mp.get_context("spawn").Pool(workers) as pool:
             for i, (crows, conline, payload, tally) in enumerate(
                     pool.imap_unordered(_run_one_cell_s3, tasks), 1):
-                rows.extend(crows)
+                cid = cell_id({k: v for k, v in tally.items() if k in names})
+                for r in crows:
+                    r["__cell"] = cid
+                    rows.append(r)
+                    rows_fh.write(json.dumps({"cell": cid, "row": r}) + "\n")
+                rows_fh.flush()
                 tallies.append(tally)
                 for r in conline:
                     onl_fh.write(json.dumps(r) + "\n")
-                    n_onl += 1
                 for av, recd, _ in payload:
                     rec_fh.write(json.dumps(
                         {"axis_values": av, "record": recd}) + "\n")
                     n_rec += 1
-                print(f"  cell {i}/{len(tasks)} done ({n_rec} records)", flush=True)
+                print(f"  cell {i}/{len(tasks)} done ({n_rec} new records)",
+                      flush=True)
     finally:
+        rows_fh.close()
         rec_fh.close()
         onl_fh.close()
 
+    # -- completion assertion: every expected cell present EXACTLY once ---
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r["__cell"]] = counts.get(r["__cell"], 0) + 1
+    expected_ids = {cell_id(t[0]) for t in all_tasks}
+    missing = expected_ids - set(counts)
+    wrong = {c: n for c, n in counts.items() if n != expected_per_cell}
+    extra = set(counts) - expected_ids
+    if missing or wrong or extra:
+        raise SystemExit(
+            f"RESUME INTEGRITY FAILURE: {len(missing)} missing cell(s), "
+            f"{len(wrong)} wrong-sized, {len(extra)} unexpected. A resume "
+            f"that double-writes or drops a cell is worse than no resume, "
+            f"so this aborts rather than writing a CSV. "
+            f"examples wrong={list(wrong.items())[:3]}")
+
+    for r in rows:
+        r.pop("__cell", None)
     write_csv(rows, str(out_dir / f"stage3_{grid_name}_rows.csv"))
     (out_dir / "floor_tally.json").write_text(json.dumps(tallies, indent=2))
-    mb = (out_dir / "records.jsonl").stat().st_size / 1e6
-    print(f"  {len(rows)} rows, {n_rec} records ({mb:.1f} MB) -> {out_dir}")
+    print(f"  {len(rows)} rows across {len(counts)} cells "
+          f"(all exactly {expected_per_cell}) -> {out_dir}")
     tot_pass = sum(t.get("gate_passes", 0) for t in tallies)
     tot_fire = sum(t.get("fires", 0) for t in tallies)
     print(f"  UL floor: gate_passes={tot_pass} fires={tot_fire}  "
@@ -667,12 +777,14 @@ def main() -> None:
     p.add_argument("--workers", type=int, default=12,
                    help="cell-level parallelism; memory-bound, see "
                         "docs/wp9-plan.md §6.3b (0 = serial)")
+    p.add_argument("--fresh", action="store_true",
+                   help="ignore and truncate prior output (no resume)")
     p.add_argument("--smoke", action="store_true",
                    help="tiny grid, for exercising the machinery only")
     a = p.parse_args()
     if a.stage == 3:
         run_stage_3(Path(a.out), a.grid, a.seeds, a.horizon,
-                    max(1, a.workers), a.smoke)
+                    max(1, a.workers), a.smoke, a.fresh)
         return
     if a.stage == 2:
         run_stage_2(Path(a.out), a.seeds, a.horizon, a.smoke, max(1, a.workers))
