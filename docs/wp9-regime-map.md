@@ -281,7 +281,7 @@ arms lose the most**, consistently.
 | G | Status | Evidence / what is missing |
 |---|---|---|
 | **G1** | **Sim-informative** | M01 p98 / M15 across the core plane. Ordering only; the millisecond is not certifiable (`SIM→RF`). |
-| **G2** | **Not answered by WP9** | Needs an event-triggered STOP flow and trial accumulation; no WP9 cell models it. GT-1.2 remains **RF**. |
+| **G2** | **Not answered by WP9 — and the reason is now STRUCTURAL, not scenario coverage** | Needs an event-triggered STOP flow and trial accumulation; no WP9 cell models it. GT-1.2 remains **RF**. **Sharpened by `docs/wp9-plan.md` §19.5:** G2's *real* failure class is the BSR/SR desync, and it is unreachable here for a reason that is about the model's structure rather than its scenarios. Truncated BSR is now built, wired to 38.321's Padding BSR trigger, and unit-tested — **and still cannot fire**, because this model sizes transport blocks continuously against demand, so padding is either exactly 0 (28,580/28,580 grants, saturated) or large (42–235 bytes), never the 2–5 bytes truncation needs. **38.321's truncated formats exist to handle a TB-size quantisation artifact this simulator does not model.** So the sim measures STOP latency under ordinary contention only — the easy case — and the case the guarantee is actually about needs TB-size quantisation (`sim/resource.py`, `scheduler/link.py`), not another scenario. |
 | **G3** | **Sim-informative, conditional** | M03/M14 scored at `t_live_s` ∈ {1, 2, 4} — reported as a function of it, since `T_live` is `[OPEN: HARDWARE]` and unmeasured. |
 | **G4** | **Not answered by WP9** | The duty-cycle axis was dropped by the cap (score 2.663). Post-silence first-packet latency needs a study-layer read that stage 2 did not produce. |
 | **G5** | **Sim-informative** | M05/M06/M17 present on every run via the `xr_video` instrument. Not analysed per-regime in this pass. |
@@ -345,11 +345,17 @@ technique.
 1. **GT-5.2 (admissible N) is the test WP9 most sharpens.** Expect the knee
    between N=4 and N=8 at full load, and later at partial load. Testing
    N=2 again would reproduce a null this map now explains.
-2. **GT-2.2 / GT-2.3 remain the only test of the UL floor.** WP9 never
-   exercised it: the floor needs a BSR/SR desync fault **and**
-   `mfbr_bps > 0`, and `sim/bsr.py` cannot express the fault at all
-   (`docs/wp9-plan.md` §8a). WP9 offers no prediction for the floor-OFF
-   delta GT-2.2 measures.
+2. **GT-2.2 / GT-2.3 remain the only test of the UL floor, and WP9 can now
+   say precisely why.** The floor needs `mfbr_bps > 0` to ARM and a BSR/SR
+   desync to FIRE. **The arming half is now satisfied and measured at
+   scale: `gate_passes ≈ 65,200, fires = 0`** — armed, never fired, with no
+   desync present (`docs/wp9-plan.md` §19.5). The firing half is
+   unreachable *structurally*: truncated BSR is built and correctly wired
+   and still cannot fire, because continuous grant sizing means padding
+   never lands in the 2–5 byte window the mechanism needs. WP9 therefore
+   offers **no prediction** for the floor-OFF delta GT-2.2 measures, and
+   hardware remains the only instrument. Stage 3's `fires=9` is superseded
+   and unreproduced — do not carry it forward.
 3. **GT-4.3 (MFBR clamp) is unmodelled**, per §0.2/G7 — hardware only.
 4. **GT-7.3 (degradation ordering) is where H6 bites.** Expect the
    first-violation order to depend on which metric the pass criterion

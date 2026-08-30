@@ -959,6 +959,20 @@ timing) but **no SR loss** — the request is always eventually delivered.
 that would produce this state; the fault is real on hardware and outside
 this model's expressive range.*
 
+> **SUPERSEDED IN ITS SECOND HALF by §19.5 — read this before scoping from
+> 0b's framing.** The mechanism 0b named (grant-size-keyed truncated-BSR
+> format selection) has since been **built, correctly wired to the Padding
+> BSR trigger, and unit-tested — and it still cannot fire.** So "`sim/bsr.py`
+> lacks a mechanism" was true but pointed one layer too high: adding it
+> there was necessary and not sufficient. The blocker is **continuous grant
+> sizing**, not the BSR model. TB sizes here track demand continuously, so
+> padding is bimodal — exactly 0 on 28,580 of 28,580 grants in a saturated
+> run, or large (42-235 bytes) in a light one — and never the 2-5 bytes a
+> truncated format needs. **38.321's truncated formats exist to handle a
+> TB-size quantisation artifact this simulator does not model.** A later
+> reader scoping from 0b alone would rebuild what §18/§19 already built;
+> the work that remains is in `sim/resource.py` / `scheduler/link.py`.
+
 ### Consequence for scoping the future fault-model WP
 
 That WP is **"add a mechanism `sim/bsr.py` does not have"**, not **"enable a
@@ -1463,6 +1477,17 @@ positive result about the fourth dormancy category, not report an absence.
 > firing condition was never actually gated on the desync fault**, which
 > is a correction to README §7's own framing of the fourth dormancy
 > category, not merely a missed prediction.
+>
+> **SUPERSEDED BY AN AT-SCALE MEASUREMENT (§19.5), and the prediction is
+> scored a HIT.** A full run measured `gate_passes ≈ 65,200, fires = 0` in
+> all three `truncated_bsr` modes — not a 16-cell smoke grid at horizon
+> 1000. **The two halves DO separate (armed, never fired), and they
+> separate with no desync present at all.** The smoke grid's `fires=9` is
+> **unreproduced**, and the conflation hypothesis above is neither
+> confirmed nor needed — `fires == 0` was right for the reason originally
+> given. Stage 3 itself never completed (it died at cell 51/52 and was
+> superseded by the re-scope), so the smoke figure was never the stronger
+> evidence and should not be cited as though it were.
 
 
 ---

@@ -346,11 +346,24 @@ they survive it:
   is a radio-link failure mode, not a traffic pattern or a missing
   signal/scenario the way categories (1)-(3) are — closing it means
   modeling a *fault*, not adding a flow or extending an interface.
-  **What would close it**: a scenario that drives
-  `estimated_ul_buffer_per_lcg` to zero while a UE's true backlog
-  (`sim/buffer.py`) stays nonzero — open whether `sim/bsr.py`'s
-  existing model can even express that state, not assumed either way
-  (`§8`'s new `[OPEN: WP9]`-adjacent entry). **Consequence for the
+  **What would close it — ANSWERED, and it is not a scenario**
+  (`docs/wp9-plan.md` §19.5). This entry used to say "a scenario that
+  drives `estimated_ul_buffer_per_lcg` to zero while a UE's true backlog
+  stays nonzero", leaving open whether `sim/bsr.py` could express the
+  state. It cannot, and neither can any scenario. Truncated BSR — the
+  mechanism that produces the state on real hardware — is now **built,
+  wired to the Padding BSR trigger 38.321 §5.4.5 actually specifies, and
+  unit-tested — and it still cannot fire**, because this model sizes
+  transport blocks **continuously** against demand. Padding is therefore
+  bimodal: exactly 0 on 28,580 of 28,580 grants in a saturated run, or
+  large (42–235 bytes) in a light one, and never the 2–5 bytes a truncated
+  format needs. **38.321's truncated formats exist to handle a TB-size
+  quantisation artifact this simulator does not model.** So the blocker is
+  **continuous grant sizing** (`sim/resource.py`, `scheduler/link.py`) —
+  one layer below `sim/bsr.py`, and not reachable by writing a scenario.
+  A scenario tuned until grants landed in the 2–5 byte window was
+  deliberately NOT written: that is fitting the measurement around the
+  claim. **Consequence for the
   regime map (§10)**: the floor is the mechanism most specific to
   two-tier's own design (born from a documented 2026-08-04 production
   incident, `ia_p5g_scheduler.c:555-644`), and if no in-corpus scenario
@@ -1615,11 +1628,13 @@ disarms correctly under the fruitless-counter logic **in its unit tests**
 directly). **That is not a statement about any sweep**: per §7 the floor
 has never fired on this corpus, and the one contrary datum —
 `gate_passes=73285, fires=9` — came from a 16-cell machinery smoke grid at
-horizon 1000 on a stage-3 run that died at cell 51/52 and was superseded,
-so it was never confirmed at scale. Whether the floor's *firing* condition
-keys on `floor_rx_lastseen` (delivery not moving) rather than on the
-BSR/SR desync it was built for is **open** — `docs/wp9-plan.md` §18.5
-registers it as the question the truncated-BSR work settles.
+horizon 1000 on a stage-3 run that died at cell 51/52 and was superseded.
+**It is now SUPERSEDED by an at-scale measurement** (`docs/wp9-plan.md`
+§19.5): a full run gives `gate_passes ≈ 65,200, fires = 0` in every mode.
+**The floor's two halves separate — armed, never fired — and they separate
+with NO desync present**, so the smoke grid's `fires=9` is unreproduced
+and should not be cited as evidence that the floor fires under ordinary
+contention.
 
 **Phase 3 exit criteria:** WP9's grid complete, regime-selection discipline
 satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved
