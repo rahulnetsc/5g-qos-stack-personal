@@ -2907,3 +2907,65 @@ touched.
 
 Nothing is published — the §18 commits are local — and the flag has never
 been on in any scenario, so this costs rework, not results.
+
+### 19.5 Result — the trigger is right, and truncation still cannot fire
+
+The re-wiring landed and is correct: Regular/Periodic BSRs are no longer
+truncated, and the Padding BSR trigger exists. **Truncation still never
+fires at scale, for a structural reason one level below the trigger.**
+
+**Measured, on the same at-scale study that caught §19.1:**
+
+| scenario | grants | padding > 0 | padding in 2..5 (the truncation window) |
+|---|---|---|---|
+| saturated (3 busy UL LCGs × 6 UEs) | 28,580 | **0** | **0** |
+| lightly loaded (2 sparse flows × 2 UEs) | 110 | 80 | **0** |
+
+Padding in this simulator is **bimodal: exactly 0, or large.** The
+saturated run has backlog ≥ grant on every one of 28,580 grants, so the UE
+fills the TB exactly. The light run leaves 42 / 90 / 111 / 126 / 235 bytes
+spare — never the 2-5 bytes a truncated format needs.
+
+**Root cause: this model has no TB-size quantisation.** `bytes_capacity`
+is sized continuously against demand and capacity, so
+`padding = grant − backlog` is either zero or a large remainder. Real
+hardware picks a TB size from a **discrete MCS/TBS table**, so the chosen
+size almost never equals the backlog exactly and a few bytes of leftover
+padding is routine — which is precisely why Padding BSRs are an ordinary
+occurrence on a real UE and why 38.321 defines truncated formats at all.
+**The truncated formats exist to handle a quantisation artifact this
+simulator does not have.**
+
+**So the honest status of §18.5's expectations is: still unscored, and not
+because the mechanism is wrong.**
+
+- **E1/E2 (does the floor fire; do arming and firing separate):** measured
+  `gate_passes ≈ 65,200, fires = 0` in every mode. The two halves DO
+  separate — armed, never fired — which settles the open question from
+  §18.3 at scale for the first time, and does so *without* a desync being
+  present. Stage 3's `fires=9` is therefore still unreproduced.
+- **E3/E4 (STOP statistic, desync width):** not answerable. The desync
+  width is identical across `off`/`oai`/`spec` because the truncated path
+  is unreachable.
+
+**What would close it, and it is NOT in `sim/bsr.py`:** TB-size
+quantisation in the grant-sizing path (`sim/resource.py` /
+`scheduler/link.py`), so grants land on discrete TBS values and small
+padding becomes routine. That is a new mechanism in a different module,
+with its own corpus exposure, and it needs its own plan. It is also
+independently motivated — TBS quantisation is a real effect this model
+lacks everywhere, not only here.
+
+**This is the third correction in this item, each one deeper than the
+last**: truncation wired to every BSR (§19.1) → wired to the right trigger
+but padding always 0 → padding never lands in the window because TB sizes
+are not quantised. **Each was caught by the same check**, the one §19.2
+added to `CLAUDE.md`: run it at scale and ask whether the precondition
+occurs at all. The rule was written from the first correction and then
+immediately caught the next two, which is the strongest evidence available
+that it generalises.
+
+**Not done, deliberately:** no scenario was constructed to land grants in
+the 2-5 byte window. Tuning a fixture until the mechanism fires would be
+fitting the measurement around the claim — the same failure this WP has
+twice recorded avoiding.

@@ -32,6 +32,7 @@ def run(
     k2_slots: int = 2,
     harq_round_max: int = 4,
     harq_combining_mode: str = "ir",
+    truncated_bsr: str = "off",
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -93,7 +94,12 @@ def run(
         blockage_seed=scenario.seed ^ 0x424C4F4B,  # ASCII "BLOK"
     )
     buffers = BufferModel()
-    bsr = BsrModel(scenario.flows, grid.slot_duration_s)
+    # `truncated_bsr` is exposed here for the same reason sr_period_slots
+    # is -- so a study can select it rather than a silent default deciding
+    # it. Defaults "off", which is the pre-§18 behaviour the frozen corpus
+    # was captured under (docs/wp9-plan.md §18.4).
+    bsr = BsrModel(scenario.flows, grid.slot_duration_s,
+                   truncated_bsr=truncated_bsr)
     ul_access = UlAccessModel(
         scenario.flows,
         grid.slot_duration_s,

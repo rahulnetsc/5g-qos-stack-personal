@@ -385,7 +385,34 @@ class BsrModel:
         st.retx_deadline_slot = slot_index + self._retx_bsr_slots
         self.on_ul_confirmed_receipt(ue_id, delivered_bytes)
 
-        if not st.pending:
+        # TS 38.321 §5.4.5 defines THREE trigger kinds, and the format
+        # rules are split by kind (docs/wp9-plan.md §19):
+        #
+        #   Regular  (arrival / retxBSR-Timer) -+-> "For Regular and
+        #   Periodic (periodicBSR-Timer)       -'   Periodic BSR": Long for
+        #                                          all LCGs with data, else
+        #                                          Short. NEVER truncated.
+        #   Padding  (UL resources allocated AND padding bits >= the BSR
+        #            MAC CE plus its subheader) --> "For Padding BSR": the
+        #            padding-keyed rules, the ONLY place the truncated
+        #            formats appear.
+        #
+        # `pending` is set exclusively by the regular/periodic/retx
+        # triggers, so a pending report is Regular or Periodic and may not
+        # be truncated. §18 wired the padding rules to this path and, in a
+        # loaded scenario where grants run nearly full, produced no BSR at
+        # all -- see §19.1.
+        padding = max(0, int(tb_size) - int(filled_bytes or 0))
+        if st.pending:
+            kind = "regular"
+        elif self._truncated_bsr != "off" and padding >= SHORT_BSR_SZ:
+            # The Padding BSR: an OPPORTUNISTIC report the UE volunteers
+            # because room happened to be left over. Nothing triggered it,
+            # so there is no `pending` to clear -- but when it truncates it
+            # overwrites the gNB's per-LCG array with a PARTIAL view, and
+            # that overwrite is the desync the UL floor exists to rescue.
+            kind = "padding"
+        else:
             return
 
         per_lcg_true: dict[int, int] = {}
@@ -400,22 +427,30 @@ class BsrModel:
                 lc_with_data.append((f.priority_level, f.lcg))
         active_lcgs = [lcg for lcg, backlog in per_lcg_true.items() if backlog > 0]
 
-        if self._truncated_bsr == "off":
+        if kind == "regular":
+            # "For Regular and Periodic BSR": Long BSR for all LCGs which
+            # have data available for transmission, else Short. The
+            # padding length is irrelevant here -- the UE makes room for
+            # the CE through logical channel prioritisation rather than
+            # squeezing it into leftovers. Unchanged from pre-§18.
             fmt = "none" if not active_lcgs else (
                 "short" if len(active_lcgs) == 1 else "long")
         else:
-            fmt = self._select_format(
-                active_lcgs, tb_size, filled_bytes)
+            fmt = self._select_format(active_lcgs, tb_size, filled_bytes)
             if fmt is None:
-                # Not even a Short BSR plus subheader fits in the padding.
-                # No BSR is generated at all, so `pending` STAYS SET and no
-                # timer is reset -- the report is deferred, not lost.
+                # Nothing fits (or, in "spec" mode, no buffer-size octet
+                # fits). No BSR is generated. Nothing was pending, so there
+                # is nothing to defer and no timer to leave alone.
                 return
 
         st.estimated_ul_buffer_per_lcg = [0] * LCG_COUNT
         self._assemble(st, ue_id, fmt, per_lcg_true, active_lcgs,
                        lc_with_data, max(0, int(tb_size) - int(filled_bytes or 0)))
 
+        # A Padding BSR is a real BSR: it clears sched_ul_bytes (so the
+        # crumb-collapse gate sees an extra reset whenever one fires -- a
+        # real behavioural consequence, §19.3) and clears `pending`, which
+        # is already False on that path.
         st.sched_ul_bytes = 0
         st.pending = False
         # TS 38.321 §5.4.5: "start or restart periodicBSR-Timer EXCEPT when
