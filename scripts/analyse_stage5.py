@@ -491,6 +491,68 @@ def e2_breaking_n(w: list[dict]) -> dict:
     return out
 
 
+def e2_breaking_n_paired_ci(w: list[dict]) -> dict:
+    """E2's breaking N under a PAIRED BOOTSTRAP CI -- a POST-HOC CORRECTION
+    to the criterion above, added after the first real run, and kept
+    separate from it rather than replacing it.
+
+    WHY. `e2_breaking_n` scores a break as `mean(on) < mean(control)` with
+    no interval at all. On real data that fires on noise: it declared
+    ugv_heavy "breaking" at N=4 on TwoTier going 2.90 -> 2.80 contracts --
+    one seed losing one contract -- while the same metric at N=32 collapses
+    6.70 -> 1.60. A "breaking N = 4, far below stage 4's onset of 16" is the
+    headline that criterion produces, and it is an artifact of the criterion,
+    not a property of the fleet.
+
+    E1 was registered WITH a paired bootstrap CI and E2 was not; that
+    inconsistency is the defect. This applies E1's own test to E2: a
+    composition breaks at the smallest N where some arm's paired per-seed
+    delta has a bootstrap CI entirely below zero.
+
+    THE PRE-REGISTERED CRITERION'S OUTPUT IS STILL REPORTED. Replacing a
+    registered criterion after seeing which answer it gives is exactly what
+    pre-registration exists to prevent, so both are printed and the
+    correction is labelled as post-hoc wherever it is quoted.
+    """
+    out = {}
+    for comp in STAGE5_GRID["composition"]:
+        breaking, detail = None, {}
+        for n in STAGE5_GRID["n_ues"]:
+            for arm in ARMS:
+                ctrl = {r["seed"]: r["met"] for r in w
+                        if r["metric"] == "M07w" and r["window"] == "during_2"
+                        and r["subset"] == "non_lidar"
+                        and r.get("composition") == comp and r.get("n_ues") == n
+                        and r.get("lidar_ues") == 0 and r["scheduler"] == arm
+                        and r.get("met") is not None}
+                on = {r["seed"]: r["met"] for r in w
+                      if r["metric"] == "M07w" and r["window"] == "during_2"
+                      and r["subset"] == "non_lidar"
+                      and r.get("composition") == comp and r.get("n_ues") == n
+                      and r.get("lidar_ues") == 2 and r["scheduler"] == arm
+                      and r.get("met") is not None}
+                shared = sorted(set(ctrl) & set(on))
+                if not shared:
+                    continue
+                d = [on[k] - ctrl[k] for k in shared]
+                ci = bootstrap_ci(d, n_boot=4000, seed=0)
+                if ci["hi"] < 0:
+                    detail.setdefault(n, {})[arm] = {
+                        "mean_delta": st.fmean(d),
+                        "ci_lo": ci["lo"], "ci_hi": ci["hi"]}
+                    if breaking is None:
+                        breaking = n
+        onset = STAGE4_ONSET_N[comp]
+        out[comp] = {
+            "breaking_n": breaking, "stage4_onset_n": onset,
+            "holds": (breaking is not None and onset is not None
+                      and breaking <= onset),
+            "consistent_both_undefined": breaking is None and onset is None,
+            "detail": detail,
+        }
+    return out
+
+
 def e3_h6_split(w: list[dict], comp: str, n: int) -> dict:
     """Does H6's construction extend from steady overload to a transient?
     Expect the split: one QoS-aware arm holds M07w while PF holds M08w.
@@ -609,6 +671,17 @@ def main(out_dir: Path) -> int:
         print(f"    {comp:<14} {v}")
     print("    A MISS here is TRACED to a confirmed mechanism (a per-slot")
     print("    trace of the first divergent grant), not absorbed.")
+
+    print("\nE2 (POST-HOC CORRECTION) -- paired bootstrap CI, not a bare mean")
+    e2ci = e2_breaking_n_paired_ci(w)
+    for comp, v in e2ci.items():
+        print(f"    {comp:<14} breaking_n={v['breaking_n']} "
+              f"onset={v['stage4_onset_n']} holds={v['holds']} "
+              f"both_undefined={v['consistent_both_undefined']}")
+    print("    The registered criterion has NO interval and fires on noise")
+    print("    (ugv_heavy 'breaks' at N=4 on 2.90 -> 2.80 contracts). Both")
+    print("    are printed; the correction is labelled post-hoc wherever")
+    print("    it is quoted.")
 
     print("\nE3 -- H6 SPLIT (M07w and M08w quoted TOGETHER, always)")
     for comp, v in e2.items():

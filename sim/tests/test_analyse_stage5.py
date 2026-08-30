@@ -253,3 +253,55 @@ def test_c5_still_catches_a_real_difference(tmp_path):
     ok, notes = c5_stage4_identity(rows, s4)
     assert not ok
     assert any("cols differ" in n for n in notes)
+
+
+# --- E2's post-hoc CI correction ----------------------------------------
+
+def _m07_pair(comp, n, arm, seed, ctrl, on):
+    return [_win_row("M07w", "during_2", "non_lidar", comp, n, 0, arm, seed, ctrl),
+            _win_row("M07w", "during_2", "non_lidar", comp, n, 2, arm, seed, on)]
+
+
+def test_registered_e2_fires_on_a_one_seed_difference():
+    """Documents the defect rather than hiding it: the pre-registered
+    criterion is a bare mean comparison, so a single seed losing a single
+    contract declares the composition 'breaking'."""
+    from analyse_stage5 import e2_breaking_n
+    w = []
+    for seed in range(10):
+        drop = 1 if seed == 0 else 0        # one seed, one contract
+        for arm in ("PF", "Reservation", "TwoTier"):
+            w += _m07_pair("ugv_heavy", 4, arm, seed, 3.0, 3.0 - drop)
+    assert e2_breaking_n(w)["ugv_heavy"]["breaking_n"] == 4
+
+
+def test_paired_ci_correction_does_not_fire_on_that_same_noise():
+    from analyse_stage5 import e2_breaking_n_paired_ci
+    w = []
+    for seed in range(10):
+        drop = 1 if seed == 0 else 0
+        for arm in ("PF", "Reservation", "TwoTier"):
+            w += _m07_pair("ugv_heavy", 4, arm, seed, 3.0, 3.0 - drop)
+    assert e2_breaking_n_paired_ci(w)["ugv_heavy"]["breaking_n"] is None
+
+
+def test_paired_ci_correction_still_fires_on_a_real_collapse():
+    """The correction must not be merely more conservative -- it has to
+    still detect the effect the excursion exists to measure."""
+    from analyse_stage5 import e2_breaking_n_paired_ci
+    w = []
+    for seed in range(10):
+        for arm in ("PF", "Reservation", "TwoTier"):
+            w += _m07_pair("ugv_heavy", 16, arm, seed, 10.0, 1.0)
+    out = e2_breaking_n_paired_ci(w)["ugv_heavy"]
+    assert out["breaking_n"] == 16
+    assert out["holds"] is True          # 16 <= stage-4 onset 16
+
+
+def test_both_undefined_is_reported_as_consistent_not_as_a_miss():
+    """sensor_dense never separated in stage 4 and never breaks here. That
+    is agreement, and `holds=False` alone would read as a failure."""
+    from analyse_stage5 import e2_breaking_n_paired_ci
+    out = e2_breaking_n_paired_ci([])["sensor_dense"]
+    assert out["breaking_n"] is None and out["stage4_onset_n"] is None
+    assert out["consistent_both_undefined"] is True
