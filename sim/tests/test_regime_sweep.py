@@ -16,6 +16,7 @@ from regime_sweep import (
     write_csv,
 )
 from sim.scenarios import smoke_scenario
+from sim.messages import MessageLedger
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
 
@@ -61,6 +62,66 @@ def test_sweep_pairs_seeds_across_schedulers_within_a_cell():
     pf_seeds = sorted(r["seed"] for r in rows if r["scheduler"] == "PF")
     rr_seeds = sorted(r["seed"] for r in rows if r["scheduler"] == "RR")
     assert pf_seeds == rr_seeds
+
+
+def test_run_sink_receives_the_live_ledger_the_record_cannot_carry():
+    """B8's whole reason to exist (docs/wp9-plan.md §16.2): the message
+    ledger is a live object RunRecord.from_summary drops, so a windowed
+    metric is underivable from what record_sink sees."""
+    seen = []
+
+    def run_sink(record, axis_values, summary):
+        seen.append((record, axis_values, summary))
+
+    sweep(
+        axes={"capacity_mult": [1.0]},
+        build_scenario=_build_scenario,
+        schedulers={"PF": ProportionalFair},
+        n_seeds=2,
+        run_sink=run_sink,
+    )
+    assert len(seen) == 2
+    for record, axis_values, summary in seen:
+        assert axis_values == {"capacity_mult": 1.0}
+        ledger = summary["_message_ledger"]
+        assert isinstance(ledger, MessageLedger)
+        # The point of the sink: per-message generation timestamps, which a
+        # window can select on. The record carries only whole-run
+        # percentiles derived from these.
+        for c in ledger.completions():
+            assert isinstance(c.message.generation_ts_s, float)
+        assert "_message_ledger" not in record.to_dict()
+
+
+def test_run_sink_runs_before_record_sink():
+    """Ordering is deliberate -- a record sink strips/projects/persists the
+    record, and must not be able to change what the run sink observed."""
+    order = []
+    sweep(
+        axes={"capacity_mult": [1.0]},
+        build_scenario=_build_scenario,
+        schedulers={"PF": ProportionalFair},
+        n_seeds=1,
+        run_sink=lambda rec, av, summary: order.append("run"),
+        record_sink=lambda rec, av: order.append("record"),
+    )
+    assert order == ["run", "record"]
+
+
+def test_run_sink_is_optional_and_record_sink_keeps_its_arity():
+    """Purely additive: a pre-B8 caller passing only a two-argument
+    record_sink must be untouched -- the reason this is a second parameter
+    rather than a widened record_sink."""
+    seen = []
+    rows = sweep(
+        axes={"capacity_mult": [1.0]},
+        build_scenario=_build_scenario,
+        schedulers={"PF": ProportionalFair},
+        n_seeds=2,
+        record_sink=lambda rec, av: seen.append((rec, av)),
+    )
+    assert len(seen) == 2
+    assert len(rows) == 2
 
 
 def test_write_csv_roundtrips(tmp_path):

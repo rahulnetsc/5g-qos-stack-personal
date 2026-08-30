@@ -102,6 +102,7 @@ def sweep(
     scorecard: Optional[Scorecard] = None,
     metric_overrides: Optional[dict] = None,
     record_sink: Optional[Callable[[RunRecord, dict[str, Any]], None]] = None,
+    run_sink: Optional[Callable[[RunRecord, dict[str, Any], dict], None]] = None,
 ) -> list[dict[str, Any]]:
     """Run every (cell, scheduler, seed) combination and return tidy rows.
 
@@ -127,6 +128,31 @@ def sweep(
     them, and re-score at different panel defaults, WITHOUT re-running:
     ``Scorecard.score()`` takes overrides and ``RunRecord.to_dict()``
     round-trips. Rows stay bounded; records go to the sink.
+
+    ``run_sink(record, axis_values, summary)``, if given, is called once
+    per run with the RAW driver summary alongside the record. It exists
+    for the one thing ``record_sink`` structurally cannot supply: the live
+    objects ``RunRecord.from_summary`` deliberately drops, above all
+    ``summary["_message_ledger"]`` (WP7), whose own docstring in
+    sim/driver.py says it is there so "a study can inspect raw per-message
+    completions beyond the percentiles". WP9 stage 5 needs exactly that --
+    a windowed M01/M02 restricted to a lidar-activation interval is not
+    derivable from the whole-run percentiles the record carries, and the
+    ledger survives neither ``from_summary`` nor persistence
+    (docs/wp9-plan.md §16.2).
+
+    A SECOND EXPLICIT PARAMETER, not a wider signature on ``record_sink``
+    and not arity introspection on it -- ``axis_aware`` above already
+    rejects introspection for this codebase, and for the same reason:
+    every existing ``record_sink`` caller must keep working untouched, and
+    a silently-widened callback would break them by arity rather than
+    visibly.
+
+    Called BEFORE ``record_sink`` so that whatever a record sink does to
+    the record (stripping timeseries, projecting, persisting) cannot
+    affect what the run sink observes. The summary is NOT retained here --
+    a run sink that wants anything out of it must extract and discard, or
+    it holds the ledger and the UE LCP state for the whole sweep.
     """
     driver_kwargs = {} if driver_kwargs is None else driver_kwargs
     scorecard = scorecard or Scorecard()
@@ -152,6 +178,8 @@ def sweep(
                     flow_configs=sc.flows, summary=summary, arm=dict(dk),
                     meta=dict(axis_values),
                 )
+                if run_sink is not None:
+                    run_sink(rec, axis_values, summary)
                 if record_sink is not None:
                     record_sink(rec, axis_values)
                 scores = scorecard.score(rec, **metric_overrides)
