@@ -50,6 +50,15 @@ from scheduler.flow import FlowConfig
 
 LCG_COUNT = 8
 
+# MAC CE sizes, from the packed structs in the full OAI checkout's
+# NR_MAC_COMMON/nr_mac.h:92-110,137-153 -- NR_BSR_SHORT is one octet
+# (Buffer_size:5 + LcgID:3), NR_BSR_LONG one octet (the 8-bit LCG bitmap),
+# NR_MAC_SUBHEADER_FIXED one octet, NR_MAC_SUBHEADER_SHORT two.
+# `long_bsr_sz` additionally counts one buffer-size octet per reported LCG,
+# so it is computed per report rather than being a constant.
+SHORT_BSR_SZ = 2          # NR_BSR_SHORT + NR_MAC_SUBHEADER_FIXED
+LONG_BSR_FIXED_SZ = 3     # NR_BSR_LONG + NR_MAC_SUBHEADER_SHORT
+
 # oai-branches/two-tier/nr_mac_common.c:43-48 (twotier branch, commit
 # 98618a7dc8c2c9bdf7fc3d2c789f57658cbd46d1) -- 38.321 Table 6.1.3.1-1,
 # transcribed verbatim.
@@ -366,37 +375,109 @@ class BsrModel:
             return
 
         per_lcg_true: dict[int, int] = {}
+        # (priority_level, lcg) for every LC that itself has data -- the
+        # spec's tie-break is on the LOGICAL CHANNEL, not the LCG, so a
+        # per-LCG aggregate cannot answer it.
+        lc_with_data: list[tuple[int, int]] = []
         for f in self._ue_flows[ue_id]:
-            per_lcg_true[f.lcg] = per_lcg_true.get(f.lcg, 0) + buffers.state(f.ue_id, f.qfi).bytes_queued
+            backlog = buffers.state(f.ue_id, f.qfi).bytes_queued
+            per_lcg_true[f.lcg] = per_lcg_true.get(f.lcg, 0) + backlog
+            if backlog > 0:
+                lc_with_data.append((f.priority_level, f.lcg))
         active_lcgs = [lcg for lcg, backlog in per_lcg_true.items() if backlog > 0]
 
-        st.estimated_ul_buffer_per_lcg = [0] * LCG_COUNT
-        if not active_lcgs:
-            st.estimated_ul_buffer = 0
-        elif len(active_lcgs) == 1:
-            # Short BSR: reports one LCG's size; the aliasing is the memset
-            # above -- every other LCG's slot is already zeroed and stays
-            # that way until a future BSR repopulates it.
-            lcg = active_lcgs[0]
-            estim = quantise_short(per_lcg_true[lcg])
-            st.estimated_ul_buffer_per_lcg[lcg] = estim
-            st.estimated_ul_buffer = estim
+        if self._truncated_bsr == "off":
+            fmt = "none" if not active_lcgs else (
+                "short" if len(active_lcgs) == 1 else "long")
         else:
-            total = 0
-            for lcg in active_lcgs:
-                estim = quantise_long(per_lcg_true[lcg])
-                st.estimated_ul_buffer_per_lcg[lcg] = estim
-                total += estim
-            st.estimated_ul_buffer = total
+            fmt = self._select_format(
+                active_lcgs, tb_size, filled_bytes)
+            if fmt is None:
+                # Not even a Short BSR plus subheader fits in the padding.
+                # No BSR is generated at all, so `pending` STAYS SET and no
+                # timer is reset -- the report is deferred, not lost.
+                return
+
+        st.estimated_ul_buffer_per_lcg = [0] * LCG_COUNT
+        self._assemble(st, fmt, per_lcg_true, active_lcgs, lc_with_data)
 
         st.sched_ul_bytes = 0
         st.pending = False
         # TS 38.321 §5.4.5: "start or restart periodicBSR-Timer EXCEPT when
         # all the generated BSRs are long or short Truncated" -- the retx
         # timer restarts unconditionally (already done at the top of this
-        # method). Only the truncated paths suppress this, so with the flag
-        # off it is unconditional exactly as before.
-        st.periodic_deadline_slot = slot_index + self._periodic_bsr_slots
+        # method). With the flag off nothing is ever truncated, so this
+        # stays unconditional exactly as before.
+        if fmt not in ("short_trunc", "long_trunc"):
+            st.periodic_deadline_slot = slot_index + self._periodic_bsr_slots
+
+    def _select_format(self, active_lcgs, tb_size, filled_bytes):
+        """Padding-keyed BSR format selection, ported from the UE side
+        (`NR_MAC_UE/nr_ue_scheduler.c:2364-2432`, full checkout).
+
+        Returns "short" / "long" / "short_trunc" / "long_trunc", or None
+        when not even a Short BSR plus its subheader fits -- OAI's final
+        `else` logs "Can't add any BSR, not enough padding" and emits
+        nothing.
+
+        BRANCH ORDER IS OAI'S, NOT THE SPEC'S PROSE ORDER, and they are not
+        the same shape: the spec nests the truncated cases inside
+        `short_bsr_sz <= padding < long_bsr_sz`, while OAI tests
+        `padding >= long_bsr_sz` first and reaches `short_trunc` only on an
+        exact `padding == short_bsr_sz`. Ported as written (CLAUDE.md:
+        reproduce measured behaviour, not documented intent); the outcomes
+        coincide on every input either way, because OAI's earlier
+        `long`-branch already excludes the range the spec's guard excludes.
+        """
+        if not active_lcgs:
+            return "none"
+        padding = max(0, int(tb_size) - int(filled_bytes or 0))
+        long_bsr_sz = len(active_lcgs) + LONG_BSR_FIXED_SZ
+        if len(active_lcgs) < 2 and padding >= SHORT_BSR_SZ:
+            return "short"
+        if padding >= long_bsr_sz:
+            return "long"
+        if padding == SHORT_BSR_SZ:
+            return "short_trunc"
+        if padding >= LONG_BSR_FIXED_SZ:
+            return "long_trunc"
+        return None
+
+    def _assemble(self, st, fmt, per_lcg_true, active_lcgs, lc_with_data):
+        """Write the gNB-side per-LCG estimate for the chosen format.
+
+        The array was zeroed by the caller, mirroring OAI's memset before
+        repopulating (`gNB_scheduler_ulsch.c:626-679`). **That memset is
+        what makes truncation a DESYNC rather than a stale read**: an LCG
+        the report omits is left at 0 even though the UE still holds data
+        for it, and nothing repopulates it until a later non-truncated
+        report.
+        """
+        if fmt == "none":
+            st.estimated_ul_buffer = 0
+            return
+
+        if fmt in ("short", "short_trunc"):
+            # "the LCG with the highest priority logical channel with data
+            # available for transmission" (TS 38.321 §5.4.5). The rank is a
+            # property of the LOGICAL CHANNEL, so it is resolved from
+            # lc_with_data, not from the per-LCG aggregate.
+            lcg = min(lc_with_data)[1] if lc_with_data else active_lcgs[0]
+            estim = quantise_short(per_lcg_true[lcg])
+            st.estimated_ul_buffer_per_lcg[lcg] = estim
+            st.estimated_ul_buffer = estim
+            return
+
+        # "long" and, for the OAI-faithful mode, "long_trunc" -- OAI fills
+        # every LCG entry for both (`nr_ue_scheduler.c:2396-2400` and
+        # `:2422-2426` are the same loop). Empty LCGs encode to 0, so this
+        # matches the spec's "Long BSR for all LCGs which have data".
+        total = 0
+        for lcg in active_lcgs:
+            estim = quantise_long(per_lcg_true[lcg])
+            st.estimated_ul_buffer_per_lcg[lcg] = estim
+            total += estim
+        st.estimated_ul_buffer = total
 
     def on_ul_confirmed_receipt(self, ue_id: int, delivered_bytes: int) -> None:
         """The SDU-receipt decrement of the scalar `estimated_ul_buffer`

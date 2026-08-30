@@ -467,3 +467,131 @@ def test_filled_bytes_is_inert_while_the_flag_is_off():
     assert len(set(results)) == 1, (
         f"supplying filled_bytes changed the report while the flag is off: "
         f"{set(results)}")
+
+
+# --- WP9 §18: the desync guard. MUST fail before the mechanism exists ----
+
+def _desync_setup(mode):
+    """Two backlogged LCGs and a grant whose padding lands in the
+    Short-Truncated window (exactly 2 bytes, TS 38.321 §5.4.5)."""
+    # priority_level: lower = higher priority (3GPP). LCG 0 wins.
+    flows = [_flow(1, 2, 0, priority_level=10), _flow(1, 9, 1, priority_level=90)]
+    buffers = BufferModel()
+    buffers.register(1, 2, is_ul=True, lcg=0)
+    buffers.register(1, 9, is_ul=True, lcg=1)
+    buffers.enqueue(1, 2, 5000, 0.0)
+    buffers.enqueue(1, 9, 5000, 0.0)
+    bsr = BsrModel(flows, _SLOT_S, truncated_bsr=mode)
+    return flows, buffers, bsr
+
+
+def test_short_truncated_bsr_produces_a_PERSISTENT_desync():
+    """THE guard for docs/wp9-plan.md §18. Commit 0b (§8a) established
+    read-only that this state is unreachable today: quantisation cannot
+    zero a live backlog, short-BSR aliasing only ever zeroes genuinely
+    empty LCGs, and the frozen array's staleness is bounded by three
+    re-arming paths.
+
+    PERSISTENCE is the discriminating half, not the zero itself. Route C
+    already produces a one-slot `estimate == 0 with backlog > 0`, so a
+    single-slot assertion would pass against the current code and guard
+    nothing. This drives repeated truncated reports and requires the
+    unreported LCG to stay at 0 across all of them while its backlog never
+    drops.
+    """
+    flows, buffers, bsr = _desync_setup("oai")
+
+    seen_zero_with_backlog = 0
+    for slot in range(1, 9):
+        _force_pending(bsr, 1)
+        # padding = tb_size - filled_bytes = 2 -> Short Truncated BSR
+        bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0,
+                        slot_index=slot, buffers=buffers, filled_bytes=98)
+        est = bsr._state[1].estimated_ul_buffer_per_lcg
+        assert est[0] > 0, "the reported LCG must carry a real estimate"
+        assert buffers.state(1, 9).bytes_queued > 0, "LCG 1 must stay backlogged"
+        assert est[1] == 0, (
+            f"slot {slot}: LCG 1 reported {est[1]} -- a truncated BSR must "
+            f"leave the unreported LCG at 0 while it is still backlogged")
+        seen_zero_with_backlog += 1
+
+    assert seen_zero_with_backlog == 8, (
+        "the desync must PERSIST across repeated reports, not self-correct "
+        "-- that persistence is what distinguishes this from Route C")
+
+
+def test_padding_thresholds_match_the_oai_branch_order():
+    """The whole mechanism keys on these boundaries, so they are pinned
+    directly rather than only through end-to-end behaviour. Sizes from
+    NR_MAC_COMMON/nr_mac.h: short=2, long=n_lcg+3, long_trunc floor=3."""
+    flows = [_flow(1, 2, 0, priority_level=10), _flow(1, 9, 1, priority_level=90)]
+    bsr = BsrModel(flows, _SLOT_S, truncated_bsr="oai")
+    two = [0, 1]                     # two active LCGs -> long_bsr_sz = 5
+
+    def fmt(padding):
+        return bsr._select_format(two, tb_size=padding, filled_bytes=0)
+
+    assert fmt(0) is None            # nothing fits: no BSR at all
+    assert fmt(1) is None
+    assert fmt(2) == "short_trunc"   # exactly short_bsr_sz
+    assert fmt(3) == "long_trunc"
+    assert fmt(4) == "long_trunc"
+    assert fmt(5) == "long"          # n_lcg + 3
+    assert fmt(4000) == "long"
+
+    one = [0]                        # a single active LCG never truncates
+    assert bsr._select_format(one, tb_size=2, filled_bytes=0) == "short"
+    assert bsr._select_format(one, tb_size=99, filled_bytes=0) == "short"
+    assert bsr._select_format(one, tb_size=1, filled_bytes=0) is None
+
+
+def test_no_bsr_fits_defers_the_report_rather_than_losing_it():
+    """OAI's final else emits nothing ("Can't add any BSR, not enough
+    padding"). `pending` must survive, or the trigger is silently dropped
+    and the UE waits a full periodic interval for no reason."""
+    flows, buffers, bsr = _desync_setup("oai")
+    _force_pending(bsr, 1)
+    before = list(bsr._state[1].estimated_ul_buffer_per_lcg)
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=5,
+                    buffers=buffers, filled_bytes=99)   # padding = 1
+    assert bsr._state[1].pending is True, "the pending trigger was dropped"
+    assert list(bsr._state[1].estimated_ul_buffer_per_lcg) == before
+
+
+def test_truncated_report_does_not_restart_the_periodic_timer():
+    """TS 38.321 §5.4.5: restart periodicBSR-Timer "except when all the
+    generated BSRs are long or short Truncated". A truncated report is
+    incomplete, so the periodic refresh that would repair it must stay on
+    its original deadline."""
+    flows, buffers, bsr = _desync_setup("oai")
+    _force_pending(bsr, 1)
+    deadline_before = bsr._state[1].periodic_deadline_slot
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=50,
+                    buffers=buffers, filled_bytes=98)   # padding = 2
+    assert bsr._state[1].periodic_deadline_slot == deadline_before
+
+    # A full Long BSR on the same setup does restart it.
+    flows, buffers, bsr2 = _desync_setup("oai")
+    _force_pending(bsr2, 1)
+    bsr2.on_ul_grant(ue_id=1, tb_size=4000, delivered_bytes=0, slot_index=50,
+                     buffers=buffers, filled_bytes=0)
+    assert bsr2._state[1].periodic_deadline_slot > deadline_before
+
+
+def test_short_truncated_picks_the_highest_priority_LC_not_the_lowest_lcg():
+    """The spec keys on the highest-priority LOGICAL CHANNEL, so a
+    lower-numbered LCG must not win by virtue of its index."""
+    # LCG 3 carries the higher-priority LC (priority 5 < 90).
+    flows = [_flow(1, 9, 1, priority_level=90), _flow(1, 2, 3, priority_level=5)]
+    buffers = BufferModel()
+    buffers.register(1, 9, is_ul=True, lcg=1)
+    buffers.register(1, 2, is_ul=True, lcg=3)
+    buffers.enqueue(1, 9, 5000, 0.0)
+    buffers.enqueue(1, 2, 5000, 0.0)
+    bsr = BsrModel(flows, _SLOT_S, truncated_bsr="oai")
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                    buffers=buffers, filled_bytes=98)
+    est = bsr._state[1].estimated_ul_buffer_per_lcg
+    assert est[3] > 0, "the higher-priority LC's LCG must be the one reported"
+    assert est[1] == 0
