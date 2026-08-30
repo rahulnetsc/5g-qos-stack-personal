@@ -18,6 +18,8 @@ import pytest
 
 from analyse_stage5 import (
     STAGE4_ONSET_N,
+    _norm_csv,
+    c5_stage4_identity,
     TransientExclusionError,
     WINDOWED_DIRECTION,
     _as_bool,
@@ -206,3 +208,48 @@ def test_direction_signs_and_stage4_onset_are_the_registered_ones():
                                  "M07w": +1, "M08w": +1}
     assert STAGE4_ONSET_N == {"sensor_dense": None, "mixed": 32,
                               "drone_heavy": 32, "ugv_heavy": 16}
+
+
+# --- C5's normalisation, found by the real run ---------------------------
+
+def test_norm_csv_maps_empty_and_none_alike():
+    assert _norm_csv("") is None
+    assert _norm_csv("None") is None
+    assert _norm_csv("0.5") == "0.5"
+
+
+def test_c5_does_not_flag_a_normalisation_difference_as_a_mismatch(tmp_path):
+    """The bug the real run caught: `load_rows` maps ''-> None on the
+    stage-5 side, so comparing against RAW stage-4 strings compared the
+    normalisation and reported all 480 control rows as differing, with zero
+    real differences underneath.
+
+    A control that cries wolf is as useless as one that never fires -- it
+    would have been read as "plumbing the lidar axis changed the lidar-off
+    path", which is the one conclusion C5 exists to license.
+    """
+    s4 = tmp_path / "stages4_rows.csv"
+    s4.write_text(
+        "composition,n_ues,video_tier,scheduler,seed,M02,M04.flow\n"
+        "ugv_heavy,8,1.0,PF,7,0.01,\n")
+    rows = [{"composition": "ugv_heavy", "n_ues": 8, "lidar_ues": 0,
+             "scheduler": "PF", "seed": 7, "M02": "0.01",
+             "M04.flow": None,          # load_rows turned '' into None
+             "transient_excluded": False}]
+    ok, notes = c5_stage4_identity(rows, s4)
+    assert ok, notes
+    assert "compared 1 control rows" in notes[0]
+
+
+def test_c5_still_catches_a_real_difference(tmp_path):
+    """The fix must not have made C5 unable to fail."""
+    s4 = tmp_path / "stages4_rows.csv"
+    s4.write_text(
+        "composition,n_ues,video_tier,scheduler,seed,M02\n"
+        "ugv_heavy,8,1.0,PF,7,0.01\n")
+    rows = [{"composition": "ugv_heavy", "n_ues": 8, "lidar_ues": 0,
+             "scheduler": "PF", "seed": 7, "M02": "0.02",
+             "transient_excluded": False}]
+    ok, notes = c5_stage4_identity(rows, s4)
+    assert not ok
+    assert any("cols differ" in n for n in notes)

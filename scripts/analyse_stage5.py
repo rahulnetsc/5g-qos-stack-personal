@@ -90,6 +90,17 @@ def _coerce(axis: str, sval: str, grid: dict) -> Any:
     return None
 
 
+def _norm_csv(v: Any) -> Any:
+    """Empty / 'None' -> None, the same normalisation `load_rows` applies.
+
+    Both sides of an identity check must pass through this or the check
+    compares a normalisation difference and reports a mismatch that is not
+    one -- which is exactly what C5 did on its first run: 480 control rows
+    flagged on `M04.flow=None vs ''` with zero real differences underneath.
+    """
+    return None if v in ("", "None") else v
+
+
 def _as_bool(v: Any) -> Optional[bool]:
     if isinstance(v, bool):
         return v
@@ -247,10 +258,18 @@ def c5_stage4_identity(
             continue
         # Compare only columns both runs emit: stage 5 adds lidar_ues /
         # n_lidar_active / transient_excluded, stage 4 adds video_tier.
+        # `n_ues`/`composition` are part of the join key -- equal by
+        # construction -- and load_rows has coerced them to their declared
+        # types while `ref` still holds strings, so comparing them would
+        # compare int 8 against '8'. Skipped, not coerced: a join key that
+        # could differ here would mean the lookup itself was wrong.
         skip = {"lidar_ues", "n_lidar_active", "transient_excluded",
-                "video_tier", "scheduler", "seed"}
+                "video_tier", "scheduler", "seed", "n_ues", "composition"}
         cols = [c for c in r if c not in skip and c in ref]
-        diff = [c for c in cols if str(r.get(c)) != str(ref.get(c))]
+        # NORMALISE BOTH SIDES: `r` came through load_rows (''-> None) and
+        # `ref` is raw csv, so comparing them directly compares the
+        # normalisation, not the runs.
+        diff = [c for c in cols if r.get(c) != _norm_csv(ref.get(c))]
         compared += 1
         if diff:
             problems.append(
