@@ -2496,3 +2496,46 @@ co-located on one LCG versus spread — **remains UNRUN**.
 - `FIVE_QI_LCG` remains invented (§12.3), so anything downstream of LCG
   co-location — including E4's tight-PDB reading — inherits that
   `[OPEN: HARDWARE/DECISION]`.
+
+### 17.9 End-of-stage judgment-calls review
+
+The standing step (CLAUDE.md), run over stage 5's own diff looking for
+undocumented decisions and silent bugs. Four found, none changing a number
+above; recorded rather than quietly fixed.
+
+1. **§16.5's exclusion is enforced by construction, not by a check in
+   `main()`.** `aggregate_panel()` raises and is tested, but `main()` never
+   calls it — it never aggregates a panel column across lidar-on cells in
+   the first place, so there is nothing to intercept. The guard protects
+   the *next* consumer, not this one. §16.5's wording ("the analyser
+   raises if asked to aggregate") is true of the function and should not be
+   read as a claim that the read path is dynamically checked.
+
+2. **`wp9_window.lidar_windows()` duplicates `LidarActivation`'s defaults
+   on its `lidar=None` path** (1.5 / 2.0 / 0.5), because the module
+   deliberately imports nothing from `sim.fleet`. The values coincide today,
+   so every control cell was scored at the right coordinates. The drift
+   hazard is real but **not silent**:
+   `test_control_cells_get_the_same_window_coordinates` compares the two
+   paths directly and fails the moment a default moves on one side only.
+   Left as-is; the alternative (importing `sim.fleet` into the pure metric
+   module) costs more than it buys.
+
+3. **C3 compares M02w on the `non_lidar` subset against a panel M02 that
+   covers all flows.** Sound only because it runs on control cells, where
+   `build_fleet` emits no 5QI-4 flow at all, so the two populations are the
+   same set. It would be wrong on any lidar-on cell, and C3 is restricted
+   to controls for exactly that reason.
+
+4. **`n_lidar_active` is derived per cell from `build_fleet`, not observed
+   per run.** Correct here — the allocation is deterministic in the axis
+   values — but it means the column reports what was *provisioned and
+   activated*, not what transmitted. That is the intended reading (§16.7
+   B7) and is what makes the degenerate-cell census meaningful; a future
+   consumer wanting "did it actually send" must not reuse this column.
+
+**Not found:** any retention growth (the worker's summary is discarded and
+pinned by a test), any scheduler-file change (none in this stage), any
+panel edit (`config/metric_panel.yml` untouched, as §16.4 required), or
+any `--capture` of the corpus (frozen at `9963be1` and `--check`-clean at
+every one of the seven commits).
