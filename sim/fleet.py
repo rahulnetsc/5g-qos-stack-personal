@@ -83,6 +83,14 @@ class LidarActivation:
     duration_s: float = 2.0
     rate_bps: float = LIDAR_ACTIVE_BPS
     synchronised: bool = False        # both UEs at once = herd on a LARGE flow
+    # Offset between successive activations when not synchronised. A FIELD
+    # rather than the literal it used to be inside build_fleet, because
+    # stage 5's scoring windows are derived from this dataclass and nothing
+    # else (docs/wp9-plan.md §16.4, "never hardcoded") -- `during_2` is
+    # [start_s, start_s + stagger_s + duration_s), which is underivable if
+    # the stagger lives only at the point of use. Same value, same
+    # behaviour; it just became reachable.
+    stagger_s: float = 0.5
 
 
 LIDAR = LidarActivation
@@ -265,7 +273,7 @@ def build_fleet(
                 start = lidar.start_s
                 if not lidar.synchronised:
                     # stagger so independent activations do not coincide
-                    start += 0.5 * sorted(active_ids).index(ue_id)
+                    start += lidar.stagger_s * sorted(active_ids).index(ue_id)
                 params["active_from_s"] = start
                 params["active_until_s"] = start + lidar.duration_s
                 params["bytes_per_period"] = int(
