@@ -154,7 +154,33 @@ class BsrModel:
         slot_duration_s: float,
         periodic_bsr_ms: float = 5.0,
         retx_bsr_ms: float = 80.0,
+        truncated_bsr: str = "off",
     ) -> None:
+        """``truncated_bsr`` selects the BSR format-selection rule
+        (`docs/wp9-plan.md` §18):
+
+        - ``"off"`` (default) -- the pre-§18 branch, keyed on the active-LCG
+          count alone. Byte-for-byte the behaviour every record in the
+          frozen corpus was captured under.
+        - ``"oai"`` -- padding-keyed selection ported from
+          ``NR_MAC_UE/nr_ue_scheduler.c:2364-2432``, INCLUDING its
+          ``b_long_trunc`` filling all 8 LCG entries under its own Fixme.
+        - ``"spec"`` -- the same, except ``b_long_trunc`` reports the
+          priority-ordered prefix TS 38.321 §5.4.5 actually specifies. A
+          DELIBERATE, DOCUMENTED DIVERGENCE from OAI, on the grounds that
+          real UEs are commercial modems implementing the spec while OAI's
+          UE code runs only in rfsim (§18.2).
+
+        Default ``"off"`` is what keeps this opt-in and inert: a fidelity
+        change of this class moved 15 of 20 corpus records last time, and
+        bundling it with the mechanism would destroy the attribution the
+        corpus exists for.
+        """
+        if truncated_bsr not in ("off", "oai", "spec"):
+            raise ValueError(
+                f"truncated_bsr must be 'off', 'oai' or 'spec', "
+                f"got {truncated_bsr!r}")
+        self._truncated_bsr = truncated_bsr
         self._ue_flows: dict[int, list[FlowConfig]] = {}
         for f in flows:
             if f.direction != "UL":
@@ -245,7 +271,8 @@ class BsrModel:
                 st.pending = True
 
     def on_ul_grant(
-        self, ue_id: int, tb_size: int, delivered_bytes: int, slot_index: int, buffers
+        self, ue_id: int, tb_size: int, delivered_bytes: int, slot_index: int,
+        buffers, filled_bytes: int | None = None,
     ) -> None:
         """Call once per UE per slot, for the UE's `ue_grant=True`
         allocation, after `buffers.drain()` has applied it.
@@ -309,6 +336,26 @@ class BsrModel:
         `estimated_ul_buffer` fix above. CLAUDE.md's crumb-fraction known
         issue names this as the remaining candidate after the
         `estimated_ul_buffer` fix's own contribution is measured.
+
+        `filled_bytes` is how much of `tb_size` the UE's SDUs actually
+        occupied. It exists for the truncated-BSR format selection
+        (`docs/wp9-plan.md` §18), which keys on PADDING -- the room left
+        after the data -- not on the grant size. **This is the coupling
+        commit 0b's forward note got wrong**: it said the mechanism "needs
+        the grant size threaded into the BSR-assembly decision", but
+        `tb_size` was already a parameter here; what was missing is
+        occupancy, a different quantity.
+
+        `None` means "not supplied", which is what every pre-§18 caller
+        passes implicitly, and is only ever read when `truncated_bsr` is
+        not `"off"`.
+
+        MODELLING BIAS, stated rather than discovered later: this simulator
+        has no MAC PDU model -- no per-SDU subheaders, no PHR, no LCP
+        multiplexing -- so `tb_size - filled_bytes` OVERSTATES the real
+        padding by exactly those omissions. Truncation therefore fires less
+        often here than on hardware, which makes a null result weak
+        evidence about hardware and leaves a positive result unweakened.
         """
         st = self._state[ue_id]
         st.sched_ul_bytes += tb_size
@@ -344,6 +391,11 @@ class BsrModel:
 
         st.sched_ul_bytes = 0
         st.pending = False
+        # TS 38.321 §5.4.5: "start or restart periodicBSR-Timer EXCEPT when
+        # all the generated BSRs are long or short Truncated" -- the retx
+        # timer restarts unconditionally (already done at the top of this
+        # method). Only the truncated paths suppress this, so with the flag
+        # off it is unconditional exactly as before.
         st.periodic_deadline_slot = slot_index + self._periodic_bsr_slots
 
     def on_ul_confirmed_receipt(self, ue_id: int, delivered_bytes: int) -> None:

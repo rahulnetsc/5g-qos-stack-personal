@@ -625,7 +625,12 @@ def run(
                 # success is known, not unconditionally at grant time.
                 ue_filled_bytes = sum(byts for _, byts in ue_split)
                 bsr.on_ul_grant(
-                    alloc.ue_id, alloc.bytes_capacity, 0, slot_index, buffers
+                    alloc.ue_id, alloc.bytes_capacity, 0, slot_index, buffers,
+                    # Occupancy, for truncated-BSR format selection
+                    # (docs/wp9-plan.md §18). Read only when the model's
+                    # `truncated_bsr` is not "off"; passing it is inert
+                    # otherwise, which is what keeps the corpus frozen.
+                    filled_bytes=ue_filled_bytes,
                 )
                 ul_access.on_ul_grant(alloc.ue_id)
                 if success:

@@ -429,3 +429,41 @@ def test_crumb_fraction_emerges_from_fast_grants_slow_bsr():
         bsr.on_ul_grant(ue_id=1, tb_size=2000, delivered_bytes=0, slot_index=slot, buffers=buffers)
     assert saw_collapse
     assert bsr._state[1].pending is False  # collapsed without any new trigger
+
+
+# --- WP9 §18: the truncated-BSR flag, before the mechanism exists --------
+
+def test_truncated_bsr_defaults_to_off():
+    """Opt-in and inert by default. The corpus is frozen at 9963be1 and a
+    fidelity change of this class moved 15 of 20 records last time."""
+    m = BsrModel([], slot_duration_s=0.0005)
+    assert m._truncated_bsr == "off"
+
+
+def test_truncated_bsr_rejects_an_unknown_mode():
+    """Mirror OAI's AssertFatal preconditions as raises rather than
+    dropping them -- silently wrong beats loudly wrong (CLAUDE.md)."""
+    with pytest.raises(ValueError, match="truncated_bsr"):
+        BsrModel([], slot_duration_s=0.0005, truncated_bsr="Long")
+
+
+def test_filled_bytes_is_inert_while_the_flag_is_off():
+    """The parameter is plumbed one commit ahead of the mechanism, so this
+    pins that plumbing it changed nothing: identical per-LCG estimates
+    whether occupancy is supplied or not, across the full padding range."""
+    flows = [_flow(1, 2, 0), _flow(1, 9, 1)]
+    results = []
+    for filled in (None, 0, 1, 2, 3, 5, 40, 4000):
+        buffers = BufferModel()
+        buffers.register(1, 2, is_ul=True, lcg=0)
+        buffers.register(1, 9, is_ul=True, lcg=1)
+        buffers.enqueue(1, 2, 4000, 0.0)      # two LCGs with data, so the
+        buffers.enqueue(1, 9, 4000, 0.0)      # truncated branch would apply
+        bsr = BsrModel(flows, _SLOT_S)
+        _force_pending(bsr, 1)
+        bsr.on_ul_grant(ue_id=1, tb_size=4000, delivered_bytes=0,
+                        slot_index=10, buffers=buffers, filled_bytes=filled)
+        results.append(tuple(bsr._state[1].estimated_ul_buffer_per_lcg))
+    assert len(set(results)) == 1, (
+        f"supplying filled_bytes changed the report while the flag is off: "
+        f"{set(results)}")
