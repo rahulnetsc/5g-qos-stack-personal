@@ -3689,3 +3689,200 @@ The corrected H2/H3 rows therefore say **"tested at one cell, paired,
 (§21.5)"**, never a bare "tested" or a bare "not tested"; the depth
 qualifier travels with the row for the same reason §0.1's two-number rule
 and G11's inline seed-count rule exist.
+
+---
+
+## 22. Stage 6 Part A — results, scored against §21.6
+
+Zero new runs. `scripts/analyse_stage6.py` over `sweeps/wp9/stage{1,4}/`;
+every figure below is reproduced by `uv run python
+scripts/analyse_stage6.py sweeps/wp9`.
+
+### 22.0 Three defects the first run of the analyser found in itself
+
+Recorded because all three would have produced a plausible published
+number, and because two are re-instances of failure modes already in
+CLAUDE.md.
+
+1. **The G6 verdict read the point estimate, not the interval.** TwoTier's
+   M01.p98 impairment is **+74.9 %** against a +20 % bar — and its CI is
+   **[−24 %, +211 %]**. The first version printed **FAIL**. That is reading
+   a number the data does not support: the interval spans both zero and the
+   bar. Fixed to PASS / FAIL / **INCONCLUSIVE**, tested against the
+   interval (`g6_verdict`, pinned by a test built from this exact cell).
+2. **G12's ramp axis was assumed, and an empty selection printed a
+   plausible summary.** Stage 4 ramps `video_tier`, not `load_mult`;
+   passing the wrong axis matched **zero** records and the function printed
+   *"distinct orderings across groups: 0"* — the third instance in this WP
+   of an empty selection wearing a real-looking number. It now **raises**,
+   naming the record count it scanned.
+3. **The impairment flip was applied to the point only.** For the
+   higher-better M05.fraction the sign flips, and flipping the point while
+   leaving `lo`/`hi` alone leaves the bounds reversed — every M05 verdict
+   silently inverted. Fixed and pinned (`impairment_interval`).
+
+A fourth, not a defect but a bias that must travel with the number: a
+**relative** delta is undefined off a zero base, so seeds whose base value
+is 0 are dropped — and for M05.fraction those are exactly the seeds where
+the base run was **already failing completely**. 7 of 10 seeds drop on
+Reservation and TwoTier. **The drop is not random; it biases M05
+optimistic**, and the analyser prints the dropped count on every affected
+cell.
+
+### 22.1 F1 — G6 passes its ≤ +20 % bar: **PARTIAL**
+
+Paired within seed, `bg=True` vs the base point, n=10 (n=3 where noted).
+
+| arm | M01.p98 | M03.max_gap_ms | M05.fraction |
+|---|---|---|---|
+| **PF** | −0.02 % **PASS** | +3.7 % **PASS** | +0.13 % **PASS** |
+| **Reservation** | +0.00 % **PASS** | +9.0 % [−8.3, +28.7] **INCONCLUSIVE** | +0.22 % **PASS** *(7 seeds dropped)* |
+| **TwoTier** | **+74.9 %** [−24.3, +210.7] **INCONCLUSIVE** | **+157.0 %** [−14.1, +460.8] **INCONCLUSIVE** | +6.2 % **INCONCLUSIVE** *(7 dropped)* |
+
+**No arm fails, and only PF cleanly passes.** F1 predicted a pass on all
+three arms; it holds for PF, is undetermined for TwoTier on every metric,
+and is mixed for Reservation. **PARTIAL.**
+
+**The undetermined cells are not a null.** TwoTier's point estimates are
++74.9 % and +157.0 % — many times the bar — with intervals wide enough to
+contain zero at n=10. **What this cell needs is more SEEDS, not more
+cells**, and that is a different investment from §21.5's grid. Stated as an
+observation and **explicitly not pre-registered**: §21.5's go/no-go governs
+depth-in-cells and says nothing about seed count, so acting on this is a
+new decision, not the discharge of an old one.
+
+### 22.2 F3 — H3 separates the arms: **HIT**
+
+`snr_spread_db` vs base, paired. Both panel metrics quoted together per
+§0.1's standing rule.
+
+| level | arm | M07.met Δ | M08.fraction Δ |
+|---|---|---|---|
+| 6 dB | PF | +0.00 [+0.00, +0.00] | −0.000 [−0.001, +0.000] |
+| | Reservation | +0.10 [−0.40, +0.60] | +0.001 [−0.479, +0.480] |
+| | **TwoTier** | +1.20 [−0.10, +2.40] | **+0.676 [+0.425, +0.886]** |
+| 12 dB | PF | −0.10 [−0.30, +0.00] | **−0.001 [−0.001, −0.000]** |
+| | Reservation | −0.10 [−0.60, +0.40] | −0.192 [−0.574, +0.190] |
+| | **TwoTier** | **+1.60 [+0.80, +2.30]** | **+0.698 [+0.453, +0.939]** |
+
+**TwoTier improves on BOTH metrics as the channel spreads, with intervals
+excluding zero at 12 dB; PF and Reservation do not move.** H3 is confirmed
+in its registered direction. And note this is a case where §0.1's
+both-numbers rule does *not* bite: there is no metric split here, TwoTier
+simply wins both — which is worth saying explicitly, because §0.1 exists to
+stop a reader assuming a split, not to manufacture one.
+
+### 22.3 F2 — H2 does NOT hold in its registered direction: **MISS**
+
+| level | arm | M07.met Δ | M08.fraction Δ |
+|---|---|---|---|
+| 0.5 | PF | **−0.40 [−0.70, −0.10]** | **−0.010 [−0.016, −0.003]** |
+| | Reservation | −0.40 [−0.90, +0.10] | −0.098 [−0.480, +0.284] |
+| | TwoTier | −0.20 [−1.30, +0.90] | +0.282 [−0.108, +0.632] |
+| 0.1 | **PF** | **−7.00 [−7.40, −6.60]** | **−0.115 [−0.133, −0.098]** |
+| | Reservation | **−4.10 [−5.50, −2.60]** | +0.093 [−0.246, +0.416] |
+| | **TwoTier** | **−4.00 [−5.20, −2.70]** | **+0.384 [+0.152, +0.599]** |
+
+At the burstiest level every arm loses GBR contracts, but **PF loses nearly
+twice as many as TwoTier (−7.0 vs −4.0) and is the only arm whose worst-flow
+GFBR fraction falls; TwoTier's rises, with an interval excluding zero.**
+**H2 holds in its registered direction, on both metrics. F2 MISSES.**
+
+### 22.4 The F2 trace — obligated by §21.6, and it produced more than the miss did
+
+`scripts/f2_duty_cycle_trace.py`. TwoTier's UL composite is
+`coef = (base_q + urg) × hyp_tbs_bytes`, where `base_q` comes from `vq_ul`
+(a virtual queue that **integrates while starved**) and `urg` from a delay
+barrier on `urgency01` (which needs **live backlog** to grow). Only
+`base_q` can accumulate across an idle period.
+
+| scenario | `base_q` median | `base_q` share of the composite |
+|---|---|---|
+| duty 1.0 — no idle periods | **0.000** | 0.385 |
+| duty 0.1 — recurring idle periods | **4,678** | **0.851** |
+| stage-5 `ugv_heavy` N=16, control | 8.017 | 0.423 |
+| stage-5 `ugv_heavy` N=16, lidar activated | **0.000** | **0.337** |
+
+**Finding 1 — the mechanism is confirmed, and it is H2's own.** Duty-cycling
+moves TwoTier's ranking from `urg`-shared to **`base_q`-dominated** (median
+0 → 4,678, share 0.385 → **0.851**). That is exactly the mechanism
+`sim/parametric.py::_burstify`'s docstring registered for H2 — *"the
+windowed ceiling accumulates credit across idle periods"* — measured rather
+than asserted.
+
+**Finding 2 — a sub-hypothesis of mine, REFUTED by the same trace.** I
+expected PF to *lose* discrimination: `ewma_window_slots=200` is 50 ms
+against silences of 330–1000 ms, so `_r_avg` should decay to a floor where
+every UE looks alike. It does not. The max/min `_r_avg` ratio is **1.608 at
+duty 1.0 and 1.599 at duty 0.1**, and the EWMA reaches its floor on **1 of
+8,000 slots**. **PF is unchanged by duty-cycling; the entire effect is
+TwoTier gaining.** Recorded because it was the more obvious story and it is
+wrong.
+
+**Finding 3 — stage 5's transient is NOT the same phenomenon, and this is
+the half §21.6 required the trace to settle.** Under a lidar activation
+`base_q` moves the **opposite** way — median **8.0 → 0.000**, share
+**0.423 → 0.337** — while `urg` becomes the majority term (mean 571 →
+3,370). **Duty-cycling makes the composite `base_q`-dominated; a step
+activation makes it `urg`-dominated.** Two different terms of one formula,
+moving in opposite directions, because a one-off step to a permanently
+higher load contains **no idle period to integrate across**.
+
+**Consequence — the regime map's H2 row is wrong in a way that has nothing
+to do with H2 being unrun.** It currently reads that stage 5's transient
+"contradicts H2's direction". It does not contradict it: it is a different
+mechanism, and the two coexist without tension. Corrected in this commit.
+
+### 22.5 F4 — G12's first-violation order: **UNSCOREABLE, and that is the result**
+
+**M13 cannot be computed on any workload this WP has run.** Measured:
+across all 1,770 stage-1 records and all 1,440 stage-4 records, the GBR
+5QI classes present are **`[2]` — exactly one.** `first_violation_order`
+orders 5QI classes against each other, so with one class every group's
+"order" is a one-element list, which is not an ordering.
+
+**This corrects the regime map's G12 row, which is accurate about what
+happened and misleading about what would fix it.** It says M13 "was
+computed for stage 1's core plane only and not analysed", which invites a
+reader to extract it. Extraction cannot answer G12 — the data has nothing
+to order.
+
+**And the fix is not to widen M13.** The delay-critical classes in these
+workloads (5QI 1/82/83/85) are `flow_class="Delay"`, which
+`first_violation_order` does not read. Widening it to them would be
+redefining a pre-registered metric so that it separates something — exactly
+what `config/metric_panel.yml`'s multiplicity guard forbids. **G12 needs a
+workload with ≥ 2 GBR classes**, which is scenario work, not analysis.
+
+### 22.6 F6 — Part A changes no committed number: **HIT**
+
+`regression_corpus.py --check` → `OK -- no drift`. Part A reads stored
+records and touches no `sim/` or `scheduler/` file.
+
+### 22.7 §21.5's go/no-go, applied as written
+
+| axis | CI excludes zero on ≥1 arm/metric? | verdict |
+|---|---|---|
+| `snr_spread_db` (H3) | **yes** — TwoTier M08 at both levels, M07 at 12 dB | **depth bought** |
+| `duty_cycle` (H2) | **yes** — TwoTier M08 and PF both metrics at 0.1 | **depth bought** |
+| `bg` (G6) | **no** — every TwoTier interval spans zero | **depth NOT bought**; more seeds is a separate, non-pre-registered decision (§22.1) |
+
+### 22.8 Scoreboard
+
+| # | expectation | verdict |
+|---|---|---|
+| F1 | G6 passes on all three arms | **PARTIAL** — PF passes, TwoTier undetermined on all three, none fails |
+| F2 | H2 does NOT hold in its registered direction | **MISS** — it holds, on both metrics; trace in §22.4 |
+| F3 | H3 separates the arms | **HIT** — TwoTier on both metrics, intervals excluding zero at 12 dB |
+| F4 | G12 order same across arms, differs across profiles | **UNSCOREABLE** — one GBR class exists |
+| F5 | G4 post-silence excess | not yet run (Part B) |
+| F6 | no committed number moves | **HIT** |
+
+**Two hits, one partial, one miss, one unscoreable — and the miss produced
+the stage's most useful result.** That is now the third consecutive time in
+this WP the registered most-likely-wrong expectation carried more than the
+hits did (stage 4's E2 → §15.5; stage 5's E2 → the flat transient boundary;
+F2 → §22.4's two-term mechanism split). **The pattern is now strong enough
+to act on rather than just note: every future stage should register an
+expectation it expects to lose**, and the trace obligation should attach to
+it in advance, as §21.6 did here.

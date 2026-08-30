@@ -127,6 +127,32 @@ repair the selection mechanism that produced it.** Read only as "the
 qualifier was overstated" this would be the wrong lesson — the qualifier
 was **mis-shaped**, and those are different corrections.
 
+### 0.4a And this document has made the OPPOSITE error too — do not merge the two
+
+§0.4 above corrects an **overstatement**: a result was presented as
+better-supported than it was. Stage 6 Part A found the reverse in §2 and §3
+— an **understatement of coverage**. H2's and H3's rows read "not tested"
+and "not tested as an axis", but the `duty_cycle` and `snr_spread_db`
+excursion cells **were run in stage 1 and have been on disk since**, 30
+paired rows per level, and both hypotheses are now confirmed from them with
+**zero new runs** (`docs/wp9-plan.md` §22.2-§22.3).
+
+**The two errors have opposite failure modes in a reader, which is why they
+must not be written up as one "the coverage claims were imprecise".** §0.4's
+makes someone **trust a result more than they should**. This one makes
+someone **commission work that is already on disk**. A reader needs to know
+which mistake they are at risk of making.
+
+**And confirming G6's row is part of the same correction.** G6's
+"computable from stage-1 rows but was not computed" was **exactly
+accurate**; saying so is what makes the H2/H3 correction legible as
+specific, rather than as a general loss of confidence in this section.
+
+**The qualifier that now travels with H2/H3, permanently:** each row states
+**one cell, paired, n=30 per level**, never a bare "tested". Same reason as
+§0.1's two-number rule and G11's inline seed count — a depth qualifier that
+lives only in a methods section is a qualifier that will be dropped.
+
 ---
 
 ## 0.5 The three-category taxonomy (added by the re-scope)
@@ -285,19 +311,28 @@ arms lose the most**, consistently.
 | **G3** | **Sim-informative, conditional** | M03/M14 scored at `t_live_s` ∈ {1, 2, 4} — reported as a function of it, since `T_live` is `[OPEN: HARDWARE]` and unmeasured. |
 | **G4** | **Not answered by WP9** | The duty-cycle axis was dropped by the cap (score 2.663). Post-silence first-packet latency needs a study-layer read that stage 2 did not produce. |
 | **G5** | **Sim-informative** | M05/M06/M17 present on every run via the `xr_video` instrument. Not analysed per-regime in this pass. |
-| **G6** | **Not answered by WP9** | `bg` (the saturating aggressor) qualified at 2.648 and was dropped by the cap. The ≤ +20 % delta statistic is computable from stage-1 rows but was not computed. |
+| **G6** | **Answered at ONE cell: no arm fails, only PF cleanly passes** | The row's previous text — "computable from stage-1 rows but was not computed" — was **ACCURATE**, and it has now been computed (`docs/wp9-plan.md` §22.1, `scripts/analyse_stage6.py`, zero new runs). Paired within seed at the base point, `bg=True` vs base, n=10: **PF passes GT-4.1's ≤ +20 % bar on all three metrics; Reservation passes two and is undetermined on M03; TwoTier is UNDETERMINED on all three** — point estimates of **+74.9 %** (M01.p98) and **+157.0 %** (M03.max_gap_ms), far above the bar, with intervals ([−24.3, +210.7] and [−14.1, +460.8]) wide enough to contain zero at 10 seeds. **No arm fails.** The verdict is read from the interval, not the point: a large point estimate inside a spanning interval is an undetermined guarantee, not a failed one. **One cell only** (N=8, load ×1.0) — depth was NOT bought (§21.5's rule), and what this cell needs is more **seeds**, which is a separate decision. M05.fraction's delta is optimistically biased: 7 of 10 seeds drop because a relative delta is undefined off a zero base, and those are the seeds already failing completely. |
 | **G7** | **NOT ANSWERABLE IN SIM** | No MFBR enforcement exists anywhere in `sim/` (`sim/config_loader.py:16`). Containment is observable; **clipping is not**, and clipping is half of G7's pass criterion. GT-4.3 is the only test. |
 | **G8** | **Sim-answerable** | M09 per-second Jain across 186 scored cells. **PF-arm contaminated** by `pf.py`'s declaration-order tie-break (README §8) — Reservation-vs-TwoTier is the trustworthy pair. |
 | **G10** | **Sim-answerable — the headline** | **Admissible N is bounded by 8 at load ≥ 1.0 and by 16 below it**, on this RAN at `min_rb=5`. This is what simulation buys that the N=2 testbed cannot. §0.1 and §0.3 apply. |
 | **G11** | **NOT RUN** | The soak sub-campaign was budgeted (§6.3, 3 seeds, ~6.5 h) and **never launched or implemented**. No WP9 evidence. |
-| **G12** | **Not answered by WP9** | M13 (`first_violation_order`) was computed for stage 1's core plane only and not analysed. The load ramp exists in both stages; the ordering was not extracted. |
+| **G12** | **NOT ANSWERABLE from any workload this WP ran — a stronger and more useful statement than "not analysed"** | This row previously said M13 "was computed for stage 1's core plane only and not analysed", which invites a reader to go and extract it. **Extraction cannot answer G12.** Measured across all 1,770 stage-1 and all 1,440 stage-4 records (`docs/wp9-plan.md` §22.5): the GBR 5QI classes present are **`[2]` — exactly one**. `first_violation_order` orders 5QI classes against each other, so with one class every group's "order" is a one-element list, which is not an ordering. **And the fix is not to widen M13**: the delay-critical classes here (5QI 1/82/83/85) are `flow_class="Delay"`, which the metric does not read, and widening a pre-registered metric until it separates something is exactly what `config/metric_panel.yml`'s multiplicity guard forbids. **G12 needs a workload with ≥ 2 GBR classes** — scenario work, not analysis. |
 | **G9** | **NOT RUN** | The 50-cycle join campaign was budgeted (§6.3, ~72 min) and **never launched or implemented**. M18/M19 mechanism exists (WP-Join); WP9 produced no cycle data. |
 
-**Honest summary of coverage: WP9 answers G10 well, G1/G3/G5/G8 partially,
-and leaves G2/G4/G6/G12 uncomputed, G7 structurally unanswerable, and
-G9/G11 not run at all.** The gap between "the metric exists" and "WP9
+**Honest summary of coverage, revised by stage 6 Part A: WP9 answers G10
+well, G1/G3/G5/G8 partially, **G6 at one cell** (no arm fails, only PF
+cleanly passes), G4 uncomputed, **G12 and G7 structurally unanswerable**,
+and G9/G11 not run at all.** The gap between "the metric exists" and "WP9
 produced the number" is larger than the plan implied, and is stated here
-rather than papered over.
+rather than papered over — **but it is not uniformly larger.** Part A
+computed G6, H2 and H3 from records already on disk with zero new runs
+(§0.4a), so part of what read as a coverage gap was an accounting gap. The
+two that moved the other way are G12, which no amount of extraction can
+answer (one GBR class exists), and M19/M18, which have read `pending` on
+**every row of every stage** — 1,770 + 7,560 + 1,440 — because no WP9
+scenario configures `UEConfig.join`, so no join event can occur. **Nothing
+except G9's campaign can move them**, which is the first measured argument
+for building it rather than an assumed one.
 
 ---
 
@@ -306,8 +341,8 @@ rather than papered over.
 | H | Verdict | Basis |
 |---|---|---|
 | **H1** (reservation collapses above a UE count) | **Confirmed, bound identified** | Boundary at N=8 / N=16, matching the PDCCH bound. §0.3 limits it to `min_rb=5`. |
-| **H2** (two-tier wins as traffic becomes bursty) | **Not tested as an axis — but a transient now contradicts its direction** | `duty_cycle` qualified (2.663) and was dropped by the cap, so H2 proper is still unrun. Stage 5's lidar activation is the burstiest workload in this project, and TwoTier **lost the most** there (M07w −9.9 vs PF −1.9 at `ugv_heavy` N=16, §1.1b). That is one transient shape, not the `duty_cycle` sweep H2 asks for, so it does not refute H2 — but H2 should no longer be written as though its direction were the expected one. |
-| **H3** (two-tier wins as channel spreads) | **Not tested** | `snr_spread_db` qualified (4.689) and was dropped by the cap. |
+| **H2** (two-tier wins as traffic becomes bursty) | **CONFIRMED at one cell, and the "contradiction" was a DIFFERENT MECHANISM** | **Two corrections here, and they are separate.** (1) *"Not tested as an axis" was an UNDERSTATEMENT of coverage*: the `duty_cycle` excursion rows were run in stage 1 and are on disk — 30 rows per level (3 arms × 10 seeds), paired within seed against the base cell. Computed (`docs/wp9-plan.md` §22.3, zero new runs), at `duty_cycle=0.1` **PF loses nearly twice as many GBR contracts as TwoTier (M07 −7.0 vs −4.0) and is the only arm whose worst-flow GFBR fraction falls, while TwoTier's rises (+0.384, interval excluding zero)**. H2 holds in its registered direction, on both metrics. (2) *Stage 5's transient does NOT contradict it.* A direct-cause trace (`scripts/f2_duty_cycle_trace.py`, §22.4) shows the two regimes are driven by **different terms of the same formula, in opposite directions**: duty-cycling makes TwoTier's UL composite `base_q`-dominated (the virtual queue integrating across idle periods — median 0 → 4,678, share 0.385 → **0.851**), while a lidar activation makes it `urg`-dominated (median `base_q` 8.0 → **0.000**, share 0.423 → 0.337), because a one-off step to a permanently higher load contains no idle period to integrate across. The two coexist without tension. **Depth beyond the base point: bought but not yet run** (§21.5). |
+| **H3** (two-tier wins as channel spreads) | **CONFIRMED at one cell, in its registered direction** | *"Not tested" was an UNDERSTATEMENT of coverage* — the `snr_spread_db` excursion rows were run in stage 1 and are on disk, 30 rows per level, paired within seed. Computed (`docs/wp9-plan.md` §22.2, zero new runs): **TwoTier improves on BOTH panel metrics as the channel spreads** — M08.fraction +0.676 [+0.425, +0.886] at 6 dB and +0.698 [+0.453, +0.939] at 12 dB, M07.met +1.60 [+0.80, +2.30] at 12 dB — while PF and Reservation do not move. Note this is a case where §0.1's both-numbers rule does not bite: there is no metric split, TwoTier wins both. **One cell only** (N=8, load ×1.0); depth bought but not yet run. |
 | **H4** (Tier-1 mismatched to factory deadlines) | **Re-tagged — not an environmental question** | Driven by `pdb_ms`, which is **Cat 1** (5QI-derived, `ad6ba54`). Testable only as a **deployment variant**, not as an axis in this map. It did qualify (2.927) and was dropped by the cap, but that framing implied a gap the map could close; it cannot. |
 | **H5** (two-tier degrades as flows-per-LCG grows) | **Now TESTABLE BY COMPOSITION** | Shared-LCG arises from the UGV profile's own `FIVE_QI_LCG` assignment — odometry (83), drive control (82), e-stop (85) all on **LCG 3** — rather than a synthetic override. **A stronger test than stage 1's**: co-location follows from a realistic device's QoS classes, not a flag set to make the mechanism fire. Still conditional on `FIVE_QI_LCG`, which remains invented (`[OPEN: HARDWARE/DECISION]`); §0.2's `mfbr_bps > 0` half is now supplied by base config. |
 | **H6** (overload outcome is metric-dependent) | **CONFIRMED ON THREE STRUCTURALLY DIFFERENT WORKLOADS, INCLUDING A TRANSIENT** | §0.1. Stage 2 (uniform 3-flow fleet, synthetic filler), stage 4 (heterogeneous device profiles, no filler) and **stage 5 (a transient lidar activation)** all show it — so the construction is **not** a steady-state property, which was stage 5's registered falsifier and it did not fire. Predicted in advance only the third time (E3, `docs/wp9-plan.md` §17.6), and deliberately **without** naming an arm. **The winner flips between workloads AND between two fleet sizes of the same composition — see §0.1.1 — which is what makes the lesson, not the ranking, the result.** |

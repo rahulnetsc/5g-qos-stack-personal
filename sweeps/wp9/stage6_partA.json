@@ -1,0 +1,422 @@
+{
+  "g12_stage1": {
+    "gbr_5qis": [
+      2
+    ],
+    "n_groups": 18,
+    "n_records": 1770,
+    "status": "structurally_uninformative"
+  },
+  "g12_stage4": {
+    "gbr_5qis": [
+      2
+    ],
+    "n_groups": 12,
+    "n_records": 1440,
+    "status": "structurally_uninformative"
+  },
+  "g6": {
+    "arms": {
+      "PF": {
+        "M01.p98": {
+          "ci": {
+            "hi": 0.0,
+            "lo": -0.0004995836802664446,
+            "n": 10,
+            "point": -0.0002497918401332223
+          },
+          "ci_excludes_zero": false,
+          "impairment": -0.0002497918401332223,
+          "impairment_hi": 0.0,
+          "impairment_lo": -0.0004995836802664446,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "PASS"
+        },
+        "M03.max_gap_ms": {
+          "ci": {
+            "hi": 0.160958507997571,
+            "lo": -0.07069013687094902,
+            "n": 10,
+            "point": 0.03730938722776022
+          },
+          "ci_excludes_zero": false,
+          "impairment": 0.03730938722776022,
+          "impairment_hi": 0.160958507997571,
+          "impairment_lo": -0.07069013687094902,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "PASS"
+        },
+        "M05.fraction": {
+          "ci": {
+            "hi": 0.0,
+            "lo": -0.002631578947368407,
+            "n": 10,
+            "point": -0.0013157894736842036
+          },
+          "ci_excludes_zero": false,
+          "impairment": 0.0013157894736842036,
+          "impairment_hi": 0.002631578947368407,
+          "impairment_lo": -0.0,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "PASS"
+        }
+      },
+      "Reservation": {
+        "M01.p98": {
+          "ci": {
+            "hi": 0.00033361157484696716,
+            "lo": -0.0003331945600888149,
+            "n": 10,
+            "point": 2.0850737907614562e-07
+          },
+          "ci_excludes_zero": false,
+          "impairment": 2.0850737907614562e-07,
+          "impairment_hi": 0.00033361157484696716,
+          "impairment_lo": -0.0003331945600888149,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "PASS"
+        },
+        "M03.max_gap_ms": {
+          "ci": {
+            "hi": 0.2844577409747728,
+            "lo": -0.0847744378435877,
+            "n": 10,
+            "point": 0.08987883006225342
+          },
+          "ci_excludes_zero": false,
+          "impairment": 0.08987883006225342,
+          "impairment_hi": 0.2844577409747728,
+          "impairment_lo": -0.0847744378435877,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "INCONCLUSIVE"
+        },
+        "M05.fraction": {
+          "ci": {
+            "hi": 0.0,
+            "lo": -0.006578947368421018,
+            "n": 3,
+            "point": -0.002192982456140339
+          },
+          "ci_excludes_zero": false,
+          "impairment": 0.002192982456140339,
+          "impairment_hi": 0.006578947368421018,
+          "impairment_lo": -0.0,
+          "n_dropped": 7,
+          "n_paired": 3,
+          "verdict": "PASS"
+        }
+      },
+      "TwoTier": {
+        "M01.p98": {
+          "ci": {
+            "hi": 2.1071406014123992,
+            "lo": -0.24296807809299567,
+            "n": 10,
+            "point": 0.7490418727807959
+          },
+          "ci_excludes_zero": false,
+          "impairment": 0.7490418727807959,
+          "impairment_hi": 2.1071406014123992,
+          "impairment_lo": -0.24296807809299567,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "INCONCLUSIVE"
+        },
+        "M03.max_gap_ms": {
+          "ci": {
+            "hi": 4.608083271249051,
+            "lo": -0.14088012592099666,
+            "n": 10,
+            "point": 1.570377180419346
+          },
+          "ci_excludes_zero": false,
+          "impairment": 1.570377180419346,
+          "impairment_hi": 4.608083271249051,
+          "impairment_lo": -0.14088012592099666,
+          "n_dropped": 0,
+          "n_paired": 10,
+          "verdict": "INCONCLUSIVE"
+        },
+        "M05.fraction": {
+          "ci": {
+            "hi": 0.819277108433735,
+            "lo": -1.0,
+            "n": 3,
+            "point": -0.06243394631156196
+          },
+          "ci_excludes_zero": false,
+          "impairment": 0.06243394631156196,
+          "impairment_hi": 1.0,
+          "impairment_lo": -0.819277108433735,
+          "n_dropped": 7,
+          "n_paired": 3,
+          "verdict": "INCONCLUSIVE"
+        }
+      }
+    },
+    "bar": 0.2
+  },
+  "h2": {
+    "axis": "duty_cycle",
+    "levels": {
+      "0.1": {
+        "PF": {
+          "M07.met": {
+            "ci": {
+              "hi": -6.6,
+              "lo": -7.4,
+              "n": 10,
+              "point": -7.0
+            },
+            "excludes_zero": true
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": -0.09770443199999998,
+              "lo": -0.13377858799999998,
+              "n": 10,
+              "point": -0.11508783999999998
+            },
+            "excludes_zero": true
+          }
+        },
+        "Reservation": {
+          "M07.met": {
+            "ci": {
+              "hi": -2.6,
+              "lo": -5.6,
+              "n": 10,
+              "point": -4.1
+            },
+            "excludes_zero": true
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.42113190300000003,
+              "lo": -0.24720359799999997,
+              "n": 10,
+              "point": 0.09294756000000004
+            },
+            "excludes_zero": false
+          }
+        },
+        "TwoTier": {
+          "M07.met": {
+            "ci": {
+              "hi": -2.7,
+              "lo": -5.3,
+              "n": 10,
+              "point": -4.0
+            },
+            "excludes_zero": true
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.590952394,
+              "lo": 0.147121496,
+              "n": 10,
+              "point": 0.38375203999999996
+            },
+            "excludes_zero": true
+          }
+        }
+      },
+      "0.5": {
+        "PF": {
+          "M07.met": {
+            "ci": {
+              "hi": -0.1,
+              "lo": -0.7,
+              "n": 10,
+              "point": -0.4
+            },
+            "excludes_zero": true
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": -0.0036600340000000086,
+              "lo": -0.015602495000000034,
+              "n": 10,
+              "point": -0.009731640000000008
+            },
+            "excludes_zero": true
+          }
+        },
+        "Reservation": {
+          "M07.met": {
+            "ci": {
+              "hi": 0.1,
+              "lo": -0.9,
+              "n": 10,
+              "point": -0.4
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.28509576000000003,
+              "lo": -0.48063709399999993,
+              "n": 10,
+              "point": -0.09782475999999998
+            },
+            "excludes_zero": false
+          }
+        },
+        "TwoTier": {
+          "M07.met": {
+            "ci": {
+              "hi": 0.9,
+              "lo": -1.3,
+              "n": 10,
+              "point": -0.2
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.632326315,
+              "lo": -0.10821788399999999,
+              "n": 10,
+              "point": 0.28201052000000004
+            },
+            "excludes_zero": false
+          }
+        }
+      }
+    }
+  },
+  "h3": {
+    "axis": "snr_spread_db",
+    "levels": {
+      "12.0": {
+        "PF": {
+          "M07.met": {
+            "ci": {
+              "hi": 0.0,
+              "lo": -0.3,
+              "n": 10,
+              "point": -0.1
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": -0.00024739199999999824,
+              "lo": -0.0010552289999999898,
+              "n": 10,
+              "point": -0.0006410400000000039
+            },
+            "excludes_zero": true
+          }
+        },
+        "Reservation": {
+          "M07.met": {
+            "ci": {
+              "hi": 0.5,
+              "lo": -0.6,
+              "n": 10,
+              "point": -0.1
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.190113894,
+              "lo": -0.573967174,
+              "n": 10,
+              "point": -0.192149
+            },
+            "excludes_zero": false
+          }
+        },
+        "TwoTier": {
+          "M07.met": {
+            "ci": {
+              "hi": 2.2,
+              "lo": 0.8,
+              "n": 10,
+              "point": 1.6
+            },
+            "excludes_zero": true
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.8910348829999999,
+              "lo": 0.43819588000000004,
+              "n": 10,
+              "point": 0.69821968
+            },
+            "excludes_zero": true
+          }
+        }
+      },
+      "6.0": {
+        "PF": {
+          "M07.met": {
+            "ci": {
+              "hi": 0.0,
+              "lo": 0.0,
+              "n": 10,
+              "point": 0.0
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.00015567999999999138,
+              "lo": -0.000574119999999978,
+              "n": 10,
+              "point": -0.00014603999999999174
+            },
+            "excludes_zero": false
+          }
+        },
+        "Reservation": {
+          "M07.met": {
+            "ci": {
+              "hi": 0.6,
+              "lo": -0.4,
+              "n": 10,
+              "point": 0.1
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.4794466,
+              "lo": -0.477927708,
+              "n": 10,
+              "point": 0.0005037200000000075
+            },
+            "excludes_zero": false
+          }
+        },
+        "TwoTier": {
+          "M07.met": {
+            "ci": {
+              "hi": 2.3,
+              "lo": -0.1,
+              "n": 10,
+              "point": 1.2
+            },
+            "excludes_zero": false
+          },
+          "M08.fraction": {
+            "ci": {
+              "hi": 0.888236949,
+              "lo": 0.42041670899999994,
+              "n": 10,
+              "point": 0.67569916
+            },
+            "excludes_zero": true
+          }
+        }
+      }
+    }
+  }
+}
