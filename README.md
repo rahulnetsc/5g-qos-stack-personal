@@ -358,9 +358,25 @@ they survive it:
   bimodal: exactly 0 on 28,580 of 28,580 grants in a saturated run, or
   large (42–235 bytes) in a light one, and never the 2–5 bytes a truncated
   format needs. **38.321's truncated formats exist to handle a TB-size
-  quantisation artifact this simulator does not model.** So the blocker is
-  **continuous grant sizing** (`sim/resource.py`, `scheduler/link.py`) —
-  one layer below `sim/bsr.py`, and not reachable by writing a scenario.
+  quantisation artifact this simulator does not model** — a real gap, and
+  **not the blocker.** **CORRECTED by `docs/wp9-plan.md` §20**, which ran
+  the counterfactual (`scripts/tbs_counterfactual.py`) before building
+  anything: quantising the TB changes the padding distribution by
+  **nothing** at the load this was measured at (13,214/13,214 grants at
+  padding 0 before *and* after) and *reduces* lawful Truncated BSRs at
+  light load, 5 → 4. **The blocker is the magnitude of the gNB's BSR error
+  at grant time** — a median 12,194–13,387 bytes on exactly the grants
+  that have ≥2 LCGs backlogged, against a window 2–5 **bytes** wide; a
+  5–64 byte TBS lattice step cannot reach it. TB-size quantisation stays
+  planned and unbuilt (§20.10) on its own independent motivation, with the
+  home corrected too — `sim/resource.py` cannot host it, because
+  `scheduler/` may never import `sim/`. **Still not reachable by writing a
+  scenario**, and now for a stated reason: the two halves of the
+  truncation precondition are **anti-correlated**. Loading a UE until
+  three LCGs are backlogged makes its grants PRB-limited, and a
+  PRB-limited grant is filled exactly — padding 0 at any TB size;
+  unloading it until the grant has spare room drains all but one LCG, and
+  38.321 §5.4.5 then says report a *Short* BSR, never a truncated one.
   A scenario tuned until grants landed in the 2–5 byte window was
   deliberately NOT written: that is fitting the measurement around the
   claim. **Consequence for the

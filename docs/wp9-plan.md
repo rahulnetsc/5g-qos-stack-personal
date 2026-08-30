@@ -2981,6 +2981,18 @@ with its own corpus exposure, and it needs its own plan. It is also
 independently motivated — TBS quantisation is a real effect this model
 lacks everywhere, not only here.
 
+> **CORRECTION (§20) — this paragraph is wrong twice, and is kept as
+> written because it is the fourth link in this item's own chain.**
+> (1) TB-size quantisation does **not** close it: measured
+> counterfactually before any of it was built, quantising the TB moves the
+> padding distribution by nothing at ×1.0 and *reduces* lawful Truncated
+> BSRs at light load. The blocker is the **BSR-error magnitude at grant
+> time** (§20.1). (2) `sim/resource.py` cannot host it either way —
+> `scheduler/` may never import `sim/`, pinned by
+> `test_scheduler_package_never_imports_sim` (§20.5). The independent
+> motivation in the last sentence survives intact, and is the only reason
+> the item still exists (§20.3).
+
 **This is the third correction in this item, each one deeper than the
 last**: truncation wired to every BSR (§19.1) → wired to the right trigger
 but padding always 0 → padding never lands in the window because TB sizes
@@ -2994,3 +3006,425 @@ that it generalises.
 the 2-5 byte window. Tuning a fixture until the mechanism fires would be
 fitting the measurement around the claim — the same failure this WP has
 twice recorded avoiding.
+
+---
+
+## 20. TB-size quantisation — the mechanism, and the premise it does *not* rescue
+
+### 20.0 The premise, tested BEFORE planning against it — and it does not hold
+
+§19.5 closed with a forward claim: truncated BSR cannot fire because this
+model has no TB-size quantisation, and quantisation in the grant-sizing
+path is "what would close it". `28e6b36` carried that into the commit
+message, README §7 and the regime map's G2 row.
+
+**Measured counterfactually, that claim is wrong.** Per CLAUDE.md's own
+forward-looking-note rule, the note was treated as a hypothesis for this
+commit to verify, and the cheap discriminator was run first: a read-only
+probe that replays every UL grant of a real run through OAI's actual
+`nr_find_nb_rb`/`nr_compute_tbs` and recomputes the padding each grant
+*would* have had. No repo file was changed to obtain these numbers.
+
+On **`scripts/bsr_desync_study.py`'s own scenario** — the multi-LCG one
+§19.5's `28,580/28,580` came from — at 4,000 slots, 6 UEs × 3 UL LCGs:
+
+| offered load | UL grants | padding = 0 today | padding = 0 quantised | ≥2 LCGs with data | median \|BSR error\| there | **lawful Truncated BSRs: today → quantised** |
+|---|---|---|---|---|---|---|
+| ×1.0 (as measured in §19.5) | 13,214 | 13,214 (100 %) | **13,214 (100 %)** | **99.70 %** | 12,194 B | **0 → 0** |
+| ×0.3 | 8,194 | 7,643 (93.3 %) | 7,597 (92.7 %) | 75.90 % | 543 B | **0 → 0** |
+| ×0.1 | 6,593 | 3,542 (53.7 %) | 1,993 (30.2 %) | 35.05 % | 192 B | **5 → 4** |
+| ×0.03 | 10,057 | 1,623 (16.1 %) | 547 (5.4 %) | 13.97 % | 191 B | **5 → 4** |
+
+**Read the ×1.0 row across, because it contains the whole finding.** The
+LCG half of the truncation conjunction passes on **99.70 %** of grants —
+this scenario was built to make it pass — and the padding half fails on
+**100 %** of them, before and after quantisation, because the median gap
+between what the gNB thinks the UE has and what it actually has is
+**12,194 bytes** against a window that is **2 to 5 bytes wide**.
+
+**At the load the claim was measured at, quantisation changes the padding
+distribution by nothing at all — 13,214 zeros before, 13,214 zeros after.**
+At light load it changes it substantially and in the *wrong* direction: it
+moves mass *out* of the small-padding buckets into ≥9 bytes, and the count
+of lawful Truncated BSRs goes **down**, 5 → 4.
+
+Same result on the corpus scenarios (4,000 slots, TwoTier,
+`cqi_delay_slots=8`), padding in the 2–5 byte window:
+
+| scenario | UL grants | 2–5 B today | 2–5 B quantised | ≥2 LCGs with data | median \|BSR error\| there | **lawful Truncated BSR** |
+|---|---|---|---|---|---|---|
+| `factory_robots` ×1.0 | 3,105 | 0.00 % | **0.00 %** | 19.13 % | 13,387 B | **0** |
+| `factory_robots` ×3.0 | 3,648 | 0.44 % | 0.05 % | 15.43 % | 6,490 B | **0** |
+| `sensor_dense` | 14,993 | 0.06 % | **8.61 %** | **0.00 %** | — (no such grant) | **0** |
+| `factory_robots` ×1.0 / Reservation | 11,246 | 0.03 % | 0.03 % | 26.18 % | 24,504 B | **0** |
+
+Every figure above is reproduced by `uv run python
+scripts/tbs_counterfactual.py`, landed in the same commit as this section
+so none of them is prose that can drift.
+
+### 20.1 What actually blocks the path — a CONJUNCTION, and its two halves are anti-correlated
+
+A lawful Truncated BSR needs three things at once (§18.1): padding ≥ 2,
+**≥ 2 LCGs with data**, and padding < `n_lcg + 3` (or a full Long BSR
+fits). The corpus fails a different half in each direction, and the two
+halves move against each other:
+
+- **The desync scenario at ×1.0, and `factory_robots`:** the LCG half
+  PASSES — 99.70 % and 19.13 % of grants respectively have ≥2 LCGs
+  backlogged — and the padding half fails **by three to four orders of
+  magnitude**. The gNB's sizing input (`bytes_reported`) differs from true
+  backlog by a median **12,194** and **13,387 bytes** on exactly those
+  grants. A TBS lattice step of 5–64 bytes cannot bring a 12 kB error into
+  a 2–5 byte window; nothing about the lattice is the operative quantity.
+- **`sensor_dense`:** the padding half PASSES once TBS is quantised
+  (0.06 % → **8.58 %** in the 2–5 window, because its BSR error is a
+  median 66 bytes — small enough for the lattice to dominate) and the LCG
+  half fails **totally**: all 14,993 granted UEs have exactly one UL flow,
+  so 38.321's padding rules say *report Short BSR*, never truncated.
+
+**And they are anti-correlated by construction, not by accident.** Loading
+a UE until three LCGs are simultaneously backlogged makes its grants
+PRB-limited, and a PRB-limited grant is filled exactly — padding 0,
+whatever size the TB is. Unloading it until the grant has spare room
+drains all but one LCG. That is the structural statement §19.5 was reaching
+for, one level below where it stopped.
+
+**So the binding constraint is the magnitude of the BSR error at grant
+time, not the TB-size lattice.** Named here, deliberately not built:
+diagnosing *why* `bytes_reported` sits 10¹–10⁴ bytes from truth is its own
+item, and it is where G2's unlock now lives.
+
+### 20.2 CORRECTION FOUR, and what is new about it
+
+This is the fourth correction in the truncated-BSR chain (§19.5 recorded
+three), and the first **caught before any code was written**. §19.5 wrote
+that the rule which caught corrections one to three — *run it at scale and
+ask whether the precondition occurs at all* — was the strongest available
+evidence it generalises. Applying it to a **forward note** rather than to a
+landed mechanism is the new part, and it is the cheaper place to apply it.
+
+It is also the **fourth instance of the forward-looking-note rule**, after
+`_dl_stamp`'s wrong citation, port-map row 46's wrong plan and commit 0b's
+wrong argument — and a fifth *kind*: a wrong **diagnosis**, an inference
+about a mechanism that was never run even in counterfactual. Cheaper to
+catch than any of the other three, and only because the discriminator was
+run before the plan rested on it.
+
+**§19.5's finding is not withdrawn — it is narrowed.** "This model has no
+TB-size quantisation" is true and remains a real fidelity gap. "That is
+what blocks truncated BSR" is false.
+
+### 20.3 The item that survives, on its own terms
+
+TBS determination is wrong everywhere in this model, not only in the BSR
+path, and that is why this item proceeds with the G2 unlock **removed from
+its justification entirely**.
+
+Today, at all six sizing sites:
+
+```
+prbs_needed = ceil(target * 8 / bits_per_rb)
+prbs_used   = min(prbs_left, max_rb, max(1, prbs_needed))
+tbs_bytes   = min(ue_backlog, (prbs_used * bits_per_rb) // 8)     # continuous
+```
+
+Ground truth computes `(nb_rb, tb_size)` **jointly**, by binary search over
+a discrete table, and does **not** cap the result at the requested bytes.
+Three consequences, each independently real:
+
+1. **Grant sizing.** The two rules pick a different PRB count on **8.8 % to
+   18.6 % of sizing decisions**, depending on MCS and slot shape — measured
+   over `want` = 1..4000 by `scripts/tbs_counterfactual.py --sizing`,
+   identical on 3,257/4,000 at 20 dB / 11 symbols (**18.6 %** differ),
+   3,648/4,000 at 12 dB / 11 symbols (**8.8 %**), 3,529/4,000 at 20 dB /
+   S-slot 7 symbols (**11.8 %**), differing by −1 to +4 PRBs elsewhere.
+   The spread runs the other way from the intuition: the **high**-SNR case
+   diverges most, because a bigger `bits_per_rb` makes each PRB a coarser
+   step for the ceil-div to land on.
+2. **Spectral-efficiency accounting.** At a fixed PRB count the quantised
+   TB differs from the continuous one by **−1.8 % to +4.5 %** (mean 1.002
+   on `factory_robots`, 1.020 on `sensor_dense`) — a per-grant error that
+   the corpus currently carries into every throughput and utilisation
+   figure.
+3. **Every latency figure that depends on how much fits in one
+   transmission**, via both of the above.
+
+There is also a consumer already waiting and already flagged: port-map
+row 8's Divergence cell says `sim/power.py::shrink_to_power_budget` takes
+a caller-supplied `tbs_bits_fn` precisely because "a full Qm/code-rate MCS
+table this sim doesn't have" — and that every existing test therefore
+drives it with a synthetic non-3GPP table, verifying loop order and never
+a real TBS number end to end.
+
+### 20.4 Ground truth
+
+**Mixed provenance, marked per source rather than averaged.**
+
+| what | where | vendored? |
+|---|---|---|
+| `nr_find_nb_rb` — the binary search returning `(nb_rb, tbs)` | `oai-branches/reservation/gNB_scheduler_primitives.c:655-712` | **yes** |
+| `nr_compute_tbs` — 38.214 §5.1.3.2 / §6.1.4.2, and `Tbstable_nr` (93 entries, Table 5.1.3.2-2) | `openair2/LAYER2/NR_MAC_COMMON/nr_compute_tbs_common.c:32-105` | **no — full checkout only** |
+| `NR_MAX_PDSCH_TBS = 3824` | `common/utils/nr/nr_common.h:42` | no |
+| `CEILIDIV` / `ROUNDIDIV` | `common/utils/nr/nr_common.h:347-348` | no |
+| two-tier's own call sites (UL incl. the floor bypass; DL) | `oai-branches/two-tier/ia_p5g_scheduler.c:3250-3266`, `:1759-1792` | **yes** |
+| MCS → (Qm, R) tables | `openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.c:1960-2070` | no |
+
+This is the **second confirmed case** of CLAUDE.md's "the vendored subset
+is a convenience copy, not the evidence base" rule after
+`nrmac->min_grant_prb`: the *caller* is vendored and the *callee* is not.
+
+**Which procedure is modelled: OAI's `nr_compute_tbs`, not the spec prose.**
+CLAUDE.md's measured-behaviour rule governs, and the C is what produced the
+calibration numbers. Two places where that matters concretely, both to be
+ported as written rather than as 38.214 reads:
+
+- `nb_re = min(156, 12·nb_symb_sch − nb_dmrs_prb − nb_rb_oh) · nb_rb` — the
+  156-RE cap is 38.214's, but note that at this repo's
+  `overhead_factor = 0.85` a full slot is **11** symbols, so `12·11 = 132`
+  and **the cap never binds**; DMRS, which the sim does not model, would
+  otherwise have been absorbed by it. Recorded because it is the reverse of
+  the intuition (at 14 symbols the cap makes DMRS irrelevant; at 11 it
+  does not).
+- `n = log2(Ninfo − 24) − 5` is a C `uint32_t` truncation of a double, and
+  `Np_info = max(24, (Ninfo >> n) << n)` a shift, not a round.
+
+**The split has one consequence with teeth, and it is not cosmetic.**
+`sim/tests/test_bsr.py` can re-check the BSR tables byte-for-byte against
+the C **on every test run** because `nr_mac_common.c` is vendored.
+`Tbstable_nr` is not, so the same guard is impossible in-repo: a test can
+only assert the table's own structural invariants (93 entries, strictly
+increasing, known anchors) and check against the full checkout
+*conditionally*, skipping where it is absent. That is strictly weaker than
+what CLAUDE.md's spec-table rule normally buys, so it is stated here rather
+than discovered later — and it is an argument for vendoring
+`nr_compute_tbs_common.c` into `oai-branches/` as part of whichever commit
+eventually builds this, not for weakening the rule.
+
+**Spec cross-check, per the standing table rule.** `Tbstable_nr` is
+transcribed from the C, and then checked byte-for-byte against TS 38.214
+Table 5.1.3.2-2 obtained from the spec document itself (`pdftotext
+-layout`, WP6's method), cited by table and page. If the primary text
+cannot be obtained the provenance is marked **secondary-source** in the
+module docstring and the test, the way §18.1's was before the spec text
+turned out to be obtainable. Either way the table is pinned by a test that
+re-checks it against the C on every run, exactly like
+`sim/tests/test_bsr.py`'s BSR tables.
+
+### 20.5 Where it lives — and §19.5 named one home that cannot work
+
+§19.5 wrote "`sim/resource.py` / `scheduler/link.py`". **`sim/resource.py`
+is ruled out**: a scheduler needs the TB size inside `allocate()`, and
+`sim/tests/test_reservation.py::test_scheduler_package_never_imports_sim`
+walks every file under `scheduler/` and forbids exactly that import. The
+only way to reach it from `sim/` would be to put a `tbs()` method on the
+`SlotView` protocol — which would also mean rewriting `ReducedSlotView` and
+every `_FakeSlot` fixture, and would model the PHY *telling* the MAC its TB
+size, which is not what ground truth does (`nr_compute_tbs` is a MAC-common
+library function the scheduler calls).
+
+**Home: a new `scheduler/tbs.py`, re-exported through `scheduler/__init__`.**
+Not appended to `link.py`: `link.py` is the SNR→MCS staircase and is
+explicitly documented as crude and comparative, whereas this is an exact
+port of a spec table. Keeping them in separate files keeps the "crude
+staircase" docstring from being read as covering the TBS table too.
+
+**The six sizing sites it changes**, all reachable because
+`sim/baselines/*` already import from `scheduler`:
+
+| # | site | note |
+|---|---|---|
+| 1 | `scheduler/two_tier.py:1382` (B_eff branch) | the main UL/DL path |
+| 2 | `scheduler/two_tier.py:1359` (floor branch) | **already structurally correct** — no backlog cap, sizes at `max_rbSize`, matching `ia_p5g_scheduler.c:3250`'s deliberate `nr_find_nb_rb` bypass. Needs only the TB size quantised, not the search. |
+| 3 | `scheduler/reservation.py:973` | |
+| 4 | `sim/baselines/pf.py:100` | |
+| 5 | `sim/baselines/round_robin.py:80` | |
+| 6 | `sim/baselines/gradient.py:150` | |
+
+### 20.6 Design decisions
+
+**D1 — Qm and R, which `_MCS_TABLE` does not carry.** `nr_compute_tbs`
+needs `(Qm, R)`; `scheduler/link.py::_MCS_TABLE` carries spectral
+efficiency only. OAI tabulates `R` as **ten times** the spec's `R×1024`
+(`nr_compute_tbs_common.c:70-72`: `R_5 = R/5`, then `>>11`), so
+`SE = Qm·R/10240`.
+
+- **Chosen:** add `(Qm, R)` columns to the existing 12 rows, with `Qm`
+  taken from 38.214 Table 5.1.3.1-1's own modulation boundaries and `R`
+  **back-solved so SE is preserved exactly** (e.g. SE 3.50 → Qm 6,
+  R 5973 → SE 3.4998, a 0.006 % residual). This keeps the commit's delta
+  purely the quantisation lattice, with **no link-adaptation change
+  smuggled in**.
+- **Rejected:** replacing `_MCS_TABLE` with the real 29-row 38.214 table.
+  More faithful, but it changes SE at every row, bundles link adaptation
+  with TBS into one uninterpretable delta, and breaks
+  `sim/olla.py::MCS_INDEX_COUNT = 12`, which was built against this table.
+  **Named as its own future item, not done here.**
+- **Recorded limitation:** back-solved `R` for the two extreme staircase
+  rows falls outside any real MCS table's code-rate range (SE 0.15 → 0.075,
+  below table 1's 0.117; SE 7.50 → 0.938, above table 2's 0.926). A
+  consequence with teeth: `nr_compute_tbs`'s `R <= 2560` branch is then
+  reachable only from the lowest rows. Asserted in a test rather than left
+  implicit.
+
+**D2 — port `nr_find_nb_rb`'s search, not just `nr_compute_tbs`.** Ground
+truth returns `(nb_rb, tb_size)` jointly and both schedulers call it;
+quantising the TB at the sim's own ceil-div PRB count would be an
+intermediate state matching nothing. It is one fidelity change — "TBS
+determination" — but it is landed in **two commits** (a pure, unwired
+function first) so the study-level deltas stay attributable.
+
+**D3 — the `min(ue_backlog, …)` cap is dropped, reversing Phase 2's D1.**
+It has to be: `nr_find_nb_rb` returns `tbs ≥ want` by construction, and
+re-clamping to backlog would put the TB straight back off the lattice,
+which *is* the mechanism. D1's rationale — never manufacture bytes beyond
+real backlog — is preserved by a different route that already exists:
+`sim/ue_lcp.py::fill`, `two_tier._dl_fill`, `reservation._dl_fill` and
+`sim/baselines/_mac.py::lcp_fill` all take `min(backlog, remaining)`, so
+no over-delivery is reachable. **Pinned by a test rather than asserted**,
+since it is now load-bearing. The gNB-side consumers that *should* see the
+full `tb_size` — `sched_ul_bytes` credit, `ul_lcg_deficit_bytes` drain,
+reservation's `expected_bytes` EWMA — are faithful to the C in taking it
+(`gNB_scheduler_ulsch.c:2730`).
+
+### 20.7 Corpus exposure, stated plainly
+
+**Unconditional, this cannot be inert.** It changes the TB size of every
+grant and the PRB count of ~9–19 % of them, on all six sites, on all five
+arms. It is the class of change that moved 15 of 20 records.
+
+**So it is opt-in, and the mechanism commit predicts `--check` clean.**
+The flag is read once at `configure()` as
+`getattr(grid, "tbs_model", "continuous")`:
+
+- **no `Scheduler` protocol change** (`configure` keeps its three
+  parameters) and **no constructor change on five arms**;
+- `getattr` default keeps every existing `_grid()`/`_FakeSlot` fixture
+  working untouched;
+- it says the right thing: TB determination is a property of the **RAN**,
+  which is what `grid` is, not of scheduling policy. Every real gNB
+  quantises; `"continuous"` exists only as a corpus-freezing device and the
+  docstring will say so.
+
+**Then, separately and without capturing anything:** a one-off `--check`
+with the flag forced on, recorded in this document as a **measurement** of
+blast radius. That is not a re-baseline and must not be committed as one.
+
+**Recommendation on the default: do not flip it in this item.** Flipping
+invalidates the published numbers of stages 1, 2, 4 and 5 — the entire
+evidence base of `docs/wp9-regime-map.md` — for a fidelity gain nothing
+downstream is currently waiting on. It gets its own decision, with its own
+re-run cost stated. **The re-baseline ceremony belongs to that decision,
+not to this mechanism.**
+
+### 20.8 The guard test — and the discriminating observable is NOT padding
+
+§19.5's own framing ("today padding is bimodal and must become routinely
+small") **would have produced a test that fails forever**, because §20.0
+measured that quantisation does not move padding at ×1.0 at all. Writing
+that test is how this item would have shipped a mechanism chasing an
+observable it does not control.
+
+**The discriminating observable is TB-size lattice membership.**
+
+1. **Verified to fail first**, at scale, before any implementation: over a
+   real run, assert that every UL `ue_grant` `Allocation.bytes_capacity` is
+   a member of the TBS lattice for its `(prbs, symbols, Qm, R)`. Today TB
+   sizes are backlog-valued, so this fails on essentially every grant —
+   and the *count* of conforming grants today is recorded in the commit
+   message, not just "it failed".
+2. **A distribution, not a grant**: assert the conforming fraction over
+   thousands of grants, both before (≈0) and after (=1.0).
+3. **UL only.** DL `Allocation.bytes_capacity` is a per-flow LCP slice of
+   the TB, not the TB — off-lattice by construction and correctly so. The
+   test asserting that is part of the same commit, so a future reader does
+   not "fix" DL to match.
+4. **The precondition check that §19.2's rule demands is already done** —
+   §20.0 — and it came back **negative for padding** and **positive for
+   lattice membership**. That is the whole reason the observable moved.
+
+### 20.9 Pre-registered expectations
+
+Registered before the mechanism exists. Several are deliberately
+**null** predictions: §20.0's counterfactual says so, and a null that is
+scored is what tests whether the counterfactual was right.
+
+| # | expectation | competing outcome, named |
+|---|---|---|
+| **E1** | `--check` clean on all 20 records with the flag off. | Any drift means the flag is not inert — information, **not** a re-baseline trigger. |
+| **E2** | Padding on the desync scenario at ×1.0: **13,214 / 13,214 grants at exactly 0, unchanged.** | If padding moves at ×1.0, the probe's model of the LCP fill was wrong, and §20.0's correction needs re-deriving. |
+| **E3** | **Truncated BSR still never fires** at ×1.0 (0 → 0), and at ×0.1/×0.03 the count does **not increase** (5 → ≤5). | An increase would mean the lattice reaches further into the window than the counterfactual showed. |
+| **E4** | Floor `gate_passes ≈ 65,200`, `fires = 0`, **unchanged** — the two halves still separate, still with no desync present. | A fire would be the first at scale and would supersede §19.5's reading, not confirm it. |
+| **E5** | G2's STOP statistic **unchanged** vs. the same scenario without the flag. | — |
+| **E6** | *(the one that must move)* With the flag on: **100 %** of UL `ue_grant` TB sizes on the lattice (from ≈0 %); PRB counts differ from today on **8–19 %** of sizing decisions; mean TB size **up**, since the backlog cap is gone. | If TB sizes stay off-lattice anywhere, a sizing site was missed — there are six, and one (the floor branch) needs different treatment. |
+| **E7** | Blast radius, measured not predicted: how many of 20 records move with the flag **forced on**, and in which direction on M02 / M11 / M12. | Registered as a measurement, per §18.5's E4 precedent. |
+
+**E2–E5 are null predictions on purpose.** If this item were justified by
+the G2 unlock they would be its failure; it is justified by §20.3 instead,
+and they are the honest statement of what it does not buy.
+
+### 20.10 Status — PLANNED AND UNBUILT, deliberately, and that is a state
+
+**Only commit 1 below is taken. The mechanism is not built, and that is a
+decision rather than a deferral.** The reasoning, recorded so a later
+reader does not mistake it for something that ran out of time:
+
+- **The discriminator answered the question the item was proposed on.**
+  §20.0 was run before the plan rested on it, and it removed the urgent
+  half of the justification.
+- **What remains is real but has no consumer.** §20.3's fidelity gap is
+  genuine, and nothing downstream is waiting on it.
+- **It is opt-in only (§20.7), so building it changes no published
+  number** — and flipping the default *would* invalidate stages 1, 2, 4
+  and 5, i.e. the entire evidence base of `docs/wp9-regime-map.md`, for a
+  fidelity gain with nothing to spend it on.
+
+So the item sits fully specified — ground truth located and its provenance
+split marked (§20.4), a home chosen and one candidate ruled out (§20.5),
+three design decisions taken with their rejected alternatives (§20.6),
+corpus exposure faced (§20.7), a guard test whose observable is settled
+and whose precondition is already measured (§20.8), and seven
+pre-registered expectations (§20.9). **Anyone taking it up starts at
+commit 2, not at scoping.**
+
+**Commit 1 — taken now.** This section, `scripts/tbs_counterfactual.py`
+(landed, not left in a scratchpad: a committed document now carries its
+numbers, and a count in prose is a claim about code that drifts), and the
+three corrections §20.0 forces in already-committed documents — README §7's
+fourth-dormancy-category entry and `docs/wp9-regime-map.md`'s G2 row, both
+of which currently name TB-size quantisation as what closes G2, and
+§19.5's "`sim/resource.py` / `scheduler/link.py`", which names a home that
+cannot work. Those are wrong where they stand and do not wait on a build.
+Plus CLAUDE.md's line for correction four. **Docs, probe and corrections
+only — no mechanism, no flag, no scheduler change.**
+
+**Commits 2-7 — specified, not taken.** For whoever picks this up:
+
+2. `scheduler/tbs.py` — `nr_compute_tbs`, `nr_find_nb_rb`, the 93-entry
+   table with the structural + conditional-vs-full-checkout test §20.4
+   describes, and `_MCS_TABLE`'s `(Qm, R)` columns. **Unwired, inert by
+   construction.** Full suite + `--check`.
+3. The guard test **shown failing** with its conforming-grant count
+   recorded, then the six sizing sites behind `grid.tbs_model`, default
+   `"continuous"`. E1 scored. Port-map rows land here, same commit as the
+   mechanism per the standing rule, citing vendored and non-vendored
+   sources separately and amending row 8's `tbs_bits_fn` cell.
+4. Flag on: the E2–E6 run, scored — hits and misses both.
+5. The blast-radius measurement (E7): `--check` with the flag forced on,
+   recorded as a number. **No `--capture`.**
+6. The default-flip decision, if it is ever wanted, with its re-run cost
+   stated. Separate from every commit above.
+7. End-of-item judgment-calls review.
+
+### 20.11 What this item does not do
+
+- **It does not unlock G2.** §20.0/§20.1. G2's blocker is now identified as
+  the **BSR-error magnitude at grant time**, and that is a separate item
+  with its own plan.
+- **It does not flip the default** (§20.7), and it does not re-baseline.
+- **It does not replace `_MCS_TABLE`** with the real 38.214 table (D1).
+- **It does not add a MAC-PDU model.** No subheaders, no RLC segmentation,
+  no LCP packing granularity — §18.4's stated omission is unchanged, and
+  the bias direction it records (modelled padding **larger** than reality)
+  still holds.
+- **It does not tune any scenario until the mechanism fires.** §19.5
+  declined that and so does this.

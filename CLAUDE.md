@@ -536,6 +536,36 @@ describing code not yet written: **an argument about existing code is
 also a hypothesis until someone runs it.** The cheap discriminator that
 would have caught it is the one that eventually did — a per-slot trace,
 not more reading.
+**A fourth kind, added by WP9 §20: a wrong *diagnosis* — an inference
+about BEHAVIOUR that was never run, not even in counterfactual.** The
+first three kinds are all about code that existed and could have been
+read; a wrong diagnosis cannot be caught by reading anything, because the
+thing it is wrong about is what a mechanism would DO. §19.5 concluded that
+truncated BSR could not fire for want of TB-size quantisation and named it
+as what would close G2 — and README §7, `docs/wp9-regime-map.md`'s G2 row
+and a commit message all carried that forward. It is wrong: replaying
+every UL grant of a real run through OAI's own `nr_find_nb_rb`/
+`nr_compute_tbs` (`scripts/tbs_counterfactual.py`) leaves the padding
+distribution **completely unchanged** at the load the claim was measured
+at — 13,214 of 13,214 grants at padding 0 before and after — and *reduces*
+lawful Truncated BSRs at light load, 5 → 4. **This is the first of the
+four caught BEFORE any code was written**, and what caught it is the same
+rule written after correction one of the previous item: *run it at scale
+and ask whether the precondition occurs at all.* Applying that rule to a
+forward NOTE rather than to a landed mechanism is the transferable part,
+and it is far and away the cheapest place to apply it — a counterfactual
+probe is hours; discovering it after a mechanism ships is a work package.
+**The positive result is reusable and is recorded so the next person does
+not re-run the probe** (`docs/wp9-plan.md` §20.1): the blocker for the
+BSR/SR desync is the **magnitude of the gNB's BSR error at grant time**
+(median 12,194–13,387 bytes on grants with ≥2 LCGs backlogged) against a
+truncation window **2–5 bytes** wide — TB granularity is nowhere near the
+operative scale. And the shape any future attempt must defeat is an
+**anti-correlation**: load a UE until several LCGs are backlogged and its
+grants become PRB-limited, and a PRB-limited grant is filled exactly
+(padding 0 at any TB size); unload it until the grant has spare room and
+all but one LCG drains, at which point 38.321 §5.4.5 mandates a *Short*
+BSR rather than a truncated one.
 
 ## Rules for the WP0 machinery
 
