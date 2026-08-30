@@ -3428,3 +3428,264 @@ only — no mechanism, no flag, no scheduler change.**
   still holds.
 - **It does not tune any scenario until the mechanism fires.** §19.5
   declined that and so does this.
+
+---
+
+## 21. Stage 6 — the unrun guarantees (plan, registered before anything runs)
+
+### 21.1 Scope
+
+**In:** G4, G6, G12, and H2/H3's two Category-2 axes (`duty_cycle`,
+`snr_spread_db`). These are the ones the regime map records as *unrun or
+uncomputed*, not as unbuildable — every mechanism and every axis they need
+already exists in `sim/parametric.py` and `scripts/wp9_sweep.py`.
+
+**Out, and separately scoped:** **G9** (a 50-cycle join campaign) and
+**G11** (a soak) — both budgeted in §6.3 and never implemented; they need
+scenario construction and a runner shape this stage does not have, and
+they get their own plan. **§15.5's discriminating experiment** likewise: it
+needs two new fleet profiles built to hold flow count and GBR fraction
+fixed, which is composition-design work, not a sweep.
+
+### 21.2 THE INVENTORY, TAKEN FIRST — most of this is already run
+
+Measured against the stored artefacts before any grid was designed,
+because "unrun" in `docs/wp9-regime-map.md` turns out to mean two
+different things and only one of them costs runs.
+
+| what | levels present | rows | verdict |
+|---|---|---|---|
+| `bg` | `True` (base is `False`, in the core plane) | 30 | **G6 computable now** |
+| `duty_cycle` | 0.5, 0.1 | 30 each | **H2 computable now** |
+| `snr_spread_db` | 6.0, 12.0 | 30 each | **H3 computable now** |
+| per-flow GBR data on stored records | all stages | — | **G12 / M13 computable now** |
+| `completion_ts_by_role_s` (WP7 ledger) | all stages | — | **partial for G4** — see §21.4 |
+
+30 rows = 3 arms × 10 seeds, and the excursion cells carry the **identical
+seed set** as the base cell (`n_ues=8`, `load_mult=1.0`) — verified, not
+assumed — so every one of these is a **within-seed paired** comparison
+against the base, which is the strongest form available.
+
+**What is genuinely missing is DEPTH, not the axis.** Each of G6/H2/H3 has
+exactly **one cell**, at the base point. That supports "is there an effect
+at N=8, load ×1.0" and supports nothing about how the effect moves with
+fleet size or load. The regime map's "not tested" is therefore too strong
+for H2/H3 and its "computable from stage-1 rows but was not computed" for
+G6 is exactly right.
+
+**So Part A is analysis with zero new runs, and it runs FIRST** — because
+what it finds determines whether Part C's grid is worth buying at all.
+
+### 21.2a A hypothesis I checked and dropped, recorded rather than quietly discarded
+
+`M09.status` is `proxy` and `M19.status` is `pending` on **1,770/1,770**
+stage-1 rows, 7,560/7,560 stage-2 and 1,440/1,440 stage-4. That looks
+exactly like §1's `record_timeseries=True, always` guard having failed —
+which would have put a full re-run of three stages into this plan's budget.
+
+**It has not failed, and the reading was mine, not the data's.**
+
+- **M09's `proxy` is its registered panel status, not a degradation.** It
+  carries a real value on every row (`M09.worst` populated 1,770/1,770,
+  `M09.windows` = 5, matching the 5.0 s horizon exactly), and the note says
+  why it is `proxy`: *"computed over all flows in the record with
+  timeseries data — pass a same-role flow subset upstream if that's what
+  the guarantee needs."* A flow-subset caveat, nothing to do with
+  timeseries presence.
+- **M19's `pending` note is "no join/re-join/re-establishment events
+  occurred this run"** — structurally true of every WP9 scenario, and
+  precisely what G9's campaign would supply. Not a missing flag.
+- **M04's `proxy` is WP7's deliberate disposition**, already in CLAUDE.md.
+- Confirmed by direct execution, not by reading: a fresh
+  `record_timeseries=True` run populates `ts_delivered_bytes` on **12/12**
+  flows and still scores M09 `proxy` / M19 `pending`.
+
+**And the strip is by design, not a leak.** `scripts/wp9_sweep.py`'s
+`_RecordSink` scores online *before* persisting and strips the per-slot
+arrays from a `to_dict()` **copy**, so the live `RunRecord` the CSV is
+scored from is untouched. Its own docstring says so.
+
+Recorded because the wrong reading would have bought three stages of
+re-runs that nothing needs — and because it is §20.0's discipline applied
+to my own hypothesis rather than to an inherited one.
+
+**And it is the first CONCRETE argument for building G9, so it is written
+down here rather than left to be re-derived when G9 gets its own plan.**
+M19 (`slo_recovery_time`) has read `pending` on **every row of every stage
+this WP has run** — 1,770 + 7,560 + 1,440 — and the reason is not a flag,
+a horizon, a scenario-coverage gap or anything a sweep axis can reach: *no
+join/re-join/re-establishment event occurs in any WP9 scenario, because
+none of them configures `UEConfig.join`*. **Nothing except a join campaign
+can move it.** So G9 is not merely "budgeted and never run" — it is the
+only thing that turns one of the panel's nineteen metrics from structurally
+absent into scored, and M18 with it. That justification is now **measured
+rather than assumed**, and G9's own plan should open from it.
+
+### 21.3 Part A — the analysis pass (zero new runs)
+
+| G/H | statistic | source |
+|---|---|---|
+| **G6** | GT-4.1's own delta: Δ on M01 p98 / M03 / M05, `bg=True` vs base, **≤ +20 % relative**, paired within-seed, bootstrap CI over the 10 pairs | `stage1_rows.csv` |
+| **H2** | Δ per arm at `duty_cycle` 0.5 and 0.1 vs base, on the arm-separating metrics (M07/M08), paired | `stage1_rows.csv` |
+| **H3** | same at `snr_spread_db` 6 and 12 | `stage1_rows.csv` |
+| **G12** | `Scorecard.first_violation_order()` over stage 1's ascending `load_mult` column at each N, **and** over stage 4's fleet profiles — the thing the regime map says was never extracted | `records.jsonl` (stage 1, stage 4) |
+
+**The pairing hazard, named because this project has already been bitten by
+it.** Excursion rows carry the **empty string** for every axis they do not
+vary — `bg` is `''` on 1,740 of 1,770 rows, `duty_cycle` and
+`snr_spread_db` on 1,710. **1,710 is exactly the row count behind
+CLAUDE.md's recorded `None`-base contamination bug.** So the analyser
+**must**:
+
+1. **coerce at the boundary** — every axis level read from CSV is cast back
+   to its declared type against `wp9_sweep.BASE`'s own values (the
+   `'True'`-vs-`True` failure is already recorded in CLAUDE.md);
+2. **fill blanks from `BASE` explicitly**, never treat `''` as a level;
+3. **assert cell size before scoring anything**: `len(cell) == n_arms ×
+   n_seeds` = 30, and assert the base and excursion seed sets are *equal*,
+   not merely the same size.
+
+A cell that selects 0 or 1,710 rows must raise, not score.
+
+### 21.4 Part B — G4, the one that genuinely needs a run
+
+**Why it cannot come from stored records.** G4's statistic (§5(a)) is *M01
+over the post-silence message subset*. The stored ledger field
+`completion_ts_by_role_s` gives per-message **completion timestamps**;
+per-message **arrival** times are on no record, and `RunRecord` keeps only
+aggregate delay percentiles. Completion timestamps alone identify *which*
+message follows a silence but not *how long it waited*.
+
+**Rejected: reconstructing arrivals from the traffic config.** For a
+`_burstify`-shaped periodic flow the arrival grid is deterministic, so
+latency looks recoverable — but it holds only for `periodic_control`, not
+for the `poisson` and `xr_video` flows in the same fleet, and it would make
+the headline number depend on an inference about the generator rather than
+on a measurement. That is the shape of error this WP has recorded three
+times.
+
+**Chosen: a `run_sink`.** `regime_sweep.sweep()` already calls
+`run_sink(record, axis_values, summary)` with the **live** summary, before
+any sink strips anything, and `sim/driver.py` already exposes
+`summary["_message_ledger"]` for exactly this ("lets a study inspect raw
+per-message completions beyond the percentiles"). So G4's read is a
+study-layer `run_sink` that extracts post-silence first-message latency
+per flow and discards the ledger — **no panel change, no M20, no
+`sim/` change**, exactly as §5(a) pre-registered.
+
+**The cells:** the `duty_cycle` excursion, which is also H2's axis — one
+grid buys both, and G4's silence structure *is* the duty cycle.
+
+### 21.5 Part C — depth, and its go/no-go stated BEFORE Part A runs
+
+Registered now so Part A cannot be read to justify whatever grid I want
+afterwards:
+
+- **Buy the grid for an axis iff** Part A shows, on that axis, a paired
+  effect whose bootstrap CI excludes zero on **at least one arm** for **at
+  least one panel metric**, at the single cell available.
+- **Otherwise record "no effect at the base point, depth not bought"** and
+  stop. A null at N=8/×1.0 is a real result about the base point and is
+  reported as one — it is not licence to go looking at other cells until
+  something separates.
+- **The grid, if bought:** the axis crossed with `n_ues` ∈ {4, 8, 16, 32}
+  at `load_mult` ×1.0, plus `load_mult` ∈ {0.75, 1.0, 1.5} at N=8 — a
+  cross, not a full factorial, because a full factorial on three axes at
+  once is what §0.4's cap existed to prevent.
+
+### 21.6 Pre-registered expectations
+
+| # | expectation | competing outcome |
+|---|---|---|
+| **F1** | **G6 passes its ≤ +20 % bar on all three arms** at the base point. `bg` scored 2.648 at stage 1's gate — above the 1.0 threshold, so it does *something* — but the guarantee's bar is a 20 % relative delta, which is a much weaker demand than separation. | A fail on any arm is the more interesting outcome and makes `bg` a primary axis, not an excursion. |
+| **F2** | **H2 does NOT hold in its registered direction.** The regime map already records stage 5's transient contradicting it (TwoTier lost most on the burstiest workload tried). I expect `duty_cycle` 0.5/0.1 to show either no separation or separation **against** two-tier. | H2 holding as originally written would mean stage 5's transient is not the same phenomenon as burstiness, which is itself worth knowing. |
+| **F3** | **H3 separates the arms** — `snr_spread_db` scored 4.689, the highest of the four genuinely-untested Category-2 axes. | A null here would say the gate score was driven by variance, not effect, and would weaken §0.4's "11 of 12 axes cleared" defence of the gate. |
+| **F4** | **G12's first-violation order is the same across arms** at a given N, and differs across **fleet profiles** (stage 4) more than across arms. M13 orders 5QI classes by when they first fail; that ordering is mostly a property of the workload's PDB/GFBR spread. | An arm-dependent ordering would be a genuine scheduler-differentiating result and the strongest thing this stage could produce. |
+| **F5** | **G4's post-silence first-message latency exceeds the steady-state p98 on at least one arm** at `duty_cycle` 0.1 — the SR/BSR cold-start path is exactly what WP4 rebuilt, and a 90 %-silent flow re-enters it constantly. | No excess would say the `ul_access` SR path fully absorbs resumption, which would be a strong positive result for WP4's mechanism. |
+| **F6** | Part A changes **no** committed number — it computes statistics never computed, it does not re-score anything. `--check` untouched, no re-baseline. | Any movement means the analyser is re-scoring rather than reading, which is a defect in the analyser. |
+
+**F2 gets a direct-cause trace if it misses — registered as an obligation,
+not left to judgement.** F2 is this stage's registered
+most-likely-wrong expectation, and in this WP that slot has twice carried
+the more interesting finding than the hits did: stage 4's E2 produced
+§15.5's tight-PDB/LCG-co-location hypothesis, and stage 5's E2 produced the
+flat transient boundary and the correction that its criterion had no
+interval. So if F2 misses — if `duty_cycle` separates the arms *in H2's
+originally registered direction* after all — it gets a
+**worktree-instrumented direct-cause trace before the write-up**, in the
+manner CLAUDE.md's cross-direction invariants require, not another pass of
+reading. The competing possibility the trace must distinguish: that stage
+5's transient and a duty-cycled steady state are **not the same
+phenomenon**, which would mean the regime map's current H2 row is
+conflating two different things rather than merely being unrun.
+
+### 21.7 Budget
+
+**Part A: zero runs.** Analysis over `sweeps/wp9/stage{1,4}/`, minutes.
+
+**Part B (G4):** the `duty_cycle` excursion is 3 levels × 3 arms × 10
+seeds at N=8. At §6.3a's **measured** 303 s per (3-arm × 10-seed) cell at
+N=8, horizon 20,000, `record_timeseries=True` — 2 non-base cells ≈ **10
+min serial**, less at 10 workers.
+
+**Part C, if bought:** ~10 cells spanning N=4..32; at §6.3a's measured
+81/303/1093 s for N=2/8/32 that is **~1.5-2 h serial**, ~15 min at 10
+workers.
+
+**Per §6.3a's own rule — time the thing you are actually going to run.**
+Every number above is read off §6.3a's measured table at the same horizon
+and flags, not scaled from a smaller one; but Part C's grid gets **one
+probe cell timed end-to-end with its real post-processing** before the
+full grid launches, because that is the rule that table exists to enforce.
+
+### 21.8 Commit sequence
+
+1. This section. Docs only.
+2. **Part A's analyser**, with the §21.3 coercion/cell-size assertions and
+   its own tests — including a test that a `''`-blank axis level raises
+   rather than selecting the 1,710-row base. Reports G6/H2/H3/G12.
+   **F1-F4 and F6 scored.**
+3. **Part B's `run_sink`** for G4 + the `duty_cycle` run. **F5 scored.**
+4. **Part C**, only if §21.5's go/no-go fires, with the probe cell timed
+   first.
+5. `docs/wp9-regime-map.md` §2's G4/G6/G12 rows and §3's H2/H3 rows
+   rewritten from results — the point of the whole stage.
+6. End-of-stage judgment-calls review.
+
+Full suite + `--check` after each. Part A and Part C touch no `sim/` or
+`scheduler/` file at all; Part B touches neither either — it is a
+study-layer sink, per §5(a)'s "no M20 is added" constraint.
+
+### 21.9 The regime-map correction is TWO-SIDED, and both sides land together
+
+Commit 5 above rewrites `docs/wp9-regime-map.md`'s G4/G6/G12 and H2/H3
+rows. **Both halves of the correction go in that one commit, and they are
+stated as two different errors rather than folded into one**, because a
+reader who acts on them does different things:
+
+- **G6's "computable from stage-1 rows but was not computed" is
+  ACCURATE.** The rows are there, the statistic was not run. Nothing to
+  correct — it is confirmed, and saying so matters, because confirming one
+  half is what makes the other half's correction legible as specific rather
+  than as a general loss of confidence in the row.
+- **H2/H3's "not tested" is TOO STRONG and is an UNDERSTATEMENT of
+  coverage.** The excursion rows exist on disk, paired within-seed against
+  the base cell, 30 rows per level. A reader who took "not tested" at face
+  value was told the map covers **less** than it does.
+
+**And that is a different error from the one §0.4 already corrects, which
+is why they must not be merged.** §0.4 corrects an **overstatement** — the
+cap did the narrowing rather than the score, so a stage-2 result on a
+cap-selected axis is weaker evidence than §6.4 assumed. This one runs the
+other way: an axis reported as absent that is in fact present but shallow.
+The two have **opposite failure modes in a reader** — §0.4's makes someone
+trust a result more than they should; this one makes someone commission
+work that is already on disk. Writing them up as "the coverage claims were
+imprecise" would lose exactly the distinction that tells a reader which
+mistake they are at risk of making.
+
+The corrected H2/H3 rows therefore say **"tested at one cell, paired,
+`n`=30 per level — result X; depth beyond the base point not bought
+(§21.5)"**, never a bare "tested" or a bare "not tested"; the depth
+qualifier travels with the row for the same reason §0.1's two-number rule
+and G11's inline seed-count rule exist.
