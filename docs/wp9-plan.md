@@ -2278,3 +2278,221 @@ uv run python scripts/analyse_stage5.py sweeps/wp9/stage5
 Finally, the end-of-WP judgment-calls review over stage 5's own diff, looking
 for undocumented decisions and silent bugs — the standing step, not an
 opportunistic one.
+
+---
+
+## 17. Stage 5 — results, scored against §16.6's pre-registered expectations
+
+48 cells, 1,440 rows (3 arms × 10 paired seeds, all cells exactly 30),
+**43.2 min at 10 workers**, 906 MB. Against §16.3's registered lower bound
+of ≥28 min and ~1 GB — both held, and the budget was a lower bound as
+stated rather than an estimate that happened to be low.
+
+### 17.1 Controls, read in the registered order
+
+| control | result |
+|---|---|
+| **C1** — null-lidar identity (STOP) | **PASS** — 120 paired rows bit-identical |
+| **C2** — cell census from `build_fleet` | **PASS** — 48 / 16 / 32 / 9 / 4 |
+| **C5** — controls vs stage 4 | **PASS** (after two analyser fixes, §17.2) — 480 control rows identical |
+| **C3** — M02w vs panel M02 | reported below as a distribution |
+| **C4** — pre-window read | **DIFFERENT branch fired** |
+
+**C3.** Over 480 control pairs at the `full` window: mean delta **+0.00266**,
+median **+0.0000857**, min 0.0, max **+0.0412**, sd 0.00822. So M02w sits
+*at or above* panel M02, with a near-zero median and a heavy right tail —
+a minority of cells carry the whole difference. **M02w is therefore
+reported as a distinct estimator with a small positive bias, never as "M02
+restricted to a window",** exactly the disposition §16.6 registered for
+this outcome.
+
+**C4 fired the DIFFERENT branch, and it changes what every number below
+says.** Pre-window M02w over non-lidar flows: mean **+0.000566**, bootstrap
+CI **[+0.000494, +0.000638]**, excluding zero over n=960. M08w showed
+exactly 0.0 and did not separate.
+
+Per §16.6's pre-registration, E1–E4 are therefore stated in the compound
+form — **"adding a provisioned-and-activated lidar bearer breaks flows at
+N=x"**, not "the activation breaks flows at N=x" — and the named follow-up
+(a third level: bearer provisioned, never activated) is now owed.
+
+**But the mechanism behind C4's difference is NOT established by this
+grid, and must not be asserted.** Two candidates fit: the lidar bearer's
+12 Mbps GBR contract genuinely perturbing Tier-1 LP or the follower budget
+while carrying no traffic; or a seed-alignment artifact from adding a flow
+to the scenario at all. `sim/traffic.py`'s activation gate returns before
+the kind dispatch so the gated flow consumes no RNG draws, which weakens
+the second — it does not eliminate it. **Scale matters for how much this
+qualifier is worth:** the pre-window effect is **+0.00057** while the
+in-window effect is **+0.039 to +0.135**, i.e. the activation term is
+**70–240× larger** than the provisioning-or-artifact term. The compound
+wording is required; the compound is heavily dominated by one component.
+
+### 17.2 Two defects the first real run found in the blind-written analyser
+
+Recorded because the analyser was written blind precisely so its failures
+would be its own, not the data's.
+
+1. **C5 compared normalisation, not runs** (`a4cd2b7`). It reported all 480
+   control rows as differing on `M04.flow=None vs ''`. Verified outside the
+   analyser: **0 real differing cells out of 480**. Two causes — `load_rows`
+   mapped `''`→`None` on one side only, and `n_ues`/`composition` were
+   type-coerced on one side and raw on the other. A control that cries wolf
+   is as useless as one that never fires: read at face value this said the
+   stage-5 controls were not stage 4's runs, which would have invalidated
+   every paired contrast in the grid.
+2. **E2's criterion had no interval** (`cd90676`). E1 was registered with a
+   paired bootstrap CI; E2 with a bare `mean(on) < mean(control)`. See
+   §17.4 — this is not a cosmetic difference, it changed the headline.
+
+Both are the same shape as §13.4 and §8b: the instrument was wrong, not the
+run.
+
+### 17.3 Contiguity, read before any effect size
+
+Per composition, over `n_ues` × `lidar_ues` only (never across the
+categorical composition axis, §16.1.2). Isolated cells out of 12:
+
+| metric | drone_heavy | ugv_heavy | sensor_dense | mixed |
+|---|---|---|---|---|
+| **M07w** | 0 | 2 | 0 (of 9) | 0 |
+| **M08w** | 0 | 3 | 0 (of 9) | 4 |
+| **M02w** | 1 | 0 | 1 | 2 |
+
+**M07w is cleanest and carries the boundary claim**, as §16.1.3 registered
+from the stage-4 prior. **One deviation from that prior:** stage 4 rated
+M02 *noisiest*, and here M02w is cleaner than M08w. Noted rather than
+explained — one grid, and the windowed variants are not the panel metrics.
+
+### 17.4 E1 — is the activation detectable at all? **HIT**
+
+`ugv_heavy` N=32, `lidar_ues=2`, M02w over non-lidar flows in `during_2`
+versus the paired control. All three arms worse beyond the within-seed
+bootstrap CI:
+
+| arm | mean Δ M02w | CI |
+|---|---|---|
+| PF | **+0.0391** | [+0.0379, +0.0405] |
+| Reservation | **+0.0650** | [+0.0600, +0.0687] |
+| TwoTier | **+0.1346** | [+0.1272, +0.1422] |
+
+The falsifier (absorbed everywhere) did not fire. **TwoTier degrades 3.4×
+more than PF** — the first of several places in this grid where the
+QoS-aware arm is the one that suffers under a transient.
+
+### 17.5 E2 — breaking fleet size: **HIT**, but the registered criterion was wrong
+
+**As scored by the pre-registered criterion:** breaking N = **4**
+(`ugv_heavy`), **8** (`drone_heavy`), **8** (`mixed`), none
+(`sensor_dense`).
+
+**That criterion is defective and its numbers must not be carried
+forward.** It is `mean(on) < mean(control)` with no interval, so
+`ugv_heavy` "breaks" at N=4 on TwoTier going **2.90 → 2.80 contracts** —
+one seed losing one contract — while at N=32 the same metric collapses
+6.70 → 1.60. E1 was registered *with* a paired CI and E2 without; that
+inconsistency is the defect.
+
+**Under E1's own test applied to E2 (POST-HOC, and labelled as such
+wherever quoted):**
+
+| composition | breaking N (corrected) | stage-4 onset (§15.4) | holds |
+|---|---|---|---|
+| `ugv_heavy` | **16** | 16 | ✅ |
+| `drone_heavy` | **16** | 32 | ✅ |
+| `mixed` | **16** | 32 | ✅ |
+| `sensor_dense` | never ≤32 | never | consistent (both undefined) |
+
+E2's expectation — breaking N ≤ onset N wherever both are defined —
+**holds everywhere**. The falsifier (a transient being *easier* to absorb
+than steady contention) did not fire.
+
+Effect sizes at N=16 are large and unambiguous, not marginal:
+
+| composition | PF | Reservation | TwoTier |
+|---|---|---|---|
+| `ugv_heavy` | −1.9 | −5.3 | **−9.9** |
+| `drone_heavy` | −2.2 | −4.6 | **−9.4** |
+
+**The finding worth carrying forward is not in the pre-registered
+prediction at all: breaking N is 16 for ALL THREE compositions that
+break.** Stage 4's steady-state onset was composition-dependent (16 / 32 /
+32); under a lidar activation that dependence collapses to a flat
+boundary. A transient does not merely shift the boundary down — it makes
+composition stop predicting where it is. That is a stronger statement for
+the hardware campaign than the registered expectation was, and it was not
+predicted.
+
+### 17.6 E3 — does H6's split extend to a transient? **HIT, and the polarity inverts with N**
+
+Split observed in 2 of 3 compositions at N=16 and **3 of 3 at N=32**. Per
+§0.1's rule, M07w and M08w are quoted together throughout.
+
+| cell | M07w winner | M08w winner | split |
+|---|---|---|---|
+| `ugv_heavy` N=16 | **PF** | **TwoTier** | ✅ |
+| `drone_heavy` N=16 | **PF** | **TwoTier** | ✅ |
+| `mixed` N=16 | TwoTier | TwoTier | ✗ |
+| `ugv_heavy` N=32 | **TwoTier** | **PF** | ✅ |
+| `drone_heavy` N=32 | **Reservation** | **PF** | ✅ |
+| `mixed` N=32 | **TwoTier** | **PF** | ✅ |
+
+H6's construction survives the move from sustained load to a transient, so
+§0.1 is **not** narrowed to sustained load.
+
+**The new result is the inversion.** At N=32 the familiar pattern holds —
+a QoS-aware arm concentrates and meets contracts, PF spreads and wins the
+max-min floor. **At N=16 it runs backwards:** PF meets more contracts while
+TwoTier holds the floor. M08w at `ugv_heavy` N=16, control → `lidar_ues=2`:
+PF **0.949 → 0.155**, TwoTier **0.945 → 0.601**. PF's worst non-lidar GBR
+flow keeps 15 % of its GFBR; TwoTier's keeps 60 %.
+
+So §0.1.1's "the lesson generalises, the ranking does not" now has a third
+demonstration, and a sharper one: the ranking inverts **within a single
+grid as a function of N**, not merely between workloads. Any single-metric
+claim about who wins is false by construction — now shown to be false in
+*both directions inside one experiment*.
+
+### 17.7 E4 — direction beats PDB tightness: **HIT**, on thin samples
+
+E-stop M02w degradation in `during_2` was **exactly 0.0** in every
+composition, while `tight_pdb` degraded most:
+
+| composition (N=16) | estop | tight_pdb | non_lidar |
+|---|---|---|---|
+| `ugv_heavy` | 0.0 | **0.1615** | 0.1575 |
+| `drone_heavy` | 0.0 | **0.2169** | 0.1494 |
+| `mixed` | 0.0 | **0.2505** | 0.0479 |
+
+E-stop was never the first flow to break, so the expectation holds and its
+falsifier did not fire.
+
+**The 0.0 was checked for being an empty selection before being reported,
+and it is not** — 54 of 90 rows at the `ugv_heavy` N=4 cell carry a real
+value and every one is 0.0. **But it rests on very little data:** at
+0.2 Hz the e-stop generates 1–4 messages per 2.5 s window, 36 of 90 rows
+are empty, versus ~426 completions per window for `tight_pdb`. So the
+honest statement is **"the e-stop showed zero PDB violations across 54
+windows carrying 1–4 messages each"**, not "the e-stop is robustly
+unharmed". Three orders of magnitude separate the two subsets' sample
+sizes.
+
+**E4 does not bear on §15.5.** This grid varies flow count, GBR fraction,
+UL share and tight-PDB density together. §15.5's discriminating experiment
+— two profiles with identical flow counts and GBR ratios, tight-PDB flows
+co-located on one LCG versus spread — **remains UNRUN**.
+
+### 17.8 What this stage cannot say
+
+- **No run-aggregate panel metric from a lidar-on cell is quoted anywhere
+  above**, and `analyse_stage5.py` raises rather than warns if asked
+  (§16.5). Every number in §17.4–§17.7 is windowed or a control.
+- **Every contrast is a compound treatment** (C4), pending the
+  provisioned-never-activated third level.
+- **Latency is not certified.** These are estimates; hardware calibrates
+  absolute latency (§0).
+- The **corrected** E2 numbers are post-hoc. The registered criterion's
+  output is in §17.5 and is what pre-registration entitles anyone to.
+- `FIVE_QI_LCG` remains invented (§12.3), so anything downstream of LCG
+  co-location — including E4's tight-PDB reading — inherits that
+  `[OPEN: HARDWARE/DECISION]`.

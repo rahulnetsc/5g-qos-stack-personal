@@ -6,9 +6,11 @@ says where the boundaries are, which guarantees are scheduler-limited
 versus fault-model-limited, and where to spend the rule-of-three budget and
 the real-RF window.
 
-**Evidence base:** stage 1 (59 cells, 1,770 runs) and stage 2 (252 cells,
-7,560 runs, full factorial, contiguity-checked), 10 paired seeds per cell,
-all 19 panel metrics scored per run. `docs/wp9-plan.md` §8b–§8d carries the
+**Evidence base:** stage 1 (59 cells, 1,770 runs), stage 2 (252 cells,
+7,560 runs, full factorial, contiguity-checked), stage 4 (48 cells, the
+Category-2 fleet grid) and **stage 5 (48 cells, 1,440 runs, the
+lidar-activation excursion)**, 10 paired seeds per cell, all 19 panel
+metrics scored per run. `docs/wp9-plan.md` §8b–§8d, §15 and §17 carry the
 detail; this document is the roll-up.
 
 ---
@@ -39,7 +41,7 @@ together, every time either is quoted.** A "PF wins at high N" claim built
 on M08 alone, or a "PF collapses at high N" claim built on M07 alone, is
 false in the same cell.
 
-### 0.1.1 The winner flipped between workloads — the lesson generalises, the ranking does not
+### 0.1.1 The winner flips between workloads AND within one grid — the lesson generalises, the ranking does not
 
 | | leads on M07 contracts | PF's M07 | PF's M08 |
 |---|---|---|---|
@@ -57,6 +59,28 @@ from stage 2 would have been **wrong on stage 4's workload while quoting a
 real number**. Any single-metric claim about who wins at high N is false
 by construction, now demonstrated across two workloads with **opposite
 winners**.
+
+**Stage 5 adds a third demonstration, and it is stronger than the first
+two: the ranking inverts WITHIN ONE GRID, as a function of N.** Under a
+lidar activation (`docs/wp9-plan.md` §17.6):
+
+| cell | M07w winner (contracts) | M08w winner (floor) |
+|---|---|---|
+| `ugv_heavy` N=16 | **PF** | **TwoTier** |
+| `drone_heavy` N=16 | **PF** | **TwoTier** |
+| `ugv_heavy` N=32 | **TwoTier** | **PF** |
+| `drone_heavy` N=32 | **Reservation** | **PF** |
+
+At N=32 the familiar pattern holds — a QoS-aware arm concentrates and
+meets contracts, PF spreads and wins the max-min floor. **At N=16 it runs
+backwards.** M08w at `ugv_heavy` N=16, control → `lidar_ues=2`: PF
+**0.949 → 0.155**, TwoTier **0.945 → 0.601** — PF's worst non-lidar GBR
+flow keeps 15 % of its GFBR where TwoTier's keeps 60 %.
+
+So the split itself (H6) survives every workload tried; **which arm sits
+on which side of it is not stable even across two fleet sizes of the same
+composition.** A single-metric claim is now demonstrably false in *both
+directions inside one experiment*.
 
 ### 0.2 H5 is untestable as configured — which is not the same as unconfirmed
 
@@ -196,6 +220,50 @@ composition set holding flow count and GBR fraction FIXED while varying
 tight-PDB density and LCG co-location independently.** Naming that
 experiment is what separates an open hypothesis from a story that fits.
 
+### 1.1b The TRANSIENT boundary (stage 5) — composition stops predicting it
+
+Stage 4's onset above is a **steady-state** boundary. Stage 5 ran the one
+regime where a large GBR demand arrives suddenly: a duty-cycled 12 Mbps
+lidar on 1–2 UGVs, concurrency capped at 2 as a factory-workflow bound.
+
+| composition | steady-state onset (§1.1a) | **transient breaking N** |
+|---|---|---|
+| `sensor_dense` | none ≤32 | none ≤32 |
+| `mixed` | 32 | **16** |
+| `drone_heavy` | 32 | **16** |
+| `ugv_heavy` | 16 | **16** |
+
+**The headline is not that the boundary moves down — it is that it goes
+FLAT.** Under steady contention onset was composition-dependent
+(16/32/32); under a transient all three break at **N=16**. Composition
+predicts the steady-state boundary and does **not** predict the transient
+one.
+
+Effect sizes at N=16 are large, not marginal (M07w contracts met, paired
+per-seed delta vs control): `ugv_heavy` PF −1.9 / Reservation −5.3 /
+TwoTier **−9.9**; `drone_heavy` −2.2 / −4.6 / **−9.4**. **The QoS-aware
+arms lose the most**, consistently.
+
+**Three qualifiers travel with this table, all load-bearing:**
+
+1. **It is a COMPOUND treatment.** Control C4 fired its *different*
+   branch: the pre-window differs between lidar-on and lidar-off cells
+   (M02w +0.00057, CI excluding zero), so each contrast measures
+   *provisioning + activation*, not activation alone. The correct phrasing
+   is **"adding a provisioned-and-activated lidar bearer breaks flows at
+   N=16"**. The activation term dominates the compound by 70–240×, and
+   separating the two needs the named follow-up: a third level with the
+   bearer provisioned but never activated.
+2. **The breaking-N numbers are POST-HOC.** The pre-registered criterion
+   had no confidence interval and fired on one seed losing one contract
+   (`docs/wp9-plan.md` §17.5); these come from re-scoring with the paired
+   bootstrap CI E1 was registered with. The registered criterion's own
+   output (4/8/8) is recorded there and is what pre-registration entitles
+   anyone to.
+3. **Run-aggregate metrics from a lidar-on cell are excluded, not
+   caveated.** At 5 s a 2 s activation is 40 % of the run; every number
+   here is windowed to the activation interval or comes from a control.
+
 ### 1.2 Who wins where — with §0.1 applied
 
 - **N ≤ 4**: nobody. Zero loss on all arms at low load; at N=4 loads 1.5–3.0
@@ -238,11 +306,11 @@ rather than papered over.
 | H | Verdict | Basis |
 |---|---|---|
 | **H1** (reservation collapses above a UE count) | **Confirmed, bound identified** | Boundary at N=8 / N=16, matching the PDCCH bound. §0.3 limits it to `min_rb=5`. |
-| **H2** (two-tier wins as traffic becomes bursty) | **Not tested** | `duty_cycle` qualified (2.663) and was dropped by the cap. |
+| **H2** (two-tier wins as traffic becomes bursty) | **Not tested as an axis — but a transient now contradicts its direction** | `duty_cycle` qualified (2.663) and was dropped by the cap, so H2 proper is still unrun. Stage 5's lidar activation is the burstiest workload in this project, and TwoTier **lost the most** there (M07w −9.9 vs PF −1.9 at `ugv_heavy` N=16, §1.1b). That is one transient shape, not the `duty_cycle` sweep H2 asks for, so it does not refute H2 — but H2 should no longer be written as though its direction were the expected one. |
 | **H3** (two-tier wins as channel spreads) | **Not tested** | `snr_spread_db` qualified (4.689) and was dropped by the cap. |
 | **H4** (Tier-1 mismatched to factory deadlines) | **Re-tagged — not an environmental question** | Driven by `pdb_ms`, which is **Cat 1** (5QI-derived, `ad6ba54`). Testable only as a **deployment variant**, not as an axis in this map. It did qualify (2.927) and was dropped by the cap, but that framing implied a gap the map could close; it cannot. |
 | **H5** (two-tier degrades as flows-per-LCG grows) | **Now TESTABLE BY COMPOSITION** | Shared-LCG arises from the UGV profile's own `FIVE_QI_LCG` assignment — odometry (83), drive control (82), e-stop (85) all on **LCG 3** — rather than a synthetic override. **A stronger test than stage 1's**: co-location follows from a realistic device's QoS classes, not a flag set to make the mechanism fire. Still conditional on `FIVE_QI_LCG`, which remains invented (`[OPEN: HARDWARE/DECISION]`); §0.2's `mfbr_bps > 0` half is now supplied by base config. |
-| **H6** (overload outcome is metric-dependent) | **CONFIRMED ON TWO STRUCTURALLY DIFFERENT WORKLOADS** | §0.1. Stage 2 (uniform 3-flow fleet, synthetic filler) and stage 4 (heterogeneous device profiles, no filler, per-device load) both show it. Not predicted in advance either time. **The winner flipped between them — see §0.1.1 — which is what makes the lesson, not the ranking, the result.** |
+| **H6** (overload outcome is metric-dependent) | **CONFIRMED ON THREE STRUCTURALLY DIFFERENT WORKLOADS, INCLUDING A TRANSIENT** | §0.1. Stage 2 (uniform 3-flow fleet, synthetic filler), stage 4 (heterogeneous device profiles, no filler) and **stage 5 (a transient lidar activation)** all show it — so the construction is **not** a steady-state property, which was stage 5's registered falsifier and it did not fire. Predicted in advance only the third time (E3, `docs/wp9-plan.md` §17.6), and deliberately **without** naming an arm. **The winner flips between workloads AND between two fleet sizes of the same composition — see §0.1.1 — which is what makes the lesson, not the ranking, the result.** |
 | **H7** (liveness decided by the UL access path) | **Re-tagged — not a regime-map hypothesis** | Driven by `sr_period_slots`, a **Cat-1** parameter, so it is a fixed property of the deployment. To be re-scoped or retired, **not** left as an untested hypothesis implying a gap this map could close. |
 
 Five of seven hypotheses are untested because the cap admitted two
@@ -286,3 +354,16 @@ technique.
 4. **GT-7.3 (degradation ordering) is where H6 bites.** Expect the
    first-violation order to depend on which metric the pass criterion
    reads; specify that metric before running.
+5. **A transient bound now sits alongside GT-5.2's steady-state one.** If
+   the campaign will ever enable a high-rate sensor on a moving robot
+   while the fleet is live, **N=16 is the fleet size to test it at**, for
+   every composition — §1.1b's boundary is flat, so a single N covers all
+   three rather than needing one per composition. Test it at N=16 rather
+   than at the steady-state onset, which is 32 for two of the three and
+   would miss the effect entirely.
+6. **The cheapest experiment WP9 leaves undone is the third lidar level:
+   bearer provisioned, never activated.** It needs no new mechanism (a
+   `LidarActivation` whose `start_s` exceeds the horizon) and it is what
+   converts §1.1b's compound "provisioned-and-activated" claim into a
+   clean one. Until it runs, every transient number in this document is a
+   compound treatment.
