@@ -1610,7 +1610,16 @@ of why the historical N=2 hardware measurement (§7) found no
 differentiation, since the follower budget is the one deliberate
 structural difference from a bare PF-style scheduler that specifically
 needs 2+ needy followers to activate; two-tier's UL floor fires and
-disarms correctly under the fruitless-counter logic.
+disarms correctly under the fruitless-counter logic **in its unit tests**
+(`sim/tests/test_two_tier.py`'s property tests drive every transition
+directly). **That is not a statement about any sweep**: per §7 the floor
+has never fired on this corpus, and the one contrary datum —
+`gate_passes=73285, fires=9` — came from a 16-cell machinery smoke grid at
+horizon 1000 on a stage-3 run that died at cell 51/52 and was superseded,
+so it was never confirmed at scale. Whether the floor's *firing* condition
+keys on `floor_rx_lastseen` (delivery not moving) rather than on the
+BSR/SR desync it was built for is **open** — `docs/wp9-plan.md` §18.5
+registers it as the question the truncated-BSR work settles.
 
 **Phase 3 exit criteria:** WP9's grid complete, regime-selection discipline
 satisfied (no 0%-loss-on-both-arms cells reported), H1–H7 each resolved

@@ -2539,3 +2539,234 @@ pinned by a test), any scheduler-file change (none in this stage), any
 panel edit (`config/metric_panel.yml` untouched, as §16.4 required), or
 any `--capture` of the corpus (frozen at `9963be1` and `--check`-clean at
 every one of the seven commits).
+
+---
+
+## 18. Truncated BSR — the mechanism `sim/bsr.py` does not have
+
+### 18.0 Why this item, and what it is not
+
+Commit 0b (§8a) established read-only that `sim/bsr.py` cannot express
+`estimated_ul_buffer_per_lcg[L] == 0` while true backlog on `L` persists,
+and committed to the sentence *the model lacks a mechanism; the fault is
+real on hardware*. That scoping makes this **"add a mechanism"**, not
+"enable a path".
+
+Two things it unlocks, and they are separate:
+
+1. **G2's real failure class.** The sim already measures STOP latency under
+   ordinary contention — that is not the gap. What it cannot produce is the
+   BSR/SR desync the UL service-interval floor exists to rescue, which is
+   what GT-2.2 and GT-2.3 are built around. G2 currently has an estimate
+   for the easy case and nothing for the case the guarantee is about.
+2. **The floor becoming exercisable.** Every grid in this WP describes
+   two-tier with its signature starvation guard inert or near-inert, so
+   `docs/wp9-regime-map.md`'s scheduler comparison is a comparison of
+   **two-tier-without-its-guard**.
+
+### 18.1 TS 38.321 §5.4.5, transcribed from the spec — PRIMARY source
+
+Transcribed from **3GPP TS 38.321 V17.5.0 (2023-06)**, §5.4.5 "Buffer
+Status Reporting", Release 17, pages 73-74, via `pdftotext -layout` — the
+same method WP6 used for TR 38.901. **Primary, not secondary**: the plan
+for this item assumed only OAI's quoted comment block would be available
+and pre-marked the provenance as secondary-source; the actual spec text
+was obtainable, so that qualifier is withdrawn rather than carried.
+
+Verbatim, for the non-IAB Padding BSR case:
+
+> 1> if the number of padding bits is equal to or larger than the size of
+> the Short BSR plus its subheader but smaller than the size of the Long
+> BSR plus its subheader:
+>
+>   2> if more than one LCG has data available for transmission when the
+>   BSR is to be built:
+>
+>     3> if the number of padding bits is equal to the size of the Short
+>     BSR plus its subheader:
+>
+>       4> report Short Truncated BSR of the LCG with the highest priority
+>       logical channel with data available for transmission.
+>
+>     3> else:
+>
+>       4> report Long Truncated BSR of the LCG(s) with the logical
+>       channels having data available for transmission following a
+>       decreasing order of the highest priority logical channel (with or
+>       without data available for transmission) in each of these LCG(s),
+>       and in case of equal priority, in increasing order of LCGID.
+>
+>   2> else:
+>
+>     3> report Short BSR.
+>
+> 1> else if the number of padding bits is equal to or larger than the size
+> of the Long BSR plus its subheader:
+>
+>   2> report Long BSR for all LCGs which have data available for
+>   transmission.
+
+And on the timers (§5.4.5, page 74):
+
+> 3> start or restart periodicBSR-Timer except when all the generated BSRs
+> are long or short Truncated or Extended long or short Truncated BSRs;
+>
+> 3> start or restart retxBSR-Timer.
+
+**The ordering rule is the load-bearing sentence** and is the one thing
+that must never be written from memory: *decreasing order of the highest
+priority logical channel **(with or without data available for
+transmission)** in each of these LCG(s), ties by increasing LCGID.* Note
+the parenthetical — an LCG's rank comes from its highest-priority channel
+whether or not that channel currently has data, which is not the obvious
+reading.
+
+### 18.2 What OAI actually does, and where it diverges
+
+Ground truth for the UE side is
+`openair2/LAYER2/NR_MAC_UE/nr_ue_scheduler.c:2364-2432` (full checkout, not
+the vendored subset — the vendored `nr_ue_scheduler.c` is a different
+upstream directory per `oai-branches/README.md`). Sizes from
+`NR_MAC_COMMON/nr_mac.h:92-110,137-153`: `NR_BSR_SHORT`=1,
+`NR_BSR_LONG`=1, `SUBHEADER_FIXED`=1, `SUBHEADER_SHORT`=2, so
+`short_bsr_sz` = **2**, `long_bsr_sz` = `n_lcg_with_data + 3`, and the
+long-truncated floor is **3**.
+
+| format | OAI condition | OAI reports | spec says |
+|---|---|---|---|
+| `b_short` | `n_lcg < 2 && padding ≥ 2` | 1 LCG | same |
+| `b_long` | `padding ≥ n_lcg+3` | all 8 entries | LCGs with data (equivalent: empty LCGs encode 0) |
+| `b_short_trunc` | `padding == 2` | **1 LCG while n_lcg ≥ 2** | same |
+| `b_long_trunc` | `padding ≥ 3` | **all 8 entries** | **a priority-ordered PREFIX** |
+| none | `padding < 2` | nothing | — |
+
+**The divergence, anchored to OAI's own acknowledgement.** `b_long_trunc`
+loops `for (int lcg_id = 0; lcg_id < 8; lcg_id++)` and fills every entry —
+identical to `b_long` — directly under its own comment
+(`nr_ue_scheduler.c:2419-2421`):
+
+> `//  Fixme: this should be sorted by (TS 38.321, 5.4.5)`
+> `// the logical channels having data available for`
+> `// transmission following a decreasing order of the highest priority logical channel ...`
+
+This is a **comment-vs-code finding in the same family as Phase 2's four,
+with one difference that matters: here the comment ADMITS the gap** rather
+than asserting something the code does not do. CLAUDE.md's rule (*port the
+code, not the comment*) still governs what "faithful" means — and the
+consequence is sharp: **ported faithfully, `b_long_trunc` cannot produce
+the desync at all.** The only shipped path that can is `b_short_trunc`, at
+a padding window of exactly 2 bytes.
+
+**Decision (recorded, not resolved silently in either direction): build
+both modes.** OAI-faithful is the default behaviour of the flag;
+38.321's priority-ordered prefix is the second mode, a **deliberate
+documented divergence**. The justification is that they are ground truth
+for *different setups*: the calibration campaign's UEs are commercial
+modems implementing the spec, while OAI's `nr_ue_scheduler.c` runs only in
+rfsim. A real gNB therefore receives spec-truncated BSRs; an rfsim gNB
+receives OAI-truncated ones. Building only the OAI path would leave the
+desync route at a 2-byte window that may never fire on this corpus —
+leaving the floor exactly as inert as it is today, which is the thing this
+item exists to fix.
+
+### 18.3 Three findings recorded while scoping
+
+1. **Stage 3's `fires=9` was NEVER confirmed at scale — it is an open
+   question, not a premise.** `sweeps/wp9/stage3.log` stops at **cell
+   51/52**, `sweeps/wp9/stage3/` holds no artefacts, and this document has
+   a stage-3 *plan* (§11) and **no stage-3 results section** — §12 goes
+   straight to the re-scope. So `gate_passes=73285, fires=9` is from a
+   **16-cell machinery smoke grid at horizon 1000** on a run that died and
+   was superseded. §11's own note is properly hedged ("*If* the full run
+   confirms this"), but `README.md` §9's "two-tier's UL floor fires and
+   disarms correctly under the fruitless-counter logic" carried no marker
+   that this is *unit-test* behaviour, which reads as established next to
+   §7's statement that the floor never fires on this corpus. **Tightened in
+   this commit.** Whether firing keys on `floor_rx_lastseen` (delivery not
+   moving) rather than on the desync fault is **open, and §18.5 registers
+   it as the thing to settle.**
+
+2. **`tb_size` was already plumbed.** Commit 0b's forward note said
+   truncated BSR "needs the *grant size* threaded into the BSR-assembly
+   decision, which today reads only the active-LCG count". It does not —
+   `on_ul_grant(ue_id, tb_size, ...)` already takes it and `sim/driver.py`
+   already passes `alloc.bytes_capacity`. **Third instance of CLAUDE.md's
+   forward-looking-note rule**, after `_dl_stamp`'s wrong citation and
+   port-map row 46's wrong plan. Same shape as commit 0b's *other* wrong
+   item (§8c): an assertion about code that already existed and could have
+   been read. The rule already covers it; no new rule is needed. **What is
+   actually missing is occupancy, not grant size** — see §18.4.
+
+3. **The `b_long_trunc` Fixme** — §18.2 above; `docs/oai-port-map.md`
+   row 4's Divergence cell is amended in this commit to cite it, since it
+   is a statement about OAI's shipped code and true independently of what
+   this repo builds.
+
+### 18.4 Design
+
+**Where it lives.** `sim/bsr.py::BsrModel.on_ul_grant`, replacing the
+`len(active_lcgs)` branch with padding-keyed selection.
+
+**The one real coupling is OCCUPANCY, not grant size.**
+`padding_len = tb_size - filled_bytes`. `filled_bytes` is computed at the
+call site already (`ue_filled_bytes`, `sim/driver.py`) and is not passed;
+one additive parameter, defaulted so every existing caller and
+`sim/tests/test_bsr.py` keep working unchanged.
+
+**Modelling decision, stated rather than glossed:** this simulator has no
+MAC PDU model — no per-SDU subheaders, no PHR, no LCP multiplexing — so
+`padding_len` is an approximation of the real quantity by exactly those
+omissions, **all of which make the modelled padding LARGER than reality**.
+The bias direction is knowable and recorded here; the magnitude is not.
+Consequence: modelled truncation fires *less* often than hardware would,
+so a null result under this model is weak evidence about hardware, while a
+positive one is not weakened.
+
+**Opt-in and inert by default.** A model-level flag (default off) selects
+the current branch byte-for-byte. **Prediction registered here:
+`--check` clean on all 20 records.** If it moves, the flag is not inert —
+that is information, not a re-baseline trigger. Deliberately *not*
+unconditional: bundling a fidelity change of the class that moved 15 of 20
+records into the same commit as a new mechanism destroys the attribution
+the corpus exists for.
+
+### 18.5 Pre-registered expectations
+
+Registered before the mechanism exists, per §16.6's discipline.
+
+1. **The floor fires under a constructed desync** — *and* the competing
+   outcome is named: `_ul_has_pending_gbr` may **block arming in exactly
+   the fault**, because it reads the same per-LCG estimate the floor exists
+   to route around (README §7, ported faithfully and pinned by
+   `test_ul_floor_has_pending_gbr_gate_reads_the_same_estimate_it_exists_to_route_around`).
+   **Both outcomes are informative and the second is the more
+   interesting** — it would mean the floor cannot rescue the fault it was
+   built for, which is a statement about the deployed scheduler, not about
+   this model.
+2. **Arming and firing separate.** Instrument gate-passes and fires
+   separately and attribute each fire to *desync* vs *ordinary starvation
+   via `floor_rx_lastseen`*. This settles finding 1's open question at
+   scale rather than from a smoke grid.
+3. **G2's STOP statistic under the fault**, against the same scenario
+   without it.
+4. **Desync WIDTH: spec-truncation vs OAI-truncation.** Measured, not
+   predicted in magnitude: **how many slots, and how many LCG-slots, hold
+   `estimate == 0 while backlog > 0` under each mode.** If OAI-mode's width
+   is zero on this corpus, that is the concrete statement of why the floor
+   has been inert — and it is what makes the divergence worth having rather
+   than an assertion that it is.
+
+### 18.6 Commit sequence
+
+1. **This document + the two doc corrections** (README §9's floor line,
+   port-map row 4). Docs only.
+2. `filled_bytes` plumbed, flag added, selection refactored — **inert**;
+   `--check` prediction scored.
+3. Guard test **shown failing first**, then `b_short_trunc`.
+4. `b_long_trunc`, both modes.
+5. A desync scenario + floor instrumentation; §18.5 scored.
+
+The guard test's discriminating state is commit 0b's: `estimate == 0` with
+`backlog > 0`, **persisting** across ≥N slots rather than self-correcting.
+Route C already produces the one-slot version, so a single-slot assertion
+would pass today and guard nothing.
