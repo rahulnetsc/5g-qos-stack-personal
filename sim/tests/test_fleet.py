@@ -81,6 +81,54 @@ def test_lidar_concurrency_is_capped_as_a_bound():
     assert len(active) == LIDAR_MAX_CONCURRENT
 
 
+def test_stage5_degenerate_cells_come_from_the_ugv_weights():
+    """WP9 stage 5's C2 census (docs/wp9-plan.md §16.3) rests on which
+    compositions have too few UGVs to activate what a cell asks for. That
+    is a structural property of COMPOSITIONS, so it is pinned here rather
+    than only inside the sweep runner's launch assertion -- if the weights
+    or `_allocate` change, this is the test that says why the census moved.
+    """
+    ugvs = {(comp, n): build_fleet(n, comp)[1].count("ugv")
+            for comp in ("sensor_dense", "mixed", "drone_heavy", "ugv_heavy")
+            for n in (4, 8, 16, 32)}
+
+    # sensor_dense weights UGVs at 0.03: none at all below N=16.
+    assert ugvs[("sensor_dense", 4)] == 0
+    assert ugvs[("sensor_dense", 8)] == 0
+    assert ugvs[("sensor_dense", 16)] == 1
+    assert ugvs[("sensor_dense", 32)] == 1
+    # The other partial cases the census counts as degenerate.
+    assert ugvs[("mixed", 4)] == 1
+    assert ugvs[("drone_heavy", 4)] == 1
+    assert ugvs[("drone_heavy", 8)] == 1
+    # ugv_heavy always has room for both.
+    assert all(ugvs[("ugv_heavy", n)] >= 2 for n in (4, 8, 16, 32))
+
+
+def test_stage5_null_cells_are_identical_to_the_control():
+    """C1's stop condition, at the fleet layer: with zero UGVs a lidar
+    request activates nothing, so the scenario must be indistinguishable
+    from lidar-off. A difference with no lidar could only come from the
+    plumbing."""
+    off, seq_off = build_fleet(8, "sensor_dense")
+    for n_ues in (1, 2):
+        on, seq_on = build_fleet(8, "sensor_dense",
+                                 lidar=LidarActivation(n_ues=n_ues))
+        assert seq_on == seq_off
+        assert on == off
+
+
+def test_lidar_stagger_is_a_field_not_a_literal():
+    """Stage 5 derives its `during_2` window from `stagger_s`, so the value
+    has to be reachable from the dataclass rather than living only inside
+    build_fleet (docs/wp9-plan.md §16.4, "never hardcoded")."""
+    lid = LidarActivation(n_ues=2, start_s=1.0, duration_s=0.5, stagger_s=0.25)
+    flows, _ = build_fleet(16, "ugv_heavy", lidar=lid)
+    act = sorted(f.traffic_params["active_from_s"] for f in flows
+                 if f.gfbr_bps == LIDAR_ACTIVE_BPS)
+    assert act == [1.0, 1.25]
+
+
 def test_lidar_window_is_applied_and_staggered_unless_synchronised():
     lid = LidarActivation(n_ues=2, start_s=1.5, duration_s=2.0)
     flows, _ = build_fleet(16, "ugv_heavy", lidar=lid)

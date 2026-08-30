@@ -167,3 +167,84 @@ def test_worker_does_not_retain_records_across_a_cell():
         f"worker retention grew {growth:.2f} MB when seeds went 2 -> 6; it is "
         f"holding live records again")
     assert absolute < 20.0, f"worker absolute retention {absolute:.2f} MB"
+
+
+def test_stage5_worker_does_not_retain_the_summary():
+    """Stage 5's worker is handed the RAW driver summary via `run_sink` --
+    which holds `_message_ledger` AND `_ue_lcp`, both live objects the
+    stripped payload never carried before. That is a NEW retention surface,
+    on the layer that actually runs the sweep.
+
+    This is the test the CLAUDE.md invariant asks for: commit 1b's guards
+    stayed green while 1c reintroduced the identical leak one layer down,
+    because they pinned the helper and not the pipeline. So pin the
+    pipeline.
+    """
+    import tracemalloc
+    from wp9_sweep import _run_one_cell_s5
+
+    cell = {"n_ues": 4, "composition": "ugv_heavy", "lidar_ues": 2}
+    tracemalloc.start()
+    try:
+        base = tracemalloc.get_traced_memory()[0]
+        _run_one_cell_s5((dict(cell), 2, 1000))
+        after_2 = tracemalloc.get_traced_memory()[0]
+        _run_one_cell_s5((dict(cell), 6, 1000))
+        after_6 = tracemalloc.get_traced_memory()[0]
+    finally:
+        tracemalloc.stop()
+
+    growth = (after_6 - after_2) / 1e6
+    absolute = (after_6 - base) / 1e6
+    assert growth < 5.0, (
+        f"stage-5 worker retention grew {growth:.2f} MB when seeds went "
+        f"2 -> 6; it is holding summaries or live records")
+    assert absolute < 20.0, (
+        f"stage-5 worker absolute retention {absolute:.2f} MB")
+
+
+def test_stage5_worker_emits_windowed_rows_and_the_exclusion_tag():
+    """The worker must actually produce §16.4's windowed rows (the run_sink
+    path) and tag every run-aggregate row on a lidar-on cell as excluded
+    (§16.5) -- rows written in full, never omitted, but marked so the
+    analyser can refuse to aggregate them."""
+    from wp9_sweep import _run_one_cell_s5
+
+    rows, online, payload, tally = _run_one_cell_s5(
+        ({"n_ues": 4, "composition": "ugv_heavy", "lidar_ues": 2}, 1, 1000))
+
+    assert all(r["n_lidar_active"] == 2 for r in rows)
+    assert all(r["transient_excluded"] is True for r in rows)
+
+    windowed = [r for r in online if r.get("metric", "").endswith("w")]
+    assert windowed, "run_sink produced no windowed rows"
+    assert {r["window"] for r in windowed} == {
+        "pre", "during_1", "during_2", "post", "full"}
+    assert {r["subset"] for r in windowed} == {
+        "non_lidar", "tight_pdb", "estop", "lidar_only"}
+    # M07w and M08w are never emitted apart (§0.1's rule, made structural).
+    assert (sum(1 for r in windowed if r["metric"] == "M07w")
+            == sum(1 for r in windowed if r["metric"] == "M08w"))
+
+
+def test_stage5_census_matches_the_registered_counts():
+    """C2 (docs/wp9-plan.md §16.3), computed from build_fleet rather than
+    restated -- CLAUDE.md's rule after the stage-1 grid was documented as 56
+    cells while the runner summed 59."""
+    from wp9_sweep import (
+        STAGE5_EXPECTED_CENSUS, STAGE5_GRID, _stage5_cell_census,
+    )
+    assert _stage5_cell_census(STAGE5_GRID) == STAGE5_EXPECTED_CENSUS
+
+
+def test_stage5_control_path_is_byte_identical_to_stage_4():
+    """C5's precondition. `lidar_ues=0` must build exactly the scenario
+    stage 4 built at video_tier=1.0, or the control is not a control."""
+    from wp9_sweep import _build_fleet_scenario, _build_fleet_scenario_s5
+
+    for comp in ("ugv_heavy", "sensor_dense"):
+        s4 = _build_fleet_scenario(7, n_ues=8, composition=comp,
+                                   video_tier=1.0)
+        s5 = _build_fleet_scenario_s5(7, n_ues=8, composition=comp,
+                                      lidar_ues=0)
+        assert s5 == s4, comp

@@ -71,7 +71,16 @@ LIDAR_LEGACY_BPS = 66_000_000.0      # operational: Legacy, misconfiguration cas
 # CONCURRENCY IS A BOUND, NOT AN AXIS. Factory tasks are serialised by the
 # floor's operation: you do not get eight UGVs docking simultaneously. This
 # is a modelling assumption with that justification -- deliberately NOT a
-# parameter someone might later think to sweep.
+# parameter to sweep as a LOAD SCALE, which is what "more concurrent lidars
+# = more offered load" would be.
+#
+# WP9 stage 5 varies n_ues over {0, 1, 2} anyway, and that is not a
+# violation of the above: 1-vs-2 are THE TWO ENDPOINTS OF THIS BOUND -- one
+# robot docking versus two, the most the floor's own serialisation allows --
+# not a scale extended past it. The clamp below is what makes the
+# distinction enforceable rather than a matter of intent, and
+# test_lidar_concurrency_is_capped_as_a_bound pins it (docs/wp9-plan.md
+# §16.3).
 LIDAR_MAX_CONCURRENT = 2
 
 

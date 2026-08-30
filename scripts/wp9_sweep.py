@@ -607,16 +607,24 @@ STAGE4_GRID: dict[str, list[Any]] = {
 }
 
 
-def _build_fleet_scenario(seed: int, **axis_values):
+def _build_fleet_scenario(seed: int, _lidar=None, **axis_values):
     """Stage-4 scenario: a heterogeneous fleet, not the stage-1/2 synthetic
     workload. Load intensity comes from per-device rates (video_tier), NOT
-    a synthetic best-effort filler -- the clean break of §6 decision 2."""
+    a synthetic best-effort filler -- the clean break of §6 decision 2.
+
+    `_lidar` is stage 5's only addition (§16, build item B7), and it is a
+    parameter here rather than a separate builder precisely so `lidar=None`
+    keeps taking the byte-identical path stage 4 ran -- which is what
+    control C5 checks against sweeps/wp9/stage4/rows.jsonl. Underscored
+    because it is not a grid axis: the axis is the scalar `lidar_ues`.
+    """
     from sim.fleet import build_fleet
     from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
 
     n = axis_values["n_ues"]
     flows, seq = build_fleet(
         n, axis_values["composition"],
+        lidar=_lidar,
         video_tier=axis_values.get("video_tier", 1.0),
     )
     ues = [UEConfig(ue_id=i + 1, mean_snr_db=20.0, coherence_slots=2000)
@@ -646,6 +654,175 @@ def _run_one_cell_s4(task: tuple) -> tuple:
         n_seeds=n_seeds, driver_kwargs=_driver_kwargs, record_sink=sink,
     )
     return rows, online, payload, dict(axis_values)
+
+
+# ---------------------------------------------------------------- stage 5
+# The lidar-activation excursion (docs/wp9-plan.md §16). N and composition
+# are stage 4's OWN levels so every cell reads against a stage-4
+# coordinate; video_tier is held at 1.0 because the excursion is a
+# fixed-magnitude perturbation and holding the background constant is what
+# isolates it (§16.3).
+STAGE5_GRID: dict[str, list[Any]] = {
+    "n_ues": [4, 8, 16, 32],
+    "composition": ["drone_heavy", "ugv_heavy", "sensor_dense", "mixed"],
+    # A JSON SCALAR, not a LidarActivation: cell_id() json-serialises axis
+    # values and write_csv needs scalar columns. The runner constructs the
+    # dataclass from it.
+    "lidar_ues": [0, 1, 2],
+}
+
+STAGE5_VIDEO_TIER = 1.0
+
+# Imported rather than restated: wp9_window owns the "which 5QI is the
+# lidar" fact, and two copies of it would be one copy too many.
+from wp9_window import LIDAR_QFI as _LIDAR_QFI  # noqa: E402
+
+# C2's registered counts (§16.3). Asserted against build_fleet at launch,
+# never trusted from here -- this is the expectation, _stage5_cell_census
+# is the measurement.
+STAGE5_EXPECTED_CENSUS = {
+    "total": 48, "control": 16, "excursion": 32, "degenerate": 9, "null": 4,
+}
+
+
+def _build_fleet_scenario_s5(seed: int, **axis_values):
+    """Stage-5 scenario: stage 4's fleet plus a duty-cycled lidar activation.
+
+    `lidar_ues=0` MUST take a path byte-identical to stage 4's, because C5
+    checks exactly that against sweeps/wp9/stage4/rows.jsonl. It does:
+    build_fleet's `lidar=None` branch is stage 4's, and video_tier is
+    pinned to the 1.0 stage 4 also ran.
+    """
+    from sim.fleet import LidarActivation
+
+    n = axis_values["n_ues"]
+    lidar_ues = int(axis_values["lidar_ues"])
+    lidar = LidarActivation(n_ues=lidar_ues) if lidar_ues > 0 else None
+    return _build_fleet_scenario(
+        seed, n_ues=n, composition=axis_values["composition"],
+        video_tier=STAGE5_VIDEO_TIER, _lidar=lidar,
+    )
+
+
+def _stage5_cell_census(grid: dict) -> dict[str, int]:
+    """C2, computed from build_fleet rather than restated in prose.
+
+    CLAUDE.md's rule: a count that describes a structure is derived at the
+    point of use or printed by the thing that produces it. The stage-1 grid
+    was described as 56 cells while the runner summed 59, and only the
+    runner printing its own count surfaced it.
+    """
+    from sim.fleet import LIDAR_MAX_CONCURRENT, build_fleet
+
+    census = {"total": 0, "control": 0, "excursion": 0,
+              "degenerate": 0, "null": 0}
+    for n in grid["n_ues"]:
+        for comp in grid["composition"]:
+            _, seq = build_fleet(n, comp)
+            n_ugv = seq.count("ugv")
+            for lidar_ues in grid["lidar_ues"]:
+                census["total"] += 1
+                if lidar_ues == 0:
+                    census["control"] += 1
+                    continue
+                census["excursion"] += 1
+                active = min(lidar_ues, LIDAR_MAX_CONCURRENT, n_ugv)
+                if active < lidar_ues:
+                    census["degenerate"] += 1
+                if active == 0:
+                    census["null"] += 1
+    return census
+
+
+def _run_one_cell_s5(task: tuple) -> tuple:
+    """Stage-4's worker plus the windowed instruments.
+
+    MEMORY: the summary holds `_message_ledger` AND `_ue_lcp`, both live
+    objects. The windowed rows are computed here and the summary is
+    dropped on return from the sink -- nothing retains it, and nothing
+    retains a live RunRecord (CLAUDE.md: a green suite does not prove a
+    long run is clean, and 1b's tests stayed green while 1c leaked).
+    """
+    from sim.fleet import LidarActivation, build_fleet
+    from wp9_window import (
+        lidar_windows, windowed_flows_from_record, windowed_metrics,
+    )
+
+    axis_values, n_seeds, horizon = task
+    _HORIZON[0] = horizon
+    online: list[dict] = []
+    payload: list[tuple] = []
+    sc_card = Scorecard()
+    lidar_ues = int(axis_values["lidar_ues"])
+    lidar = LidarActivation(n_ues=lidar_ues) if lidar_ues > 0 else None
+
+    # COUNTED FROM THE FLOWS build_fleet RETURNED, NOT FROM THE REQUEST
+    # (§16.7 B7): `lidar_ues=2` on a composition with one UGV activates
+    # one, and that gap IS the degenerate-cell census. Deliberately not
+    # counted off the RunRecord -- a record only carries flows that
+    # generated traffic, so an activation whose window falls outside a
+    # short horizon would read as "not active" when it was provisioned and
+    # activated. Deterministic in the axis values, so once per cell.
+    cell_flows, _ = build_fleet(
+        axis_values["n_ues"], axis_values["composition"],
+        lidar=lidar, video_tier=STAGE5_VIDEO_TIER)
+    n_active = sum(1 for f in cell_flows if f.qfi == _LIDAR_QFI)
+    excluded = n_active > 0
+
+    def run_sink(record, av, summary):
+        time_s = record.timeseries_time_s
+        horizon_s = (time_s[-1] + (time_s[1] - time_s[0])) if time_s else 0.0
+        tag = {**av, "scheduler": record.scheduler_name, "seed": record.seed,
+               "n_lidar_active": n_active}
+        for row in windowed_metrics(
+            summary["_message_ledger"].completions(),
+            windowed_flows_from_record(record), time_s,
+            lidar_windows(lidar, horizon_s),
+        ):
+            online.append({**tag, **row})
+        # summary goes out of scope here; nothing above holds it.
+
+    def sink(record, av):
+        for row in _online_rows_for(sc_card, record, av):
+            # §16.5: on a lidar-on cell no run-aggregate panel metric may be
+            # quoted. The rows are still WRITTEN in full -- an omitted row is
+            # indistinguishable from a forgotten one -- and tagged instead,
+            # so the analyser can refuse to aggregate them.
+            online.append({**row, "transient_excluded": excluded})
+        payload.append((dict(av), _strip_timeseries(record.to_dict()), None))
+
+    rows = sweep(
+        axes={k: [v] for k, v in axis_values.items()},
+        build_scenario=_build_fleet_scenario_s5, schedulers=_arms(),
+        n_seeds=n_seeds, driver_kwargs=_driver_kwargs,
+        record_sink=sink, run_sink=run_sink,
+    )
+    for r in rows:
+        r["n_lidar_active"] = n_active
+        r["transient_excluded"] = excluded
+    return rows, online, payload, dict(axis_values)
+
+
+def run_stage_5(out_dir: Path, n_seeds: int, horizon: int, workers: int,
+                smoke: bool, fresh: bool = False) -> None:
+    """Stage 5, reusing stage 3/4's proven resumable loop.
+
+    C2 is asserted BEFORE any cell runs: if the census disagrees with the
+    registered counts, `_allocate` or the concurrency cap changed and the
+    grid's interpretation is suspect, so aborting beats producing a CSV
+    whose degenerate cells are silently a different set.
+    """
+    grid = {k: (v[:2] if smoke else v) for k, v in STAGE5_GRID.items()}
+    census = _stage5_cell_census(grid)
+    print(f"stage 5 cell census (from build_fleet): {census}", flush=True)
+    if not smoke and census != STAGE5_EXPECTED_CENSUS:
+        raise SystemExit(
+            f"C2 FAILURE: census {census} != registered "
+            f"{STAGE5_EXPECTED_CENSUS} (docs/wp9-plan.md §16.3). The fleet "
+            f"allocation or the concurrency cap changed; the grid's "
+            f"degenerate cells are not the ones the plan registered.")
+    _run_resumable(out_dir, grid, "s5", _run_one_cell_s5, n_seeds, horizon,
+                   workers, fresh)
 
 
 def cell_id(axis_values: dict) -> str:
@@ -835,7 +1012,7 @@ def _run_gate(rows, core, excursions, out_dir: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--stage", type=int, default=1, choices=(1, 2, 3, 4))
+    p.add_argument("--stage", type=int, default=1, choices=(1, 2, 3, 4, 5))
     p.add_argument("--grid", default="q1", choices=("q1", "q2"))
     p.add_argument("--out", default="sweeps/wp9/stage1")
     p.add_argument("--seeds", type=int, default=10)
@@ -848,6 +1025,10 @@ def main() -> None:
     p.add_argument("--smoke", action="store_true",
                    help="tiny grid, for exercising the machinery only")
     a = p.parse_args()
+    if a.stage == 5:
+        run_stage_5(Path(a.out), a.seeds, a.horizon, max(1, a.workers),
+                    a.smoke, a.fresh)
+        return
     if a.stage == 4:
         run_stage_4(Path(a.out), a.seeds, a.horizon, max(1, a.workers),
                     a.smoke, a.fresh)
