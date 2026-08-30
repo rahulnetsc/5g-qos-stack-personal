@@ -270,6 +270,49 @@ per-seed delta vs control): `ugv_heavy` PF −1.9 / Reservation −5.3 /
 TwoTier **−9.9**; `drone_heavy` −2.2 / −4.6 / **−9.4**. **The QoS-aware
 arms lose the most**, consistently.
 
+#### CORRECTION — this result does NOT contradict H2, and the reason is mechanistic
+
+**This document previously said, in §3's H2 row, that stage 5's transient
+"contradicts H2's direction".** It does not. Corrected by measurement
+(`docs/wp9-plan.md` §22.4, `scripts/f2_duty_cycle_trace.py`) — the same
+class of correction as §12.2's flow-count claim and §13.2's rejected
+horizon, where a committed claim was withdrawn because someone ran the
+thing rather than reasoned about it further.
+
+TwoTier's uplink ranking composite is `(base_q + urg) × hyp_tbs_bytes`.
+`base_q` comes from `vq_ul`, a virtual queue that **integrates while a flow
+is starved**; `urg` is a delay barrier that needs **live backlog** to grow.
+Only `base_q` can accumulate across an idle period — and the two regimes
+load opposite terms:
+
+| regime | `base_q` median | `base_q` share of the composite |
+|---|---|---|
+| no idle periods (`duty_cycle` 1.0) | 0.000 | 0.385 |
+| **recurring idle periods** (`duty_cycle` 0.1) | **4,678** | **0.851** |
+| stage-5 `ugv_heavy` N=16, control | 8.017 | 0.423 |
+| **stage-5 lidar activated** | **0.000** | **0.337** |
+
+**A duty cycle FEEDS `base_q`; a permanent step STARVES it and `urg` takes
+over.** Duty-cycled traffic gives the virtual queue idle periods to
+integrate across, and TwoTier's ranking becomes `base_q`-dominated — which
+is precisely the mechanism H2 was registered on
+(`sim/parametric.py::_burstify`: *"accumulates credit across idle
+periods"*). A lidar activation is a one-off step to a permanently higher
+load: there is no idle period, `base_q`'s median falls to zero, and the
+delay barrier becomes the majority term.
+
+**So the two results measure different mechanisms and coexist without
+tension.** H2 is confirmed in its registered direction (§3), and stage 5's
+"the QoS-aware arms lose the most" stands exactly as written above. What
+was wrong was only the inference joining them.
+
+**The general lesson, and it is why this sits in the map's own text rather
+than in a findings section:** "a transient is just extreme burstiness" is
+the intuition that produced the retracted sentence, and it is wrong for
+this scheduler. **Burstiness and step-load are different axes here**, and
+any future claim that transfers a result from one to the other has to name
+which term of the composite it thinks is carrying it.
+
 **Three qualifiers travel with this table, all load-bearing:**
 
 1. **It is a COMPOUND treatment.** Control C4 fired its *different*
@@ -309,9 +352,9 @@ arms lose the most**, consistently.
 | **G1** | **Sim-informative** | M01 p98 / M15 across the core plane. Ordering only; the millisecond is not certifiable (`SIM→RF`). |
 | **G2** | **Not answered by WP9 — and the reason is now STRUCTURAL, not scenario coverage** | Needs an event-triggered STOP flow and trial accumulation; no WP9 cell models it. GT-1.2 remains **RF**. **Sharpened by `docs/wp9-plan.md` §19.5:** G2's *real* failure class is the BSR/SR desync, and it is unreachable here for a reason that is about the model's structure rather than its scenarios. Truncated BSR is now built, wired to 38.321's Padding BSR trigger, and unit-tested — **and still cannot fire**. **CORRECTED by `docs/wp9-plan.md` §20 — this row previously named TB-size quantisation as the blocker, and that is wrong.** Measured counterfactually (`scripts/tbs_counterfactual.py`): quantising the TB changes the padding distribution by **nothing** at the load the claim was measured at (13,214/13,214 grants at padding 0 before and after), and *reduces* lawful Truncated BSRs at light load (5 → 4). **The blocker is the magnitude of the gNB's BSR error at grant time** — on that same run, 99.70 % of grants DO have ≥2 LCGs backlogged (the scenario was built so they would), and the gNB's estimate is off by a median **12,194 bytes** on them; on `factory_robots` it is **13,387**. Against a window **2–5 bytes** wide, a 5–64 byte TBS lattice step is nowhere near the operative scale. The shape any future attempt must defeat is an **anti-correlation**: loading a UE until three LCGs are backlogged makes its grants PRB-limited, and a PRB-limited grant is filled exactly (padding 0 at any TB size); unloading it until the grant has spare room drains all but one LCG, and 38.321 says report a *Short* BSR then, never a truncated one. So the sim measures STOP latency under ordinary contention only — the easy case — and closing the real one is a BSR-accuracy item, not a TB-sizing one and not another scenario. |
 | **G3** | **Sim-informative, conditional** | M03/M14 scored at `t_live_s` ∈ {1, 2, 4} — reported as a function of it, since `T_live` is `[OPEN: HARDWARE]` and unmeasured. |
-| **G4** | **Not answered by WP9** | The duty-cycle axis was dropped by the cap (score 2.663). Post-silence first-packet latency needs a study-layer read that stage 2 did not produce. |
+| **G4** | **ANSWERED at one cell — resume is prompt; the number is entangled with message size** | `scripts/g4_postsilence.py`, a study-layer read of the live WP7 message ledger (`docs/wp9-plan.md` §23). Post-silence p98 on T1 telemetry (the liveness instrument) at `duty_cycle` 0.1 is **77.23 / 64.87 / 74.79 ms** (PF / Reservation / TwoTier) against a steady state of 21.62 / 20.58 / 33.82. **SCOPE NOTE, and a reader must not quote the number without it: the size confound is NOT incidental to this guarantee.** Under `sim/parametric.py::_burstify` the post-silence message **is larger by construction** — mean offered rate is held constant by stretching the period and growing the burst by the same 1/duty — so a 10× longer silence carries a 10× larger message. Measured against that baseline the latency grew **sub-proportionally on every arm** (×3.57 / ×3.15 / ×2.21 against ×10), leaving **no residual for an SR/BSR cold-start penalty to explain**. So resumption is prompt on this workload — but **on this workload the guarantee's own question is entangled with message size in a way a real deployment need not be**: a real robot that goes quiet for a second then sends one 300-byte telemetry frame has a long silence and a *normal-sized* message. `_burstify`'s constant-mean-rate design is correct for H2, whose axis must not smuggle in a load change, and is the wrong shape for G4, which wants silence varied at **constant message size**. A reader taking "post-silence p98 = 77 ms" without this is reading a number about size as a number about silence. |
 | **G5** | **Sim-informative** | M05/M06/M17 present on every run via the `xr_video` instrument. Not analysed per-regime in this pass. |
-| **G6** | **Answered at ONE cell: no arm fails, only PF cleanly passes** | The row's previous text — "computable from stage-1 rows but was not computed" — was **ACCURATE**, and it has now been computed (`docs/wp9-plan.md` §22.1, `scripts/analyse_stage6.py`, zero new runs). Paired within seed at the base point, `bg=True` vs base, n=10: **PF passes GT-4.1's ≤ +20 % bar on all three metrics; Reservation passes two and is undetermined on M03; TwoTier is UNDETERMINED on all three** — point estimates of **+74.9 %** (M01.p98) and **+157.0 %** (M03.max_gap_ms), far above the bar, with intervals ([−24.3, +210.7] and [−14.1, +460.8]) wide enough to contain zero at 10 seeds. **No arm fails.** The verdict is read from the interval, not the point: a large point estimate inside a spanning interval is an undetermined guarantee, not a failed one. **One cell only** (N=8, load ×1.0) — depth was NOT bought (§21.5's rule), and what this cell needs is more **seeds**, which is a separate decision. M05.fraction's delta is optimistically biased: 7 of 10 seeds drop because a relative delta is undefined off a zero base, and those are the seeds already failing completely. |
+| **G6** | **ANSWERED at n=40 — and TwoTier FAILS it** | Computed from stage-1 records, then extended to **n=40** with a pre-registered one-look rule (`docs/wp9-plan.md` §22.1a/§22.1b, `scripts/g6_seed_extension.py`). **Control read first: stage 1's own 10 seeds reproduce bit-for-bit (worst absolute difference 0.000e+00 over 30 arm×seed pairs × 3 metrics).** Paired within seed, `bg=True` vs base, N=8, load ×1.0. **PF and Reservation PASS GT-4.1's ≤ +20 % bar on all three metrics.** **TwoTier FAILS on M03.max_gap_ms: +136.84 %, CI [+35.23, +267.01] — the whole interval above the bar** — i.e. the saturating background aggressor more than doubles the worst liveness gap. M01.p98 is +67.52 % [+14.91, +123.74], INCONCLUSIVE only because the lower bound sits just under the bar. **This is the first guarantee FAILURE this WP has produced.** Two qualifiers travel with it: **ONE CELL** (N=8, load ×1.0 — depth was not bought, §21.5), and **M05.fraction must not be read as a near-pass** — 31–33 of 40 seeds drop because a relative delta is undefined off a zero base, and those are the seeds already failing completely, which biases M05 optimistic and gets worse with n, not better. |
 | **G7** | **NOT ANSWERABLE IN SIM** | No MFBR enforcement exists anywhere in `sim/` (`sim/config_loader.py:16`). Containment is observable; **clipping is not**, and clipping is half of G7's pass criterion. GT-4.3 is the only test. |
 | **G8** | **Sim-answerable** | M09 per-second Jain across 186 scored cells. **PF-arm contaminated** by `pf.py`'s declaration-order tie-break (README §8) — Reservation-vs-TwoTier is the trustworthy pair. |
 | **G10** | **Sim-answerable — the headline** | **Admissible N is bounded by 8 at load ≥ 1.0 and by 16 below it**, on this RAN at `min_rb=5`. This is what simulation buys that the N=2 testbed cannot. §0.1 and §0.3 apply. |

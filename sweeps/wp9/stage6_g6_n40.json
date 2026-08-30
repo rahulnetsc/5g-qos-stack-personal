@@ -1,0 +1,87 @@
+{
+  "control_passed": true,
+  "summary": {
+    "n_seeds": 40,
+    "bar": 0.2,
+    "arms": {
+      "PF": {
+        "M01.p98": {
+          "impairment": -8.319456008881488e-05,
+          "lo": -0.00022892381348875936,
+          "hi": 6.255203996669443e-05,
+          "verdict": "PASS",
+          "n_paired": 40,
+          "n_dropped": 0
+        },
+        "M03.max_gap_ms": {
+          "impairment": 0.004395171513589108,
+          "lo": -0.042929919274476355,
+          "hi": 0.0537487080333816,
+          "verdict": "PASS",
+          "n_paired": 40,
+          "n_dropped": 0
+        },
+        "M05.fraction": {
+          "impairment": -5.475194609041978e-06,
+          "lo": -0.0009955849889624728,
+          "hi": 0.0009857797432322505,
+          "verdict": "PASS",
+          "n_paired": 40,
+          "n_dropped": 0
+        }
+      },
+      "Reservation": {
+        "M01.p98": {
+          "impairment": -6.223951066955756e-05,
+          "lo": -0.0002497743212407273,
+          "hi": 0.00012533002352587154,
+          "verdict": "PASS",
+          "n_paired": 40,
+          "n_dropped": 0
+        },
+        "M03.max_gap_ms": {
+          "impairment": 0.018406568900114884,
+          "lo": -0.02424184517044763,
+          "hi": 0.07198117553501526,
+          "verdict": "PASS",
+          "n_paired": 40,
+          "n_dropped": 0
+        },
+        "M05.fraction": {
+          "impairment": 0.0009398496240601453,
+          "lo": -0.0,
+          "hi": 0.0028195488721804362,
+          "verdict": "PASS",
+          "n_paired": 7,
+          "n_dropped": 33
+        }
+      },
+      "TwoTier": {
+        "M01.p98": {
+          "impairment": 0.6751934428147285,
+          "lo": 0.14912420478452368,
+          "hi": 1.2373571229336369,
+          "verdict": "INCONCLUSIVE",
+          "n_paired": 40,
+          "n_dropped": 0
+        },
+        "M03.max_gap_ms": {
+          "impairment": 1.3684000964336664,
+          "lo": 0.35225812630602155,
+          "hi": 2.6700759799790825,
+          "verdict": "FAIL",
+          "n_paired": 40,
+          "n_dropped": 0
+        },
+        "M05.fraction": {
+          "impairment": 0.18095532317783086,
+          "lo": -0.21758876367007052,
+          "hi": 0.6022821558233784,
+          "verdict": "INCONCLUSIVE",
+          "n_paired": 9,
+          "n_dropped": 31
+        }
+      }
+    }
+  }
+}

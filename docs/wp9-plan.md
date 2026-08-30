@@ -3746,10 +3746,104 @@ and is mixed for Reservation. **PARTIAL.**
 **The undetermined cells are not a null.** TwoTier's point estimates are
 +74.9 % and +157.0 % — many times the bar — with intervals wide enough to
 contain zero at n=10. **What this cell needs is more SEEDS, not more
-cells**, and that is a different investment from §21.5's grid. Stated as an
-observation and **explicitly not pre-registered**: §21.5's go/no-go governs
-depth-in-cells and says nothing about seed count, so acting on this is a
-new decision, not the discharge of an old one.
+cells**, and that is a different investment from §21.5's grid.
+
+### 22.1a DECISION — buy seeds at the G6 cell, and the stopping rule that makes it legitimate
+
+**This is outside §21.5's registered rule, stated plainly rather than
+slipped in as an extension of it.** §21.5's go/no-go governs
+**depth-in-cells** — whether to cross an axis with `n_ues`/`load_mult` —
+and says nothing about **seed count** at a cell already run. Reading it as
+covering both would be widening a pre-registered rule after seeing the
+data, which is the thing pre-registration exists to prevent. So this is a
+**new decision**, taken here, with its own registration.
+
+**Decision: buy it.** Two reasons, and neither is "the number looked
+interesting":
+
+1. **The shape says n is the binding constraint, not the effect.** +74.9 %
+   and +157.0 % against a +20 % bar, with intervals spanning zero, is what
+   a real effect under-sampled looks like — not what absence looks like.
+   Absence would be a point estimate near zero with a tight interval, which
+   is exactly what PF shows on the same cell.
+2. **G6 is client-facing and its row currently says nothing.** "Not
+   answered" on a guarantee the campaign has to make a call about is worse
+   than "undetermined at n=40", which is at least a bounded statement.
+
+**Registered BEFORE running, because otherwise this becomes sampling until
+the interval excludes zero:**
+
+- **n = 40 total.** `regime_sweep.paired_seeds` is prefix-stable
+  (`paired_seeds(40)[:10] == paired_seeds(10)`, verified), so the existing
+  10 seeds are reused unchanged and **30 new paired seeds** are run on the
+  `bg=True` cell **and** the base cell. n=40 is 4× the current sample, so
+  the interval narrows ~2×; it is chosen as an affordable one-shot, not as
+  the n that would make the answer come out.
+- **ONE LOOK. No interim analysis, no extension.** The verdict is read once
+  at n=40 with the same `g6_verdict` on the same three metrics and the same
+  paired-within-seed design. **If it is still INCONCLUSIVE at n=40, that is
+  the reported result**, G6's row says "undetermined at n=40", and the
+  question is closed for this WP rather than resampled.
+- **No metric or arm is added or dropped after the fact.** M01.p98 /
+  M03.max_gap_ms / M05.fraction, three arms, as already run.
+- **The M05 optimistic bias (§22.0) still applies** and is reported with
+  the number; more seeds does not fix a non-random drop, it only makes the
+  dropped count larger in absolute terms.
+
+**Pre-registered expectation (F7):** at n=40, TwoTier's M01.p98 and
+M03.max_gap_ms both resolve to **FAIL** — the point estimates are 3.7× and
+7.9× the bar, so if they are real at all the interval should clear +20 %
+once it halves. **The competing outcome, named:** they collapse toward zero
+instead, which would mean the n=10 point estimates were driven by one or
+two extreme seeds — in which case the *seeds*, not the arms, are the
+finding, and the per-seed deltas get printed.
+
+### 22.1b G6 at n=40 — RESULT, one look as registered
+
+`scripts/g6_seed_extension.py`. Read in the registered order.
+
+**CONTROL FIRST — stage 1's own 10 seeds reproduce BIT-FOR-BIT.** 30 shared
+(arm, seed) pairs × 3 metrics, **worst absolute difference 0.000e+00**.
+This was included because re-running seeds 0–9 was nearly free and nothing
+in this WP had ever checked that the stage-1 CSV and a fresh runner agree
+about the scenario. They do, exactly — which **retroactively validates
+every Part A number too**, since all of them were read from that CSV.
+
+**The result, at n=40, one look, no extension:**
+
+| arm | M01.p98 | M03.max_gap_ms | M05.fraction |
+|---|---|---|---|
+| PF | −0.01 % [−0.02, +0.01] **PASS** | +0.44 % [−4.29, +5.37] **PASS** | −0.00 % **PASS** |
+| Reservation | −0.01 % [−0.02, +0.01] **PASS** | +1.84 % [−2.42, +7.20] **PASS** | +0.09 % **PASS** *(33 dropped)* |
+| **TwoTier** | **+67.52 % [+14.91, +123.74] INCONCLUSIVE** | **+136.84 % [+35.23, +267.01] FAIL** | +18.10 % **INCONCLUSIVE** *(31 dropped)* |
+
+**TwoTier FAILS G6 on M03.** Background traffic more than doubles the worst
+liveness gap, and the entire interval sits above GT-4.1's +20 % bar. This
+is a client-facing guarantee failing on one arm, and it is the first
+guarantee failure this WP has produced.
+
+**F7 — PARTIAL, and the half that mattered is confirmed.** F7 predicted
+*both* M01.p98 and M03.max_gap_ms resolve to FAIL. M03 does; M01.p98 does
+not — its lower bound (+14.91 %) sits just below the bar, so it remains
+INCONCLUSIVE even at n=40.
+
+**But the competing outcome F7 named did not occur, and that is the more
+important reading.** The alternative registered was *"they collapse toward
+zero instead, which would mean the n=10 point estimates were driven by one
+or two extreme seeds"*. They did not collapse: the point estimates held
+(+74.9 → +67.5, +157.0 → +136.8) and both intervals **now exclude zero**
+(+14.91 and +35.23 lower bounds, against n=10 lower bounds of −24.3 and
+−14.1). **§22.1a's reasoning — that n was the binding constraint rather
+than the effect being absent — is confirmed by measurement**, which is
+what the extension was bought to settle.
+
+**M05's bias is now larger, not smaller.** 31–33 of 40 seeds drop, against
+7 of 10 before, because a relative delta is undefined off a zero base and
+more seeds means more zero-base seeds. §22.0's warning stands unchanged and
+scales with n; M05's cell should not be read as a near-pass.
+
+**The question is now closed for this WP as registered.** No resampling, no
+third look.
 
 ### 22.2 F3 — H3 separates the arms: **HIT**
 
@@ -3875,14 +3969,198 @@ records and touches no `sim/` or `scheduler/` file.
 | F2 | H2 does NOT hold in its registered direction | **MISS** — it holds, on both metrics; trace in §22.4 |
 | F3 | H3 separates the arms | **HIT** — TwoTier on both metrics, intervals excluding zero at 12 dB |
 | F4 | G12 order same across arms, differs across profiles | **UNSCOREABLE** — one GBR class exists |
-| F5 | G4 post-silence excess | not yet run (Part B) |
+| F5 | G4 post-silence excess | **CRITERION HIT / MECHANISM MISS** — exceeds on all three arms, but sub-proportionally to a 10× size step, so nothing is left for the SR path to explain (§23.2) |
 | F6 | no committed number moves | **HIT** |
+| F7 | G6's TwoTier cells resolve to FAIL at n=40 | **PARTIAL** — M03 FAILs [+35.23, +267.01]; M01.p98 stays INCONCLUSIVE. But the named alternative (collapse toward zero) did NOT occur: both intervals now exclude zero, confirming n was the binding constraint (§22.1b) |
 
-**Two hits, one partial, one miss, one unscoreable — and the miss produced
-the stage's most useful result.** That is now the third consecutive time in
+**Final tally across Parts A and B: two hits, two partials, one split
+verdict, one miss, one unscoreable — and the miss produced the stage's most
+useful result.** That is now the third consecutive time in
 this WP the registered most-likely-wrong expectation carried more than the
 hits did (stage 4's E2 → §15.5; stage 5's E2 → the flat transient boundary;
 F2 → §22.4's two-term mechanism split). **The pattern is now strong enough
 to act on rather than just note: every future stage should register an
 expectation it expects to lose**, and the trace obligation should attach to
 it in advance, as §21.6 did here.
+
+---
+
+## 23. Stage 6 Part B — G4, prompt resume after silence
+
+`scripts/g4_postsilence.py`. The one guarantee in this set that genuinely
+needed a run (§21.4), taken via a study-layer `run_sink` reading the live
+`MessageLedger` — no panel change, no M20, no `sim/` or `scheduler/`
+change.
+
+### 23.0 Three things caught in the instrument before any number was read
+
+**(a) A killed run left a SMOKE artefact sitting at the result path.** The
+first real grid was killed mid-flight by a session teardown. It had written
+nothing — but an earlier `--smoke` invocation had written
+`sweeps/wp9/stage6_g4.json`, with the right filename, a plausible 145 KB,
+and 2 seeds at horizon 2,000 covering two of the three duty levels. **A
+reader picking up that file would have read a machinery test as the
+result.**
+
+This is the **inverse** of the failure mode already in CLAUDE.md — *an
+empty or unchanging output file is evidence about the FILE, not about the
+process*. Here a **populated, correctly-named, plausibly-sized** file was
+evidence about a **different run**, which is strictly harder to catch than
+an empty one: nothing about the contents looked wrong. What caught it was
+checking the file's mtime against when `--smoke` was invoked.
+
+Fixed structurally rather than by remembering: `--smoke` now writes
+`stage6_g4_SMOKE.json`, and **both** variants stamp a `provenance` block
+inside the JSON (smoke flag, duty levels, seed count, horizon), so a reader
+holding only the file can still tell which run produced it. Re-launched
+under `setsid nohup` — the cause was session teardown, not a crash.
+
+**(b) The gap buckets were partly separating FLOWS, not silences.**
+Bucketing by preceding gap is threshold-free, which is why it was chosen —
+but the workload's flows have different cadences, so a gap bucket at a
+given duty is dominated by whichever flow has that cadence. Measured at
+duty 0.1: `[1000,inf)` contains **qfi 1 only**, while `[0,1)` is ~933k
+qfi-9 best-effort messages plus ~120k video fragments. **A cross-bucket
+comparison is therefore a comparison of different flows**, with different
+sizes and PDBs, not of different silence lengths. **All scoring below is
+per-flow.** The first table produced by this script was cross-bucket and
+would have scored F5 on a flow contrast.
+
+**(c) The first message of each flow was bucketed at gap 0.** It has no
+preceding gap at all, and calling that "followed a zero-length silence" is
+a false claim about the one quantity this instrument measures. It mattered:
+for the low-cadence flows (qfi 1 and 82) those first messages were the
+**entire** `[0,1)` bucket — n=80, exactly 8 UEs × 10 seeds, a number that
+factors into the grid's own dimensions in the way §19.2's rule flags —
+so that cell read as an in-burst measurement and was nothing of the kind.
+Now excluded, and the grid re-run rather than annotated.
+
+### 23.1 What the flows are, since the scoring depends on it
+
+| qfi | tier | direction | generator | base | at duty 0.1 |
+|---|---|---|---|---|---|
+| **1** | T1 telemetry — **the liveness instrument, and G4's flow** | **UL** | `periodic_control` | 100 ms / 300 B | 1000 ms / 3000 B |
+| 2 | T3 camera | UL | `xr_video`, fragmented at 1500 B | 33 ms / 16 kB | 330 ms / 160 kB |
+| **82** | T2 commands | **DL** | `periodic_control` | 50 ms / 100 B | 500 ms / 1000 B |
+| 9 | T6 best-effort — the load | UL | `poisson` | — | unchanged |
+
+### 23.2 F5 — post-silence latency exceeds steady state: **CRITERION HIT, MECHANISM MISS**
+
+**F5 as registered:** *"G4's post-silence first-message latency exceeds the
+steady-state p98 on at least one arm at `duty_cycle` 0.1 — the SR/BSR
+cold-start path is exactly what WP4 rebuilt, and a 90 %-silent flow
+re-enters it constantly."*
+
+qfi 1 (T1 telemetry, UL — G4's own flow), p98 ms, mean over 10 seeds:
+
+| duty | gap bucket | PF | Reservation | TwoTier | msgs | size |
+|---|---|---|---|---|---|---|
+| 1.0 | `[100,1000)` | 21.62 | 20.58 | 33.82 | 2,400 | 300 B |
+| 0.5 | `[100,1000)` | 33.68 | 26.63 | 39.71 | 1,920 | 600 B |
+| **0.1** | **`[1000,inf)`** | **77.23** | **64.87** | **74.79** | 254 | 3,000 B |
+
+**The criterion is met, and on all three arms rather than the "at least
+one" registered** — 77.23 / 64.87 / 74.79 ms against a steady state of
+21.62 / 20.58 / 33.82.
+
+**The stated mechanism is not supported.** The post-silence message is
+**10× larger by construction** (§23.5), and measured against that baseline
+the latency grew **sub-proportionally on every arm**:
+
+| arm | duty 1.0 → 0.1 | ratio | size baseline | excess over size |
+|---|---|---|---|---|
+| PF | 21.62 → 77.23 ms | ×3.57 | ×10 | **×0.36** |
+| Reservation | 20.58 → 64.87 ms | ×3.15 | ×10 | **×0.32** |
+| TwoTier | 33.82 → 74.79 ms | ×2.21 | ×10 | **×0.22** |
+
+**So the exceedance is fully accounted for by message size, with room to
+spare — there is no residual an SR/BSR cold-start penalty needs to
+explain.** The competing outcome named with F5 — *"the `ul_access` SR path
+fully absorbs resumption"* — is the closer description of what happened.
+
+**Scored as a HIT on the criterion and a MISS on the mechanism, kept as two
+separate verdicts rather than averaged into one.** The project has scored
+this shape before and in the same way: §11's `fires == 0` prediction was
+recorded as a HIT *"for the reason originally given rather than the
+conflation hypothesis that was floated afterwards"*. A prediction that
+lands for the wrong reason is not a confirmation of the reasoning that
+produced it, and collapsing the two verdicts would lose exactly that.
+
+### 23.3 The qfi 82 contrast — SUGGESTIVE, with four confounds named
+
+qfi 82 (T2 commands) is **DL**, so it has no SR path at all — the gNB is
+its own buffer and never waits for a scheduling request. It takes the
+**identical 10× size step**, which makes it a control that was in the
+workload already rather than one built for the purpose.
+
+| flow | direction | PF | Reservation | TwoTier |
+|---|---|---|---|---|
+| qfi 1 | UL | ×3.57 | ×3.15 | ×2.21 |
+| qfi 82 | DL | ×1.62 | ×2.08 | ×1.49 |
+| **UL / DL** | | **×2.20** | **×1.51** | **×1.48** |
+
+**UL pays between 1.5× and 2.2× more than DL for the same size step, and
+the figure is not stable across arms** — ×2.20 on PF against ×1.48–1.51 on
+the two QoS-aware arms. **That spread is itself a reason to distrust the
+contrast as an access-chain measurement:** an SR-chain cost should not
+depend this strongly on which scheduler is running, whereas contention for
+UL grants very much does.
+
+**Four confounds, and the contrast cannot separate them.** qfi 1 and qfi 82
+differ in **direction** (the term of interest), **absolute size** (300 B vs
+100 B base), **PDB** (both 100 ms, but qfi 82's is scenario-overridable via
+`pdb_ms` while qfi 1's is fixed), and **priority / contention** — the UL
+flow competes with the qfi-9 best-effort load for grants while the DL flow
+does not contend for that resource at all. Any one of the four could
+produce the ratio difference on its own.
+
+**Recorded as an observation with a candidate mechanism, not a finding** —
+the same status §15.5 carries, and §23.4 names the experiment that would
+change it.
+
+### 23.4 The experiment that would settle the qfi 82 contrast — REGISTERED, NOT RUN
+
+§23.3's UL-vs-DL contrast is **suggestive and not a measurement of the
+access chain**, and it is named here as its own experiment for the same
+reason §15.5 named its own: an observation with a candidate mechanism that
+is never given a discriminating test becomes a story that fits the data.
+
+**What would settle it: a purpose-built two-flow scenario, not a grid.**
+One UL flow and one DL flow **identical in message size, cadence, PDB and
+priority — differing only in direction — subjected to the same silence.**
+Their latency difference after silence is then the UL access chain (SR on
+PUCCH → `sr-ProhibitTimer` → grant → BSR, `sim/ul_access.py`) and nothing
+else, because every other term is held equal by construction.
+
+**Why the current contrast cannot do this job: qfi 1 and qfi 82 differ in
+four ways at once** — direction (the term of interest), **absolute size**
+(300 B vs 100 B base), **PDB** (100 ms both, but qfi 82's is
+scenario-overridable via `pdb_ms` while qfi 1's is fixed), and **priority /
+flow position** (a UL flow contends with the qfi-9 best-effort load for
+grants; the DL flow does not contend for the same resource at all). Any of
+the four could produce a 2.2× ratio difference.
+
+**Deliberately not run now, and not appended to this stage.** G4's grid and
+the n=40 extension were in flight when the observation appeared; bolting a
+new scenario onto a stage already running is how a post-hoc result acquires
+the appearance of a registered one. It gets its own registration.
+
+### 23.5 SCOPE NOTE for G4's row — the size confound is not incidental to this guarantee
+
+**This belongs in the regime map's G4 row, not only here.** G4 asks whether
+a message sent after silence arrives promptly. Under `_burstify` the
+post-silence message **is larger by construction** — the generator holds
+mean offered rate constant by stretching the period and growing the burst
+by the same 1/duty, so a 10× longer silence means a 10× larger message.
+
+**On this workload the guarantee's own question is therefore entangled with
+message size**, in a way a real deployment need not be: a real robot that
+goes quiet for a second and then sends one 300-byte telemetry frame has a
+long silence and a *normal-sized* message. `_burstify`'s constant-mean-rate
+design is right for H2 — it exists so the duty axis cannot smuggle in a
+load change — and it is the wrong shape for G4, which wants silence varied
+at constant message size.
+
+**A reader taking "post-silence p98 = 77 ms" without this is reading a
+number about size as a number about silence.** The scope note travels with
+the row.
