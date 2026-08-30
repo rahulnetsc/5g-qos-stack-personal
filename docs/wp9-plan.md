@@ -2770,3 +2770,140 @@ The guard test's discriminating state is commit 0b's: `estimate == 0` with
 `backlog > 0`, **persisting** across ≥N slots rather than self-correcting.
 Route C already produces the one-slot version, so a single-slot assertion
 would pass today and guard nothing.
+
+---
+
+## 19. The Padding BSR trigger — §18's mechanism, wired to the right trigger
+
+### 19.1 The error, as a finding in its own right
+
+§18 built the truncated-BSR formats and wired them to **every** BSR the
+model assembles. That is wrong, and TS 38.321 §5.4.5 says so in the
+heading of the very block §18.1 quoted verbatim.
+
+The spec splits the format rules by **trigger kind**:
+
+> **For Regular and Periodic BSR**, the MAC entity […] shall:
+> 1> if more than one LCG has data available for transmission when the MAC
+> PDU containing the BSR is to be built:
+>   2> **report Long BSR for all LCGs which have data available for
+>   transmission.**
+> 1> else: 2> report Short BSR.
+
+> **For Padding BSR**, the MAC entity […] shall: *(the padding-keyed rules,
+> and the only place the truncated formats appear)*
+
+And the triggers themselves (§5.4.5, page 73):
+
+> - UL resources are allocated and number of padding bits is equal to or
+>   larger than the size of the Buffer Status Report MAC CE plus its
+>   subheader, in which case the BSR is referred below to as **'Padding
+>   BSR'**;
+> - retxBSR-Timer expires […] **'Regular BSR'**;
+> - periodicBSR-Timer expires […] **'Periodic BSR'**.
+
+**Truncation is a Padding-BSR phenomenon only.** A Regular or Periodic BSR
+always reports a full Long BSR when several LCGs have data — the UE makes
+room for it through logical channel prioritisation rather than squeezing
+it into leftovers.
+
+`sim/bsr.py`'s `pending` flag is set **exclusively** by regular / periodic
+/ retx triggers. So every BSR this model has ever assembled is a Regular
+or Periodic one — **precisely the class the spec forbids truncating.**
+Applying the padding rules to them meant that in a loaded scenario, where
+grants run nearly full, padding fell below 2 bytes, `_select_format`
+returned "defer", and **no BSR was assembled at all, ever**.
+
+**THE SELF-ASSESSMENT, KEPT RATHER THAN SOFTENED: the transcription was
+correct and the reading of it was wrong.** §18.1 quotes "For Padding BSR"
+verbatim, at the top of the block it transcribed, and the mechanism was
+still wired to every trigger. **This is a distinct failure mode from this
+project's existing comment/citation family** — `_dl_stamp`'s wrong
+citation, port-map row 46's wrong plan, commit 0b's wrong argument — where
+the source text was wrong, stale, or absent. **Here the source was right,
+complete, and on the screen.** Quoting a heading is not the same as
+honouring it, and no amount of transcription discipline substitutes for
+asking *which of the things this section describes am I actually
+building?*
+
+### 19.2 What caught it — and it was not the tests
+
+**An at-scale run producing an arithmetically impossible number.** The
+study reported `desync_lcg_slots = 144000` for both truncated modes, and
+`144000 = 6 UEs × 3 LCGs × 8000 slots` **exactly** — every LCG desynced in
+every slot, with `gate_passes = 0` beside it.
+
+**The unit tests could not have caught this, and the reason generalises.**
+All 36 pass, because each one **constructs the padding condition
+directly** — it hands `on_ul_grant` a `tb_size`/`filled_bytes` pair chosen
+to land in the window under test. **A test that builds the precondition it
+is testing cannot discover that the precondition never occurs in
+practice.** The tests verified "given a 2-byte padding, the report is
+short-truncated", which is true and remains true; what no test asked was
+whether a 2-byte padding ever co-occurs with the trigger the model
+actually uses. Recorded in `CLAUDE.md` beside the existing guard-test rule,
+because it is the same shape as WP9 commit 1b/1c (a test pinning the
+helper while the pipeline around it was broken) seen from the other side.
+
+**The impossibility is why it cost minutes rather than a WP.** Both prior
+instances of this class in WP9 produced numbers that were **wrong but
+plausible** — the gate's `None`-base contamination selecting 1,710 rows,
+and the CSV coercion scoring exactly `0.000`. This one factored cleanly
+into the grid's own dimensions. **The reusable check is: "does this number
+factor into the grid dimensions?"** A count that equals
+`n_ues × n_lcgs × n_slots`, or any exact product of the run's shape, is
+almost never a measurement — it is a saturated counter or an empty
+selection wearing one.
+
+### 19.3 Scope — a new trigger class, not a widened branch
+
+**The machinery built in §18 carries over UNCHANGED.** The size constants
+(`SHORT_BSR_SZ`, `LONG_BSR_FIXED_SZ`), the branch thresholds (0,1 → none;
+2 → short_trunc; 3,4 → long_trunc; 5 → long), the per-LCG priority ranking
+including the "with or without data available for transmission"
+parenthetical, and the OAI-vs-spec prefix split are all correct and stay
+as they are, with their tests. **This is re-wiring, not rebuilding** — the
+formats were attached to the wrong trigger, they were not themselves
+wrong.
+
+What is added is the trigger:
+
+| condition | BSR kind | format rules | may truncate? |
+|---|---|---|---|
+| `pending` | Regular / Periodic | today's branch, unchanged | **never** |
+| not `pending`, `padding ≥ SHORT_BSR_SZ` | **Padding BSR (new)** | `_select_format` | **yes** |
+| not `pending`, `padding < SHORT_BSR_SZ` | none | — | — |
+
+**Why this is the mechanism and not a detour to reach it.** A Padding BSR
+is an *opportunistic* report the UE volunteers because room happened to be
+left over. When it is truncated it **overwrites the gNB's per-LCG array
+with a partial view** — the memset repopulates only the reported LCGs and
+leaves the rest at zero. That overwrite *is* the desync. Anything narrower
+leaves truncation unable to fire lawfully, which leaves two-tier's floor
+as inert as it has been for the whole WP, which is the hole §18 exists to
+close.
+
+**Timer consequences, from §5.4.5 and unchanged in substance:** any BSR
+restarts `retxBSR-Timer`; `periodicBSR-Timer` restarts *except* when the
+report is truncated. A Padding BSR is a real BSR, so it also clears
+`sched_ul_bytes` — which means the crumb-collapse gate sees an extra reset
+whenever one fires. That is a real behavioural consequence of the
+mechanism, not a side effect to hide, and it is one reason the flag stays
+opt-in.
+
+**This repo's own "retx timer restarts on EVERY grant" behaviour
+(README §4 WP3, a hardware-measured fact rather than a spec rule) is left
+exactly as it is.** It already sits outside the `pending` check and is not
+touched.
+
+### 19.4 Unchanged from §18
+
+- **Flag still defaults to `"off"`.** With the flag off no Padding BSR is
+  ever generated, so the `pending`-only path is byte-identical to
+  pre-§18 behaviour.
+- **Corpus prediction unchanged: `--check` clean on all 20 records.**
+- §18.5's four expectations stand as written and are scored after the
+  re-wiring, not before.
+
+Nothing is published — the §18 commits are local — and the flag has never
+been on in any scenario, so this costs rework, not results.

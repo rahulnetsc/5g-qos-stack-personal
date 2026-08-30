@@ -400,6 +400,27 @@ suite.** Note also that `pkill -f <script>` does not reach
 so stopping a pool leaves orphans holding memory that `pgrep -f` cannot
 see; kill the children by PID.
 
+**A test that CONSTRUCTS the precondition it is testing cannot discover
+that the precondition never occurs.** The other side of the guard-test
+rule above. WP9 §19: the truncated-BSR formats were wired to the wrong
+BSR trigger, and all 36 unit tests passed — every one of them handed
+`on_ul_grant` a `tb_size`/`filled_bytes` pair chosen to land in the
+padding window under test. They correctly verified "given a 2-byte
+padding, the report is short-truncated"; none could ask whether a 2-byte
+padding ever co-occurs with the trigger the model actually uses. It
+didn't, and in a loaded scenario no BSR was assembled at all. **What
+caught it was an at-scale run producing an arithmetically impossible
+number**, and the recognition is reusable: `144000` was exactly
+`6 UEs × 3 LCGs × 8000 slots`. **Ask of any surprising count: does this
+factor into the run's own dimensions?** A value equal to an exact product
+of the grid's shape is almost never a measurement — it is a saturated
+counter or an empty selection wearing one. Note the contrast with this
+WP's two earlier instances (the gate's `None`-base selecting 1,710 rows,
+the CSV coercion scoring `0.000`): both were wrong but PLAUSIBLE and
+survived longer for it. So the lesson is not "impossible numbers get
+caught" — it is that a fixture-built precondition needs a separate
+at-scale check that the precondition fires at all.
+
 **An empty or unchanging output file is evidence about the FILE, not about
 the process — check process state directly before concluding anything
 about liveness.** Twice in WP9 a *reading* of instrumentation produced a
