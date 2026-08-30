@@ -1605,6 +1605,13 @@ being fitted around it.
   throughput or utilisation figure from a transient cell mixes two regimes
   and must not be quoted. This is an exclusion list, not a warning.
 
+**CORRECTED by §16.2 — the framing above was right and the instrument was
+assumed.** "M01, M02 evaluated during the activation window" names a
+quantity nothing in this repo computes: there is no windowing anywhere in
+the scoring layer, so the exclusion list as written could not have been
+applied. §16.2 carries the trace and the consequence (stage 5 re-runs its
+own controls rather than reusing stage 4's).
+
 ### 13.3 Grid budget
 
 Core plane N ∈ {4, 8, 16, 32} × 4 compositions × 3 video tiers = **48
@@ -1819,3 +1826,455 @@ single-metric claim about who wins at high N is false by construction, and
 now **demonstrably so across two workloads whose winners are opposite**.
 A reader who took "Reservation wins on contracts" from stage 2 would have
 been wrong on stage 4's workload, having quoted a real number.
+
+---
+
+## 16. Stage 5 — the lidar-activation excursion (plan, registered before the runner exists)
+
+`docs/wp9-regime-map.md` maps where the three schedulers separate under
+*steady* conditions: fleet size, composition, offered load. Every cell in
+stages 1–4 ran a workload whose shape was constant for the whole run.
+
+The lidar activation is the only regime in this project where a **large,
+transient GBR demand arrives suddenly** against a fleet whose telemetry and
+control flows must still meet their PDBs. `sim/fleet.py`'s UGV profile
+carries a duty-cycled 12 Mbps lidar flow (`LIDAR_ACTIVE_BPS`, Ouster LDRP
+class) gated by `LidarActivation`; `sim/traffic.py:197-216` applies the
+activation window before the kind dispatch so it composes with every
+generator. Both are built and tested (`sim/tests/test_fleet.py`).
+
+**Neither has ever run in a sweep.** `scripts/wp9_sweep.py::_build_fleet_scenario`
+(line 610) never passes `lidar=`, so all 48 stage-4 cells ran lidar-off.
+
+Concurrency is capped at 2 UEs as a factory-workflow bound — floor tasks are
+serialised, you do not get eight UGVs docking at once — so this is a
+**fixed-magnitude perturbation, not a load scale**. That is what makes the
+operator question well-posed:
+
+> **At what fleet size does a single lidar activation start breaking other
+> flows' PDBs?**
+
+Stage 5 answers it, and hands the hardware campaign a fleet-size bound for a
+transient to sit alongside G10's steady-state one.
+
+### 16.1 What carries forward (do not rediscover)
+
+**16.1.1 The 5 s horizon, and its consequence as an exclusion.** The 20 s
+option was measured at **8.86×**, not the predicted 4× — superlinear, because
+both the message ledgers and the timeseries the panel walks grow with horizon
+(§13.2). Rejected; horizon stays 20,000 slots. At 5 s a 2 s activation is
+40 % of the run (50 % at 2 staggered UEs), so **run-aggregate metrics from a
+lidar-on cell mix two regimes.** This is an exclusion list, not a caveat —
+see §16.5.
+
+**16.1.2 Contiguity is per composition, over ORDERED axes only.**
+`regime_sweep.check_contiguity` walks each axis by **index ±1**, which invents
+adjacency on a categorical axis (§15.2). `composition` is categorical.
+Stage 5's ordered axes are `n_ues` and `lidar_ues` (a count, so genuinely
+ordered), and contiguity is computed **per composition over N × lidar_ues**,
+never across compositions.
+
+**16.1.3 Contiguity reliability differs by metric.** At stage 4: **M07.met was
+clean** (0–2 isolated of 12) and can carry a boundary claim; **M08.fraction**
+was noisier (3 of 12 in three compositions); **M02 was noisiest** (1–4 of 12,
+33 % in `mixed`) and must not be quoted with equal confidence. Stage 5's
+windowed variants inherit this ordering as the prior, not as a result — which
+matters, because M02w is the metric the operator question most directly asks
+for and it is the one stage 4 rated least reliable. **M07w carries the
+boundary claim; M02w describes it.**
+
+**16.1.4 The cost model, with its measured transient correction.**
+`4.48 × flows^1.09` s/cell (3 arms × 10 seeds), fitted to three steady-state
+probe points. **At 65 flows the model gives 424.0 s against the lidar probe's
+measured 498.6 s — a 1.176× transient correction**, because a transient with
+one or two large GBR flows arriving at once moves the deficit spread, VQ
+growth and follower budget simultaneously (§13.1). That factor is **fitted at
+tier 1.0 only, from one cell**. Any cell budgeted at the bare
+`4.48 × flows^1.09` is a **lower bound**, and so is any tier ≠ 1.0 cell.
+
+**16.1.5 Standing rules.** Paired seeds within-seed (§4 of the regime map: an
+*unpaired* comparison produced a confident answer opposite to the paired one).
+Contiguity read before any effect size. §0.1's rule — M07w and M08w quoted
+**together**, every time either is quoted. Corpus frozen at `9963be1`,
+`--check` clean before and after. The stage-1 promotion gate is **not**
+applied: these axes were chosen by argument, not score.
+
+### 16.2 A correction to §13.2 — the exclusion named an instrument that does not exist
+
+§13.2 records an approved exclusion list: *"Interpretable: M01, M02 evaluated
+during the activation window … NOT interpretable: M10 and every other
+run-aggregate metric."*
+
+**The framing was right and the instrument was assumed.** There is no
+windowing anywhere in the scoring layer:
+
+- `Scorecard._m01_latency_percentiles` reads `FlowRecord.delay_p*_ms`, which
+  the driver computes over the **whole run** (`sim/driver.py:781-787`).
+- `Scorecard._m02_pdb_violation_rate` sums `bytes_arrived` /
+  `bytes_delivered` / `bytes_dropped_pdb` / `bytes_delivered_late_pdb` —
+  all run-total counters.
+- The per-message data that *could* support a windowed M01 lives in
+  `summary["_message_ledger"]`, which `RunRecord.from_summary` deliberately
+  does not carry (it is a live object), and which `regime_sweep.sweep()`
+  never hands to `record_sink`.
+
+So the approved exclusion list named a quantity nothing in the repo computes.
+This is recorded as a **correction to §13.2**, in the same class as §12.2's
+composition flow-count claim and §13.2's own threshold rule: a claim of mine
+that reading the code replaced.
+
+**Direct consequence: the controls are re-run, not reused.** Stage 4's cells
+are the natural control — same grid coordinates, same `paired_seeds(10, 0)`,
+same driver kwargs — but `_strip_timeseries` nulls every per-slot array before
+persisting, and no ledger is persisted at all. **The windowed control number
+cannot be reconstructed from stage-4 output.** Stage 5 therefore re-runs
+`lidar_ues=0` at every coordinate with the windowed instrumentation attached.
+Stage 4's rows are demoted from *the control* to a **bit-identity check on the
+control** (C5, §16.6).
+
+### 16.3 Grid and budget
+
+**Axes.** `n_ues ∈ {4, 8, 16, 32}` × `composition ∈ {sensor_dense, mixed,
+drone_heavy, ugv_heavy}` × `lidar_ues ∈ {0, 1, 2}`. `video_tier` held at
+**1.0**. 10 paired seeds, 3 arms, horizon 20,000 (5 s).
+
+- N and composition are stage 4's own levels, so every stage-5 cell reads
+  against a stage-4 coordinate and §15.4's onset table (`sensor_dense` none,
+  `mixed` 32, `drone_heavy` 32, `ugv_heavy` 16) is directly comparable.
+- `video_tier` fixed because the excursion is a fixed-magnitude perturbation;
+  holding the background constant is what isolates it.
+- `lidar_ues` is a **JSON scalar, not a `LidarActivation`** — `cell_id()`
+  json-serialises axis values and `write_csv` needs scalar columns. The
+  runner constructs `LidarActivation(n_ues=lidar_ues)` from it.
+
+**`lidar_ues` as a level, and the comment it amends.** `sim/fleet.py:71-74`
+says "CONCURRENCY IS A BOUND, NOT AN AXIS … deliberately NOT a parameter
+someone might later think to sweep." That stands for load-scaling. 1-vs-2 is
+the **two endpoints of the bound itself** — one robot docking versus two —
+not a scale. The comment is amended in the same commit to say exactly that,
+rather than left reading as though the bound was violated. `build_fleet`'s
+`min(lidar.n_ues, LIDAR_MAX_CONCURRENT, len(ugv_ids))` clamp is unchanged, and
+`test_lidar_concurrency_is_capped_as_a_bound` keeps pinning it.
+
+**Cell counts — derived, and asserted by the runner, never restated in prose.**
+The runner computes and prints these from `build_fleet` at launch and
+**aborts if they disagree** with the registered values below:
+
+| quantity | expected |
+|---|---|
+| total cells | 48 |
+| control cells (`lidar_ues=0`) | 16 |
+| excursion cells (`lidar_ues>0`) | 32 |
+| **degenerate** excursion cells (`n_active < lidar_ues`) | **9** |
+| **null** excursion cells (`n_active == 0`) | **4** |
+
+Degeneracy is structural, from largest-remainder allocation over the
+compositions' UGV weights: `sensor_dense` (0.03) has **zero** UGVs at N=4 and
+N=8 and exactly one at N=16 and N=32; `mixed` has one at N=4; `drone_heavy`
+has one at N=4 and N=8. The 4 null cells are C1's stop condition (§16.6).
+
+**Budget, from §16.1.4's model with the 1.176× transient correction applied to
+every cell with `n_active > 0`:**
+
+| | value |
+|---|---|
+| serial | **4.64 h** |
+| largest single cell | **1025.8 s** (17.1 min — `ugv_heavy` N=32, `lidar_ues=2`) |
+| wall at 10 workers | **≥ 28 min** (bounded below by the largest cell) |
+
+Stage 4's comparable 48-cell grid measured 40.6 min at 10 workers. **These are
+lower bounds**: the transient factor is fitted from one cell at tier 1.0. Disk
+≈ 1 GB of `records.jsonl` (stage 4: 982 MB / 48 cells); 180 GB free. 10
+workers, matching stage 4, on 24 cores / 30 GB.
+
+### 16.4 The windowed instruments — study-layer, panel untouched
+
+`config/metric_panel.yml` is **not edited**. These are excursion-specific
+windowed variants computed by the stage-5 runner, the same status as stage 3's
+UL-floor tally and M13/M16's study-layer calls.
+
+**Windows.** Derived from `LidarActivation`'s own fields, never hardcoded.
+With `start_s=1.5`, `duration_s=2.0` and the 0.5 s stagger:
+
+| name | interval | purpose |
+|---|---|---|
+| `pre` | [0.0, 1.5) | C4 — nothing has happened yet |
+| `during_1` | [1.5, 3.5) | the `lidar_ues=1` window |
+| `during_2` | [1.5, 4.0) | the `lidar_ues=2` union window |
+| `post` | [4.0, 5.0) | recovery — transient or persistent? |
+| `full` | [0.0, 5.0) | C3 calibration only |
+
+Every cell is scored at **all five**, control cells included, so a control
+pairs with either excursion level at no extra run cost.
+
+**Flow subsets.** `non_lidar` (everything except a 5QI-4 flow on an activated
+UGV), `tight_pdb` (non-lidar, `pdb_ms ≤ 30` — §12.2's own threshold), `estop`
+(5QI 85, the 5 ms DL flow), `lidar_only`.
+
+**Definitions.**
+
+- **M01w** — `message_latency_percentiles_ms(completions)` over completions
+  whose `message.generation_ts_s` falls in the window, worst flow by p99, with
+  M01's own "exclude flows with zero complete messages" rule. **A pure
+  restriction of panel M01's population** — same formula, same percentile
+  index convention, fewer samples.
+- **M02w** — over the same completion selection:
+  `(Σ dropped_bytes + Σ delivered_bytes where late) / (Σ delivered_bytes +
+  Σ dropped_bytes)`. **A restriction *plus* an accounting change**, and the
+  difference must not be glossed: panel M02 counts `bytes_delivered_late_pdb`
+  per drained *chunk*, tagged at drain time; M02w counts a whole message's
+  delivered bytes when `MessageCompletion.late` is true. A message whose first
+  bytes drained on time and last bytes late is counted differently by the two.
+  This is why C3 exists.
+- **M07w** — per GBR flow, in-window throughput
+  `Σ ts_delivered_bytes[window] × 8 / window_s`, counted against
+  `gfbr_bps × 0.95` (the panel default). Reported over `non_lidar`; the lidar
+  flow's own M07w reported separately (does the activation itself get served?).
+- **M08w** — `min` of that fraction over non-lidar GBR flows: the max-min
+  floor, in-window.
+
+M01w/M02w need the ledger; M07w/M08w need `ts_delivered_bytes`. Both are
+available to the sink and **neither survives persistence** — so both are
+computed online and discarded, exactly as `_online_rows_for` already does.
+
+### 16.5 The exclusion list, as an exclusion
+
+**On any cell with `n_active > 0`, no run-aggregate panel metric is quoted.**
+That is M01–M19 as emitted by `Scorecard.score()` — not only M10.
+
+Rows are still written in full (the panel's never-omit rule: an omitted row is
+indistinguishable from a forgotten one). The runner tags every such row
+`transient_excluded=True`, and `scripts/analyse_stage5.py` **raises** if asked
+to aggregate an excluded column across lidar-on cells. Only M01w/M02w/M07w/M08w
+and the paired-control contrast at the same window carry claims.
+
+Control cells (`n_active == 0`) are **not** excluded — their run-aggregate
+metrics are legitimately interpretable and feed C5.
+
+### 16.6 Pre-registered controls and expectations
+
+Registered here, in the plan commit, **before the runner exists** — so the
+scoring is checkable from history rather than asserted, the way `2ea4040` was
+for stage 4.
+
+#### Controls
+
+**C1 — the null-lidar identity. READ FIRST. STOP CONDITION.**
+`sensor_dense` at N=4 and N=8 has **zero** UGVs, so `lidar_ues ∈ {1, 2}` there
+activates nothing: the scenario must be identical to `lidar_ues=0`, and every
+row must be **bit-identical** at the same seed and arm. If any row differs,
+the axis plumbing is wrong — a difference with no lidar can only come from the
+plumbing — and **nothing else in the grid is read** until it is explained.
+
+**C2 — the degenerate-cell count.** The runner asserts exactly **9 of 32**
+excursion cells have `n_active < lidar_ues`, and **4** have `n_active == 0`,
+computed from `build_fleet` at launch. A disagreement means `_allocate` or the
+cap changed and the grid's interpretation is suspect. Asserted, not discovered.
+
+**C3 — M02w calibration.** M02w at the `full` window versus panel M02 on the
+same record, across all 16 control cells. Reported as a distribution **before
+any windowed number is quoted**. If the two diverge systematically, M02w is
+reported as a distinct estimator with its bias stated, never as "M02
+restricted to a window."
+
+**C4 — the pre-window read. Both branches named in advance, WITH their
+different consequences for what the whole grid measures.**
+`pre`-window metrics, lidar-on vs lidar-off, same seed and arm.
+
+*Identical* → the perturbation is cleanly localised to the activation window.
+E1–E4 are read as written: the contrast measures **activation**.
+
+*Different* → the lidar bearer's mere **provisioning** — a 12 Mbps GBR
+contract carrying no traffic — already changes scheduling, plausibly through
+TwoTier's Tier-1 LP or Reservation's follower budget. This is not a stop
+condition and does not invalidate E1–E4, but it **changes what they say**:
+every lidar-on cell's on/off contrast then measures **provisioning +
+activation**, a compound treatment, and the wording changes accordingly —
+
+> "the activation breaks flows at N=x" → **"adding a provisioned-and-activated
+> lidar bearer breaks flows at N=x"**
+
+which is a materially different claim for the hardware campaign, because
+provisioning and activation are **separately controllable in a real
+deployment**: an operator can leave a bearer configured and never enable the
+sensor.
+
+**Registered now, before the run:** if C4 fires the *different* branch, E1–E4
+are reported with the compound wording throughout, and the plan records that
+separating the two effects needs a **third level — bearer provisioned, never
+activated**. That level is already expressible without new mechanism: a
+`LidarActivation` whose `start_s` exceeds the horizon puts the flow in
+`scenario.flows` with its full GBR contract while `sim/traffic.py`'s activation
+gate emits nothing for the entire run. It is **not** in this grid (it would
+take `lidar_ues` to four levels and re-open the "not an axis" question), and
+naming it in advance is what keeps a C4-different outcome a **finding with a
+named follow-up** rather than a caveat bolted on after the fact.
+
+**C5 — stage-4 bit-identity on the controls.** Stage-5 `lidar_ues=0` rows must
+reproduce stage 4's `video_tier=1.0` rows exactly (same `_build_fleet_scenario`,
+same `paired_seeds(10, 0)`, same `_driver_kwargs`). Verified against
+`sweeps/wp9/stage4/rows.jsonl`. A mismatch means plumbing the lidar axis
+changed the lidar-off path — stronger coverage than C1, across all 16 controls.
+
+#### Falsifiable expectations
+
+**All four are worded for C4's *identical* branch.** If C4 fires the
+*different* branch, each is restated in the compound "provisioned-and-activated
+bearer" form C4 registers above — the hits and misses are unchanged, the claim
+they support is narrower.
+
+**E1 — the activation is detectable at all.** At `ugv_heavy` N=32,
+`lidar_ues=2`, M02w over `non_lidar` in `during_2` is worse than its paired
+control beyond the within-seed bootstrap CI on at least one arm.
+*Falsifier:* no cell in the grid shows a windowed degradation outside the
+paired CI → 12–24 Mbps against a ~100 Mbps cell is absorbed everywhere in this
+fleet range, and the excursion has no operating point here. **That is a real
+result, not a failed run**, and it bounds the hardware campaign the other way.
+
+**E2 — the breaking fleet size sits at or below stage 4's separation onset.**
+Define *breaking N* per composition as the smallest N at which a non-lidar GBR
+flow loses its M07w contract in-window that it holds in the paired control.
+*Expectation:* breaking N ≤ stage-4 onset N (`ugv_heavy` 16, `drone_heavy` 32,
+`mixed` 32, `sensor_dense` none ≤ 32) wherever both are defined, since the
+activation adds fixed GBR demand on top of the same background.
+*Falsifier:* breaking N > onset N anywhere → a transient is **easier** to
+absorb than steady contention, inverting the intuition this excursion is built
+on. This is the expectation most likely to be wrong, because a 40 %-duty
+transient may simply be averaged away by an EWMA-based arm.
+
+**If E2 misses, it is TRACED, not absorbed.** A miss gets a direct-cause trace
+to a confirmed mechanism — a per-slot trace of the first divergent grant, not
+more reading — before it is written up. Precedent from this WP's own history:
+stage 4's E2 was the registered "most likely to be wrong" expectation, it
+missed, and tracing the miss is what produced §15.5's open hypothesis and its
+named discriminating experiment. **The likeliest-wrong expectation has already
+once carried the more interesting finding**, so a miss here is worth more
+effort than a hit, not less.
+
+**E3 — H6 extends from steady overload to a transient.** At the breaking cell,
+expect §0.1's split: one QoS-aware arm holds M07w while PF holds M08w.
+*Falsifier:* the same arm wins both → H6's construction is a steady-state
+property and does **not** extend to transients, which would narrow §0.1 from a
+general construction lesson to one about sustained load. Per §0.1's standing
+rule, M07w and M08w are quoted **together**, every time either is quoted.
+Given §0.1.1 (the winner flipped between stage 2 and stage 4), **no prediction
+is registered about which arm** — only that the split occurs.
+
+**E4 — direction beats PDB tightness. Weak, and explicitly NOT §15.5's
+experiment.** The UGV e-stop has the tightest PDB in the panel (5 ms) but is
+DL and 40 bytes at 0.2 Hz; the lidar is UL and 150 KB every 100 ms.
+*Expectation:* e-stop is not the first flow to break; the first breaks are UL
+flows sharing the uplink with the lidar.
+*Falsifier:* e-stop breaks first → PDB tightness dominates direction.
+**Stated up front, whichever way it lands:** this grid varies flow count, GBR
+fraction, UL share and tight-PDB density *together*, so it **cannot** test
+§15.5's open hypothesis. §15.5's named discriminating experiment — two profiles
+with identical flow counts and GBR ratios, one with tight-PDB flows co-located
+on a single LCG and one with them spread — remains **unrun**. E4 is suggestive
+at best and must not be reported as bearing on it.
+
+### 16.7 Build items
+
+**B7 — `lidar_ues` plumbed into the stage-5 scenario builder.**
+`scripts/wp9_sweep.py`: `_build_fleet_scenario_s5(seed, **axis_values)` passes
+`lidar=LidarActivation(n_ues=lidar_ues)` when `lidar_ues > 0`, else `None`.
+Records `n_lidar_active` (counted from the returned flows, not from the
+request) on every row so degeneracy is visible in the CSV. `lidar_ues=0` must
+take a path byte-identical to stage 4's (C5).
+
+**B8 — `regime_sweep.sweep(..., run_sink=...)`.** An optional second sink
+called as `run_sink(record, axis_values, summary)`, giving access to
+`summary["_message_ledger"]` — the handle whose own docstring at
+`sim/driver.py:826-829` says it exists so "a study can inspect raw per-message
+completions beyond the percentiles". Purely additive; `record_sink` and every
+existing caller are unchanged. **An explicit second parameter, not arity
+introspection** — `axis_aware`'s docstring already rejects introspection for
+this codebase, for the same reason.
+
+**B9 — `scripts/wp9_window.py`.** `windowed_metrics(ledger, flows_ts, flow_cfgs,
+windows, subsets) -> list[dict]`, computing §16.4's four quantities. Pure
+function over data it is handed; imports no driver and no config, the same
+contract `sim/scorecard.py` holds. Reuses
+`sim.messages.message_latency_percentiles_ms` rather than reimplementing the
+percentile convention.
+
+**B10 — `run_stage_5` in `scripts/wp9_sweep.py`.** Reuses `_run_resumable`
+unchanged (resume semantics, oversized-cell abort, rolling-range ETA). Worker
+`_run_one_cell_s5` mirrors `_run_one_cell_s4` plus the `run_sink`. Launch-time
+assertion of C2's counts. `--stage 5` added to `main()`.
+
+**B11 — tests.** `sim/tests/test_wp9_window.py`: window selection on a
+synthetic ledger (boundary inclusivity, empty-window guard, subset selection);
+M01w equals panel M01 when the window is the full run and no flow is excluded.
+`sim/tests/test_fleet.py`: assert the degenerate-cell structure directly
+(`sensor_dense` has 0 UGVs at N=4/8). Extend
+`sim/tests/test_wp9_sweep_memory.py` to cover `_run_one_cell_s5` — per
+CLAUDE.md's own invariant, a test on the helper does not prove the pipeline
+calling it is clean, which is exactly how commit 1c reintroduced 1b's leak.
+
+**Memory discipline.** The worker computes windowed metrics from the ledger and
+**discards it immediately** — it must never retain `summary` (which holds both
+`_message_ledger` and `_ue_lcp`) or a live `RunRecord`. Live RSS
+instrumentation with a kill threshold during the run, per CLAUDE.md: a green
+suite does not prove a long run is clean. `pkill -f` **does not reach
+`multiprocessing` spawn workers** — kill children by PID. And per the
+observation-channel rule, judge liveness by `ps` on the PID (CPU time, RSS),
+never by whether a log file is growing.
+
+### 16.8 Commit sequence
+
+One fidelity change per commit; full suite + `regression_corpus.py --check`
+after each.
+
+1. **Plan + expectations** — this document into `docs/wp9-plan.md` as §16,
+   including §16.2's correction to §13.2. Registered **before the runner
+   exists**.
+2. **B8** — `run_sink` in `scripts/regime_sweep.py`, with its test. Additive;
+   `--check` must not move.
+3. **B9 + B11's window tests** — the windowed instruments, unit-tested against
+   a synthetic ledger, before any sweep consumes them.
+4. **B7 + B10 + the `sim/fleet.py` comment amendment** — the stage-5 runner
+   and the axis. C2's counts asserted at launch.
+5. **Launch** — `--stage 5`, controls C1/C5 read first.
+6. **Results** — scored against §16.6, hits **and** misses, in the style of
+   §15.
+
+`--check` is expected clean at every step: `run_sink` is opt-in, the windowed
+metrics are study-layer, and the corpus does not run stage-5 code. If it moves,
+that is information — not a reason to `--capture`.
+
+### 16.9 Verification
+
+```bash
+uv run pytest sim/tests -q                              # 739 must stay green
+uv run python scripts/regression_corpus.py --check      # frozen at 9963be1
+
+# machinery only, before committing to the real grid
+uv run python scripts/wp9_sweep.py --stage 5 --smoke --seeds 2 --workers 2 \
+    --out sweeps/wp9/stage5-smoke
+
+# the real grid
+uv run python scripts/wp9_sweep.py --stage 5 --workers 10 \
+    --out sweeps/wp9/stage5 2>&1 | tee sweeps/wp9/stage5.log
+
+uv run python scripts/analyse_stage5.py sweeps/wp9/stage5
+```
+
+**Read order, enforced by the analyser, not by discipline alone:**
+
+1. **C1** — the 4 null cells bit-identical. If not, stop; read nothing else.
+2. **C2** — 48 / 16 / 32 / 9 / 4, computed from `build_fleet`.
+3. **C5** — 16 control cells against `sweeps/wp9/stage4/rows.jsonl`.
+4. **C3** — M02w vs panel M02 at the `full` window, distribution reported.
+5. **C4** — the pre-window read. Name the branch that fired **before** reading
+   E1–E4, since it fixes their wording: the *different* branch makes every
+   expectation a claim about a provisioned-and-activated bearer, and triggers
+   the "provisioned, never activated" follow-up.
+6. **Contiguity**, per composition, over N × `lidar_ues` only (§16.1.2) —
+   **before** any effect size.
+7. **E1–E4**, scored with hits and misses both recorded, M07w and M08w always
+   quoted together.
+
+Finally, the end-of-WP judgment-calls review over stage 5's own diff, looking
+for undocumented decisions and silent bugs — the standing step, not an
+opportunistic one.
