@@ -57,6 +57,7 @@ LCG_COUNT = 8
 # `long_bsr_sz` additionally counts one buffer-size octet per reported LCG,
 # so it is computed per report rather than being a constant.
 SHORT_BSR_SZ = 2          # NR_BSR_SHORT + NR_MAC_SUBHEADER_FIXED
+DEFAULT_RANK = 10_000     # an LCG with no known LC ranks last, never first
 LONG_BSR_FIXED_SZ = 3     # NR_BSR_LONG + NR_MAC_SUBHEADER_SHORT
 
 # oai-branches/two-tier/nr_mac_common.c:43-48 (twotier branch, commit
@@ -199,6 +200,19 @@ class BsrModel:
         # retxBSR = 80 ms.
         self._periodic_bsr_slots = max(1, round((periodic_bsr_ms / 1000.0) / slot_duration_s))
         self._retx_bsr_slots = max(1, round((retx_bsr_ms / 1000.0) / slot_duration_s))
+        # Rank of each LCG = the priority_level of the highest-priority
+        # logical channel mapped to it, **whether or not that channel
+        # currently has data** -- TS 38.321 §5.4.5's parenthetical, which is
+        # not the obvious reading and is why this is precomputed from the
+        # flow list rather than derived from live backlog at report time.
+        # Lower value = higher priority (3GPP convention, scheduler/flow.py).
+        self._lcg_rank: dict[int, dict[int, int]] = {}
+        for ue_id, ue_flows in self._ue_flows.items():
+            rank: dict[int, int] = {}
+            for f in ue_flows:
+                if f.lcg not in rank or f.priority_level < rank[f.lcg]:
+                    rank[f.lcg] = f.priority_level
+            self._lcg_rank[ue_id] = rank
         self._state: dict[int, _UeBsrState] = {
             ue_id: _UeBsrState(
                 periodic_deadline_slot=self._periodic_bsr_slots,
@@ -399,7 +413,8 @@ class BsrModel:
                 return
 
         st.estimated_ul_buffer_per_lcg = [0] * LCG_COUNT
-        self._assemble(st, fmt, per_lcg_true, active_lcgs, lc_with_data)
+        self._assemble(st, ue_id, fmt, per_lcg_true, active_lcgs,
+                       lc_with_data, max(0, int(tb_size) - int(filled_bytes or 0)))
 
         st.sched_ul_bytes = 0
         st.pending = False
@@ -440,10 +455,24 @@ class BsrModel:
         if padding == SHORT_BSR_SZ:
             return "short_trunc"
         if padding >= LONG_BSR_FIXED_SZ:
+            # A Long Truncated BSR costs LONG_BSR_FIXED_SZ plus one
+            # buffer-size octet per REPORTED LCG, so the padding fixes how
+            # many fit. In "spec" mode that count is load-bearing (it is
+            # what makes the report a prefix), and a report carrying zero
+            # buffer sizes conveys nothing -- so defer instead, exactly as
+            # the `padding < SHORT_BSR_SZ` case does. OAI never faces this
+            # because it ignores the count and always writes all 8 entries;
+            # the two modes therefore differ at padding == LONG_BSR_FIXED_SZ,
+            # which is a real consequence of the divergence, not an edge
+            # case papered over.
+            if self._truncated_bsr == "spec" and (
+                    padding - LONG_BSR_FIXED_SZ) < 1:
+                return None
             return "long_trunc"
         return None
 
-    def _assemble(self, st, fmt, per_lcg_true, active_lcgs, lc_with_data):
+    def _assemble(self, st, ue_id, fmt, per_lcg_true, active_lcgs,
+                  lc_with_data, padding):
         """Write the gNB-side per-LCG estimate for the chosen format.
 
         The array was zeroed by the caller, mirroring OAI's memset before
@@ -468,12 +497,30 @@ class BsrModel:
             st.estimated_ul_buffer = estim
             return
 
-        # "long" and, for the OAI-faithful mode, "long_trunc" -- OAI fills
-        # every LCG entry for both (`nr_ue_scheduler.c:2396-2400` and
-        # `:2422-2426` are the same loop). Empty LCGs encode to 0, so this
-        # matches the spec's "Long BSR for all LCGs which have data".
+        reported = active_lcgs
+        if fmt == "long_trunc" and self._truncated_bsr == "spec":
+            # TS 38.321 §5.4.5: "report Long Truncated BSR of the LCG(s)
+            # with the logical channels having data available for
+            # transmission following a decreasing order of the highest
+            # priority logical channel (with or without data available for
+            # transmission) in each of these LCG(s), and in case of equal
+            # priority, in increasing order of LCGID."
+            #
+            # DELIBERATE DIVERGENCE FROM OAI, which fills all 8 entries here
+            # under its own `//  Fixme: this should be sorted by (TS 38.321,
+            # 5.4.5)` (nr_ue_scheduler.c:2419-2421). Justification in
+            # docs/wp9-plan.md §18.2: real UEs are commercial modems
+            # implementing the spec, while OAI's UE code runs only in rfsim,
+            # so the two are ground truth for different setups rather than
+            # one being wrong.
+            rank = self._lcg_rank.get(ue_id, {})
+            ordered = sorted(active_lcgs,
+                             key=lambda g: (rank.get(g, DEFAULT_RANK), g))
+            n_fit = max(0, padding - LONG_BSR_FIXED_SZ)
+            reported = ordered[:n_fit]
+
         total = 0
-        for lcg in active_lcgs:
+        for lcg in reported:
             estim = quantise_long(per_lcg_true[lcg])
             st.estimated_ul_buffer_per_lcg[lcg] = estim
             total += estim

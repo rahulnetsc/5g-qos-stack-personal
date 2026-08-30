@@ -595,3 +595,118 @@ def test_short_truncated_picks_the_highest_priority_LC_not_the_lowest_lcg():
     est = bsr._state[1].estimated_ul_buffer_per_lcg
     assert est[3] > 0, "the higher-priority LC's LCG must be the one reported"
     assert est[1] == 0
+
+
+# --- WP9 §18: the OAI-vs-spec divergence, and what separates them --------
+
+def _three_lcg_setup(mode):
+    """Three backlogged LCGs whose priority order is deliberately NOT the
+    LCG-index order, so a prefix that ignored priority would be visible."""
+    flows = [
+        _flow(1, 9, 1, priority_level=90),   # lowest priority
+        _flow(1, 2, 5, priority_level=10),   # highest priority, highest LCG
+        _flow(1, 82, 3, priority_level=50),  # middle
+    ]
+    buffers = BufferModel()
+    for qfi, lcg in ((9, 1), (2, 5), (82, 3)):
+        buffers.register(1, qfi, is_ul=True, lcg=lcg)
+        buffers.enqueue(1, qfi, 5000, 0.0)
+    return flows, buffers, BsrModel(flows, _SLOT_S, truncated_bsr=mode)
+
+
+def test_oai_long_trunc_does_not_truncate_and_so_cannot_desync():
+    """The finding that shaped this work (docs/wp9-plan.md §18.2): OAI's
+    b_long_trunc fills every LCG entry, identical to b_long, under its own
+    Fixme. Ported faithfully it reports everything -- so it produces NO
+    desync, which is why building only the OAI mode would have left the
+    floor as inert as before."""
+    flows, buffers, bsr = _three_lcg_setup("oai")
+    _force_pending(bsr, 1)
+    # padding 4: long_bsr_sz = 3+3 = 6, so this is the long_trunc window.
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                    buffers=buffers, filled_bytes=96)
+    est = bsr._state[1].estimated_ul_buffer_per_lcg
+    assert est[1] > 0 and est[3] > 0 and est[5] > 0, (
+        "OAI's long_trunc reports all LCGs -- if this fails the port stopped "
+        "being faithful to nr_ue_scheduler.c:2422-2426")
+
+
+def test_spec_long_trunc_reports_a_priority_ordered_PREFIX():
+    """The deliberate divergence. padding 4 -> one buffer-size octet fits,
+    so exactly the highest-priority LCG is reported and the other two are
+    left at 0 while still backlogged."""
+    flows, buffers, bsr = _three_lcg_setup("spec")
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                    buffers=buffers, filled_bytes=96)          # padding = 4
+    est = bsr._state[1].estimated_ul_buffer_per_lcg
+    assert est[5] > 0, "LCG 5 holds the highest-priority LC and must report"
+    assert est[1] == 0 and est[3] == 0, f"expected a 1-LCG prefix, got {est}"
+    for qfi, lcg in ((9, 1), (82, 3)):
+        assert buffers.state(1, qfi).bytes_queued > 0
+
+    # padding 5 -> two fit: the next-highest priority joins, LCG 1 last.
+    flows, buffers, bsr2 = _three_lcg_setup("spec")
+    _force_pending(bsr2, 1)
+    bsr2.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                     buffers=buffers, filled_bytes=95)         # padding = 5
+    est2 = bsr2._state[1].estimated_ul_buffer_per_lcg
+    assert est2[5] > 0 and est2[3] > 0 and est2[1] == 0, (
+        f"prefix must extend by PRIORITY (5 then 3), got {est2}")
+
+
+def test_spec_prefix_ranks_by_lc_priority_not_by_lcg_index():
+    """The prefix must not degrade into 'lowest LCG index first' -- LCG 5
+    outranks LCG 1 here purely on its logical channel's priority."""
+    flows, buffers, bsr = _three_lcg_setup("spec")
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                    buffers=buffers, filled_bytes=96)
+    est = bsr._state[1].estimated_ul_buffer_per_lcg
+    assert est[5] > 0 and est[1] == 0, "index order beat priority order"
+
+
+def test_lcg_rank_uses_channels_WITHOUT_data_too():
+    """TS 38.321 §5.4.5's parenthetical: an LCG is ranked by its highest
+    priority logical channel '(with or without data available for
+    transmission)'. Here LCG 1 carries a high-priority LC that is EMPTY, so
+    LCG 1 must still outrank LCG 3 despite only its low-priority LC having
+    data. Getting this wrong is invisible unless a rank-setting channel is
+    empty -- which is exactly why the parenthetical is in the spec."""
+    flows = [
+        _flow(1, 9, 1, priority_level=90),   # LCG 1, has data
+        _flow(1, 1, 1, priority_level=1),    # LCG 1, EMPTY, sets the rank
+        _flow(1, 82, 3, priority_level=50),  # LCG 3, has data
+    ]
+    buffers = BufferModel()
+    for qfi, lcg in ((9, 1), (1, 1), (82, 3)):
+        buffers.register(1, qfi, is_ul=True, lcg=lcg)
+    buffers.enqueue(1, 9, 5000, 0.0)
+    buffers.enqueue(1, 82, 5000, 0.0)        # qfi 1 deliberately left empty
+    bsr = BsrModel(flows, _SLOT_S, truncated_bsr="spec")
+    _force_pending(bsr, 1)
+    # two active LCGs -> long_bsr_sz = 5; padding 4 -> one entry fits.
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                    buffers=buffers, filled_bytes=96)
+    est = bsr._state[1].estimated_ul_buffer_per_lcg
+    assert est[1] > 0 and est[3] == 0, (
+        f"LCG 1's rank must come from its empty priority-1 channel, got {est}")
+
+
+def test_spec_mode_defers_when_no_buffer_size_octet_fits():
+    """padding == LONG_BSR_FIXED_SZ leaves room for the bitmap but zero
+    buffer sizes. A report conveying nothing is worse than deferring, so
+    spec mode defers -- OAI cannot exhibit this, since it ignores the
+    count. The modes therefore differ at exactly this padding."""
+    flows, buffers, bsr = _three_lcg_setup("spec")
+    _force_pending(bsr, 1)
+    bsr.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                    buffers=buffers, filled_bytes=97)          # padding = 3
+    assert bsr._state[1].pending is True
+    assert bsr._state[1].estimated_ul_buffer_per_lcg == [0] * 8
+
+    flows, buffers, bsr_oai = _three_lcg_setup("oai")
+    _force_pending(bsr_oai, 1)
+    bsr_oai.on_ul_grant(ue_id=1, tb_size=100, delivered_bytes=0, slot_index=1,
+                        buffers=buffers, filled_bytes=97)
+    assert bsr_oai._state[1].pending is False, "OAI emits here; spec defers"
