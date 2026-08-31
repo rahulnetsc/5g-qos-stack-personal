@@ -345,6 +345,15 @@ which term of the composite it thinks is carrying it.
 
 ---
 
+> **Interval provenance for the G6, H2 and H3 rows below (and §3's).**
+> Their bootstrap bounds came from `analyse_stage6.py` /
+> `g6_seed_extension.py` before `e95d6ee`, which seeded the resample with
+> `hash(...)` — salted per process. **Every verdict, point estimate and
+> median is unaffected**, and re-running under the fixed seed flips no
+> verdict; **the CI bounds themselves will not reproduce exactly**, moving
+> by ≈0.01–0.05 in the metric's own units. Quote the verdicts freely; treat
+> a quoted *bound* from these three rows as ±0.05 rather than exact.
+
 ## 2. G1–G12 bridge table, filled in
 
 | G | Status | Evidence / what is missing |

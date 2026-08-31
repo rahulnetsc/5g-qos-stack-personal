@@ -1638,6 +1638,15 @@ because it is 124 flows, not because it is 32 UEs.
 > caught it was going back to *what the model was fitted to*; the arithmetic
 > was correct throughout.
 
+> **Commit-hygiene note, additive rather than rewritten.** This section's
+> commit (`533105a`) also carries **§26**, which was asked for as a separate
+> commit. Both sections were written to this file before either was staged,
+> so `git add docs/wp9-plan.md` took both, and `533105a`'s message describes
+> only the cost-model qualifier — it **under-describes its own diff**.
+> Recorded here rather than fixed by a rebase: nothing was pushed, so a
+> split would have been clean, but the standing preference is additive over
+> rewrite and **the record is what matters, not the shape of history.**
+
 ### 13.1 The lidar cell does not interpolate — measuring it was right
 
 At **7.7 s/flow** the activation cell costs ~40% more per flow than
@@ -3776,6 +3785,21 @@ the base run was **already failing completely**. 7 of 10 seeds drop on
 Reservation and TwoTier. **The drop is not random; it biases M05
 optimistic**, and the analyser prints the dropped count on every affected
 cell.
+
+> **Interval provenance (added later).** Every bootstrap interval in §22
+> and §22.1b was produced by `analyse_stage6.py` / `g6_seed_extension.py`
+> **before `e95d6ee`**, when both seeded `bootstrap_ci` with `hash(...)` —
+> which Python salts per process. **Point estimates, medians and every
+> PASS/FAIL/INCONCLUSIVE verdict are unaffected** (all are deterministic
+> functions of the data, and re-running under the fixed crc32 seed flips no
+> verdict and no exclude-zero flag). **The CI BOUNDS will not reproduce
+> exactly** — recomputed, they move by ≈0.01–0.05 in the metric's own units
+> (e.g. §22.2's TwoTier M08 at 12 dB reads [+0.453, +0.939] here and
+> [+0.418, +0.893] on recomputation). Not recomputed in place, per the rule
+> that a bound is only worth re-deriving when a verdict sits near a
+> boundary; none does. **The one cell closest to a boundary is §22.2's
+> TwoTier M07 at 6 dB, whose lower bound sits at −0.100 — it is *not*
+> marked as excluding zero, and it stays unmarked on recomputation.**
 
 ### 22.1 F1 — G6 passes its ≤ +20 % bar: **PARTIAL**
 
