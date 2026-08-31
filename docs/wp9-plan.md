@@ -1590,6 +1590,54 @@ s/cell.** Cost scales with **flow count**, near-linearly — so §6.3a's
 N-based timings genuinely do not transfer, and N=32 ugv_heavy is expensive
 because it is 124 flows, not because it is 32 UEs.
 
+> **SCOPE QUALIFIER (added later, from measurement): this model is fitted
+> to FLEET-BUILDER compositions and does not transfer to the parametric
+> `factory` mix.** Checked against §6.3a's parametric points (8/32/128
+> flows, same 5.0 s horizon), it **under-predicts by 1.23–1.87×**:
+>
+> | workload | flows | measured s/cell | `4.48 × flows^1.09` | measured/predicted |
+> |---|---|---|---|---|
+> | fleet (this table) | 26 | 163.6 | 156.2 | 1.048 |
+> | fleet | 69 | 379.4 | 452.5 | 0.838 |
+> | fleet | 124 | 928.6 | 857.3 | 1.083 |
+> | **parametric** | 8 | 81 | 43.2 | **1.874** |
+> | **parametric** | 32 | 303 | 195.8 | **1.547** |
+> | **parametric** | 128 | 1093 | 887.4 | **1.232** |
+>
+> **The model is not wrong — a least-squares refit of its own three points
+> gives `4.48 × flows^1.086`, essentially identical.** What the parametric
+> residuals show is a **workload** difference: at comparable flow counts the
+> parametric mix costs **~1.5× more per flow** (9.47 s/flow at 32 flows vs
+> 6.29 s/flow at 26), because that mix carries a fragmenting `xr_video` flow
+> and a per-UE poisson best-effort flood that the fleet compositions do not
+> weight the same way. **`flows` alone is therefore not a sufficient cost
+> index across workloads.**
+>
+> **What this did and did not affect.** Every grid since stage 4 was
+> budgeted from this model, on a workload it was never fitted to — and every
+> budget held. **That is §16.1.4's "lower bound" framing doing the work, not
+> the model being right.** A model quoted as an estimate would have
+> under-budgeted the parametric grids by up to 1.87×; quoted as a floor, it
+> stayed true across a workload change nobody checked for. **The safety came
+> from the framing.**
+>
+> **A correction that ran in an unusual direction, recorded because the
+> direction is the lesson.** The replacement first proposed here —
+> `11.50 × flows^0.939`, fitted to the parametric points — would have been
+> **wrong**: it would have replaced a model that fits its own data with one
+> derived from a workload it was never meant to cover, and §13's own probe
+> points would then have been mis-predicted. The premise came from this
+> session's own speedup analysis and returned as an instruction to act on.
+> `92d9a60`'s rule (*a decision rule is an input to be checked, not
+> evidence*) was written for rules arriving from outside; **this is the
+> first time it caught one that originated in the session's own work.** The
+> obvious reading of that rule is "check what you are told"; the correct
+> reading is **"check any decision rule before applying it, including one
+> you produced"** — and a self-supplied premise is the harder case, because
+> it arrives already carrying the authority of your own measurement. What
+> caught it was going back to *what the model was fitted to*; the arithmetic
+> was correct throughout.
+
 ### 13.1 The lidar cell does not interpolate — measuring it was right
 
 At **7.7 s/flow** the activation cell costs ~40% more per flow than
@@ -4476,3 +4524,104 @@ leave the estimator error untouched.
    §25.5 shows the estimator is not a presentation choice here: median
    −2.44 % and mean +34.08 % on the same 10 pairs disagree about whether
    the guarantee holds.
+
+---
+
+## 26. How fast is this simulator, really — and the comparison that actually justifies it
+
+Derived from measurements already on disk (§6.3a's serial timings, §13's
+probe, stages 4 and 5's own logs). **Nothing here was run for it.** The
+headline the deck needs is in §26.4, and it is not a speed claim.
+
+### 26.1 Per-run ratio, single core — and it is a NEGATIVE result
+
+Sim-seconds delivered per wall-second. Horizon is **20,000 slots = 5.0 s of
+sim time** at this RAN (`dsuuu_40mhz`, numerology 2, 0.25 ms slots), and a
+cell is **3 arms × 10 seeds = 30 runs**.
+
+`driver.run()` only:
+
+| configuration | flows | PF | Reservation | TwoTier |
+|---|---|---|---|---|
+| n_ues=2 | 8 | **4.55×** | 3.73× | 1.47× |
+| n_ues=8 | 32 | 1.38× | 0.87× | 0.46× |
+| n_ues=32 | 128 | 0.30× | 0.22× | **0.18×** |
+
+**Endpoints named: 4.55× at the cheapest configuration (n_ues=2, PF) down
+to 0.18× at the most expensive (n_ues=32, TwoTier) — a 25× span that
+CROSSES UNITY.** Full per-record cost (cell ÷ 30, so driver + scoring + the
+12 variations) is worse: **1.852× → 0.495× → 0.137×**.
+
+**So at every working fleet size this simulator is SLOWER than the radio it
+models.** That is the useful thing for a future reader to know and it is
+why this table stays in the document even though it does not go on a slide.
+The ratio the deck quotes comes from **parallelism**, not from the model
+being fast.
+
+### 26.2 Reference configuration, so the headline has a defined meaning
+
+**n_ues=8, `factory` mix, 32 flows, 20,000 slots = 5.0 s sim** — §1's base
+point. Measured cell 303 s ÷ 30 runs = **10.10 wall-s per run**:
+
+| | ratio |
+|---|---|
+| single core, full per-record cost | **0.495×** |
+| single core, `driver.run()` only, 3-arm mean | 0.74× |
+| 10 workers @ stage 2's measured **6.75×** parallel efficiency (68 %) | **3.34×** |
+| 10 workers @ linear 10× — **not used** | 4.95× |
+
+### 26.3 But the MEASURED end-to-end number is lower, and it is the one to quote
+
+| stage | cells | runs | sim time | wall (10 workers) | ratio |
+|---|---|---|---|---|---|
+| stage 4 | 48 | 1,440 | 7,200 s | 40.6 min | **2.96×** |
+| stage 5 | 48 | 1,440 | 7,200 s | 43.2 min | **2.78×** |
+
+**≈2.9×, whole pipeline, measured over two real stages — not derived.**
+§26.2's 3.34× over-states it, because a real stage includes n_ues=32 cells
+far more expensive than the base point. **Quote the measured one.**
+
+### 26.4 What the ratio EXCLUDES — and why a driver-only figure will not reproduce
+
+Scoring is **~24 % of per-record time** on top of `driver.run()`
+(§6.3a's own third cause), and record persistence is on top of that again.
+**§26.1's driver-only column is not reproducible by anyone running a
+sweep.** §26.3's figures are, because they are end-to-end wall time
+including scoring, the 12 scoring variations, and record writing.
+
+### 26.5 The comparison that justifies the tool — and it is NOT speed
+
+WP9 to date: **407 cells × 30 runs = 12,210 runs = 17.0 h of simulated air
+time, in ≈5.9 h of wall time** at the measured 2.86× (stages 4+5 pooled).
+
+| testbed equivalent, same 407 configurations | wall time | vs sim |
+|---|---|---|
+| pure air time, zero overhead, perfectly serial | 17.0 h | **2.9×** |
+| + 5 min reconfiguration per cell | 50.9 h | 8.6× |
+| + 15 min reconfiguration per cell | 118.7 h | 20.0× |
+| + 30 min reconfiguration per cell | 220.5 h | 37.2× |
+
+**THE RECONFIGURATION MINUTES ARE AN ASSUMPTION, NOT A MEASUREMENT, and
+they drive most of the claim's range (8.6×–37.2×).** Nobody has measured
+them. **Ask whoever runs the testbed before this reaches a slide.** Until
+then the defensible statement is the **2.9× pure-air-time floor**, which
+needs no assumption at all, plus the two capabilities below, which need
+none either.
+
+**And the honest framing for the deck is not speed — it is that a testbed
+cannot run this study at all. Not slowly: at all.**
+
+1. **Paired seeds.** Every comparison in this WP is within-seed: the same
+   channel realisation is replayed across arms. A testbed cannot replay a
+   channel realisation, so it must raise n per cell to recover the same
+   statistical power — which means the table above **understates** the gap.
+   §4 of the regime map records an unpaired comparison producing a
+   confident answer **opposite** to the paired one, so this is not a
+   refinement; it is the difference between a right and a wrong result.
+2. **Fleet size.** Stages swept `n_ues` to 32. Reaching n_ues=32 physically
+   needs 32 robots.
+
+**Lead with reachability, not with time.** A speed claim invites the
+obvious and correct rebuttal — *a testbed gives you real RF* — and the time
+saving is real but secondary. "This study is not physically runnable"
+has no such rebuttal, and it is true.
