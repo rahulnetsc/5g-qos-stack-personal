@@ -4164,3 +4164,212 @@ at constant message size.
 **A reader taking "post-silence p98 = 77 ms" without this is reading a
 number about size as a number about silence.** The scope note travels with
 the row.
+
+---
+
+## 24. FINDING — G6's TwoTier "failure" is a metric-scope artefact over an under-specified test, and the real impairment is elsewhere
+
+Diagnosis requested before any extension. **No fix, no re-baseline and no
+new grid is taken here.** One single-seed diagnostic run was made to
+confirm a mechanism read from source; everything else is from records
+already on disk.
+
+### 24.0 A disambiguation the answer depends on: `n=40` is a SEED COUNT
+
+The failing cell is **N=8 UEs at offered load ×1.0** — the base point
+(§1). `n=40` is the number of paired seeds §22.1a bought. **No cell at 40
+UEs has ever been run**, so if the question was "does G6 hold at a fleet of
+40", the answer is *unrun*, not *failed*.
+
+### 24.1 G6's exact wording, and what it binds
+
+`docs/IA_P5G_Factory_Guarantee_Test_Plan.md:100`:
+
+> **G6** | Background traffic (logs, firmware) can never impair the fleet. |
+> With saturating 5QI-9 load added (either direction), every G1/G3/G5
+> statistic **stays within its bound and** shifts by ≤ ▷ +20 % relative.
+
+Three things follow, and the implemented test honoured none of them fully.
+
+1. **The bar is `▷` — a proposed default, not a ratified threshold.**
+   Same file, line 91: *"Numbers marked ▷ are **proposed defaults** to be
+   ratified with the client."* So "+20 %" is an assumption under test, not
+   a specification.
+2. **It is a CONJUNCTION.** "stays within its bound **and** shifts by
+   ≤ +20 %". `scripts/analyse_stage6.py::g6_verdict` tests **only the
+   second half**. The bound half was never evaluated.
+3. **It binds "every G1/G3/G5 statistic" — which is TEN panel metrics**,
+   derived from `config/metric_panel.yml`'s own `guarantees:` fields:
+   M01, M02, M03, M04, M05, M06, M15, M16, M17, M19.
+   **The implemented test used three: M01.p98, M03.max_gap_ms,
+   M05.fraction. Seven were omitted, M02 among them.**
+
+### 24.2 The mechanism, from source — M03 scores the AGGRESSOR's own starvation
+
+`sim/scorecard.py:220` iterates **every flow in the record**:
+
+```
+for fr in record.flows.values():
+    for role, ts_list in fr.completion_ts_by_role_s.items():
+```
+
+and takes the maximum gap across all of them (`sim/scorecard.py:233-235`).
+**There is no restriction to telemetry, and none to the protected fleet** —
+the panel's own note says so: *"computed generically over any flow's
+completions"* (`config/metric_panel.yml:106-108`).
+
+`bg=True` adds exactly one flow — `sim/parametric.py:282-292`:
+
+```
+flows.append(FlowConfig(
+    ue_id=n_ues, qfi=_QFI_AGGRESSOR, direction="UL", flow_class="PF",
+    pdb_ms=300.0, lcg=6, traffic_kind="poisson",
+    traffic_params={"rate_bps": 50_000_000.0}))
+```
+
+a 50 Mbps saturating best-effort flood on the last UE
+(`_QFI_AGGRESSOR = 8`, `sim/parametric.py:64`).
+
+**Measured: on all four seeds that produce the +136.84 %, M03's reported
+worst-gap flow under `bg` is `ue8_qfi8` — the aggressor itself.**
+
+Single-seed diagnostic, seed 1440696407, TwoTier, per-flow max
+inter-completion gap:
+
+| | fleet telemetry (qfi 1) | aggressor (qfi 8) | M03 reports |
+|---|---|---|---|
+| `bg=False` | 108.50 – 118.75 ms | — | `ue4_qfi1` @ 118.75 ms |
+| `bg=True` | 117.75 – **352.25** ms | **2277.50 ms** | **`ue8_qfi8` @ 2277.50 ms** |
+
+**Every fleet telemetry flow stays inside G3's own 500 ms bound; the
+statistic G6 failed on belongs to the background traffic.**
+
+**And the causal direction is inverted.** TwoTier is QoS-aware, so it
+correctly deprioritises a non-GBR 5QI-8 flood against GBR video and
+delay-critical telemetry. Starving that flood is **what G6 asks for.** The
+metric then reads the starvation back as a liveness failure — so **the
+better an arm contains the aggressor, the worse its G6 score.** PF spreads
+capacity, the aggressor gets steadier service, and PF's M03 worst-gap flow
+stays a fleet telemetry flow on 40/40 seeds — which is why PF "passes".
+
+### 24.3 The interval, and what it does and does not cover
+
+`+136.84 %`, **95 % percentile-bootstrap CI [+35.23, +267.01]**, n = **40
+paired seeds** (`regime_sweep.bootstrap_ci`, 2000 resamples), **paired
+within seed** — same seed drives base and excursion, verified equal seed
+sets before scoring.
+
+**The point estimate is the mean of 40 per-seed RATIOS on a MAX statistic,
+and it is not a robust summary of them:**
+
+| | TwoTier | PF |
+|---|---|---|
+| seeds worse / better | **18 / 21** (1 unchanged) | 18 / 22 |
+| **median** relative delta | **−0.22 %** | −0.30 % |
+| **mean** relative delta | **+136.84 %** | +0.44 % |
+
+**The median is negative — more seeds improve than worsen.** The mean is
+carried by four seeds (+2158, +1918, +1720, +1511 ms).
+
+**What the interval covers:** sampling variability of that mean across
+these 40 seeds, at this one cell (N=8, load ×1.0), on this scenario.
+**What it does not cover:** any other fleet size or load; the choice of
+estimator (mean-of-ratios on a maximum); the metric's flow scope (§24.2);
+the seven omitted statistics (§24.1); and the ▷-provisional bar itself.
+
+### 24.4 The real impairment is large, universal, and on a metric the test omitted
+
+**M02 (`pdb_violation_rate`, `guarantees: [G1, G5, G12]` — squarely inside
+G6's "every G1/G5 statistic") rises on 40 of 40 seeds on every arm:**
+
+| arm | mean Δ M02 | median Δ | seeds increased |
+|---|---|---|---|
+| PF | **+0.2446** | +0.2452 | **40/40** |
+| Reservation | **+0.2404** | +0.2406 | **40/40** |
+| **TwoTier** | **+0.2178** | +0.2131 | **40/40** |
+
+The aggressor raises the byte-weighted PDB-violation rate by ~**24
+percentage points**. That is a real, unambiguous fleet impairment and a
+genuine G6 failure — **on all three arms**, not one.
+
+**And TwoTier is the LEAST impaired.** So the reported result was not
+merely imprecise: **it was inverted.** The arm the test singled out as
+failing is the best-performing arm on the statistic that actually measures
+what G6 is about. Corroborated by the diagnostic seed, where fleet
+telemetry loses messages under `bg` (ue6_qfi1: 50 → 32 delivered) — real
+impairment that M03's max-gap statistic cannot see and M02 does.
+
+### 24.5 Is it monotone in fleet size? NOT ANSWERABLE FROM DISK
+
+The `bg` excursion was run **only at the base point**: all 30 stage-1
+`bg=True` rows carry `n_ues = None`. There is no `bg` cell at any other
+fleet size, so where the guarantee starts to fail as N grows **cannot be
+answered without new runs**, and is reported as unrun rather than
+estimated.
+
+### 24.6 This DOES change what Part C measures
+
+Part C's depth on `duty_cycle` is directly exposed, and the interaction is
+already visible on disk (stage 1, median M03 `max_gap_ms`, breaches of
+G3's 500 ms bound):
+
+| cell | PF | TwoTier |
+|---|---|---|
+| base point | 132.25 ms — 0/10 breach | 120.13 ms — 1/10 |
+| `duty_cycle` 0.5 | 233.12 ms — 0/10 | 503.25 ms — **5/10** |
+| `duty_cycle` 0.1 | **2077.50 ms — 10/10** | **2033.25 ms — 10/10** |
+
+**At `duty_cycle` 0.1 the telemetry flow's own configured period is
+1000 ms** (`_burstify(100.0, 300.0, 0.1)`, `sim/parametric.py:122-137`), so
+a ~2000 ms inter-completion gap is **the cadence, not a liveness failure**.
+M03 breaches its bound in 10/10 seeds on **both** arms for a reason that
+has nothing to do with scheduling. **Any Part C M03 reading at
+`duty_cycle` ≤ 0.5 is measuring the duty cycle.** `snr_spread_db` shows no
+such coupling — it does not change any flow's cadence.
+
+This is the same shape as §23.5's G4 scope note: `_burstify` holds mean
+rate constant by stretching the period, which is right for H2 and wrong for
+any metric keyed to inter-arrival time.
+
+### 24.7 Verdict, and what would falsify it
+
+**Verdict: (c) a measurement artefact of the metric definition, compounded
+by an under-specified test — NOT (a) a scheduler defect and NOT (b) a
+guarantee stated at the wrong scope.** The failing statistic belongs to the
+background traffic; the arm blamed is the one containing it best; and the
+statistic that shows the real impairment was omitted from the test.
+
+**Two things are nonetheless real and must not be lost in the correction:**
+G6 *is* failing — on M02, on all three arms, 40/40 seeds — and TwoTier's
+max-gap distribution is genuinely heavy-tailed even at `bg=False` (one seed
+at 660 ms, mean 183.85 vs median 119.13), which is its own open question.
+
+**What would falsify this diagnosis:**
+
+1. **A fleet-restricted M03 that still fails.** Recompute the worst-gap
+   contest over protected-fleet flows only (excluding qfi 8 and qfi 9). If
+   TwoTier's delta still exceeds +20 % with an interval above the bar, the
+   artefact is not the explanation and (a) returns.
+2. **Per-flow evidence that fleet telemetry, not the aggressor, drives the
+   four extreme seeds.** §24.2 checked one seed; the other three are
+   assumed to share it from their identical `M03.flow`, not verified
+   per-flow.
+3. **The bound half evaluated.** If fleet-only gaps breach 500 ms under
+   `bg` while staying inside it without, G6 fails its first conjunct on a
+   fleet statistic and the verdict changes regardless of the relative bar.
+
+### 24.8 What follows — proposed, not taken
+
+Nothing below is done in this commit.
+
+1. **Correct the G6 test before extending it**: evaluate the conjunction's
+   bound half, restrict M03's contest to protected-fleet flows or add a
+   fleet-restricted companion, and cover the seven omitted G1/G3/G5
+   statistics. Each is a mechanism change with its own guard test.
+2. **A guard test verified to fail against current code** must accompany
+   any such fix, with the failing output in the commit message.
+3. **Part C's M03 readings need the duty-cycle coupling handled** before
+   depth is bought, or its M03 column will be uninterpretable.
+4. **§22.1b's G6 row and the regime map's G6 row are now known to be
+   wrong** and must be corrected — but the correction is part of the fix
+   commit, not asserted ahead of it.

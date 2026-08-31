@@ -62,3 +62,44 @@ an unexplained failure is worse than the unexplained failure, and this
 project has recorded three corrections that began exactly that way.
 
 **Scored:** see the end of this entry once the investigation completes.
+
+### SCORED — 2026-08-31: **MISS on the branch, HIT on the discriminator**
+
+**The answer is (c), not (a).** `docs/wp9-plan.md` §24.
+
+**The branch was wrong.** I predicted a real scheduler behaviour, with a
+named mechanism: the UL composite's size-proportional `hyp_tbs_bytes` term
+letting the aggressor outrank the 300-byte telemetry flow. **That is not
+what happens.** M03's worst-gap contest scans *every* flow
+(`sim/scorecard.py:220`), and on all four seeds carrying the effect the
+reported flow is **`ue8_qfi8` — the aggressor itself**. Fleet telemetry
+stays inside its 500 ms bound. The mechanism I named was never tested,
+because the statistic was never about the telemetry flow.
+
+**The discriminator was right, and it is what found the answer.** I
+registered: *"if the excess were a max-statistic artefact it would be
+carried by one or two extreme seeds"*. Measured: **median relative delta
+−0.22 %, 21 of 40 seeds IMPROVE, and the +136.84 % mean is carried by four
+seeds.** That test fired exactly as written and pointed at (c) while my
+predicted branch pointed at (a) — the registration earned its keep by
+disagreeing with the prediction it was attached to.
+
+**I also under-weighted my own hedge.** I wrote that M01.p98 having moved
+was *"weak prior evidence against (c) but not decisive, because both could
+share a single starvation episode"*. They did share one — the aggressor's.
+The hedge was correct and I should have followed it rather than the branch.
+
+**What the prediction missed entirely**, and neither branch anticipated:
+the G6 test was **under-specified**. G6 binds ten G1/G3/G5 statistics
+(`config/metric_panel.yml`); the test used three. The omitted **M02** rises
+on **40/40 seeds on every arm** (+0.24), which is the real impairment — and
+**TwoTier is the least impaired of the three**, so the reported result was
+inverted, not merely imprecise. No option in the (a)/(b)/(c) framing covers
+"the test measured the wrong set of statistics", and I did not think to
+add one.
+
+**Lesson carried forward:** the three-way framing was mine to widen and I
+did not. When registering a prediction over a fixed set of branches, add
+the branch *"the instrument is measuring something other than what the
+question is about"* — in this project that branch has now been the answer
+three times (§19.1's trigger, §22.5's single GBR class, and this).
