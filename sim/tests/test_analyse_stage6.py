@@ -175,3 +175,35 @@ def test_g12_raises_when_the_ramp_axis_matches_nothing(tmp_path):
     path.write_text(json.dumps({"axis_values": {"video_tier": 1.0}, "record": rec}) + "\n")
     with pytest.raises(AssertionError, match="matched NO record"):
         A.report_g12(tmp_path, "load_mult", ("n_ues",), "toy")
+
+
+# -- bootstrap seed determinism -------------------------------------------
+
+def test_stable_seed_is_identical_across_processes():
+    """`hash()` is salted per process unless PYTHONHASHSEED is set, so
+    `hash((arm, metric))` gave a different bootstrap resample on every run.
+    Measured on one identical dataset, TwoTier's M03 interval came back as
+    [+35.23, +267.01], [+34.34, +272.70] and [+32.75, +272.45] across three
+    runs. This project reads intervals, so a bound that will not reproduce
+    is unverifiable by anyone re-running the script."""
+    import subprocess
+    import sys as _sys
+    from pathlib import Path as _Path
+    scripts = str(_Path(__file__).resolve().parents[2] / "scripts")
+    code = (f"import sys; sys.path.insert(0, {scripts!r});"
+            "from analyse_stage6 import _stable_seed;"
+            "print(_stable_seed('TwoTier', 'M03.max_gap_ms'))")
+    outs = set()
+    for salt in ("0", "1", "random"):
+        env = {**__import__("os").environ, "PYTHONHASHSEED": salt}
+        outs.add(subprocess.run([_sys.executable, "-c", code], capture_output=True,
+                                text=True, env=env).stdout.strip())
+    assert len(outs) == 1, f"seed varies with PYTHONHASHSEED: {outs}"
+
+
+def test_stable_seed_separates_different_cells():
+    """Distinct (arm, metric) pairs must still get distinct resamples --
+    a constant seed would correlate every cell's interval."""
+    seeds = {A._stable_seed(a, m)
+             for a in A.ARMS for m in A.G6_METRICS}
+    assert len(seeds) == len(A.ARMS) * len(A.G6_METRICS)

@@ -39,8 +39,9 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from analyse_stage6 import (ARMS, G6_BAR, G6_METRICS, g6_verdict,  # noqa: E402
-                            impairment_interval, load_rows, paired_deltas)
+from analyse_stage6 import (ARMS, G6_BAR, G6_METRICS, _stable_seed,  # noqa: E402
+                            g6_verdict, impairment_interval, load_rows,
+                            paired_deltas)
 from regime_sweep import bootstrap_ci, sweep, write_csv  # noqa: E402
 from sim.parametric import sweep_scenario  # noqa: E402
 from wp9_sweep import (BASE, PersistingRecordSink, _arms,  # noqa: E402
@@ -137,7 +138,7 @@ def report(rows: list[dict[str, Any]]) -> dict[str, Any]:
             if not deltas:
                 print(f"    {metric:18s}  (no paired samples)")
                 continue
-            ci = bootstrap_ci(deltas, seed=hash((arm, metric)) & 0xFFFF)
+            ci = bootstrap_ci(deltas, seed=_stable_seed(arm, metric))
             imp, lo, hi = impairment_interval(metric, ci)
             verdict = g6_verdict(lo, hi)
             dropped = N_SEEDS - len(deltas)

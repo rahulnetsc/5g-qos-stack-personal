@@ -27,6 +27,7 @@ import csv
 import json
 import statistics
 import sys
+import zlib
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
@@ -180,6 +181,23 @@ def _fmt_ci(ci: dict[str, float], pct: bool = False) -> str:
             f"[{ci['lo'] * scale:+8.3f}, {ci['hi'] * scale:+8.3f}]{unit}  n={ci['n']}")
 
 
+def _stable_seed(*parts: object) -> int:
+    """A bootstrap seed that is the SAME on every process.
+
+    NOT `hash(...)`: Python salts string hashing per process unless
+    PYTHONHASHSEED is set, so `hash((arm, metric))` gave a different
+    bootstrap resample on every run. The point estimate and median are
+    unaffected (they are deterministic functions of the data), but the CI
+    BOUNDS moved run to run -- measured on one identical dataset, TwoTier's
+    M03 interval came back as [+35.23, +267.01], [+34.34, +272.70] and
+    [+32.75, +272.45] across three runs. This project reads intervals
+    (`docs/wp9-plan.md` §24.3), so an interval that will not reproduce is a
+    defect in the instrument, not a cosmetic one -- it makes a quoted bound
+    unverifiable by anyone re-running the script.
+    """
+    return zlib.crc32("|".join(str(p) for p in parts).encode()) & 0xFFFF
+
+
 def _excludes_zero(ci: dict[str, float]) -> bool:
     return ci["lo"] > 0.0 or ci["hi"] < 0.0
 
@@ -239,7 +257,7 @@ def report_g6(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 print(f"    {metric:18s}  (no paired samples)")
                 out["arms"][arm][metric] = None
                 continue
-            ci = bootstrap_ci(deltas, seed=hash((arm, metric)) & 0xFFFF)
+            ci = bootstrap_ci(deltas, seed=_stable_seed(arm, metric))
             # "Impairment" is direction-aware: for a lower-better metric a
             # POSITIVE relative delta is worse; for M05.fraction (higher-
             # better) it is a NEGATIVE delta that impairs. Flip the whole
@@ -280,7 +298,7 @@ def report_axis(rows: list[dict[str, Any]], axis: str, label: str) -> dict[str, 
             cells = []
             for metric in H_METRICS:
                 deltas = paired_deltas(base, exc, arm, metric, relative=False)
-                ci = bootstrap_ci(deltas, seed=hash((axis, level, arm, metric)) & 0xFFFF)
+                ci = bootstrap_ci(deltas, seed=_stable_seed(axis, level, arm, metric))
                 cells.append((metric, ci))
                 out["levels"][str(level)].setdefault(arm, {})[metric] = {
                     "ci": ci, "excludes_zero": _excludes_zero(ci),
