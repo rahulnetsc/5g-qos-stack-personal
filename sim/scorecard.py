@@ -15,7 +15,9 @@ adapter) without caring how it was produced.
 
 from __future__ import annotations
 
+import dataclasses
 import math
+import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -115,6 +117,15 @@ class Scorecard:
         out["M01"] = self._m01_latency_percentiles(record)
         out["M02"] = self._m02_pdb_violation_rate(record)
         out["M03"] = self._m03_liveness_gap_distribution(record, cfg["t_live_s"])
+        # M20 is auto-scored rather than left a study-layer call like
+        # M13/M16. It needs no extra argument (its exclusion set has a
+        # documented default) and the record_sink defect this WP just
+        # fixed is the argument for it: a statistic absent from the
+        # scored row is one a later question cannot be re-asked of
+        # without re-running. The excluded 5QIs travel INSIDE the
+        # value, never as a bare number -- same convention as M03/M14
+        # reporting the t_live_s they were computed against.
+        out["M20"] = self.protected_fleet_liveness_gap(record, cfg["t_live_s"])
         out["M04"] = self._m04_survival_time_failures(record, cfg["survival_miss_n"])
         out["M05"] = self._m05_pdu_set_completeness(record)
         out["M06"] = self._m06_frame_age_at_mec(record)
@@ -267,6 +278,88 @@ class Scorecard:
                 "no flow/role pair had >=2 completions this run; " + note,
             )
         return MetricResult("M03", "liveness_gap_distribution", worst, "ok", "ms", note)
+
+    # 5QIs that are NOT protected fleet bearers: the GT-4.1/4.2 saturating
+    # aggressor and the per-UE best-effort filler (sim/parametric.py:63-64).
+    # Named by 5QI rather than by flow_class because "not protected" is a
+    # QoS-profile fact, not a scheduler-visible one -- a GBR video flow and
+    # a best-effort flood can share flow_class in other scenarios.
+    NON_PROTECTED_5QI: frozenset = frozenset({8, 9})
+
+    def protected_fleet_liveness_gap(
+        self, record: RunRecord, t_live_s: Optional[float] = None,
+        non_protected_5qi: Optional[frozenset] = None,
+    ) -> MetricResult:
+        """M03's contest restricted to PROTECTED FLEET bearers.
+
+        WHY THIS IS A SEPARATE STATISTIC AND NOT AN EDIT TO M03. M03's domain
+        is deliberately every flow -- its panel note says "computed
+        generically over any flow's completions" -- and changing it would
+        silently re-interpret every historical reading. What is wrong is not
+        M03; it is the BINDING of G6 to M03, because G6 asks whether
+        background traffic impairs *the fleet* and M03's maximum can be won
+        by the background traffic itself.
+
+        Measured: on the four seeds that produced G6's headline failure the
+        winning flow was the aggressor (`docs/wp9-plan.md` §24.2), so the
+        guarantee was scored on the aggressor's own starvation -- and since a
+        QoS-aware scheduler starves a non-GBR flood *by design*, the better an
+        arm contained it, the worse its G6 score. The causal direction was
+        inverted.
+
+        Returns the same value shape as M03 so a consumer can swap them.
+        """
+        t_live_s = self.defaults["t_live_s"] if t_live_s is None else t_live_s
+        excluded_5qi = (self.NON_PROTECTED_5QI if non_protected_5qi is None
+                        else non_protected_5qi)
+        keep = {k: fr for k, fr in record.flows.items()
+                if fr.qfi not in excluded_5qi}
+        if not keep:
+            return MetricResult(
+                "M20", "protected_fleet_liveness_gap", None, "ok", "ms",
+                f"no protected flow in this record (excluded 5QIs: "
+                f"{sorted(excluded_5qi)})")
+        sub = dataclasses.replace(record, flows=keep)
+        res = self._m03_liveness_gap_distribution(sub, t_live_s)
+        value = res.value
+        if isinstance(value, dict):
+            value = {**value, "excluded_5qi": sorted(excluded_5qi)}
+        return MetricResult(
+            "M20", "protected_fleet_liveness_gap", value, res.status, "ms",
+            f"M03's contest over PROTECTED bearers only, excluding 5QIs "
+            f"{sorted(excluded_5qi)}; {res.note}")
+
+    @staticmethod
+    def robust_delta_summary(deltas: list[float]) -> dict:
+        """A summary for a per-seed delta distribution on a MAX-type
+        statistic, where the mean of ratios is not a robust estimator.
+
+        The G6 cell that motivated this had **mean +136.84 %** while its
+        **median was -0.22 % and 21 of 40 seeds IMPROVED** -- the mean was
+        carried by four seeds. Reporting the mean alone said the guarantee
+        failed; reporting the median alone said it was untouched. Both are
+        returned, plus the quartiles, the count, and the fraction of seeds
+        that actually got worse, so a reader can see the disagreement instead
+        of inheriting whichever estimator was chosen.
+        """
+        n = len(deltas)
+        if n == 0:
+            return {"n": 0, "mean": float("nan"), "median": float("nan"),
+                    "p25": float("nan"), "p75": float("nan"),
+                    "frac_worse": float("nan")}
+        ordered = sorted(deltas)
+
+        def _q(frac: float) -> float:
+            return ordered[min(n - 1, int(n * frac))]
+
+        return {
+            "n": n,
+            "mean": sum(deltas) / n,
+            "median": statistics.median(deltas),
+            "p25": _q(0.25),
+            "p75": _q(0.75),
+            "frac_worse": sum(1 for d in deltas if d > 0) / n,
+        }
 
     def _m14_communication_service_availability(self, record: RunRecord) -> MetricResult:
         """TS 22.104 CSA: fraction of transfer intervals where the message

@@ -113,6 +113,40 @@ metrics:
       FlowRecord) reports status=pending, not a fallback proxy -- this
       metric has none.
 
+  - id: M20
+    name: protected_fleet_liveness_gap
+    definition: >
+      M03's worst-gap contest restricted to PROTECTED FLEET bearers --
+      every 5QI except the GT-4.1/4.2 saturating aggressor and the per-UE
+      best-effort filler. Same value shape as M03.
+    guarantees: [G6]
+    unit: ms
+    direction: lower_better
+    status: ok
+    requires: null
+    note: >
+      WP9 Step 2. Added because G6 was bound to M03, whose domain is
+      deliberately EVERY flow ("computed generically over any flow's
+      completions", M03's own note). G6 asks whether background traffic
+      impairs THE FLEET, and M03's maximum can be won by the background
+      traffic itself -- measured, it was, on the four seeds that produced
+      G6's headline failure (docs/wp9-plan.md sec24.2). Since a QoS-aware
+      scheduler starves a non-GBR flood BY DESIGN, the better an arm
+      contained the aggressor the worse its G6 score: the causal direction
+      was inverted. M03 is UNCHANGED -- editing it would silently
+      re-interpret every historical reading -- so this is an additional
+      statistic and a re-pointed binding, not a redefinition. The panel is
+      append-only under the same pre-registration rules; this is an
+      addition, not a definition change to an existing metric.
+    caveats:
+      - >
+        A MAX over UEs. Even restricted to protected bearers this is an
+        extreme-value statistic: the winning flow changed identity between
+        paired base and excursion runs on 35 of 40 seeds
+        (docs/wp9-plan.md sec27.3), so a relative change tracks WHICH UE
+        spiked hardest as much as whether the fleet degraded. Read it with
+        Scorecard.robust_delta_summary, never as a bare mean of ratios.
+
   - id: M04
     name: survival_time_failures
     definition: >

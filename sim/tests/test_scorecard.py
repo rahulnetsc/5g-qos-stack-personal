@@ -57,11 +57,14 @@ def _record(scenario_fn=smoke_scenario, record_timeseries=False, **run_kwargs):
     ), sc
 
 
-def test_panel_loads_and_has_nineteen_metrics():
-    """M18/M19 (WP-Join commit 4, docs/wp-join-plan.md sec5) are the
-    panel's first additions since WP0's original 17."""
+def test_panel_loads_and_has_twenty_metrics():
+    """M18/M19 (WP-Join commit 4, docs/wp-join-plan.md sec5) were the
+    panel's first additions since WP0's original 17; M20 (WP9 Step 2,
+    protected_fleet_liveness_gap) is the third. The panel is append-only:
+    additions are allowed, redefinitions of an existing metric are not, and
+    M20 exists precisely so M03 did NOT have to be redefined."""
     panel = load_panel()
-    assert len(panel["metrics"]) == 19
+    assert len(panel["metrics"]) == 20
     ids = [m["id"] for m in panel["metrics"]]
     assert len(ids) == len(set(ids)), "duplicate metric ids in the panel"
 
@@ -77,12 +80,19 @@ def test_caveats_travel_with_the_value_for_registered_metrics_only():
     rec, _ = _record()
     sc = Scorecard()
     results = sc.score(rec)
-    for mid in ("M01", "M02", "M14", "M15", "M19"):
+    # DERIVED from the panel, not hardcoded: a hand-listed set of
+    # caveat-carrying ids is a count-in-prose that drifts the moment a
+    # metric gains or loses a caveat (CLAUDE.md's derive-it rule). It did:
+    # M20 gained one in WP9 Step 2 and this test failed on the literal list.
+    panel = load_panel()
+    with_caveats = {m["id"] for m in panel["metrics"] if m.get("caveats")}
+    assert with_caveats, "the panel registers no caveats at all -- check load_panel"
+    for mid in with_caveats & set(results):
         assert results[mid].caveats, f"{mid} should carry its registered caveat"
         assert all(isinstance(c, str) and c for c in results[mid].caveats)
     for mid, res in results.items():
-        if mid not in ("M01", "M02", "M14", "M15", "M19"):
-            assert res.caveats == []
+        if mid not in with_caveats:
+            assert res.caveats == [], f"{mid} carries a caveat the panel does not register"
 
 
 def test_score_emits_every_scoreable_metric_row():
