@@ -103,3 +103,72 @@ did not. When registering a prediction over a fixed set of branches, add
 the branch *"the instrument is measuring something other than what the
 question is about"* — in this project that branch has now been the answer
 three times (§19.1's trigger, §22.5's single GBR class, and this).
+
+---
+
+## P2 — Does fleet-restricted M03 fall inside G6's +20 % bar? (registered 2026-08-31)
+
+**Registered before running §24.7's falsifier.** Counts carry their noun
+throughout: `n_seeds` for paired seeds, `n_ues` for fleet size. The cell is
+**n_ues=8, offered load ×1.0**.
+
+**A data constraint recorded up front, not discovered afterwards.**
+`scripts/g6_seed_extension.py:62-64` calls `sweep()` with **no
+`record_sink`**, so the n_seeds=40 run persisted only the tidy CSV — which
+carries M03's *winning* flow and value, never the per-flow completion
+timestamps a restricted recomputation needs. **The falsifier is therefore
+computable from disk at n_seeds=10** (stage 1's `records.jsonl` holds the
+`bg=True` excursion cell and the base-point cell with
+`completion_ts_by_role_s` intact), **and at n_seeds=40 only by re-running
+those same two cells with a sink.** Whatever comes back is reported at the
+`n_seeds` it was actually computed at.
+
+### The prediction — one falsifiable sentence
+
+**Fleet-restricted M03 will NOT fall inside the +20 % bar under the
+mean-of-ratios estimator: the excess will drop substantially from
++136.84 % but stay above +20 %, because the aggressor degrades real fleet
+flows as well as starving itself — on the one seed already traced
+(1440696407) the fleet-only max gap moved 118.75 → 352.25 ms, +197 %,
+with no aggressor flow involved.**
+
+**Corollary predicted in the same breath:** the **median** fleet-restricted
+relative delta will stay **inside** the bar, so the verdict will depend on
+the estimator rather than on the data — which is Step 4's point arriving
+early.
+
+### What would show the §24 mechanism is INCOMPLETE rather than WRONG
+
+Three outcomes, distinguished in advance:
+
+- **Excess collapses to ≈ 0 %** → §24's mechanism was **complete**: the
+  aggressor's own starvation was the whole effect, (c) stands unqualified.
+- **Excess stays near +136 %** → §24's mechanism was **wrong**: excluding
+  the aggressor changed nothing, so it was never what drove the statistic.
+- **Excess drops a lot but stays above +20 %** → §24's mechanism was
+  **INCOMPLETE**: it correctly identified the aggressor as the dominant
+  contributor while missing a real, second, fleet-side degradation. **This
+  is what I predict**, and it means the honest verdict is neither pure (a)
+  nor pure (c) but both, with the split quantified.
+
+### Standing branch — the instrument is measuring something other than the question
+
+Included by standing rule, having been the answer three times in this WP
+(§19.1's wrong trigger, §22.5's single GBR class, §24.2's aggressor flow).
+**Its live form here:** fleet-restricted M03 is *still a maximum over
+n_ues=8 UEs × several flows*, so its relative change is dominated by
+whichever single flow happens to spike hardest, and "fleet-restricted"
+does not make an extreme-value statistic into a fleet-health statistic.
+**The signature to look for:** the restricted excess is again carried by a
+handful of seeds with a near-zero median, and the winning flow changes
+identity between the paired base and excursion runs — i.e. the statistic is
+tracking *which flow spiked*, not *whether the fleet degraded*.
+
+**A second live form:** M03's own definition
+(`config/metric_panel.yml:96-99`) says **"telemetry** inter-arrival gaps",
+so restricting to "every fleet flow" is already looser than the metric's
+own text. Both restrictions are therefore computed — aggressor-excluded and
+telemetry-only — because they answer different questions and only the
+second matches the definition.
+
+**Scored:** at the end of this entry.
