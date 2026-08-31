@@ -214,3 +214,62 @@ review.
 **Why this belongs in the journal rather than in a plan section:** it is a
 statement about how predictions get scored, and the failure mode it guards
 is scoring a prediction against a rule that was itself wrong.
+
+---
+
+## Standing rule — predict the SHAPE, not the mechanism
+
+A rule about **how to write an expectation**, not about what to expect. It
+belongs beside the most-likely-wrong rule for that reason: both govern the
+form of a registration rather than its content.
+
+**Predict what the data will LOOK like, and what each possible look would
+mean. Do not predict WHY.**
+
+### Why, from the two predictions in this journal
+
+**P1 predicted a mechanism, inferred from an aggregate, and missed.** It
+named a specific code path — the UL composite's size-proportional
+`hyp_tbs_bytes` term letting an aggressor outrank telemetry — reasoned from
+a +136.84 % headline. The mechanism was never even under test: the
+statistic belonged to a different flow. **A mechanism prediction is
+unscoreable until someone traces the code**, and until then it does nothing
+except make one explanation feel likely.
+
+**P2 predicted a shape, with each shape's meaning fixed in advance, and hit
+on every clause.** It said the excess would drop substantially and stay
+above the bar, that the median would stay inside it, and — the load-bearing
+part — it enumerated three outcomes *before* the data arrived: collapse to
+zero ⇒ the mechanism was complete; unchanged ⇒ the mechanism was wrong;
+drops-but-stays-above ⇒ the mechanism was **incomplete**. When the third
+arrived, the interpretation was already fixed and could not be fitted to it.
+
+### What the form buys
+
+1. **It is scoreable on arrival.** No trace needed to know whether it hit.
+2. **It cannot be re-fitted afterwards**, because the mapping from outcome
+   to meaning was written down before the outcome existed. This is the
+   whole guard, and a mechanism prediction has no equivalent.
+3. **It still forces the mechanism question — but only when it misses**,
+   and then with the search already narrowed by which shape actually turned
+   up. P1's miss required a full source trace to explain; P2's hit needed
+   none, and a P2-style miss would have arrived with three candidate
+   explanations already distinguished.
+4. **It survives the instrument being wrong.** A shape prediction about
+   medians, spreads and seed counts still scores when the metric turns out
+   to measure the wrong thing — which in this WP it has, three times.
+
+### The failure mode it prevents
+
+**A mechanism inferred from an aggregate is a story that fits the summary
+statistic, and summary statistics under-determine mechanisms.** P1's story
+was consistent with every number then available and still wrong, because
+the number was a mean of 40 ratios of a maximum over 8 UEs — a quantity
+compatible with many mechanisms and diagnostic of none. **The aggregate was
+never going to identify the code path, and no amount of care in reasoning
+from it would have helped.**
+
+**Corollary for registration:** if an expectation cannot be scored without
+first running a trace, it is written in the wrong form. Rewrite it as a
+statement about what the distribution will look like, and attach the
+mechanism as the thing the *trace* will settle if the shape misses.
