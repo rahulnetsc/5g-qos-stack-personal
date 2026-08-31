@@ -172,3 +172,45 @@ telemetry-only — because they answer different questions and only the
 second matches the definition.
 
 **Scored:** at the end of this entry.
+
+---
+
+## Standing methodology note — a decision rule stated in a prompt is not evidence
+
+Recorded beside P2's standing branch because it is the same shape of error,
+one level up: **the standing branch is about the instrument measuring the
+wrong thing; this is about the DECISION RULE evaluating it wrongly.**
+
+**The instance.** Step 1's instruction read *"Excess still above +20 % ⇒
+verdict returns to (a), a scheduler defect."* That is a **point-estimate
+rule**, issued to a project that had, one section earlier, committed itself
+in writing to the opposite: `docs/wp9-plan.md` §24.3 reports the interval
+and not the point, and `scripts/analyse_stage6.py::g6_verdict` implements
+PASS / FAIL / **INCONCLUSIVE** against the interval precisely so a large
+point estimate inside a spanning interval cannot be read as a failure.
+
+**Applying the rule literally would have returned (a).** Fleet-restricted
+M03's point estimate is **+34.08 %**, above the bar. Its interval is
+**[−16.90, +105.67]**, containing both the bar and zero, and its median is
+**−2.44 %**, inside the bar. A defect verdict — and then a binding change to
+a client-facing guarantee — would have rested on a statistic the data does
+not support.
+
+**This is the second time in this thread a prompt encoded an error the
+source-side check caught.** The first was the `n=40` framing, which read as
+a fleet size when the cell is n_ues=8 at load ×1.0 and 40 is the paired-seed
+count (`docs/wp9-plan.md` §24.0); left unchecked it would have produced a
+scope finding about a fleet size never run.
+
+**The rule, stated so it generalises:** *a decision rule, a threshold, or a
+framing that arrives in a prompt is an input to be checked against the
+project's own methodology, exactly like a forward-looking note in this
+repo's docs (CLAUDE.md's four kinds).* It is not evidence, and it does not
+override a discipline the project has already committed to in code and in
+writing. When the two conflict, **say so and apply the project's own rule**,
+rather than following the instruction into a result that will not survive
+review.
+
+**Why this belongs in the journal rather than in a plan section:** it is a
+statement about how predictions get scored, and the failure mode it guards
+is scoring a prediction against a rule that was itself wrong.
