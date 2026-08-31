@@ -43,6 +43,7 @@ from analyse_stage6 import (ARMS, G6_BAR, G6_METRICS, _stable_seed,  # noqa: E40
                             g6_verdict, impairment_interval, load_rows,
                             paired_deltas)
 from regime_sweep import bootstrap_ci, sweep, write_csv  # noqa: E402
+from sim.scorecard import Scorecard  # noqa: E402
 from sim.parametric import sweep_scenario  # noqa: E402
 from wp9_sweep import (BASE, PersistingRecordSink, _arms,  # noqa: E402
                         _driver_kwargs)
@@ -143,9 +144,18 @@ def report(rows: list[dict[str, Any]]) -> dict[str, Any]:
             verdict = g6_verdict(lo, hi)
             dropped = N_SEEDS - len(deltas)
             warn = f"  [{dropped} seed(s) dropped]" if dropped else ""
+            # STEP 4's REPORTING DEFAULT for a max-type statistic: median
+            # and quartiles beside the mean, never the mean alone. On this
+            # very cell the mean read +136.84% while the median read -0.22%
+            # and 21/40 seeds improved -- the two estimators disagreed about
+            # whether the guarantee held.
+            rs = Scorecard.robust_delta_summary(deltas)
             print(f"    {metric:18s}  impairment {imp * 100:+8.2f}%  "
-                  f"[{lo * 100:+8.2f}, {hi * 100:+8.2f}]%   n={len(deltas):3d}  "
-                  f"{verdict}{warn}")
+                  f"[{lo * 100:+8.2f}, {hi * 100:+8.2f}]%   "
+                  f"median {rs['median'] * 100:+7.2f}%  "
+                  f"IQR [{rs['p25'] * 100:+7.2f},{rs['p75'] * 100:+7.2f}]%  "
+                  f"worse {rs['frac_worse'] * 100:.0f}%  "
+                  f"n_seeds={len(deltas):3d} paired  {verdict}{warn}")
             out["arms"][arm][metric] = {
                 "impairment": imp, "lo": lo, "hi": hi, "verdict": verdict,
                 "n_paired": len(deltas), "n_dropped": dropped,

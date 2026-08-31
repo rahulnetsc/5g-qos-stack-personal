@@ -267,9 +267,14 @@ def report_g6(rows: list[dict[str, Any]]) -> dict[str, Any]:
             verdict = g6_verdict(lo, hi)
             dropped = N_SEEDS - len(deltas)
             warn = f"  [{dropped} seed(s) dropped]" if dropped else ""
-            print(f"    {metric:18s}  {_fmt_ci(ci, pct=True)}   impairment "
-                  f"{imp * 100:+7.2f}%  [{lo * 100:+7.2f}, {hi * 100:+7.2f}]%   "
-                  f"{verdict}{warn}")
+            # Step 4's reporting default -- median/IQR beside the mean for
+            # a max-type statistic; the two disagreed on this exact cell.
+            rs = Scorecard.robust_delta_summary(deltas)
+            print(f"    {metric:18s}  impairment {imp * 100:+7.2f}%  "
+                  f"[{lo * 100:+7.2f}, {hi * 100:+7.2f}]%  "
+                  f"median {rs['median'] * 100:+7.2f}%  "
+                  f"IQR [{rs['p25'] * 100:+7.2f},{rs['p75'] * 100:+7.2f}]%  "
+                  f"n_seeds={rs['n']} paired  {verdict}{warn}")
             out["arms"][arm][metric] = {
                 "ci": ci, "impairment": imp, "impairment_lo": lo,
                 "impairment_hi": hi, "verdict": verdict,

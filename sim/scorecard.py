@@ -149,7 +149,13 @@ class Scorecard:
         # metric's definition (config/metric_panel.yml), not of any one
         # run's data, so it shouldn't be up to each method to remember.
         for metric_id, result in out.items():
-            result.caveats = list(self._caveats_by_id.get(metric_id, []))
+            # EXTEND, never overwrite. A metric method may attach a caveat
+            # derived from THIS run's data (M03's cadence caveat), and the
+            # panel's registered caveats are a property of the metric's
+            # definition -- both must travel. Assigning here used to discard
+            # the former silently.
+            result.caveats = (list(self._caveats_by_id.get(metric_id, []))
+                              + list(result.caveats or []))
         return out
 
     def _has_true_latency(self, record: RunRecord) -> bool:
@@ -247,6 +253,15 @@ class Scorecard:
                         "flow": fr.key,
                         "role": role,
                         "max_gap_ms": max_gap_ms,
+                        # The flow's OWN cadence, carried so a reader can
+                        # tell a liveness failure from a slow flow. A
+                        # duty-cycled source whose configured period already
+                        # exceeds the bound makes max_gap_ms report the
+                        # cadence, not a failure -- see the caveat below,
+                        # which is derived from THIS number rather than from
+                        # any scenario axis, so it fires for any slow flow
+                        # from any producer.
+                        "median_gap_ms": statistics.median(gaps_s) * 1000.0,
                         "gap_count_over_t_live_over_4": sum(1 for g in gaps_s if g > t_live_quarter),
                         "gap_count_over_t_live_over_2": sum(1 for g in gaps_s if g > t_live_half),
                         "gap_count_over_t_live": sum(1 for g in gaps_s if g > t_live_s),
@@ -277,7 +292,26 @@ class Scorecard:
                 "M03", "liveness_gap_distribution", None, "ok", "ms",
                 "no flow/role pair had >=2 completions this run; " + note,
             )
-        return MetricResult("M03", "liveness_gap_distribution", worst, "ok", "ms", note)
+        # THE CADENCE CAVEAT, attached to the value at score time rather than
+        # written in prose afterwards. If the winning flow's own MEDIAN gap
+        # already exceeds the bound, max_gap_ms is reporting how often the
+        # application sends, not whether the network kept up -- e.g. a
+        # duty-cycled telemetry source at duty 0.1 has a 1000 ms configured
+        # period against a 500 ms (T_live/4) bound, so every seed "breaches"
+        # with nothing failing. Derived from the flow's own data, so it
+        # applies to any slow flow from any producer, not just to a WP9 axis.
+        result = MetricResult(
+            "M03", "liveness_gap_distribution", worst, "ok", "ms", note)
+        if worst["median_gap_ms"] > t_live_quarter * 1000.0:
+            result.caveats = [
+                f"CADENCE, NOT LIVENESS: the reporting flow's own median "
+                f"inter-arrival gap is {worst['median_gap_ms']:.0f} ms, already "
+                f"above the T_live/4 bound of {t_live_quarter * 1000.0:.0f} ms "
+                f"(t_live_s={t_live_s}). max_gap_ms here measures the source's "
+                f"cadence, not a liveness failure -- do not score it against "
+                f"that bound."
+            ]
+        return result
 
     # 5QIs that are NOT protected fleet bearers: the GT-4.1/4.2 saturating
     # aggressor and the per-UE best-effort filler (sim/parametric.py:63-64).

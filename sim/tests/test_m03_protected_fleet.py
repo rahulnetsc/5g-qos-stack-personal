@@ -116,3 +116,34 @@ def test_robust_summary_reports_median_and_spread_not_a_bare_mean():
     assert summ["n"] == 6
     assert summ["p25"] <= summ["median"] <= summ["p75"]
     assert summ["frac_worse"] == 3 / 6
+
+
+# -- Step 4: the cadence caveat, derived from the record ------------------
+
+def test_m03_flags_cadence_when_the_flow_is_slower_than_the_bound():
+    """At duty_cycle 0.1 the telemetry source's configured period is 1000 ms
+    against a 500 ms (T_live/4) bound, so every seed 'breaches' with nothing
+    failing (docs/wp9-plan.md §24.6). The caveat is derived from the flow's
+    OWN median gap, so it fires for any slow flow from any producer."""
+    rec = _record({"ue1_qfi1": _flow(1, 1, [1.00, 1.00, 1.05])})
+    res = Scorecard().score(rec)["M03"]
+    assert res.value["median_gap_ms"] == 1000.0
+    assert any("CADENCE, NOT LIVENESS" in c for c in res.caveats), res.caveats
+
+
+def test_m03_does_not_flag_cadence_for_a_normal_flow():
+    rec = _record({"ue1_qfi1": _flow(1, 1, [0.10, 0.10, 0.60])})
+    res = Scorecard().score(rec)["M03"]
+    assert abs(res.value["max_gap_ms"] - 600.0) < 1e-6, "a real gap above the bound"
+    assert res.value["median_gap_ms"] == 100.0
+    assert not any("CADENCE" in c for c in res.caveats), \
+        "a fast flow with one long gap is a real liveness event, not cadence"
+
+
+def test_panel_caveats_and_data_caveats_both_travel():
+    """The panel loop used to ASSIGN caveats, discarding any a metric method
+    had attached from the run's own data."""
+    rec = _record({"ue1_qfi1": _flow(1, 1, [1.00, 1.00])})
+    results = Scorecard().score(rec)
+    assert any("CADENCE" in c for c in results["M03"].caveats)
+    assert results["M01"].caveats, "M01's registered panel caveat must survive"
