@@ -5003,3 +5003,30 @@ it was cheap: predicted before the data existed, confirmed on arrival, and
 it changed how the headline number is read. Contrast the same insight's
 three earlier appearances (§24.2, §25.4, §28.1), each of which cost a
 published conclusion first.
+
+
+---
+
+## 30. Part C — the depth §21.5 bought, and a count-in-prose correction
+
+`scripts/wp9_part_c.py`. §21.5's pre-registered rule bought depth for
+`duty_cycle` and `snr_spread_db` (both had a paired CI excluding zero) and
+not for `bg` (§22.7).
+
+**§21.7's budget said "~10 cells". The grid §21.5 actually specifies is
+24** — each axis × 2 levels × (4 `n_ues` + 2 off-base `load_mult`) — and
+the runner prints its own count rather than restating one. **Fifth instance
+of the count-in-prose rule**, and the first where the prose and the spec
+were in the *same document*: §21.5 described the cross correctly and §21.7
+budgeted a number nobody derived from it. Serial cost is therefore ~3 h,
+not the ~15 min at 10 workers §21.7 implied — the runner is serial and was
+not parallelised, which is the honest cost of the grid as specified.
+
+**M03's cadence caveat is attached automatically** (Step 4,
+`sim/scorecard.py`): at `duty_cycle` ≤ 0.5 the telemetry source's own period
+approaches or exceeds the T_live/4 bound, so `max_gap_ms` reports cadence
+rather than a liveness failure. It is derived from each flow's own median
+gap and travels **in the record**, so Part C's M03 column cannot be read
+against that bound by mistake.
+
+**Results are pending the run.** Nothing is claimed here in advance of it.
