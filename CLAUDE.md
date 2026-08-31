@@ -465,6 +465,19 @@ count in prose is a claim about code that drifts silently the moment the
 code changes, and unlike a wrong citation it does not point anywhere that
 would reveal the error. Derive it (`len(_cases())`, `sum(len(v) for v in
 EXCURSIONS.values())`), or print it from the thing that produces it.
+**A fourth instance, and its LOCATION is the new part: it was in TEST
+code.** `sim/tests/test_scorecard.py`'s caveat test hard-listed the
+caveat-carrying metric ids (`("M01","M02","M14","M15","M19")`) instead of
+deriving them from the panel; WP9 Step 2 added a caveat to M20 and the
+literal list was wrong. The generalised rule is unchanged, but **the blast
+radius differs by where the restated count lives.** The first three
+instances were a document, a plan and an analysis script — all of which
+fail *loudly and visibly*, by disagreeing with something. **A test that
+restates a count fails in the direction of PASSING**: had the new metric
+carried no caveat, the stale list would have kept passing while silently
+checking less than it claimed to. That is worse precisely because a test is
+the thing meant to catch this class of drift. Derive the set inside the
+test (`{m["id"] for m in load_panel()["metrics"] if m.get("caveats")}`).
 
 **Spec/hardware-derived numeric tables get transcribed from the actual
 source text, never reconstructed from memory or re-derived by formula —
