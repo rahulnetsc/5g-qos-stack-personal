@@ -4900,3 +4900,106 @@ the higher-better **M05** — so it counted the 37 seeds that **met** the
 way `analyse_stage2.py::_load_directions` already does, and for the reason
 that file gives: *a hand-copied sign inverts a winner and nothing
 downstream catches it.*
+
+---
+
+## 29. P3 — the clause-1 breaches are PRE-EXISTING, and one of them is a serious G5 finding
+
+Answered from `sweeps/wp9/stage6_g6_n40_records.jsonl` (both cells), **no
+new run**. Protected fleet, n_ues=8, offered load ×1.0, n_seeds=40 paired.
+
+### 29.1 The standing branch, read first — and it was right
+
+P3 registered, before looking: *"30/40 under" may be one
+chronically-incomplete video flow rather than thirty failures, since M05's
+bound only applies to `xr_video`.*
+
+**Measured — M05 breach counts are over SEEDS, and the breaching flows are
+a handful:**
+
+| arm | seeds under 0.99 (base) | **distinct flows** | concentration |
+|---|---|---|---|
+| PF | 4/40 | 4 | scattered |
+| Reservation | 33/40 | **2** | `ue8_qfi2` ×24, `ue7_qfi2` ×9 |
+| TwoTier | 35/40 | 4 | **`ue6_qfi2` ×30**, then ×2, ×2 |
+
+**"33/40 breaching" is two flows, not thirty-three failures.** M01/M03/M06
+behave the same way (3–5 distinct flows behind 6–12 seed breaches). The
+count answers *how many seeds contained a breach*, never *how many flows
+breached* — and every one of those flows is a `qfi 2` video flow except
+M03's, which is telemetry.
+
+### 29.2 P3's question — pre-existing on every statistic
+
+| metric | arm | base | bg | Δ | verdict |
+|---|---|---|---|---|---|
+| M01 | TwoTier | 6 | 8 | +2 | pre-existing |
+| M03 | TwoTier | 1 | 2 | +1 | pre-existing |
+| M05 | PF / Res / TwoTier | 4 / 33 / 35 | 3 / 30 / 35 | −1 / −3 / 0 | **pre-existing** |
+| M06 | TwoTier | 7 | 12 | **+5** | pre-existing, **widened** |
+
+*(PF and Reservation breach nothing on M01, M03 or M06 in either cell.)*
+
+**Nothing is aggressor-created — no statistic goes from 0 breaches at base
+to non-zero under `bg`. So G6 passes its FIRST conjunct too**, and
+§28.1's headline stands unqualified: **G6 passes both clauses, on the
+protected fleet, on every arm.**
+
+**M06's +5 is the messiest outcome P3 named in advance**, and it lands
+exactly where predicted: non-zero in both cells but materially higher under
+`bg`. **G6's wording supplies no rule for how much widening counts** — it
+says "stays within its bound", not "does not breach it more often". A
+statistic that breaches on 7 seeds without the aggressor and 12 with it is
+neither clearly passing nor clearly failing under the text as written.
+**That is a finding about the guarantee's specification, not about the
+scheduler**, and it belongs with §0.6's other two.
+
+### 29.3 THE G5 FINDING — and it is not a G6 one
+
+**M05's breaches are pre-existing, which means they are a G5 failure at the
+base cell with no aggressor present.** G5 is *"Operators and the AI always
+see fresh, complete video"*, bar *"≥ 99 % of PDU sets complete within
+PDB"* (`IA_P5G_Factory_Guarantee_Test_Plan.md:99`).
+
+**It is severe, and it is not a thin-sample artefact** — checked before
+quoting, per the rule §29.1's own prediction came from:
+
+| arm | min | median | max | seeds < 0.99 |
+|---|---|---|---|---|
+| PF | 0.9868 | 0.9934 | 1.0000 | 4/40 |
+| **Reservation** | **0.0000** | **0.0000** | 1.0000 | 33/40 |
+| **TwoTier** | **0.0000** | **0.0000** | 1.0000 | 35/40 |
+
+**On more than half of all seeds, both QoS-aware arms have a video flow
+whose PDU-set completeness is ZERO.** The zero flows carry
+**frame_count 147–148** against sibling video flows at 152 — so the flow
+produced ~148 frames and **completed none of them within its 150 ms PDB**.
+Not a flow with two frames and bad luck.
+
+**PF has no zero cells at all.** Its worst seed is 0.9868.
+
+**This is §0.1's documented concentrate-vs-spread split, arriving for the
+first time on a GUARANTEE BAR rather than on a comparative metric.** PF
+spreads capacity and every video flow clears 98.7 %; the QoS-aware arms
+concentrate and one video flow per run gets nothing. §0.1's rule has always
+said neither arm is simply better — but on G5's own pass criterion, at the
+base cell, **PF passes and both QoS-aware arms fail.**
+
+**Filed as G5, not G6.** It surfaced inside the G6 work only because Step 3
+evaluated a conjunct nobody had evaluated before; no aggressor is involved
+and the failure is present at the base point. It belongs in G5's row.
+
+### 29.4 P3 scored — one clean hit, one miss, and the branch that mattered
+
+| clause registered | outcome |
+|---|---|
+| M05's breaches **pre-existing on all three arms** | **HIT** — Δ −1 / −3 / 0 |
+| TwoTier's M01/M03/M06 **partially aggressor-driven, at materially lower base counts** | **MISS for M01/M03** (6→8, 1→2 — within noise at n_seeds=40), **HIT for M06** (7→12) |
+| the messiest outcome needs a widening rule G6 does not supply | **HIT** — M06 is exactly that cell |
+| **standing branch**: "30/40" may be one chronic flow | **HIT, decisively** — 2 distinct flows behind 33 breaches |
+
+**The standing branch was the most valuable clause again**, and this time
+it was cheap: predicted before the data existed, confirmed on arrival, and
+it changed how the headline number is read. Contrast the same insight's
+three earlier appearances (§24.2, §25.4, §28.1), each of which cost a
+published conclusion first.

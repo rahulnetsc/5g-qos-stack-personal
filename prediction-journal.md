@@ -342,3 +342,38 @@ breaching flow is the same video flow in both conditions, "30/40 under" may
 be one chronically-incomplete flow rather than thirty failures.
 
 **Scored at the end of this entry.**
+
+### P3 SCORED — 2026-08-31: one clean hit, one miss, and the standing branch again
+
+`docs/wp9-plan.md` §29. Answered from stored records, no new run.
+
+| clause | outcome |
+|---|---|
+| M05's breaches **pre-existing on all three arms** | **HIT** — base 4/33/35 vs bg 3/30/35 (Δ −1/−3/0) |
+| TwoTier's M01/M03/M06 **partially aggressor-driven, at materially lower base counts** | **MISS for M01/M03** (6→8, 1→2, within noise at n_seeds=40), **HIT for M06** (7→12) |
+| the messiest outcome would need a widening rule G6 does not supply | **HIT** — M06 is exactly that cell, now recorded as §0.6.3 |
+| **standing branch:** "30/40" may be one chronic flow, not thirty failures | **HIT, decisively** |
+
+**The standing branch was the most valuable clause for the second
+consecutive prediction, and this time it cost nothing.** Registered before
+the data existed; confirmed on arrival — Reservation's 33 breaches come
+from **2 distinct flows**, TwoTier's 35 from 4 with one accounting for 30.
+It changed how the headline number is read rather than merely annotating
+it.
+
+**Contrast with the same insight's three earlier appearances in this item**
+(§24.2, §25.4, §28.1): each was discovered *after* a wrong conclusion had
+been published, and each cost a correction. **Asked in advance it is free;
+asked afterwards it is a retraction.** That asymmetry is the argument for
+making it a standing branch on every registration rather than a lesson
+recalled when something looks odd — and it is now a mechanical check in
+CLAUDE.md ("decompose before attributing"), with the four instances listed.
+
+**What the misses teach about the form.** M01/M03's clause failed because I
+predicted a *magnitude* ("materially lower base counts") on a quantity with
+no stated resolution — 6 vs 8 breaches at n_seeds=40 is neither clearly
+different nor clearly the same, and I had not said in advance what would
+count. **A shape prediction still needs its threshold fixed in advance when
+the shape is a difference in degree.** The pre-registration rule from the
+previous entry is necessary but not sufficient: *predict the shape, and if
+the shape is quantitative, name the cut.*
