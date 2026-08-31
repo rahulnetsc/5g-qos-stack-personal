@@ -217,6 +217,52 @@ def _strip_timeseries(d: dict) -> dict:
     return d
 
 
+class PersistingRecordSink:
+    """The minimal `record_sink` every excursion runner should pass to
+    `sweep()`. Strips the per-slot arrays and writes one JSONL line per run.
+
+    THE DEFECT THIS EXISTS TO KILL, and it was an instrument defect rather
+    than a scheduler one. `scripts/g6_seed_extension.py` called `sweep()`
+    with **no record_sink at all**, so its n_seeds=40 run persisted only the
+    tidy CSV -- one scored row per run, carrying M03's *winning* flow and
+    value and nothing else. When the G6 diagnosis needed per-flow
+    `completion_ts_by_role_s` to recompute a flow-restricted statistic, the
+    data did not exist, and the falsifier had to fall back to stage 1's
+    n_seeds=10 records -- an interval too wide to decide anything.
+
+    **A run that cannot be re-analysed is a run you have to repeat.** The
+    scored row answers the question you had when you launched; the record
+    answers the question the result gives you. `_RecordSink` above already
+    did this for the stage runners; nothing offered it to a one-off
+    excursion, which is exactly where it went missing.
+
+    Deliberately NOT `_RecordSink`: that one also computes the 12 online
+    scoring variations, which an excursion does not need and which cost
+    ~24 % of per-record time (§6.3a). This is the persistence half alone.
+    """
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._fh = path.open("w")
+        self.n = 0
+
+    def __call__(self, record: RunRecord, axis_values: dict) -> None:
+        self._fh.write(json.dumps({
+            "axis_values": axis_values,
+            "record": _strip_timeseries(record.to_dict()),
+        }) + "\n")
+        self.n += 1
+
+    def close(self) -> None:
+        self._fh.close()
+
+    def __enter__(self) -> "PersistingRecordSink":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+
 def m13_projection(record: RunRecord) -> RunRecord:
     """The ONLY thing worth retaining across a whole stage run.
 

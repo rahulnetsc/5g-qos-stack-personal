@@ -43,7 +43,8 @@ from analyse_stage6 import (ARMS, G6_BAR, G6_METRICS, g6_verdict,  # noqa: E402
                             impairment_interval, load_rows, paired_deltas)
 from regime_sweep import bootstrap_ci, sweep, write_csv  # noqa: E402
 from sim.parametric import sweep_scenario  # noqa: E402
-from wp9_sweep import BASE, _arms, _driver_kwargs  # noqa: E402
+from wp9_sweep import (BASE, PersistingRecordSink, _arms,  # noqa: E402
+                        _driver_kwargs)
 
 N_SEEDS = 40
 HORIZON = 20_000
@@ -51,7 +52,12 @@ CONTROL_N = 10          # the seeds stage 1 already ran
 CONTROL_TOL = 1e-9      # bit-for-bit: same scenario, same flags, same seed
 
 
-def run_cells(n_seeds=N_SEEDS, horizon=HORIZON) -> list[dict[str, Any]]:
+def run_cells(n_seeds=N_SEEDS, horizon=HORIZON,
+              records_path: Path | None = None) -> list[dict[str, Any]]:
+    """`records_path` is not optional in spirit. The first version of this
+    function passed no `record_sink`, so its n_seeds=40 run kept only the
+    scored CSV and the per-flow completion timestamps were gone -- see
+    `wp9_sweep.PersistingRecordSink`. Every caller should persist."""
     def build(seed: int, **axis_values):
         kwargs = {**BASE, **axis_values}
         kwargs.pop("min_rb", None)
@@ -59,9 +65,16 @@ def run_cells(n_seeds=N_SEEDS, horizon=HORIZON) -> list[dict[str, Any]]:
             kwargs.pop(key, None)
         return sweep_scenario(seed=seed, horizon_slots=horizon, **kwargs)
 
-    return sweep(axes={"bg": [False, True]}, build_scenario=build,
-                 schedulers=_arms(), n_seeds=n_seeds,
-                 driver_kwargs=_driver_kwargs)
+    if records_path is None:
+        return sweep(axes={"bg": [False, True]}, build_scenario=build,
+                     schedulers=_arms(), n_seeds=n_seeds,
+                     driver_kwargs=_driver_kwargs)
+    with PersistingRecordSink(records_path) as sink:
+        rows = sweep(axes={"bg": [False, True]}, build_scenario=build,
+                     schedulers=_arms(), n_seeds=n_seeds,
+                     driver_kwargs=_driver_kwargs, record_sink=sink)
+        print(f"  persisted {sink.n} records to {records_path}")
+    return rows
 
 
 def control_vs_stage1(rows: list[dict[str, Any]], stage1_csv: Path) -> bool:
@@ -149,7 +162,7 @@ def main(argv: list[str]) -> int:
         rows = run_cells(n_seeds=2, horizon=2000)
         print(f"smoke: {len(rows)} rows -- machinery only, NOT a result")
         return 0
-    rows = run_cells()
+    rows = run_cells(records_path=root / "stage6_g6_n40_records.jsonl")
     ok = control_vs_stage1(rows, root / "stage1" / "stage1_rows.csv")
     write_csv(rows, str(root / "stage6_g6_n40.csv"))
     summary = report(rows) if ok else {"control": "FAILED -- not read"}
