@@ -4733,3 +4733,122 @@ P1 predicted a MECHANISM from the aggregate; P2 predicted an OUTCOME SHAPE
 and named in advance what each possible shape would mean.** The second is
 the form that survives contact with data, and it is the form to register in
 future.
+
+---
+
+## 28. Step 3 — G6's conjunction over all ten statistics, and a CORRECTION to §24.4's headline
+
+`scripts/g6_conjunction_table.py`. n_seeds=40 paired, cell n_ues=8 at
+offered load ×1.0, evaluated on the **protected fleet** (M20's restriction,
+excluding 5QIs 8 and 9).
+
+### 28.1 THE HEADLINE, AND IT REVERSES §24.4: M02's rise does NOT survive
+
+**§24.4 called M02's ~24-point rise "the real fleet impairment" and said
+G6 was genuinely failing on all three arms. That is wrong, and it is wrong
+in the same way M03's number was.** Put through the identical
+decomposition, M02's rise is **entirely the aggressor's own bytes**:
+
+| flow subset | PF | Reservation | TwoTier |
+|---|---|---|---|
+| **ALL flows** (as implemented) | **+0.2313** [+0.2264, +0.2362] | **+0.2270** [+0.2224, +0.2320] | **+0.2055** [+0.1951, +0.2164] |
+| **aggressor excluded** (no qfi 8) | **−0.0019** [−0.0075, +0.0041] | **−0.0022** [−0.0075, +0.0036] | **+0.0010** [−0.0109, +0.0133] |
+| no best-effort (no qfi 8, 9) | +0.0000 | −0.0104 [−0.0284, +0.0049] | −0.0270 [−0.0724, +0.0191] |
+| telemetry only (qfi 1) | +0.0000 | −0.0104 [−0.0285, +0.0054] | −0.0150 [−0.0534, +0.0216] |
+
+*(absolute deltas — M02 is a fraction, so a relative delta off a near-zero
+base is meaningless; §28.3.)*
+
+**Every arm's protected-fleet interval contains zero.** The +0.23 was the
+50 Mbps saturating flood's own traffic being late or dropped — which is
+what should happen to a best-effort flood under a QoS-aware scheduler, and
+what G6 wants.
+
+**M02's rise dissolves MORE completely than M03's did.** M03 left a 21 %
+telemetry residual whose interval excludes zero (§27.2); M02 leaves
+**nothing** — all three intervals contain zero.
+
+**So the honest position after Step 3 is: G6 does not fail on the protected
+fleet, on any arm, on either of the two statistics that appeared to fail
+it.** The entire apparent failure was the aggressor being measured as
+though it were the fleet, through **two different mechanisms in two
+different metrics** — M03's max-over-all-flows, and M02's
+byte-weighting-over-all-flows.
+
+### 28.2 Why M03 needed a binding change and M02 did not
+
+The question §28.1 forces, and the answer separates two defects that
+looked like one:
+
+| | M03 | M02 |
+|---|---|---|
+| **scope defect** (aggregate includes non-fleet flows) | **yes** — max over every flow | **yes** — bytes summed over every flow |
+| **estimator defect** (summary misrepresents its own distribution) | **yes** — mean +136.84 % vs median −0.22 %, 21/40 seeds improve | **no** — mean +0.2313 vs median +0.2318, **100 % of seeds move the same way** |
+| **winner-churn** (statistic tracks *which* flow spiked) | **yes** — winning flow changes identity on 35/40 seeds | **not applicable** — a byte-weighted aggregate has no "winning flow" |
+
+**Both metrics have the scope defect; only M03 has the estimator defect.**
+M02's mean is a perfectly good summary of its distribution — it just
+summarises the wrong flow set. That is precisely why Step 2's binding
+change carried **two** halves for M03 and why M02 needs only the flow
+restriction: **the estimator fix is metric-specific, the scope fix is
+guarantee-wide.**
+
+### 28.3 A structural problem with G6's bar that this exposes
+
+**G6's "+20 % relative" is undefined for a rate that can be zero.** On the
+protected fleet PF's M02 is exactly 0.0 in both conditions on every seed, so
+the relative form is `0/0`; TwoTier's relative mean reads **+4271 %** off a
+near-zero base while its median is **−0.21 %**. A relative bar is the wrong
+shape for M02 and the absolute delta is the only readable form.
+
+Recorded rather than fixed: **the bar is `▷`-provisional** (test plan line
+91), so this is input to ratifying it, not a defect to patch unilaterally.
+
+### 28.4 The full conjunction — ten statistics × two clauses × three arms
+
+Statistics **derived from the panel's `guarantees:` fields**, not
+hand-listed: M01, M02, M03, M04, M05, M06, M15, M16, M17, M19.
+
+| metric | arm | clause 1: within bound | clause 2: shift ≤ +20 % |
+|---|---|---|---|
+| **M01** | PF | PASS 0/40 over 100 ms | INCONCLUSIVE (med +4.36 %, mean +12.09 %) |
+| | Reservation | PASS 0/40 | PASS (med −0.46 %) |
+| | TwoTier | **FAIL 8/40 over 100 ms** | INCONCLUSIVE (med −1.02 %, mean +45.97 %) |
+| **M02** | all | no stated bound | see §28.1 — **PASS on absolute deltas** |
+| **M03** | PF / Reservation | PASS 0/40 over 500 ms | PASS |
+| | TwoTier | **FAIL 2/40 over 500 ms** | INCONCLUSIVE (med −0.44 %, mean +29.35 %) |
+| **M04** | all | **NOT EVALUABLE** — `pending` | NOT EVALUABLE |
+| **M05** | PF | **FAIL 3/40 under 0.99** | PASS |
+| | Reservation | **FAIL 30/40** | PASS |
+| | TwoTier | **FAIL 35/40** | INCONCLUSIVE |
+| **M06** | PF / Reservation | PASS 0/40 over 67 ms | PASS |
+| | TwoTier | **FAIL 12/40 over 67 ms** | INCONCLUSIVE |
+| **M15, M17** | all | **NOT EVALUABLE** — no bound stated, and the metric emits a dict this table cannot reduce to one scalar without inventing a rule | NOT EVALUABLE |
+| **M16** | all | **NOT EVALUABLE** — study-layer, needs a named flow pair | NOT EVALUABLE |
+| **M19** | all | **NOT EVALUABLE** — `pending`, no join events in any WP9 scenario | NOT EVALUABLE |
+
+**Stated plainly, per the instruction not to estimate: 4 of 10 statistics
+are NOT EVALUABLE (M04, M15/M17, M16, M19) and are reported as unrun, not
+inferred.** Only 5 have a stated numeric bound at all; M02 has none.
+
+**Clause 1 is where the real failures are, and it was never checked before
+this.** M05 fails on all three arms (3/40, 30/40, 35/40 seeds under the
+99 % completeness bar) and M01/M03/M06 fail on TwoTier — **none of which
+the original three-statistic, second-clause-only test could see.**
+
+**These clause-1 failures are NOT G6 failures on their own.** G6 is a
+*delta* guarantee: it asks whether background traffic pushes a statistic
+out of bound. A statistic already out of bound **without** the aggressor is
+a G1/G3/G5 problem, not a G6 one. Whether these are pre-existing is the
+next question and **is not answered here** — the base-cell bound check is
+computed but not yet compared against it.
+
+### 28.5 A defect this table found in its own first run
+
+The first version tested `value > bound` for **every** metric, including
+the higher-better **M05** — so it counted the 37 seeds that **met** the
+≥ 99 % completeness bar as failures. Fixed by reading `direction` from
+`config/metric_panel.yml` rather than hand-writing the comparison, the same
+way `analyse_stage2.py::_load_directions` already does, and for the reason
+that file gives: *a hand-copied sign inverts a winner and nothing
+downstream catches it.*
