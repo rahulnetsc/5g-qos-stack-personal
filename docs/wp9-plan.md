@@ -4373,3 +4373,106 @@ Nothing below is done in this commit.
 4. **§22.1b's G6 row and the regime map's G6 row are now known to be
    wrong** and must be corrected — but the correction is part of the fix
    commit, not asserted ahead of it.
+
+---
+
+## 25. Step 1 — §24.7's falsifier run. Neither branch fires cleanly; the test is under-powered at the `n_seeds` on disk
+
+`scripts/g6_fleet_restricted_m03.py`. Read-only: recomputes M03's own
+contest (`sim/scorecard.py:220-235`) over four flow subsets from records
+stage 1 already wrote. **No metric changed, no new grid.**
+
+### 25.1 A data constraint that decides what `n_seeds` this can be answered at
+
+`scripts/g6_seed_extension.py:62-64` calls `sweep()` with **no
+`record_sink`**, so the n_seeds=40 run persisted only the tidy CSV, which
+carries M03's *winning* flow and value and never the per-flow
+`completion_ts_by_role_s` a restricted recomputation needs. Stage 1's
+`records.jsonl` does carry them, for **n_seeds=10** (3 arms × 10 seeds in
+both the `bg=True` cell and the base cell, 30 paired (arm, seed) pairs).
+
+**So this falsifier is answerable from disk at n_seeds=10, and at
+n_seeds=40 only by re-running those same two cells with a sink.**
+
+### 25.2 The result — cell n_ues=8, load ×1.0, paired within seed, n_seeds=10
+
+Relative delta of M03's max gap, `bg=True` vs base. Mean is the
+mean-of-ratios the existing test uses; median and IQR are shown beside it
+because Step 4 exists.
+
+| flow subset | arm | MEAN [95 % CI] | verdict | MEDIAN | IQR | seeds worse |
+|---|---|---|---|---|---|---|
+| **ALL flows** (as implemented) | PF | +3.73 [−6.80, +15.57] | PASS | −1.53 | [−10.95, +17.15] | 5/10 |
+| | Reservation | +8.99 [−8.37, +29.04] | INCONCLUSIVE | +0.82 | [−2.02, +17.82] | 6/10 |
+| | **TwoTier** | **+157.04 [−13.83, +467.12]** | INCONCLUSIVE | **−1.20** | [−5.80, +55.94] | 5/10 |
+| **aggressor excluded** (no qfi 8) | PF | +3.73 [−6.80, +15.57] | PASS | −1.53 | | 5/10 |
+| | Reservation | +8.99 [−8.37, +29.04] | INCONCLUSIVE | +0.82 | | 6/10 |
+| | **TwoTier** | **+60.37 [−19.41, +190.99]** | INCONCLUSIVE | **−2.44** | [−16.54, +41.38] | 4/10 |
+| **no best-effort** (no qfi 8, 9) | **TwoTier** | **+34.08 [−16.90, +105.67]** | INCONCLUSIVE | **−2.44** | [−8.43, +41.38] | 4/10 |
+| **TELEMETRY only** (qfi 1) | **TwoTier** | **+34.08 [−16.90, +105.67]** | INCONCLUSIVE | **−2.44** | [−8.43, +41.38] | 4/10 |
+
+**PF and Reservation are bit-identical across all four subsets.** Their
+winning flow was never the aggressor or the best-effort filler — always
+fleet telemetry — which is the §24.2 mechanism confirmed from the opposite
+direction.
+
+### 25.3 Verdict: NEITHER branch fires cleanly
+
+§24.7's rule was *excess still above +20 % ⇒ (a); inside the bar ⇒ (c)
+stands*. At n_seeds=10:
+
+- the **point estimate** is +34.08 %, **above** the bar;
+- the **interval** is [−16.90, +105.67], which **contains the bar and
+  contains zero** — INCONCLUSIVE;
+- the **median** is **−2.44 %**, inside the bar, with **4 of 10 seeds
+  worse**.
+
+**Reading the point estimate alone would return (a); reading the interval
+returns neither.** §24.3 committed this project to reading the interval, so
+the honest answer is **the falsifier is under-powered at n_seeds=10 and
+does not decide between (a) and (c).**
+
+### 25.4 What it DOES decide — the decomposition, which is estimator-independent
+
+| subset removed | TwoTier mean excess | share of the original removed |
+|---|---|---|
+| — (as implemented) | +157.04 % | — |
+| aggressor (qfi 8) | +60.37 % | **62 %** |
+| + best-effort filler (qfi 9) | +34.08 % | **+17 %** (79 % cumulative) |
+| telemetry only | +34.08 % | unchanged |
+
+**About 78 % of the excess belongs to flows that are not fleet telemetry**,
+and ~22 % remains on telemetry itself. **That is precisely the "mechanism
+INCOMPLETE rather than wrong" outcome P2 registered in advance**: §24
+correctly identified the dominant contributor and missed a smaller, real,
+telemetry-side degradation.
+
+### 25.5 The standing branch FIRED, and it changes what any fix must do
+
+P2 registered the branch *"the instrument is measuring something other than
+what the question is about"*, with a named signature: *the winning flow
+changes identity between the paired base and excursion runs.*
+
+**Measured: the winner flow changes identity on 9 of 10 seeds — for every
+arm, and in every subset including telemetry-only.**
+
+So even restricted to telemetry, M03's max is a **maximum over n_ues=8
+UEs**, and its relative change is dominated by *which UE happened to spike
+hardest*, not by whether the fleet degraded. **Restricting the flow set
+does not turn an extreme-value statistic into a fleet-health statistic.**
+A Step 2 that only restricts the flow set would fix the scope error and
+leave the estimator error untouched.
+
+### 25.6 What this changes about the remaining steps — proposed, not taken
+
+1. **Step 1 is not finished.** Deciding (a) vs (c) needs the same two cells
+   re-run with a `record_sink` at n_seeds=40 — the same cells, not a new
+   grid. At n_seeds=40 the interval narrows ≈2×, which is the difference
+   between INCONCLUSIVE and an answer.
+2. **Step 2's guard test still stands unchanged** — the aggressor really
+   does own 62 % of the excess, and a fleet-restricted statistic really
+   does need to ignore it.
+3. **Step 4 is promoted from a reporting default to part of the fix.**
+   §25.5 shows the estimator is not a presentation choice here: median
+   −2.44 % and mean +34.08 % on the same 10 pairs disagree about whether
+   the guarantee holds.
