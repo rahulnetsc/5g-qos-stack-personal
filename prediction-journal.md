@@ -273,3 +273,72 @@ from it would have helped.**
 first running a trace, it is written in the wrong form. Rewrite it as a
 statement about what the distribution will look like, and attach the
 mechanism as the thing the *trace* will settle if the shape misses.
+
+---
+
+## P3 — Are Step 3's clause-1 bound failures PRE-EXISTING? (registered 2026-08-31, before looking)
+
+**Registered before any query, because this question has an obvious desired
+answer** — "yes, pre-existing, so G6 is clean and nothing new is owed" —
+and that is exactly the shape that gets confirmed rather than tested.
+
+**The observation.** §28.4's clause-1 column (G6's *first* conjunct,
+"stays within its bound", never evaluated before Step 3) shows, on the
+protected fleet at n_ues=8, load ×1.0, n_seeds=40, **with the aggressor
+present**:
+
+| statistic | bound | PF | Reservation | TwoTier |
+|---|---|---|---|---|
+| M05 pdu_set_completeness | ≥ 0.99 | 3/40 under | 30/40 under | 35/40 under |
+| M01 p98 | ≤ 100 ms | 0/40 | 0/40 | 8/40 over |
+| M03 max gap | ≤ 500 ms | 0/40 | 0/40 | 2/40 over |
+| M06 frame age p95 | ≤ 67 ms | 0/40 | 0/40 | 12/40 over |
+
+**The question:** do these breaches also occur in the **base** cell,
+without the aggressor? If yes they are **G1/G3/G5 findings** and G6 is
+untouched by them. If no — if the aggressor is what pushes them out of
+bound — then **G6 fails its first conjunct** even though it passes its
+second, and §28.1's headline needs qualifying.
+
+**Answerable from records already on disk** (`stage6_g6_n40_records.jsonl`
+holds both cells), **no new run** — the same shape as the inventory that
+found most of Part A already stored.
+
+### The prediction — one falsifiable sentence
+
+**M05's breaches are PRE-EXISTING on all three arms (present in the base
+cell at similar rates), while TwoTier's M01/M03/M06 breaches are
+PARTIALLY aggressor-driven — present in the base cell but at materially
+lower seed counts, so the aggressor widens an existing tail rather than
+creating a new failure.**
+
+### What each outcome would mean, fixed in advance
+
+- **All four pre-existing at similar rates** ⇒ clause 1 says nothing about
+  G6; the findings are G1/G3/G5 and belong to those guarantees. §28.1's
+  headline stands unqualified.
+- **Any breach absent from the base cell and present under `bg`** ⇒ **G6
+  fails its first conjunct** on that statistic. §28.1's headline becomes
+  "passes the *shift* clause on both statistics, fails the *bound* clause
+  on N", and the guarantee's verdict is mixed rather than clean.
+- **Rates materially higher under `bg` but non-zero in both** ⇒ the
+  aggressor widens an existing tail. **This is the messiest outcome and the
+  one I expect for TwoTier's three**, and it needs a stated rule for how
+  much widening counts, which G6's wording does not supply — a finding
+  about the guarantee's specification, not about the scheduler.
+
+### Standing branch — the instrument is measuring something other than the question
+
+Live form here: **three of the four bounds are applied to a scalar the
+metric reports for its own WORST flow**, and the worst flow can differ
+between the base and `bg` runs — the same winner-churn that made M03's
+relative delta untrustworthy (§27.3). A breach count of "8/40" may be
+8 different flows. **Before attributing any difference to the aggressor,
+check whether the breaching flow's identity is stable across the pair.**
+
+**A second live form:** M05's bound (≥ 0.99) is applied to
+`pdu_set_completeness`, which only `xr_video` flows produce. If the
+breaching flow is the same video flow in both conditions, "30/40 under" may
+be one chronically-incomplete flow rather than thirty failures.
+
+**Scored at the end of this entry.**
