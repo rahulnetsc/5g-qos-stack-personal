@@ -155,6 +155,53 @@ lives only in a methods section is a qualifier that will be dropped.
 
 ---
 
+## 0.6 FOR THE CAMPAIGN — two things to settle about G6's own wording before it is run
+
+Both were found by measuring against G6 as written
+(`IA_P5G_Factory_Guarantee_Test_Plan.md:100`), and both are the kind of
+thing that otherwise surfaces mid-campaign.
+
+### 0.6.1 The +20 % relative bar is UNDEFINED when the denominator can be zero
+
+G6 says every G1/G3/G5 statistic *"shifts by ≤ ▷ +20 % relative"*. **A
+relative bound has no meaning for a statistic whose baseline is legitimately
+zero, and one of G6's own bound statistics is exactly that.** Measured, on
+the protected fleet at n_seeds=40:
+
+- **PF's M02 (PDB-violation rate) is exactly 0.0 in BOTH conditions on every
+  seed** — the relative shift is `0/0`, not a pass and not a fail;
+- **TwoTier's M02 relative mean reads +4271 %** off a near-zero base, while
+  its **median is −0.21 %** and its **absolute** delta is **+0.0010** with a
+  CI containing zero. The relative form reports a catastrophe where the
+  absolute form reports nothing.
+
+**Recommendation for ratification: state G6's bar for rate-type statistics
+in ABSOLUTE terms** (e.g. "the PDB-violation rate rises by ≤ X percentage
+points"), keeping the relative form only for statistics with a
+strictly-positive baseline such as latency percentiles and gap maxima.
+**The bar is `▷`-provisional (line 91), so this is input to ratifying it —
+not a defect anyone has patched unilaterally.**
+
+### 0.6.2 G6 is a CONJUNCTION and only its second clause had ever been tested
+
+G6 requires each statistic to **stay within its bound AND** shift by
+≤ +20 %. Every G6 result before `docs/wp9-plan.md` §28 tested the shift
+clause only, on **three** of the **ten** statistics G6 binds (the ten are
+derivable from `config/metric_panel.yml`'s own `guarantees:` fields:
+M01–M06, M15–M17, M19).
+
+With the first clause now evaluated: **4 of the 10 are NOT EVALUABLE at all**
+(M04 and M19 are `pending`, M16 is a study-layer call needing a named flow
+pair, M15/M17 report dicts with no stated scalar bound), and **only 5 have a
+numeric bound stated anywhere in the test plan.** M02 has none.
+
+**Consequence for the campaign: G6 cannot currently be scored as written.**
+Six of its ten statistics either lack a bound or lack a value. Ratification
+should either name bounds for them or narrow G6's wording to the statistics
+it can actually bind.
+
+---
+
 ## 0.5 The three-category taxonomy (added by the re-scope)
 
 The scoping error this corrects: three categories were treated as one axis
@@ -363,7 +410,7 @@ which term of the composite it thinks is carrying it.
 | **G3** | **Sim-informative, conditional** | M03/M14 scored at `t_live_s` ∈ {1, 2, 4} — reported as a function of it, since `T_live` is `[OPEN: HARDWARE]` and unmeasured. |
 | **G4** | **ANSWERED at one cell — resume is prompt; the number is entangled with message size** | `scripts/g4_postsilence.py`, a study-layer read of the live WP7 message ledger (`docs/wp9-plan.md` §23). Post-silence p98 on T1 telemetry (the liveness instrument) at `duty_cycle` 0.1 is **77.23 / 64.87 / 74.79 ms** (PF / Reservation / TwoTier) against a steady state of 21.62 / 20.58 / 33.82. **SCOPE NOTE, and a reader must not quote the number without it: the size confound is NOT incidental to this guarantee.** Under `sim/parametric.py::_burstify` the post-silence message **is larger by construction** — mean offered rate is held constant by stretching the period and growing the burst by the same 1/duty — so a 10× longer silence carries a 10× larger message. Measured against that baseline the latency grew **sub-proportionally on every arm** (×3.57 / ×3.15 / ×2.21 against ×10), leaving **no residual for an SR/BSR cold-start penalty to explain**. So resumption is prompt on this workload — but **on this workload the guarantee's own question is entangled with message size in a way a real deployment need not be**: a real robot that goes quiet for a second then sends one 300-byte telemetry frame has a long silence and a *normal-sized* message. `_burstify`'s constant-mean-rate design is correct for H2, whose axis must not smuggle in a load change, and is the wrong shape for G4, which wants silence varied at **constant message size**. A reader taking "post-silence p98 = 77 ms" without this is reading a number about size as a number about silence. |
 | **G5** | **Sim-informative** | M05/M06/M17 present on every run via the `xr_video` instrument. Not analysed per-regime in this pass. |
-| **G6** | **ANSWERED at n=40 — and TwoTier FAILS it** | Computed from stage-1 records, then extended to **n=40** with a pre-registered one-look rule (`docs/wp9-plan.md` §22.1a/§22.1b, `scripts/g6_seed_extension.py`). **Control read first: stage 1's own 10 seeds reproduce bit-for-bit (worst absolute difference 0.000e+00 over 30 arm×seed pairs × 3 metrics).** Paired within seed, `bg=True` vs base, N=8, load ×1.0. **PF and Reservation PASS GT-4.1's ≤ +20 % bar on all three metrics.** **TwoTier FAILS on M03.max_gap_ms: +136.84 %, CI [+35.23, +267.01] — the whole interval above the bar** — i.e. the saturating background aggressor more than doubles the worst liveness gap. M01.p98 is +67.52 % [+14.91, +123.74], INCONCLUSIVE only because the lower bound sits just under the bar. **This is the first guarantee FAILURE this WP has produced.** Two qualifiers travel with it: **ONE CELL** (N=8, load ×1.0 — depth was not bought, §21.5), and **M05.fraction must not be read as a near-pass** — 31–33 of 40 seeds drop because a relative delta is undefined off a zero base, and those are the seeds already failing completely, which biases M05 optimistic and gets worse with n, not better. |
+| **G6** | **PASSES on the protected fleet — every arm, both statistics** | Computed from stage-1 records, extended to **n_seeds=40** paired with a pre-registered one-look rule, then re-evaluated on the **protected fleet** (`docs/wp9-plan.md` §22.1a/§27/§28). **Background traffic does not impair the fleet.** M02 (PDB-violation rate) protected-fleet delta: PF **−0.0019** [−0.0075, +0.0041], Reservation **−0.0022** [−0.0075, +0.0036], TwoTier **+0.0010** [−0.0109, +0.0133] — **every interval contains zero**. M03 (worst liveness gap) passes on PF and Reservation and is INCONCLUSIVE on TwoTier (median −0.44 %). **An earlier reading of this row reported a TwoTier FAILURE at +136.84 % and a ~24-point M02 rise on all arms; both were the AGGRESSOR MEASURED AS THE FLEET**, by two different mechanisms — M03 takes a max over *every* flow and M02 byte-weights over *every* flow, so a 50 Mbps best-effort flood being correctly starved scored as fleet damage. Since a QoS-aware scheduler starves such a flood **by design**, the better an arm contained it the worse it scored: the causal direction was inverted. Fixed by binding G6 to **M20** (`protected_fleet_liveness_gap`) rather than by editing M03, whose all-flow domain is deliberate. **Two qualifiers travel with this row:** it is **ONE CELL** (n_ues=8, offered load ×1.0 — depth not bought), and G6's **first conjunct** ("stays within its bound") has failures under investigation that this row does not cover — see §0.6. |
 | **G7** | **NOT ANSWERABLE IN SIM** | No MFBR enforcement exists anywhere in `sim/` (`sim/config_loader.py:16`). Containment is observable; **clipping is not**, and clipping is half of G7's pass criterion. GT-4.3 is the only test. |
 | **G8** | **Sim-answerable** | M09 per-second Jain across 186 scored cells. **PF-arm contaminated** by `pf.py`'s declaration-order tie-break (README §8) — Reservation-vs-TwoTier is the trustworthy pair. |
 | **G10** | **Sim-answerable — the headline** | **Admissible N is bounded by 8 at load ≥ 1.0 and by 16 below it**, on this RAN at `min_rb=5`. This is what simulation buys that the N=2 testbed cannot. §0.1 and §0.3 apply. |

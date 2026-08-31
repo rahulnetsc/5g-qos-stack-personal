@@ -4365,7 +4365,17 @@ percentage points**. That is a real, unambiguous fleet impairment and a
 genuine G6 failure — **on all three arms**, not one.
 
 **And TwoTier is the LEAST impaired.** So the reported result was not
-merely imprecise: **it was inverted.** The arm the test singled out as
+merely imprecise: **it was inverted.**
+
+> **RETRACTED by §28.1a.** The paragraph above calls M02's rise "a real,
+> unambiguous fleet impairment and a genuine G6 failure". **It is not.** Put
+> through the same aggressor/filler decomposition this very section applied
+> to M03, M02's rise is **entirely the aggressor's own bytes** — the
+> protected-fleet delta is −0.0019 / −0.0022 / +0.0010 with every interval
+> containing zero. The error was attributing an aggregate to the fleet
+> **without decomposing it**, immediately after decomposing M03 and finding
+> exactly that mistake. Read §28.1 for the settled result: **G6 passes on
+> the protected fleet on every arm and both statistics.** The arm the test singled out as
 failing is the best-performing arm on the statistic that actually measures
 what G6 is about. Corroborated by the diagnostic seed, where fleet
 telemetry loses messages under `bg` (ue6_qfi1: 50 → 32 delivered) — real
@@ -4742,12 +4752,31 @@ future.
 offered load ×1.0, evaluated on the **protected fleet** (M20's restriction,
 excluding 5QIs 8 and 9).
 
-### 28.1 THE HEADLINE, AND IT REVERSES §24.4: M02's rise does NOT survive
+### 28.1 THE RESULT: G6 PASSES on the protected fleet, on every arm, on both statistics
 
-**§24.4 called M02's ~24-point rise "the real fleet impairment" and said
-G6 was genuinely failing on all three arms. That is wrong, and it is wrong
-in the same way M03's number was.** Put through the identical
-decomposition, M02's rise is **entirely the aggressor's own bytes**:
+**Background traffic does not impair the fleet.** Neither statistic that
+appeared to fail G6 does so once it is measured on the bearers G6 is about:
+
+| | M03 (worst liveness gap) | M02 (PDB violation rate) |
+|---|---|---|
+| PF | PASS | PASS — Δ **−0.0019** [−0.0075, +0.0041] |
+| Reservation | PASS | PASS — Δ **−0.0022** [−0.0075, +0.0036] |
+| TwoTier | INCONCLUSIVE, median −0.44 % | PASS — Δ **+0.0010** [−0.0109, +0.0133] |
+
+**Every protected-fleet M02 interval contains zero, on all three arms, at
+n_seeds=40 paired.** The fleet's PDB-violation rate does not move when a
+50 Mbps saturating flood is added beside it.
+
+**This is a stronger and more useful result than the failure was.** It says
+the schedulers do the thing G6 exists to check — a non-GBR flood is
+absorbed without touching the protected bearers — and it says the apparent
+failure came from **the aggressor being measured as though it were the
+fleet, by two different mechanisms in two different metrics**: M03's
+max-over-all-flows, and M02's byte-weighting-over-all-flows. One
+guarantee, two metrics, two distinct scope defects, same root cause.
+
+The supporting decomposition — M02's rise is **entirely the aggressor's own
+bytes**:
 
 | flow subset | PF | Reservation | TwoTier |
 |---|---|---|---|
@@ -4759,21 +4788,40 @@ decomposition, M02's rise is **entirely the aggressor's own bytes**:
 *(absolute deltas — M02 is a fraction, so a relative delta off a near-zero
 base is meaningless; §28.3.)*
 
-**Every arm's protected-fleet interval contains zero.** The +0.23 was the
-50 Mbps saturating flood's own traffic being late or dropped — which is
-what should happen to a best-effort flood under a QoS-aware scheduler, and
-what G6 wants.
+The +0.23 was the flood's own traffic being late or dropped — which is what
+**should** happen to a best-effort flood under a QoS-aware scheduler.
 
 **M02's rise dissolves MORE completely than M03's did.** M03 left a 21 %
 telemetry residual whose interval excludes zero (§27.2); M02 leaves
-**nothing** — all three intervals contain zero.
+**nothing**.
 
-**So the honest position after Step 3 is: G6 does not fail on the protected
-fleet, on any arm, on either of the two statistics that appeared to fail
-it.** The entire apparent failure was the aggressor being measured as
-though it were the fleet, through **two different mechanisms in two
-different metrics** — M03's max-over-all-flows, and M02's
-byte-weighting-over-all-flows.
+### 28.1a CORRECTION to §24.4, stated here because this is where it is settled
+
+**§24.4 called M02's ~24-point rise "the real fleet impairment" and said G6
+was genuinely failing on all three arms. That was wrong.**
+
+**The claim was mine**, and the direction it went wrong is the point: §24
+had *just* decomposed M03's excess and found most of it belonged to the
+aggressor — and then attributed M02's rise to the fleet **without running
+the same decomposition on it**. The tool was already built and in hand; it
+simply was not pointed at the second metric.
+
+**The check that caught it is the one that has now caught four corrections
+in this item: decompose before attributing.** §24.2 (M03's worst flow is
+the aggressor), §25.4 and §27.1 (the 68/10/21 split), and now §28.1. Each
+time the failure mode was the same — reading an aggregate as a statement
+about the population it is *named* for rather than the one it is *computed
+over*.
+
+**And the instruction to lead with M02 compounded it**, by framing the
+alternative as *burial* — "otherwise the genuine finding gets buried under
+the corrected one" — which presupposed M02 was genuine. That presupposition
+came from §24.4, i.e. from me. **The right response to "don't bury the real
+finding" was to check whether it was real, not to promote it**; the framing
+made promotion feel like the careful option and it was not. Recorded
+because this is the second time in this thread a premise of mine returned
+as an instruction and had to be checked rather than executed
+(`92d9a60`, and the cost-model replacement in §13).
 
 ### 28.2 Why M03 needed a binding change and M02 did not
 
