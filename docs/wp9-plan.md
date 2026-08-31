@@ -4625,3 +4625,87 @@ cannot run this study at all. Not slowly: at all.**
 obvious and correct rebuttal — *a testbed gives you real RF* — and the time
 saving is real but secondary. "This study is not physically runnable"
 has no such rebuttal, and it is true.
+
+---
+
+## 27. Step 1 COMPLETED at n_seeds=40 — the telemetry residual is real, and still not resolved against the bar
+
+`scripts/g6_fleet_restricted_m03.py --records sweeps/wp9/stage6_g6_n40_records.jsonl`.
+The two cells re-run with `PersistingRecordSink`, so the per-flow
+completion timestamps exist this time. **240/240 records persisted; the
+control passed bit-for-bit (worst absolute difference 0.000e+00 over 30
+shared arm-seed pairs × 3 metrics).**
+
+Framed as §25.6 required: **this measures the telemetry residual**, not
+(a)-vs-(c). The verdict falls out of it.
+
+### 27.1 The decomposition at n_seeds=40 — and it is stable
+
+TwoTier, cell n_ues=8 at offered load ×1.0, paired within seed:
+
+| flow subset | mean [95 % CI] | verdict | median | seeds worse |
+|---|---|---|---|---|
+| ALL flows (as implemented) | **+136.84 % [+32.75, +272.45]** | **FAIL** | −0.22 % | 18/40 |
+| aggressor excluded (no qfi 8) | **+43.15 % [+6.13, +87.99]** | INCONCLUSIVE | −0.44 % | 17/40 |
+| no best-effort (no qfi 8, 9) | **+29.35 % [+4.81, +56.18]** | INCONCLUSIVE | −0.44 % | 17/40 |
+| **telemetry only** (qfi 1) | **+29.35 % [+4.81, +56.18]** | INCONCLUSIVE | −0.44 % | 17/40 |
+
+PF (+0.44 %) and Reservation (+1.84 %) **PASS** and are identical across
+all four subsets — their winning flow was never the aggressor or the
+filler.
+
+**The decomposition barely moved from n_seeds=10, which is the point:**
+
+| removed | n_seeds=10 | n_seeds=40 |
+|---|---|---|
+| aggressor (qfi 8) | 62 % of the excess | **68 %** |
+| + best-effort filler (qfi 9) | +17 % (79 % cum.) | **+10 % (78 % cum.)** |
+| **telemetry residual** | **22 %** | **21 %** |
+
+**~78 % of the excess belongs to flows that are not fleet telemetry, and
+~21 % is a real telemetry-side residual.** Quadrupling n_seeds changed that
+split by one point.
+
+### 27.2 The verdict, stated at the precision the data supports
+
+**The interval narrowed as predicted and moved off zero: [−16.90, +105.67]
+at n_seeds=10 → [+4.81, +56.18] at n_seeds=40.** So:
+
+- the residual **excludes zero** — there IS a real telemetry-side
+  degradation under the aggressor, which n_seeds=10 could not establish;
+- the residual **still contains the +20 % bar** — whether it BREACHES the
+  guarantee is unresolved, and quadrupling the seeds again would be needed
+  to settle it.
+
+**So the honest verdict is neither pure (a) nor pure (c): the metric-scope
+artefact is the dominant term (78 %) AND a smaller real scheduler-side
+effect exists underneath it, previously masked.** §24's verdict of (c)
+stands as the explanation of the *reported number*; it was **incomplete**
+as an account of the *underlying behaviour*.
+
+### 27.3 The standing branch fired again, harder
+
+P2's registered signature — *the winning flow changes identity between the
+paired base and excursion runs* — holds on **35 of 40 seeds** (37/40 for
+Reservation), **in every subset including telemetry-only**.
+
+**Even restricted to one 5QI, M03's max is a maximum over n_ues=8 UEs, so
+its relative change tracks WHICH UE spiked hardest rather than whether the
+fleet degraded.** Confirmed at n_seeds=40 what n_seeds=10 suggested: **a
+scope-only fix leaves the estimator error untouched**, which is why Step 2
+lands scope and estimator as one binding change.
+
+### 27.4 P2 scored — HIT, on every clause
+
+| clause registered | outcome |
+|---|---|
+| excess drops substantially but stays **above +20 %** under mean-of-ratios | **HIT** — +136.84 % → +29.35 %, above the bar |
+| **median** stays inside the bar | **HIT** — −0.44 % |
+| the branch: mechanism **INCOMPLETE** rather than wrong | **HIT** — 78 % explained, 21 % real residual |
+| standing branch's signature (winner-flow identity churn) | **HIT** — 35/40 |
+
+**P2 is a clean hit where P1 was a miss, and the difference is instructive:
+P1 predicted a MECHANISM from the aggregate; P2 predicted an OUTCOME SHAPE
+and named in advance what each possible shape would mean.** The second is
+the form that survives contact with data, and it is the form to register in
+future.

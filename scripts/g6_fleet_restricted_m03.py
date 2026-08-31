@@ -56,8 +56,13 @@ def load(path):
         for line in fh:
             p = json.loads(line); av = p["axis_values"]; rec = p["record"]
             is_bg = av.get("bg") is True
-            is_base = (av.get("n_ues") == 8 and av.get("load_mult") == 1.0
-                       and not any(a in av and av[a] is not None for a in EXC_AXES))
+            if set(av) == {"bg"}:
+                # the n_seeds=40 extension: its only axis IS bg, so the
+                # base cell is bg=False rather than a core-plane row.
+                is_base = av.get("bg") is False
+            else:
+                is_base = (av.get("n_ues") == 8 and av.get("load_mult") == 1.0
+                           and not any(a in av and av[a] is not None for a in EXC_AXES))
             if not (is_bg or is_base):
                 continue
             key = (rec["scheduler_name"], rec["seed"])
@@ -71,7 +76,12 @@ VARIANTS = {
     "TELEMETRY only (M03's own text)": lambda fr: fr["qfi"] == TELEMETRY_QFI,
 }
 
-base, exc = load(REPO / "sweeps/wp9/stage1/records.jsonl")
+import argparse
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--records", default="sweeps/wp9/stage1/records.jsonl")
+_args = _ap.parse_args()
+base, exc = load(REPO / _args.records)
+print(f"records: {_args.records}")
 print(f"base-cell runs: {len(base)}   bg-cell runs: {len(exc)}")
 shared = sorted(set(base) & set(exc), key=lambda k: (k[0], k[1]))
 print(f"paired (arm, seed) pairs available: {len(shared)}\n")
