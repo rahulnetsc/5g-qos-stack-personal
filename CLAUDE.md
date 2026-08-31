@@ -479,6 +479,40 @@ checking less than it claimed to. That is worse precisely because a test is
 the thing meant to catch this class of drift. Derive the set inside the
 test (`{m["id"] for m in load_panel()["metrics"] if m.get("caveats")}`).
 
+**DECOMPOSE BEFORE ATTRIBUTING: for any aggregate about a protected set,
+ask what rows actually entered the sum before quoting it.** Not an instinct
+— a check with a definite question, because it caught **four** errors in a
+single WP9 item and the shape was identical every time: *reading an
+aggregate as a statement about the population it is NAMED for rather than
+the one it is COMPUTED OVER.*
+
+1. **M03's worst liveness gap** is a max over *every* flow
+   (`sim/scorecard.py:220`), so a saturating background aggressor's own
+   starvation won the contest and was scored as fleet damage — inverting
+   the causal direction, since a QoS-aware scheduler starves such a flood
+   *by design* (`docs/wp9-plan.md` §24.2).
+2. **The same statistic's per-seed deltas** were summarised by a
+   mean-of-ratios that read +136.84 % while the median read −0.22 % and
+   21/40 seeds improved (§25.4, §27.1).
+3. **M02's PDB-violation rate** byte-weights over *every* flow, so its
+   ~24-point rise was the aggressor's own bytes; the protected-fleet delta
+   is ≈0 on all three arms (§28.1). **This one was asserted immediately
+   after catching (1)** — the tool was built and in hand and simply was not
+   pointed at the second metric.
+4. **M05's "30/40 seeds under bound"** is a worst-*flow* scalar, so the
+   count is over seeds, not over flows: Reservation's 33 breaches came from
+   **2 distinct flows** and TwoTier's 35 from 4, one accounting for 30
+   (§29). Thirty failures and one chronically-broken flow look identical in
+   that number.
+
+**The check, stated so it is mechanical:** before quoting any aggregate —
+max, mean, rate, count of breaches — name (a) the rows it sums over, (b)
+the rows the *claim* is about, and (c) whether they are the same set. If
+they differ, the aggregate does not support the claim no matter how large
+the effect or how tight the interval. **Asking it in advance is cheap;
+instance (4) was predicted before the data arrived and cost nothing, while
+instances (1)–(3) each cost a wrong published conclusion.**
+
 **Spec/hardware-derived numeric tables get transcribed from the actual
 source text, never reconstructed from memory or re-derived by formula —
 this applies to any such table, not just BSR's.** `sim/bsr.py`'s
