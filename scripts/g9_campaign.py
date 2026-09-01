@@ -131,7 +131,7 @@ def main(argv):
     out: dict = {}
 
     for label, (build, want_path) in CASES.items():
-        print(f"\n{'=' * 78}\n{label}  ({want_path} path)\n{'=' * 78}")
+        print(f"\n{'=' * 78}\n{label}  ({want_path} path)\n{'=' * 78}", flush=True)
         out[label] = {}
         for arm_name, factory in _arms().items():
             m18, m19, m21, nb_deltas, n_ev = [], [], [], [], []
@@ -146,7 +146,7 @@ def main(argv):
                                                    f"{label}/{arm_name}")
                 if not printed_population:
                     print(f"  [{arm_name}] neighbours population ({len(keys)} flows): "
-                          f"{keys[:4]}{' ...' if len(keys) > 4 else ''}")
+                          f"{keys[:4]}{' ...' if len(keys) > 4 else ''}", flush=True)
                     printed_population = True
                 scored = sc_card.score(rec)
                 for store, key in ((m18, "M18"), (m19, "M19"), (m21, "M21")):
@@ -165,6 +165,13 @@ def main(argv):
                 # guarantee's own currency, p98 is what can actually detect
                 # a change.
                 nb_p98_deltas.append(a["worst_p98_ms"] - b["worst_p98_ms"])
+                # PER-SEED heartbeat. Without it the only progress signal is
+                # process liveness: this runner's first launch wrote a
+                # ZERO-LINE log for its entire duration, because Python
+                # block-buffers a redirected stdout and the summary prints
+                # come only at the end of an arm. Same family as the run
+                # logs lost to session-scoped scratchpads.
+                print(f"    ... {label}/{arm_name} seed {seed} done", flush=True)
             ci = bootstrap_ci(nb_deltas, seed=4242) if nb_deltas else None
             ci_p98 = bootstrap_ci(nb_p98_deltas, seed=4243) if nb_p98_deltas else None
             rs_p98 = Scorecard.robust_delta_summary(nb_p98_deltas)
@@ -172,13 +179,14 @@ def main(argv):
             print(f"  {arm_name:<12} events/run={statistics.mean(n_ev):5.1f}  "
                   f"M18 p95={statistics.median(m18) if m18 else None}  "
                   f"M19 p95={statistics.median(m19) if m19 else None}  "
-                  f"M21 p95={statistics.median(m21) if m21 else None}")
+                  f"M21 p95={statistics.median(m21) if m21 else None}", flush=True)
             print(f"  {'':<12} neighbours ΔM02  mean {ci['point']:+.6f} "
                   f"[{ci['lo']:+.6f},{ci['hi']:+.6f}]  median {rs['median']:+.6f} "
                   f"worse {rs['frac_worse']:.0%}  n_seeds={rs['n']} paired")
             print(f"  {'':<12} neighbours Δp98  mean {ci_p98['point']:+.3f} ms "
                   f"[{ci_p98['lo']:+.3f},{ci_p98['hi']:+.3f}]  "
-                  f"median {rs_p98['median']:+.3f}  worse {rs_p98['frac_worse']:.0%}")
+                  f"median {rs_p98['median']:+.3f}  worse {rs_p98['frac_worse']:.0%}",
+                  flush=True)
             out[label][arm_name] = {
                 "events_per_run": statistics.mean(n_ev),
                 "m18_p95_median": statistics.median(m18) if m18 else None,

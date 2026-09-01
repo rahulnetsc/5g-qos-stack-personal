@@ -5437,3 +5437,86 @@ here **before** any number was quoted rather than after.
 **Consequence for J5:** it is now falsifiable. If neighbours are genuinely
 disturbed by a join, Δp98 can show it; if ΔM02 and Δp98 are both flat, that
 is a real null rather than a floored one.
+
+---
+
+## 34. G9 campaign — J1–J5 scored
+
+10 paired seeds, 3 arms, 3 cases, 7 neighbours + bg. Both registered
+assertions passed on every run: non-zero events of the expected path, and
+a neighbours population of **21 protected flows from ue2–ue8, none from
+the joiner**.
+
+### 34.1 Scoreboard
+
+| # | expectation | verdict |
+|---|---|---|
+| **J1** | handshake wired ⇒ `n_never_completed` ≈ 0, real M18 p50/p95 | **HIT** — warm M18 p95 = 16.6 (PF) / 21.0 (Res) / 79.6 ms (TT) |
+| **J2** | warm p95 a *narrow* distribution near its configured floor | **MISS on TwoTier, HIT on the others** — 16.6 / 21.0 vs **79.6 ms**, ~4× |
+| **J3** | cold M18 restates its configured distribution, load-insensitive | **HIT** — PF 145.25 vs Res 147.75 ms, near-identical across arms |
+| **J4** | M19 reestablish non-degenerate once a fade breaks SLO | **HIT on the registered form** — still **0.0 on every arm and case**, so §31.4's blindness is confirmed active and M21 supplies the number (PF 130.1 / Res 142.1 ms) |
+| **J5** *(most-likely-wrong)* | neighbours **disturbed**: ≥1 protected statistic shifts with an interval excluding zero | **MISS** — two cells exclude zero and both move the **wrong way** |
+
+### 34.2 J5's miss, and the trace it obligated
+
+Two cells have Δp98 intervals excluding zero, **both negative**:
+GT-6.2 cold / TwoTier **−8.995 ms [−14.234, −3.085]** and GT-6.3 / PF
+**−1.268 ms [−2.074, −0.504]**. **Neighbours measurably IMPROVE when the
+join schedule is present.** ΔM02 stays floored at zero everywhere, exactly
+as §33.3 predicted, so Δp98 is the only instrument that saw anything —
+which is the dynamic-range rule paying for itself.
+
+**The obvious explanation is that the joiner is absent part of the run and
+therefore competes less. The trace refutes it.** Over the campaign's own
+10 seeds, TwoTier GT-6.2:
+
+- the joiner delivers a **median 9.9 %** of its control bytes — it really is
+  almost entirely absent;
+- neighbours' Δp98 median is **−9.289 ms**;
+- **correlation between joiner-absence and neighbour improvement:
+  r = −0.028.**
+
+**Essentially zero.** Absence is near-constant across seeds (ratio 0.095–
+0.105) while Δp98 swings from **−23.9 to +9.1 ms**, so the variance is not
+explained by how much the joiner got out of the way. **My explanation was
+wrong, and so was J5's direction.**
+
+**What the trace was obligated to distinguish** — "the scheduler contains
+the join" vs "the join is too small to see at this load" — **is answered by
+neither.** A third possibility is what the data shows: the effect is real
+and sizeable (±10–24 ms swings) but **not attributable to the joiner's
+resource footprint at all**. Its cause is unidentified. **Recorded as
+unexplained**, per the standing rule that an unexplained result is a
+legitimate finding and an invented mechanism is not.
+
+### 34.3 A control-design limitation this exposes, stated plainly
+
+The paired control removes the **join schedule**, which also removes the
+joiner's **outages**. So the comparison is *"joiner sometimes absent"* vs
+*"joiner always present"* — it cannot separate the cost of the **join
+procedure** from the effect of the **UE being gone**. That the correlation
+is ~0 shows absence is not driving the p98 result, but the confound is
+structural: **for this workload no control can hold the joiner's offered
+load constant while varying whether it joins, because being off IS the
+outage.**
+
+**Consequence: G9's fourth clause is answerable only in the weak form** —
+"no neighbour statistic degrades with an interval excluding zero" — and
+that form **passes on all nine arm-cases**. The strong form, isolating the
+join procedure's own cost, needs a control this scenario shape cannot
+provide.
+
+### 34.4 An anomaly, not scored, recorded for its own commit
+
+**TwoTier registers far fewer join events than the other arms** and many do
+not complete: warm **3.8 events/run vs 10.0**, cold **1.0 vs 5.0** with
+M18 p95 `None` (nothing completed), and GT-6.3 M21 `None`. Its warm M18 p95
+is also ~4× the others (79.6 ms), which is J2's own "handshake queueing
+behind load" branch.
+
+**A plausible link is that a slower handshake overlaps the next scripted
+restart, so events are dropped rather than queued — but that is a
+hypothesis, not a finding, and the event-count assertion passed because it
+checks non-zero, not the expected count.** Worth its own investigation;
+**strengthening that assertion to check the expected count is the cheap
+guard**, and it would have flagged this on the first run.

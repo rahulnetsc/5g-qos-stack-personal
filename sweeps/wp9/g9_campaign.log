@@ -1,0 +1,50 @@
+
+==============================================================================
+GT-6.1_warm  (warm path)
+==============================================================================
+  [PF] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  PF           events/run= 10.0  M18 p95=16.62499999999989  M19 p95=0.0  M21 p95=0.0
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean +0.053 ms [-0.975,+1.007]  median +0.125  worse 50%
+  [Reservation] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  Reservation  events/run= 10.0  M18 p95=21.00000000000002  M19 p95=0.0  M21 p95=0.0
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean +2.450 ms [-0.126,+6.150]  median +1.250  worse 70%
+  [TwoTier] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  TwoTier      events/run=  3.8  M18 p95=79.625  M19 p95=0.0  M21 p95=400.25
+               neighbours ΔM02  mean +0.000073 [-0.000014,+0.000234]  median -0.000003 worse 20%  n_seeds=10 paired
+               neighbours Δp98  mean -3.450 ms [-8.447,+1.753]  median -5.277  worse 30%
+
+==============================================================================
+GT-6.2_cold  (cold path)
+==============================================================================
+  [PF] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  PF           events/run=  5.0  M18 p95=145.2500000000001  M19 p95=0.0  M21 p95=2948.8749999999995
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -1.222 ms [-2.750,+0.257]  median -0.125  worse 20%
+  [Reservation] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  Reservation  events/run=  5.0  M18 p95=147.75  M19 p95=0.0  M21 p95=2948.8749999999995
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -0.225 ms [-1.550,+1.400]  median +0.000  worse 40%
+  [TwoTier] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  TwoTier      events/run=  1.0  M18 p95=None  M19 p95=0.0  M21 p95=0.0
+               neighbours ΔM02  mean -0.000660 [-0.036623,+0.034790]  median -0.000024 worse 30%  n_seeds=10 paired
+               neighbours Δp98  mean -8.995 ms [-14.234,-3.085]  median -9.289  worse 20%
+
+==============================================================================
+GT-6.3_rlf  (reestablish path)
+==============================================================================
+  [PF] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  PF           events/run=  1.0  M18 p95=1180.5000000000002  M19 p95=0.0  M21 p95=130.12500000000006
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -1.268 ms [-2.074,-0.504]  median -0.748  worse 0%
+  [Reservation] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  Reservation  events/run=  1.0  M18 p95=1181.1249999999998  M19 p95=0.0  M21 p95=142.12500000000006
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -0.525 ms [-1.250,+0.050]  median +0.000  worse 30%
+  [TwoTier] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  TwoTier      events/run=  1.0  M18 p95=2201.7499999999995  M19 p95=0.0  M21 p95=None
+               neighbours ΔM02  mean -0.003142 [-0.036097,+0.027352]  median -0.000784 worse 10%  n_seeds=10 paired
+               neighbours Δp98  mean +0.068 ms [-2.275,+2.464]  median -0.119  worse 50%
+
+wrote sweeps/wp9/g9_campaign.json
