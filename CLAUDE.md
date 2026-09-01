@@ -421,6 +421,38 @@ survived longer for it. So the lesson is not "impossible numbers get
 caught" — it is that a fixture-built precondition needs a separate
 at-scale check that the precondition fires at all.
 
+**A SIXTH instance, and its shape is different enough to separate: the
+MECHANISM returned nothing and the metric reported SUCCESS.** The previous
+five were a *selection* returning nothing — the gate's `None`-base picking
+1,710 rows, the CSV coercion scoring `0.000`, the stage-6 analyser's wrong
+ramp axis printing "distinct orderings: 0", and so on. WP9's G9 commit 2 is
+not that. `sim/scenarios/g9.py`'s GT-6.3 scripted a fade **half the length
+of t310**, so `sim/rlf.py` never declared RLF, **zero join events occurred,
+and M18/M19 reported instant recovery.** Every number was *correct for the
+events that happened* — there simply were none.
+
+**No metric caveat could have caught this**, which is what makes it worth
+separating: a caveat qualifies a computed value, and here the value was
+right. The catch has to happen one level up, at "did the thing I am
+measuring actually occur?".
+
+**So the standing rule — run it at scale and ask whether the precondition
+occurs at all — applies to MECHANISMS FIRING, not only to rows selecting.**
+Before trusting any metric over an event-driven mechanism, assert the event
+count is non-zero and roughly what the scenario should produce; a scenario
+that produces no events reads identically to one where everything went
+well.
+
+**The concrete diagnosis, kept verbatim because a later reader will hit
+this exact trap: depth arms t310, duration expires it.** Two identically
+named `rlf_snr_floor_db` fields exist on *different objects* —
+`JoinConfig` and `RlfDetectorConfig` — and **`sim/driver.py` constructs
+`RlfDetectorConfig()`, so that is the one that matters**; setting
+`JoinConfig`'s does nothing for detection. A fade deep enough to cross the
+floor only *arms* the n310/t310 dwell. **t310 is 2,000 ms — 8,000 slots at
+numerology 2 — and the fade has to outlast it**, or the dwell re-arms and
+nothing is ever declared.
+
 **An empty or unchanging output file is evidence about the FILE, not about
 the process — check process state directly before concluding anything
 about liveness.** Twice in WP9 a *reading* of instrumentation produced a
