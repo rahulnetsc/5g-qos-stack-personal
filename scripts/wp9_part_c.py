@@ -26,9 +26,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import sweep, write_csv  # noqa: E402
-from sim.parametric import sweep_scenario  # noqa: E402
-from wp9_sweep import BASE, PersistingRecordSink, _arms, _driver_kwargs  # noqa: E402
+import json  # noqa: E402
+import multiprocessing as mp  # noqa: E402
+
+from regime_sweep import write_csv  # noqa: E402
+from wp9_sweep import BASE, _run_one_cell  # noqa: E402
 
 N_SEEDS = 10
 HORIZON = 20_000
@@ -43,52 +45,62 @@ CROSS = {
 }
 
 
-def _build(seed: int, horizon_slots: int = HORIZON, **axis_values):
-    kwargs = {**BASE, **axis_values}
-    kwargs.pop("min_rb", None)
-    kwargs.pop("horizon_slots", None)
-    for k in ("sr_period_slots", "k2_slots"):
-        kwargs.pop(k, None)
-    return sweep_scenario(seed=seed, horizon_slots=horizon_slots, **kwargs)
-
-
 def cells(smoke: bool):
-    """Emit (axes-dict) per cell. Printed as a count by the runner rather
-    than restated in prose -- CLAUDE.md's derive-it rule."""
+    """One task per cell, in `_run_one_cell`'s own (axis_values, n_seeds,
+    horizon) shape. Count is PRINTED by the runner, never restated: §21.7
+    budgeted "~10 cells" while the cross §21.5 specifies derives to 24."""
+    n_seeds = 2 if smoke else N_SEEDS
+    horizon = 2000 if smoke else HORIZON
     out = []
     for axis, spec in CROSS.items():
         for lvl in spec["levels"]:
             for n in spec["n_ues"]:
-                out.append({axis: [lvl], "n_ues": [n], "load_mult": [1.0]})
+                out.append(({axis: lvl, "n_ues": n, "load_mult": 1.0},
+                            n_seeds, horizon))
             for load in spec["load_mult"]:
                 if load == 1.0:
                     continue          # already covered by the n_ues line
-                out.append({axis: [lvl], "n_ues": [BASE["n_ues"]],
-                            "load_mult": [load]})
+                out.append(({axis: lvl, "n_ues": BASE["n_ues"],
+                             "load_mult": load}, n_seeds, horizon))
     return out[:2] if smoke else out
 
 
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--workers", type=int, default=10)
     ap.add_argument("--root", default="sweeps/wp9")
     args = ap.parse_args(argv[1:])
     root = Path(args.root)
-    grid = cells(args.smoke)
-    n_seeds = 2 if args.smoke else N_SEEDS
-    horizon = 2000 if args.smoke else HORIZON
-    print(f"Part C: {len(grid)} cells x {len(_arms())} arms x {n_seeds} seeds "
-          f"= {len(grid) * len(_arms()) * n_seeds} runs")
+    root.mkdir(parents=True, exist_ok=True)
+    tasks = cells(args.smoke)
     suffix = "_SMOKE" if args.smoke else ""
-    rows = []
-    with PersistingRecordSink(root / f"part_c_records{suffix}.jsonl") as sink:
-        for i, axes in enumerate(grid, 1):
-            rows += sweep(axes=axes, build_scenario=lambda seed, **kw:
-                          _build(seed, horizon_slots=horizon, **kw),
-                          schedulers=_arms(), n_seeds=n_seeds,
-                          driver_kwargs=_driver_kwargs, record_sink=sink)
-            print(f"  cell {i}/{len(grid)} done ({len(rows)} rows)", flush=True)
-        print(f"  persisted {sink.n} records")
+
+    # PARALLEL OVER CELLS, reusing wp9_sweep._run_one_cell rather than a
+    # second implementation. §6.3b's reasoning applies unchanged: cells are
+    # independent, within a cell seeds and arms stay ordered, paired_seeds
+    # is drawn up front from a fixed base seed, and every run is a pure
+    # function of (scenario, seed) -- so this changes no result, only the
+    # wall time. Serial, this grid is ~5.5 h summed over its actual n_ues
+    # mix; the first attempt ran serially and was killed by an OS suspend
+    # at cell 3 of 24.
+    print(f"Part C: {len(tasks)} cells on {args.workers} workers "
+          f"({sum(1 for _ in tasks) * 3 * tasks[0][1]} runs)")
+    rows, n_rec = [], 0
+    rec_fh = (root / f"part_c_records{suffix}.jsonl").open("w")
+    try:
+        with mp.get_context("spawn").Pool(args.workers) as pool:
+            for i, (crows, _conline, payload) in enumerate(
+                    pool.imap_unordered(_run_one_cell, tasks), 1):
+                rows.extend(crows)
+                for av, recd, _m13 in payload:
+                    rec_fh.write(json.dumps(
+                        {"axis_values": av, "record": recd}) + "\n")
+                    n_rec += 1
+                print(f"  cell {i}/{len(tasks)} done ({n_rec} records)",
+                      flush=True)
+    finally:
+        rec_fh.close()
     write_csv(rows, str(root / f"part_c_rows{suffix}.csv"))
     print(f"wrote {len(rows)} rows -> {root}/part_c_rows{suffix}.csv")
     return 0

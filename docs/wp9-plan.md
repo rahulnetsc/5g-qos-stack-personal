@@ -5029,4 +5029,53 @@ rather than a liveness failure. It is derived from each flow's own median
 gap and travels **in the record**, so Part C's M03 column cannot be read
 against that bound by mistake.
 
-**Results are pending the run.** Nothing is claimed here in advance of it.
+### 30.1 Results — 24 cells, 720 runs, 10 workers, ~28 min
+
+M07 contracts met / M08 worst-flow GFBR fraction, mean over 10 paired
+seeds, at `load_mult` 1.0. **§0.1's rule applies throughout: both numbers
+are quoted together, every time either is quoted.**
+
+| axis | n_ues | PF | Reservation | TwoTier |
+|---|---|---|---|---|
+| `duty_cycle` 0.1 | 4 | 3.8 / 0.972 | 3.8 / 0.968 | 3.7 / 0.965 |
+| | 8 | 1.0 / **0.847** | **3.1** / 0.380 | 1.4 / 0.627 |
+| | 16 | 0.0 / **0.445** | 0.0 / 0.000 | 0.0 / 0.271 |
+| | 32 | 0.0 / **0.216** | 0.0 / 0.000 | 0.0 / 0.000 |
+| `duty_cycle` 0.5 | 4 | 3.9 / 0.961 | 3.9 / 0.961 | 3.9 / 0.961 |
+| | 8 | **7.6** / **0.952** | 6.8 / 0.190 | 5.2 / 0.525 |
+| | 16 | **12.8** / **0.922** | 10.5 / 0.000 | 4.5 / 0.000 |
+| | 32 | 0.0 / **0.475** | 2.6 / 0.000 | **5.6** / 0.000 |
+| `snr_spread_db` 6 | 4 | 4.0 / 0.965 | 4.0 / 0.964 | 4.0 / 0.965 |
+| | 8 | **8.0** / **0.962** | 7.3 / 0.288 | 6.6 / 0.919 |
+| | 16 | 9.6 / **0.795** | **10.5** / 0.000 | 9.2 / 0.000 |
+| | 32 | 0.0 / **0.382** | **14.3** / 0.000 | 7.2 / 0.000 |
+| `snr_spread_db` 12 | 4 | 4.0 / 0.965 | 4.0 / 0.965 | 4.0 / 0.965 |
+| | 8 | 7.9 / **0.961** | 7.1 / 0.095 | 7.0 / 0.941 |
+| | 16 | 9.0 / **0.596** | **10.4** / 0.000 | 7.8 / 0.000 |
+| | 32 | 0.0 / **0.289** | **15.0** / 0.000 | 7.4 / 0.000 |
+
+**Finding 1 — §0.1's split reproduces on BOTH new axes, at every fleet size
+above 4.** At n_ues=32 on `snr_spread_db` 12: **Reservation meets 15.0
+contracts and PF meets 0.0, while PF holds a 0.289 max-min floor and both
+QoS-aware arms sit at exactly 0.000.** That is §0.1's pattern verbatim, on
+axes stage 2 never ran. **The split is therefore not an artefact of the two
+axes the stage-1 cap happened to promote** — which is the strongest
+available answer to §0.4's standing complaint that the cap, not the score,
+did the narrowing.
+
+**Finding 2 — the axes do NOTHING at n_ues=4.** All three arms are
+identical to three significant figures on both axes at every level
+(3.7–4.0 / 0.961–0.972). **The effects Part A measured at the n_ues=8 base
+point are fleet-size-dependent, not properties of the axes themselves**, and
+a reader quoting Part A's single-cell result should carry that.
+
+**Finding 3 — `duty_cycle` 0.5 is worse than 0.1 for contracts and better
+for the floor, non-monotonically.** At n_ues=16, duty 0.5 gives PF
+12.8 / 0.922 while duty 0.1 gives 0.0 / 0.445 — the burstier setting
+destroys contracts outright. **Duty cycle is not a monotone axis**, so a
+two-level reading of it (which is all Part A had) can invert.
+
+**What this does NOT establish.** Every cell is `load_mult` 1.0; the load
+line was run but is not analysed here. M03 in these cells carries its
+**cadence caveat** automatically at `duty_cycle` ≤ 0.5 (Step 4) and is not
+quoted above for that reason.
