@@ -5558,3 +5558,378 @@ exceed the slowest arm's handshake — and it is deliberately **not** made
 here: re-running the campaign with a longer period is its own commit with
 its own before/after, and §34.1's numbers stand as what the current
 scenario produced, now with the bias direction stated.
+
+---
+
+## 35. G12 — ordered degradation under overload (plan, registered before any code)
+
+§22.5 closed F4 as **UNSCOREABLE** and named the fix as *"a workload with
+≥ 2 GBR classes — scenario work, not analysis"*. That is right, and this
+section is that scenario work. It is planned before any code, and the
+§33.3 pre-flight below was **run** rather than assumed — which is how a
+confound large enough to invalidate the whole statistic was found before
+any expectation was registered.
+
+### 35.1 What G12 asks — and its four clauses use FOUR DIFFERENT currencies
+
+`docs/IA_P5G_Factory_Guarantee_Test_Plan.md:106` and GT-7.3 (line 318):
+
+> First-violation order under a load ramp is exactly: **5QI 9 → 5QI 4
+> (lidar) → 5QI 2 (camera) → *never* 5QI 1** (telemetry/commands) while any
+> lower class still has throughput. […] any inversion (e.g. **telemetry
+> gap** grows while bg still **moves bytes**) is a FAIL regardless of
+> absolute numbers.
+
+Read one clause at a time, in G9's manner, because a single verdict would
+again average four different epistemic situations — and here the four
+clauses are not even measured in the same units:
+
+| # | clause | the guarantee's own word | currency | instrument |
+|---|---|---|---|---|
+| 1 | 5QI 9 first | **"exhausted"** | throughput → 0 | study-layer; 5QI 9 is non-GBR (GFBR 0), so it has **no contract to breach** |
+| 2 | then 5QI 4 | **"degrades"** | GBR contract | **M13**, unchanged |
+| 3 | then 5QI 2 | **"degrades"** | GBR contract | **M13**, unchanged |
+| 4 | never 5QI 1 | **"intact"**, inversion = *"telemetry **gap** grows"* | liveness gap / PDB | **M20** (`protected_fleet_liveness_gap`) + M02, **not** a GBR contract |
+
+**This is the load-bearing observation of the whole item.** The middle pair
+is exactly the pair that has a GBR contract, and exactly the pair M13
+orders. **Clauses 1 and 4 are not M13's job by the guarantee's own
+wording** — "exhausted" and "gap" are not contract language, and GT-7.3's
+own worked example of a FAIL is phrased in gaps and bytes, not in GFBR.
+
+### 35.2 M13 is usable UNCHANGED — and the reason is structural, not a concession
+
+§22.5 rejected widening M13 to the Delay-class flows as redefining a
+pre-registered metric until it separates something. **That rejection stands
+and this plan does not reopen it.** Confirmed against the code rather than
+from the section text: `sim/scorecard.py:1083`'s `first_violation_order`
+reads `rec.flows_by(flow_class="GBR")` and `meets_gbr_contract(fraction)`
+only, and returns `{order_5qi, first_fail_at_index}`. Nothing it needs is
+missing; what was missing was a second GBR class in the input.
+
+**And §35.1 shows the restriction is not a limitation.** M13 covers clauses
+2 and 3 completely. Clauses 1 and 4 were never contract statistics in the
+guarantee's own text, so supplying them from M20/M02/throughput is
+*reading the guarantee correctly*, not routing around a metric.
+
+**A rejected alternative, recorded because it is the tempting one.**
+Convert `sim/fleet.py`'s 5QI 1 telemetry flow from `flow_class="Delay"` to
+`"GBR"` so M13 sees all four classes. Rejected: it is the same error shape
+as widening M13 one level down — changing the *input's* class until the
+instrument reads it, rather than changing the instrument. It also fails on
+its own terms, measured in §35.4(c).
+
+### 35.3 The inventory, taken first — and it corrects §22.5's scan
+
+Per §21.2's discipline: measure what is on disk before designing a grid.
+
+**§22.5's measurement was over stages 1 and 4 only, and it is accurate for
+those.** Re-measured here across all three fleet stages:
+
+| stage | records | GBR 5QI classes present |
+|---|---|---|
+| stage 1 | 1,770 | `[2]` |
+| stage 4 | 1,440 | `[2]` (90 records carry no GBR flow at all) |
+| **stage 5** | **1,440** | **`[2, 4]` on 840 records, across 28 cells** |
+
+**So a two-GBR-class workload already exists on disk and F4 did not scan
+it.** The regime map's G12 row says G12 "needs a workload with ≥ 2 GBR
+classes"; that is true as far as it goes and **too weak** — the classes are
+there, in stage 5's lidar excursion, and they are still unusable, for a
+different and more specific reason:
+
+**Stage 5's 5QI 4 has NO DYNAMIC RANGE, by construction.** Across all 1,110
+lidar flow-records its `gfbr_fraction` is `min 0.0329, median 0.4000,
+max 0.4000`, and **0 of 1,110 meet the 0.95 contract**. The cap is
+arithmetic, not scheduling: `LidarActivation` is active `duration_s=2.0` of
+a `5.0 s` horizon, `throughput_bps` averages over the **whole** run, so the
+fraction cannot exceed `2.0 / 5.0 = 0.4000` — which is exactly the observed
+maximum. **5QI 4 fails at every load, including ramp index 0, on every
+arm.** It would enter every ordering first, always, as a property of the
+duty cycle rather than of the scheduler.
+
+**This is the §33.3 shape one level over: not a floored delta, a floored
+ORDER.** And stage 5 could not have been used regardless — its axes are
+`composition / lidar_ues / n_ues` with **no load-ramp axis at all**, so
+`report_g12` would raise on it, correctly.
+
+**What `sim/fleet.py` already carries, per profile** (read from the module,
+not assumed):
+
+| G12 class | present? | as what | usable for G12 as-is? |
+|---|---|---|---|
+| **5QI 9** | yes — DRONE 1 Hz heartbeat (512 bps), UGV logs (500 kbps poisson), SENSOR DL config (2 kbps) | `PF`, GFBR 0 | **no** — nothing saturating; the guarantee's bg is *"0 GFBR / 100 Mbps MFBR / saturating"* |
+| **5QI 4** | yes — UGV lidar | `GBR`, GFBR 12 Mbps, **duty-cycled off by default** | **yes, via existing parameters** — see §35.5 |
+| **5QI 2** | yes — DRONE/UGV/CAMERA `xr_video` | `GBR`, GFBR 4–6 Mbps | **yes, unchanged** |
+| **5QI 1** | yes — DRONE MAVLink telemetry | `Delay`, GFBR 0 | **yes, unchanged** — clause 4 is a gap statistic (§35.1) |
+
+**So exactly one flow has to be added: a saturating 5QI 9.** Neither
+`sim/parametric.py`'s `bg` aggressor nor `sim/scenarios/g9.py`'s
+`QFI_AGGRESSOR` can be reused — both are **5QI 8**, and G12 names 5QI 9
+specifically. Both 8 and 9 are in `Scorecard.NON_PROTECTED_5QI`, so the
+substitution is invisible to every protected-fleet statistic and would have
+gone unnoticed.
+
+### 35.4 The §33.3 pre-flight — RUN, not assumed
+
+The journal's third form rule requires checking the instrument has dynamic
+range **in the control** before registering anything. Applied to an *order*
+rather than a delta, the question becomes: **at the bottom of the ramp does
+every class MEET its contract, and at the top do several fail?** A class
+pinned at "fails" (stage 5's lidar) or pinned at "meets" cannot enter an
+ordering.
+
+Throwaway probe: `mixed`, N=8, one seed, horizon 20,000, `cqi_delay_slots=8`,
+a saturating 50 Mbps 5QI 9 bg, and a committed-load multiplier scaling both
+GBR classes' offered rate **and** their GFBR together — the sim analogue of
+GT-7.3's *"ramp aggregate offered load … to 145 % of the measured ceiling"*.
+
+**(a) The control is CLEAN on all three arms.** At ×1.0 every GBR class
+meets on PF, Reservation and TwoTier (5QI 2 `5/5`, 5QI 4 `2/2`), at
+UL utilisation 0.897–0.925 and 5QI 9 carrying 31.3–36.3 Mbps. Nothing is
+pre-broken, so the ordering starts empty and has somewhere to go.
+
+**(b) The ramp moves the statistic, and 5QI 9 degrades FIRST.** PF, one
+seed: bg throughput falls **35.8 → 22.8 → 13.9 → 11.8 Mbps** across
+×1.0/×1.5/×2.0/×3.0 while both GBR classes are still meeting at ×1.5 — so
+clause 1's "best-effort gives way first" is observable *before* any
+contract breaks, which is the whole ordering claim.
+
+**(c) The test plan's OWN provisioning makes clause 4 unscoreable, and the
+document already half-caught it.** §2.1's table gives telemetry (5QI 1)
+`GFBR 0.5 Mbps` against `offered ≈ 24 kbps`. Converting 5QI 1 to GBR at that
+GFBR scores **0 of 2 flows meeting, `gfbr_fraction = 0.045`, at ramp index
+0** — 5QI 1 would lead every ordering and G12 would read as a maximal FAIL
+on an untouched telemetry stream. `meets_gbr_contract` is
+`delivered / GFBR`, so a flow provisioned ~21× above what it offers (against
+the test plan's own 24 kbps) can never meet it. **§2.1 raises exactly this arithmetic in its own prose** — *"a
+heartbeat with a 5 Mbps GFBR is never meaningfully 'within GFBR'"* — and
+then fixes 5 Mbps to 0.5 Mbps, which is still ~21× the offered rate. The
+flag was right and the correction was insufficient. This is the measured
+half of §35.2's rejected alternative.
+
+### 35.5 THE FINDING — flow DECLARATION ORDER sets the first-violation order
+
+**Found by two probe builds disagreeing, not by design**, and recorded that
+way. Probe 1 appended its 5QI 4 flows to the end of `ScenarioConfig.flows`;
+probe 2 obtained them from `build_fleet`, which emits them first within each
+UE. **The two disagree about whether 5QI 4 ever violates at all** — which is
+clause 2, the centre of the guarantee.
+
+Isolated by varying one thing at a time from probe 2's build, everything
+else byte-identical (`mixed`, N=8, seed 12345):
+
+| variant | PF ×2.0 | PF ×3.0 | TwoTier ×3.0 |
+|---|---|---|---|
+| `build_fleet` order | 5QI4 **2/2** met (min 1.000) | 5QI4 **2/2** (min 1.000) | 5QI4 **2/2** (min 0.966) |
+| **lidar declared last** | 5QI4 **0/2** (min 0.771) | 5QI4 **0/2** (min **0.005**) | 5QI4 **0/2** (min 0.142) |
+| 5QI 1 as GBR | no material change | no material change | no material change |
+| drop `active_*_s` params | **identical** | **identical** | **identical** |
+
+**Declaration order is the entire cause; the other two candidates change
+nothing.** And it is a broad sensitivity, not a knife-edge — five random
+permutations of the same flow list at PF ×2.0 give 5QI 4 `1/2 min 0.822`,
+`1/2 min 0.832`, `1/2 min 0.941`, `1/2 min 0.765`, `2/2 min 1.000` against
+`build_fleet`'s own `2/2 min 1.000`; at
+TwoTier ×2.0 two permutations drive a 5QI 2 flow to **min 0.021** and
+**min 0.000** — a bearer delivering nothing — where `build_fleet`'s own
+order gives `5/5 met, min 0.953`.
+
+**Why this matters more than any other item here: the first-violation order
+between 5QI 4 and 5QI 2 — the exact pair M13 orders and the exact pair G12
+is about — INVERTS on the order flows happen to appear in a list.** That is
+a scenario-authoring detail with no physical referent. An order read off one
+declaration order is not a scheduler property until this is controlled.
+
+**And the direction is the sharp part, not just the magnitude.** Under
+`build_fleet`'s own order — the canonical one, the one every WP9 fleet stage
+ran — **5QI 4 never breaches at all through ×3.0 on any of the three arms**
+(min 0.966–1.000) while **5QI 2 collapses** (PF min 0.121). Under the
+permuted order the result conforms to the guarantee instead: 5QI 4 breaches
+first. So the canonical order does not merely give a *different* order, it
+gives **G12's own inversion** — and `scheduler/flow.py`'s standardised
+`FIVE_QI_PRIORITY` puts 5QI 2 at **40** and 5QI 4 at **50**, i.e. 5QI 2 is
+the *higher*-priority class, which is what the guarantee's `4 → 2` sequence
+encodes. **Whether any arm actually consumes that priority value is part of
+what the trace must establish**, and is deliberately not asserted here.
+
+**A consequence that lands directly on E2.** Stage 5's lidar was pinned at
+*"fails"* (§35.3). Under the canonical order this workload's lidar looks
+pinned at *"meets"* — **the same §33.3 defect mirrored**, and equally fatal
+to an ordering. So the ramp's top level is not a free choice: **the grid is
+not launched until a probe cell shows 5QI 4 breaching under the CANONICAL
+order**, and if no feasible load does so, that is itself the result and is
+reported as one rather than fixed by adopting whichever permutation
+cooperates. Choosing the permutation that produces the expected answer would
+be the multiplicity-guard violation §22.5 refused, moved from the metric to
+the scenario.
+
+**The mechanism is NOT identified and is not guessed at.** Three candidates
+exist in this repo's own recorded behaviour and the trace must distinguish
+them, not assume: `sim/baselines/pf.py`'s declaration-order tie-break
+(README §8); per-UE flow iteration order in the LCP fill; and
+`sim/harq.py::HarqProcessPool._pools`' shared insertion-ordered iteration,
+which CLAUDE.md already records as able to move outcomes for an *unrelated*
+UE. Recorded as **unexplained** pending that trace, per §34.2's precedent —
+an invented mechanism is not a finding.
+
+### 35.6 Decisions
+
+**D1 — the ramp is a committed-load multiplier, not `video_tier` and not
+`n_ues`.** `video_tier` scales only `xr_video`, i.e. only 5QI 2, which
+biases the very ordering under test toward 5QI 2 failing first. `n_ues`
+changes class populations lumpily through `_allocate`'s largest-remainder
+step. The multiplier scales **both** GBR classes' offered rate and GFBR
+together, at fixed fleet — GT-7.3's *"both assets nominal; ramp aggregate
+offered load"*.
+
+**D2 — no `sim/fleet.py` change is needed, and this was verified rather
+than hoped.** `build_fleet(n, comp, lidar=LidarActivation(n_ues=2,
+start_s=0.0, duration_s=horizon_s, rate_bps=3e6*m, synchronised=True),
+video_tier=m)` already produces a **continuous** 5QI 4 at the test plan's
+3 Mbps with GFBR tracking it, plus 5QI 2 scaled identically. Only the
+saturating 5QI 9 is appended by the scenario module. `LIDAR_MAX_CONCURRENT`
+is respected, not bypassed.
+
+**D3 — a continuous lidar is a different device claim from stage 5's, and
+does not contradict `sim/fleet.py`'s comment.** That module argues a
+duty-cycled lidar must not be modelled as *"a permanently-downscaled
+continuous feed"* — an argument about **stage 5's transient excursion**,
+whose point was to stress a transient. GT-7.3's T4 is *"lidar / **second
+feed**"*, provisioned at *"3 Mbps mean, 10 Hz sweeps"*: a stream, not an
+event. Both models are in the test plan; they belong to different tests.
+Stated as a decision so a later reader does not read it as an oversight.
+
+**D4 — declaration order becomes a REGISTERED CONTROL, not a silent
+choice.** Canonical order is `build_fleet`'s own, because it is the order
+every other WP9 fleet stage ran. The campaign additionally runs *k* seeded
+permutations at one cell. **If the M13 order flips under permutation, G12's
+result is not a scheduler property and the write-up says so** — that is the
+control's whole purpose, and it is registered before any number exists.
+
+**D5 — `record_timeseries` stays `True`.** M13 needs only
+`throughput_bps`/`gfbr_bps`, but clause 4's M20/M02 companions and §1's
+standing guard both want it, and turning it off to save disk is exactly the
+kind of quiet divergence from every other stage that makes a cross-stage
+comparison unreadable later.
+
+### 35.7 Degenerate cases, pre-registered as ASSERTIONS rather than discoveries
+
+Given this WP's record, each is asserted by the runner before any number is
+reported — a failure raises, it does not score.
+
+1. **One-element order.** `len(order_5qi) < 2` at the top of the ramp is
+   **not an ordering** and is F4's own result recurring. Assert ≥ 2 GBR
+   classes are present *and* that the number that ever violate is ≥ 2.
+2. **A class that violates at ramp index 0.** `first_fail_at_index[qi] == 0`
+   means the class was already broken in the control (stage 5's lidar,
+   §35.4(c)'s telemetry) — the order is measuring provisioning, not load.
+   Assert the ramp's bottom cell has an **empty** `first_fail_at`.
+3. **A class that never violates.** Silently absent from `order_5qi`, which
+   reads identically to "protected". Print the per-class terminal
+   `gfbr_fraction` at the top of the ramp beside the order, always, so
+   "never failed" and "never present" cannot be confused.
+4. **An empty selection.** `report_g12` already raises when the ramp axis
+   matches no record (§21.3's coercion rules); the G12 runner reuses it
+   rather than re-deriving it, and asserts `len(cell) == n_arms × n_seeds`.
+5. **A tie.** `first_violation_order` sorts by `first_fail_at` index, and
+   Python's sort is stable — two classes first failing at the **same** ramp
+   index therefore emit in dict-insertion order, which is silently the
+   flow-iteration order §35.5 has just shown to be an artefact. **Ties are
+   detected and reported as ties**, never as an order.
+
+### 35.8 The expected-count assertion, in its strengthened form, applied to violations
+
+c2a9f13 strengthened G9's guard from *"did the mechanism fire at all"* to
+*"did it fire as often as the schedule specifies"*, because the gap between
+those is where a **partially** degenerate run hides. The analogue here is
+not events but **violations**, and it has the same two levels:
+
+- **Weak (rejected as sufficient):** ≥ 1 class violated somewhere.
+- **Registered:** per (arm, cell), assert the **number of ramp points** is
+  the grid's own `len(RAMP)` — derived, never restated — and assert the
+  **number of GBR flow-records per class per ramp point** equals what
+  `build_fleet` produced for that composition and N, computed from the
+  built scenario at run time.
+
+**And the self-selection warning transfers directly.** If one arm's ramp
+contributes fewer flow-records than another's, the survivors are not a
+smaller sample of the same population — G9's exact lesson — and the arms are
+not comparable. That check runs before the order is computed.
+
+### 35.9 Pre-registered expectations
+
+**Registered in the journal's required form: what the data will LOOK like,
+and what each look would MEAN. No mechanism is predicted.**
+
+**A disclosure that has to come first, because it affects how these should
+be read.** §33.3's dynamic-range check is *not* information-neutral for an
+order statistic the way it is for a delta. Asking *"does M02 move in the
+control"* tells you nothing about the treatment effect; asking *"do these
+classes violate across the ramp"* **is a one-seed draw of the answer**. The
+pre-flight therefore leaked part of G12's result, and E1–E3 below are
+**pilot-informed, not blind**. They are still falsifiable — at 10 seeds ×
+3 arms × the full ramp, against a one-seed, one-composition pilot — but a
+later reader must not score them as blind predictions. **This tension
+between two of the project's own rules is itself new and is recorded rather
+than resolved silently.**
+
+| # | expectation | what each outcome would mean |
+|---|---|---|
+| **E1** | **The bottom of the ramp is clean on all three arms at every composition** — `first_fail_at` empty, so the order starts from nothing. | Any class violating at index 0 means the workload is mis-provisioned rather than overloaded, and the ramp measures provisioning (§35.7 case 2). **This is the control and it is read FIRST**; a failure is a stop condition, not a result. |
+| **E2** | **`order_5qi` is a TWO-element list on every arm** — both 5QI 4 and 5QI 2 violate somewhere in the ramp, under the CANONICAL declaration order. | One element ⇒ F4's result recurring one level down: the second class is pinned, and the item returns to being about the workload, not the schedulers. **The pilot argues against E2 at ×3.0** (5QI 4 unbroken on all three arms), so either the ramp must reach further or E2 loses — and §35.5's stop condition, not a change of permutation, is what settles which. |
+| **E3** | **Clause 4 holds: 5QI 1 shows no liveness-gap or PDB degradation at any ramp point where 5QI 9 still moves bytes.** The pilot's 5QI 9 stays above zero at every ramp point on every arm (PF floors at 11.8 Mbps; Reservation reaches 0.019 and TwoTier 0.755 Mbps at ×3.0), so the conjunction's left side is true throughout — which makes clause 4 maximally exposed rather than vacuous. **Those arms differ by three orders of magnitude, so the left side is evaluated per arm, never pooled.** | A 5QI 1 degradation while bg still moves bytes is GT-7.3's own worked example of a FAIL and would be the strongest negative result this item can produce. |
+| **E4** | **Clause 1 is NOT literally satisfied: a GBR class will breach its contract while 5QI 9 is still moving multiple Mbps** — "exhausted" as a strict precondition will not hold, though 5QI 9 degrades first and furthest. In the pilot 5QI 2 breaches at PF ×2.0 with bg still carrying 13.9 Mbps. | Strict exhaustion before any GBR breach would mean the schedulers enforce a harder class boundary than any of them claims to, and would make GT-7.3's ordering literally rather than approximately true. |
+| **E5** *(most-likely-wrong)* | **The M13 order is the SAME across arms**, and varies across compositions more than across arms — F4's original wording, re-registered because it was never actually tested. | An **arm-dependent** order is the genuine scheduler-differentiating result and the strongest positive thing G12 can produce. The pilot already hints against E5 (Reservation put a 5QI 1 flow at 0.700 at ×3.0 where TwoTier held ≥ 0.980), which is precisely why it takes the most-likely-wrong slot. |
+
+**E5 carries the standing trace obligation, and §35.5 has already fixed
+what the trace must rule out first.** If the order differs across arms, the
+first question is **not** which scheduler is safer — it is whether the
+difference survives D4's permutation control. A per-arm order difference
+that disappears under a re-ordered flow list is the declaration-order
+artefact wearing a scheduler result, and this WP has published that shape of
+error before. Only a difference that **persists across permutations** gets a
+mechanism trace, and that trace is worktree-instrumented and direct-cause,
+per CLAUDE.md's cross-direction invariants.
+
+### 35.10 Budget
+
+**Timed, not scaled** — §6.3a's rule. Measured in the pre-flight at
+`mixed`/N=8/horizon 20,000, **without** scoring or `record_timeseries`:
+PF ≈ 2.4 s, Reservation ≈ 3.3 s, TwoTier ≈ 9.0 s per run, ≈ 14.7 s per
+(3 arms × 1 ramp point × 1 seed).
+
+**That figure is a floor and is deliberately not the budget.** §6.3a's own
+measured 303 s per 3-arm × 10-seed N=8 cell includes `record_timeseries=True`
+and the full scorecard pass, which D5 keeps. **One probe cell is timed
+end-to-end with its real post-processing before the full grid launches** —
+the rule that table exists to enforce, and the one §21.7 also bound itself
+to.
+
+### 35.11 Commit sequence
+
+1. **This section.** Docs only.
+2. **`sim/scenarios/g12.py`** — the GT-7.3 ramp workload built on
+   `sim/fleet.py`'s profiles per D2 (no `fleet.py` change), plus the
+   saturating 5QI 9, plus its tests: that the ramp scales both GBR classes'
+   GFBR together, that 5QI 4 is continuous over the horizon, that the bg is
+   5QI 9 and not 8, and that `LIDAR_MAX_CONCURRENT` still binds.
+   **§35.7's assertions land here, with the runner refusing to report.**
+   **The ramp's top level is fixed by §35.5's stop-condition probe in this
+   commit** — under the canonical order, not a permuted one — and the
+   measured level is recorded, never chosen to produce an outcome.
+3. **The campaign runner + analyser**, reusing `report_g12`'s coercion and
+   empty-selection guards rather than re-deriving them; §35.8's
+   expected-count assertion; D4's permutation control.
+4. **The run. E1–E5 scored, hits and misses both.**
+5. **`docs/wp9-regime-map.md`'s G12 row rewritten from results** — and its
+   current *"needs a workload with ≥ 2 GBR classes"* corrected on both
+   sides: the classes already exist on disk in stage 5 (§35.3), and what
+   they lack is **dynamic range**, which is a stricter and more useful
+   requirement to hand a reader than a class count.
+6. **End-of-item judgment-calls review.**
+
+Full suite + `--check` after each. **`--check` is predicted CLEAN
+throughout**: every commit is a new scenario module, a script and docs, and
+no corpus scenario builds a fleet. If it moves, `sim/fleet.py` is less
+inert than D2 claims, and that is a finding about D2.
