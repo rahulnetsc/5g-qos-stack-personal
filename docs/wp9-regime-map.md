@@ -127,6 +127,26 @@ repair the selection mechanism that produced it.** Read only as "the
 qualifier was overstated" this would be the wrong lesson — the qualifier
 was **mis-shaped**, and those are different corrections.
 
+**AMENDMENT (Part C) — the qualifier survives, but its FORCE is reduced.**
+The worry this section encodes is that the promoted axes might not have
+been the important ones, so a result found on them might be an artefact of
+*which* axes the cap happened to keep. **Part C ran depth on two axes the
+cap DROPPED — `duty_cycle` and `snr_spread_db` — and §0.1's
+concentrate-vs-spread split reproduces on both, at every fleet size above
+4** (`docs/wp9-plan.md` §30.1). At n_ues=32, `snr_spread_db` 12:
+Reservation meets **15.0** GBR contracts and PF meets **0.0**, while PF
+holds a **0.289** max-min floor and both QoS-aware arms sit at exactly
+**0.000**.
+
+**So the headline structural result is NOT an artefact of the promotion
+mechanism** — it holds on promoted and dropped axes alike. What remains
+true, and is why the qualifier is not withdrawn: the cap still did the
+narrowing rather than the score, 11 of 12 axes still cleared the threshold,
+and **nothing here shows the promoted axes were the *best* choice** — only
+that the split does not depend on having chosen them. **Read this as: the
+selection mechanism is still unrepaired, but the principal finding no
+longer rests on it.**
+
 ### 0.4a And this document has made the OPPOSITE error too — do not merge the two
 
 §0.4 above corrects an **overstatement**: a result was presented as

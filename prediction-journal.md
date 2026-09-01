@@ -377,3 +377,34 @@ count. **A shape prediction still needs its threshold fixed in advance when
 the shape is a difference in degree.** The pre-registration rule from the
 previous entry is necessary but not sufficient: *predict the shape, and if
 the shape is quantitative, name the cut.*
+
+---
+
+## Standing rule — a TWO-LEVEL axis reading can invert
+
+Beside the other two form rules, and it governs the **depth-versus-breadth**
+question §21.5's go/no-go rule exists to settle.
+
+**Two levels of an axis tell you a direction, not a shape, and the
+direction can reverse at a third point.**
+
+**The concrete instance.** Part A had exactly two off-base levels on
+`duty_cycle` (0.5 and 0.1) at one fleet size, and read a monotone story
+from them: burstier → worse. Part C ran the same axis across `n_ues` and
+found **at n_ues=16, `duty_cycle` 0.5 gives PF 12.8 contracts / 0.922
+floor while `duty_cycle` 0.1 gives 0.0 / 0.445** — the burstier setting
+destroys contracts outright rather than continuing a trend. **The axis is
+not monotone, and a two-point reading could not have shown that.**
+
+**What this changes about registering an expectation.** An axis with two
+levels supports *"this axis has an effect"* and does **not** support
+*"more of it does more of that"*. Register the first; if the second is
+what the claim needs, the axis needs a third level before the claim is
+scoreable at all.
+
+**And it sharpens §21.5's rule rather than replacing it.** That rule
+decides *whether* to buy depth from a single-cell effect. This says what
+the single cell can and cannot licence in the meantime: **breadth
+establishes existence, depth establishes shape**, and a plan that reports
+shape from breadth is over-reading its own grid. Part A's `duty_cycle`
+write-up did exactly that and Part C corrected it.
