@@ -5243,3 +5243,53 @@ is G9 passing.
 
 Full suite + `--check` after each. **§31.5's clean-corpus prediction is
 scored at commit 2**, the first point at which it could move.
+
+### 31.9 Commit 2 — landed, with two scenario defects caught by running them
+
+**§31.5's corpus prediction: HIT.** `--check` clean on all 20 records; 846
+passing (20 new). Scenario construction only — no `sim/` or `scheduler/`
+behaviour change, as predicted.
+
+**All three scenarios produce non-degenerate events** (PF, 3 neighbours):
+
+| scenario | events | M18 |
+|---|---|---|
+| GT-6.1 warm | 7 warm, **0 never completed** | p50 **1.5 ms**, p95 **6.5 ms** |
+| GT-6.2 cold | 4 cold, **0 never completed** | p50 **74 ms**, p95 **164 ms** |
+| GT-6.3 RLF | 1 reestablish | p95 **1055.75 ms**; phases cell_search 997.75 / reestablish 25.25 / handshake 32.75; **rf_restore_to_attached 58.0 ms** |
+
+**So §31.3's first degeneracy is closed** — `n_never_completed` is 0
+everywhere, against 100 % in the probe.
+
+**DEFECT 1, caught by the probe before commit 2: the handshake QFIs.**
+`JoinConfig` cannot validate them (it never sees the flow list) and a wrong
+or absent pair does not raise — it silently yields all-`None` latencies.
+`validate_handshake_wiring()` is the guard, every builder calls it, and
+three tests pin the failure modes. Narrowed while testing:
+`JoinConfig.__post_init__` **already** rejects a *half*-set pair, so the
+reachable defect is **both unset**, which it allows by design as the
+pre-commit-6 default. That is exactly what the probe hit.
+
+**DEFECT 2, caught by RUNNING GT-6.3: the fade was half of t310, and the
+scenario produced ZERO RLF events.** `sim/rlf.py`'s `RlfDetectorConfig` —
+which the driver constructs, **not** `JoinConfig`'s identically-named field
+— carries **t310 = 2000 ms**, i.e. **8,000 slots** at numerology 2. The
+first fade was 4,000 slots, so the dwell re-armed and RLF was never
+declared. **Zero events reads as "recovery was instant", not as "the
+scenario never fired."** Depth arms t310; **duration expires it**, and both
+are needed. Fade is now 12,000 slots (1.5× t310) with a test asserting
+`fade_len > T310_SLOTS_MU2`, and the constant is derived in the module
+rather than restated.
+
+**A divergence from the test plan, recorded rather than silently taken:**
+GT-6.3 specifies a **10 s** obstruction; this uses **3 s**. 10 s is 40,000
+slots and would need a ~60,000-slot horizon. The detector only requires
+t310 to expire — the 10 s figure is the hardware's obstruction duration,
+not a detection threshold.
+
+**J4's precondition is already visible and it is NOT yet met.** M19 reports
+`p50_ms = 0.0` on every path, with `n_never_recovered` 3/7 (warm) and 2/4
+(cold). That is §31.4's registered blindness: the joiner's flows are either
+never out of SLO, or never recovering. **The campaign scenario needs the
+recovering UE's flows to actually breach PDB for M19 to mean anything**, and
+J4 is registered against exactly this.

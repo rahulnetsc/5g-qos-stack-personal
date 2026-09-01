@@ -449,9 +449,20 @@ which term of the composite it thinks is carrying it.
 | **G10** | **Sim-answerable — the headline** | **Admissible N is bounded by 8 at load ≥ 1.0 and by 16 below it**, on this RAN at `min_rb=5`. This is what simulation buys that the N=2 testbed cannot. §0.1 and §0.3 apply. |
 | **G11** | **NOT RUN** | The soak sub-campaign was budgeted (§6.3, 3 seeds, ~6.5 h) and **never launched or implemented**. No WP9 evidence. |
 | **G12** | **NOT ANSWERABLE from any workload this WP ran — a stronger and more useful statement than "not analysed"** | This row previously said M13 "was computed for stage 1's core plane only and not analysed", which invites a reader to go and extract it. **Extraction cannot answer G12.** Measured across all 1,770 stage-1 and all 1,440 stage-4 records (`docs/wp9-plan.md` §22.5): the GBR 5QI classes present are **`[2]` — exactly one**. `first_violation_order` orders 5QI classes against each other, so with one class every group's "order" is a one-element list, which is not an ordering. **And the fix is not to widen M13**: the delay-critical classes here (5QI 1/82/83/85) are `flow_class="Delay"`, which the metric does not read, and widening a pre-registered metric until it separates something is exactly what `config/metric_panel.yml`'s multiplicity guard forbids. **G12 needs a workload with ≥ 2 GBR classes** — scenario work, not analysis. |
-| **G9** | **NOT RUN** | The 50-cycle join campaign was budgeted (§6.3, ~72 min) and **never launched or implemented**. M18/M19 mechanism exists (WP-Join); WP9 produced no cycle data. |
+| **G9** | **NOT RUN — and one of its four clauses is NOT SIMULABLE HERE, for a third kind of reason** | The 50-cycle campaign was budgeted (§6.3, ~72 min) and never launched. **The mechanism is fully built** (`sim/join.py`, `sim/rlf.py`, driver wiring, M18/M19); what is missing is a SCENARIO — `JoinConfig` appears nowhere outside `sim/join.py` and `sim/config.py` (`docs/wp9-plan.md` §31.2). **But clause 2, full attach-to-streaming ≤ ▷ 15 s, cannot be produced here at all**, and the reason is a category this document has not needed before. `JoinConfig`'s RACH+RRC, cell-search and reestablishment delays are sampled between **the deployment's own t300/t301/t311 ceilings and one RACH trace**, with `sim/join.py`'s own comment recording that the reestablishment floor is *"a BORROW from the one RACH trace, not a reestablishment-specific measurement"*. **A p95 sampled from those bounds restates the configuration; it does not measure attach time.** **This is a THIRD kind of gap, and the campaign must not read it as either of the other two.** G7 is *no mechanism exists*. G2 is *the mechanism exists and is blocked on a missing upstream one*. **Here the mechanism exists and runs — the INPUT is not independent evidence.** No amount of simulation improves it; only a real attach-time measurement does. **Consequence for the campaign: GT-6.2's 15 s number has exactly one source, and it is hardware.** Clauses 1, 3 and 4 (warm re-handshake, post-RLF time-to-SLO, neighbours unaffected) are sim-answerable and are what §31 plans. |
 
-### 2.1 GUARANTEE INVENTORY — one status per guarantee, with its reason
+#> **Standing rule for any M19 number this document ever quotes.** M19's
+> "SLO green" test is head-of-line age, and `sim/buffer.py::expire()` evicts
+> a queue head before it can age past `pdb_ms` — **so a flow that never
+> delivers anything reads GREEN.** The panel registers this as an M19
+> caveat (`config/metric_panel.yml`), and `Scorecard.score()` attaches it to
+> every M19 result, so it travels automatically with the value. **It must
+> also travel with any M19 figure quoted in prose here: every M19 number is
+> reported beside that UE's M02 for the same window.** This is the same
+> shape as the failure §29 found on M05 — a metric reading well because the
+> traffic it measures is absent rather than served.
+
+## 2.1 GUARANTEE INVENTORY — one status per guarantee, with its reason
 
 Replaces the prose coverage summary. Five statuses, chosen so a reader can
 tell *what would change each one*.
