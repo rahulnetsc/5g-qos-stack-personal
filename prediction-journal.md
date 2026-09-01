@@ -408,3 +408,59 @@ the single cell can and cannot licence in the meantime: **breadth
 establishes existence, depth establishes shape**, and a plan that reports
 shape from breadth is over-reading its own grid. Part A's `duty_cycle`
 write-up did exactly that and Part C corrected it.
+
+---
+
+## Standing rule — check the instrument has DYNAMIC RANGE before registering a delta
+
+Third of the form rules, and the one that catches a correctly-written
+expectation that still cannot be scored.
+
+**An expectation stated as a delta on a metric that is FLOORED (or capped)
+in both conditions cannot be falsified. Before registering any delta
+expectation, verify the statistic actually moves in the CONTROL.**
+
+### Why this is a rule about expectations, not about metrics
+
+**J5 was written correctly** — a shape prediction, with each outcome's
+meaning named in advance, carrying the most-likely-wrong slot and its trace
+obligation. It satisfied every rule above it in this journal. **And it was
+unfalsifiable**, because the neighbours' M02 was `0.0` in *both* the join
+and the no-join condition: ΔM02 = 0 − 0 = 0 on every arm, every case, every
+seed. No possible outcome of the campaign could have contradicted it.
+
+**The check that would have caught it is on the INSTRUMENT, not the
+expectation** — which is exactly why it needs its own rule. Reading J5
+again, however carefully, would never have revealed it. Running the control
+once and asking *"does this number move at all?"* does.
+
+### The mechanical form
+
+Before registering a delta expectation, on the control condition alone:
+
+1. **Is the statistic at a bound?** M02 floored at 0.0, a completeness
+   fraction pinned at 1.0, a max capped by construction (M19's HoL, capped
+   by `expire()`).
+2. **What would have to happen for it to move**, and is that within the
+   range the experiment explores? The neighbours sat at p98 15.5 ms against
+   a 100 ms PDB — **6× headroom**, so only a catastrophic disturbance could
+   register on M02.
+3. **If it cannot move, register the delta on a statistic that can** — and
+   report both: the guarantee's own currency *and* the instrument with
+   range. Δp98 alongside ΔM02, not instead of it.
+
+### The asymmetry, which is the same one the decompose rule records
+
+**Asked beforehand it costs a scenario fix; asked afterwards it is a
+retraction.** The floored-metric shape now has three instances:
+
+| | when caught | cost |
+|---|---|---|
+| §24.2 — M03's max won by the aggressor | after publication | **retraction** |
+| §28.1 — M02's rise was the aggressor's own bytes | after publication | **retraction** |
+| §33.2 — neighbours' ΔM02 floored at zero | **before any number was quoted** | a scenario fix (added the `bg` load GT-6 already specified) |
+
+**Two retractions, then one cheap fix — and the difference is entirely
+when the question was asked**, not how hard it was to answer. Each time the
+question is the same: *what does this statistic do in the condition I am
+comparing against?*
