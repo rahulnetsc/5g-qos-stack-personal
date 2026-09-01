@@ -5293,3 +5293,69 @@ not a detection threshold.
 never out of SLO, or never recovering. **The campaign scenario needs the
 recovering UE's flows to actually breach PDB for M19 to mean anything**, and
 J4 is registered against exactly this.
+
+
+---
+
+## 32. G9 commit 3 — J4 solved STRUCTURALLY, because M19 cannot report red
+
+J4 taken first, as the campaign's blocker. **The answer is not a scenario
+that breaches PDB harder — no such scenario exists.**
+
+### 32.1 What "actually breach PDB" requires, and why nothing can
+
+M19's green test is `_first_sustained_green`: every flow's
+`ts_hol_delay_s` within its own `pdb_ms` for `slo_green_dwell_s`.
+`sim/buffer.py::expire()` pops any chunk older than the PDB **every slot**
+(`while chunks and (now_s - chunks[0][0]) > pdb_s`), so **head-of-line age
+is capped at `pdb_s` by construction.**
+
+Measured on G9's own scenarios, joiner UE:
+
+| scenario | flow | pdb | max HoL | slots over PDB | bytes dropped |
+|---|---|---|---|---|---|
+| cold | qfi 1 | 100 ms | **100.00 ms** | **0 / 20,000** | 900 |
+| cold | qfi 2 | 150 ms | 149.88 ms | **0 / 20,000** | 16,511 |
+| rlf | qfi 2 | 150 ms | **150.00 ms** | **0 / 30,000** | **1,396,203** |
+
+**A UE losing 1.4 MB of video reads GREEN on every slot of the run.**
+`hol > pdb_ms` is never true, so M19's recovery time is 0.0 ms by
+arithmetic, not by the UE recovering.
+
+**So M19's registered caveat understates it.** The caveat says a
+never-delivering flow *can* read green; the measurement says it **always**
+does — M19 has no red state at all. **That is not tunable**, and a scenario
+adjusted until M19 moved would be fitting the fixture to the metric.
+
+### 32.2 The fix: a companion metric, not an edited one
+
+**M19 is left byte-for-byte unchanged.** Editing a pre-registered metric is
+what `config/metric_panel.yml`'s own guard forbids, and every historical
+M19 reading must keep meaning what it meant. **M21
+(`slo_recovery_time_by_delivery`) is an ADDITION** — the same disposition
+Step 2 used for M03/M20, and the fix M19's own caveat names ("a true fix
+needs the PDB-violation rate itself (M02-style), not head-of-line age
+alone").
+
+Green = a window in which the UE's flows drop or deliver-late ≤ 1 % of
+their **arriving bytes**. Measured, same runs:
+
+| path | M19 | **M21** |
+|---|---|---|
+| warm | 0.0 ms | **0.0 ms** — correct; a warm app restart never interrupts the radio |
+| cold | 0.0 ms | **p50 1449 ms / p95 2949 ms** |
+| reestablish | 0.0 ms | **13.5 ms** |
+
+**J4 is met: M21 produces a non-degenerate number where M19 structurally
+cannot**, and warm staying at 0.0 is the control that shows M21 is not
+manufacturing delay.
+
+### 32.3 A defect in M21's own first version, caught by running it
+
+The first implementation compared bytes **dropped in slot i** against bytes
+that **arrived in slot i**. But a chunk is dropped `pdb_ms` *after* it
+arrived, so those are different bytes — the ratio was near-meaningless and
+**returned 0.25 ms on the UE that had just lost 1.4 MB**. Summing both over
+the same window removes the offset and matches M02's byte-weighted form.
+Pinned by a test with arrivals and drops deliberately offset, which a
+per-slot ratio scores as recovered.

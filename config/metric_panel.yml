@@ -147,6 +147,43 @@ metrics:
         spiked hardest as much as whether the fleet degraded. Read it with
         Scorecard.robust_delta_summary, never as a bare mean of ratios.
 
+  - id: M21
+    name: slo_recovery_time_by_delivery
+    definition: >
+      Per join/re-join/re-establishment event, time from the event's
+      trigger (RF-restore, for the reestablish path) to the first window
+      in which the recovering UE's flows drop or deliver-late no more
+      than `violation_ceiling` of their arriving bytes. M19's companion,
+      judging "green" by DELIVERY instead of head-of-line age.
+    guarantees: [G9, G3]
+    unit: ms
+    direction: lower_better
+    status: ok
+    requires: null
+    note: >
+      WP9 G9 commit 3. Added because M19 CANNOT REPORT RED:
+      sim/buffer.py::expire() pops any chunk older than the PDB every
+      slot, so head-of-line age is capped at pdb_ms BY CONSTRUCTION and
+      M19's `hol <= pdb_ms` green test is always true. Measured on G9's
+      own scenarios: 0 of 20,000 and 0 of 30,000 slots exceed PDB on any
+      flow, max HoL exactly pdb_ms, while the recovering UE drops
+      1,396,203 bytes of video -- M19 reads green throughout a total
+      outage and reports p50 = 0.0 ms. M19's registered caveat therefore
+      UNDERSTATES it: the metric does not merely risk reading a
+      never-delivering flow as green, it can never read anything else.
+      M19 IS LEFT UNCHANGED -- editing a pre-registered metric is what
+      this file's own guard forbids, and every historical M19 reading must
+      keep meaning what it meant. This is an ADDITION and a re-pointed
+      binding, the same disposition M20 used for M03. On the same
+      scenarios M21 reports cold-path p50 1449 ms / p95 2949 ms and
+      reestablish 13.5 ms where M19 reports 0.0.
+    caveats:
+      - >
+        The windowed ratio is byte-weighted over the recovering UE's own
+        flows only. It says when that UE's delivery recovered, NOT whether
+        neighbours were unaffected -- G9's fourth clause is a separate
+        statistic over a separate population (docs/wp9-plan.md §31.6).
+
   - id: M04
     name: survival_time_failures
     definition: >

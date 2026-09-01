@@ -60,11 +60,12 @@ def _record(scenario_fn=smoke_scenario, record_timeseries=False, **run_kwargs):
 def test_panel_loads_and_has_twenty_metrics():
     """M18/M19 (WP-Join commit 4, docs/wp-join-plan.md sec5) were the
     panel's first additions since WP0's original 17; M20 (WP9 Step 2,
-    protected_fleet_liveness_gap) is the third. The panel is append-only:
+    protected_fleet_liveness_gap) is the third and M21 (G9 commit 3,
+    slo_recovery_time_by_delivery) the fourth. The panel is append-only:
     additions are allowed, redefinitions of an existing metric are not, and
     M20 exists precisely so M03 did NOT have to be redefined."""
     panel = load_panel()
-    assert len(panel["metrics"]) == 20
+    assert len(panel["metrics"]) == 21
     ids = [m["id"] for m in panel["metrics"]]
     assert len(ids) == len(set(ids)), "duplicate metric ids in the panel"
 

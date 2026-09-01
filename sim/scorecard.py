@@ -126,6 +126,11 @@ class Scorecard:
         # value, never as a bare number -- same convention as M03/M14
         # reporting the t_live_s they were computed against.
         out["M20"] = self.protected_fleet_liveness_gap(record, cfg["t_live_s"])
+        # M21 auto-scored beside M19 for the same reason M20 is beside
+        # M03: the pair must be readable together, and a statistic
+        # absent from the scored row is one a later question cannot be
+        # re-asked of without a re-run.
+        out["M21"] = self.slo_recovery_time_by_delivery(record)
         out["M04"] = self._m04_survival_time_failures(record, cfg["survival_miss_n"])
         out["M05"] = self._m05_pdu_set_completeness(record)
         out["M06"] = self._m06_frame_age_at_mec(record)
@@ -905,6 +910,123 @@ class Scorecard:
             "is a follow-on commit, not this one; events never green before "
             "the run ends are counted (n_never_recovered), not excluded",
         )
+
+    def slo_recovery_time_by_delivery(
+        self, record: RunRecord, window_s: float = 1.0,
+        violation_ceiling: float = 0.01,
+    ) -> MetricResult:
+        """M21 -- M19's companion, judging "green" by DELIVERY rather than by
+        head-of-line age.
+
+        WHY THIS EXISTS AND WHY M19 IS NOT EDITED. M19's green test is
+        `hol_delay <= pdb_ms` on every flow, and `sim/buffer.py::expire()`
+        pops any chunk older than the PDB **every slot** -- so head-of-line
+        age is capped at `pdb_s` BY CONSTRUCTION and `hol > pdb_ms` is never
+        true. Measured on G9's own scenarios: **0 of 20,000 and 0 of 30,000
+        slots** exceed PDB on any flow, with max HoL exactly `pdb_ms`, while
+        the recovering UE drops **1,396,203 bytes** of video. M19 reads green
+        throughout a total outage.
+
+        So M19's registered caveat understates it: the metric does not merely
+        *risk* reading a never-delivering flow as green, it **cannot report
+        red at all**. That is not fixable by scenario design -- no amount of
+        breaking the UE makes `hol` exceed a bound `expire()` enforces.
+
+        **M19 is left exactly as it is** (editing a pre-registered metric is
+        what `config/metric_panel.yml`'s guard forbids, and every historical
+        M19 reading must keep meaning what it meant). This is an ADDITION,
+        the same disposition Step 2 used for M03/M20.
+
+        "Green" here is a window in which the UE's flows drop or deliver-late
+        no more than `violation_ceiling` of their arriving bytes -- the
+        M02-style test M19's own caveat names as the true fix.
+        """
+        if record.join_events is None:
+            return MetricResult("M21", "slo_recovery_time_by_delivery", None,
+                                "pending", "ms",
+                                "requires WP-Join (RunRecord.join_events)")
+        if not record.join_events:
+            return MetricResult("M21", "slo_recovery_time_by_delivery", None,
+                                "pending", "ms",
+                                "no join/re-join/re-establishment events this run")
+        if not record.has_timeseries():
+            return MetricResult("M21", "slo_recovery_time_by_delivery", None,
+                                "pending", "ms", "requires record_timeseries=True")
+
+        time_s = record.timeseries_time_s
+        by_path: dict[str, Any] = {}
+        for path in ("warm", "cold", "reestablish"):
+            events = [e for e in record.join_events if e.path == path]
+            if not events:
+                continue
+            durations_ms, n_never = [], 0
+            for e in events:
+                start = (e.rf_restore_ts_s
+                         if path == "reestablish" and e.rf_restore_ts_s is not None
+                         else e.trigger_ts_s)
+                flows = [fr for fr in record.flows.values()
+                         if fr.ue_id == e.ue_id
+                         and fr.ts_arrived_bytes is not None
+                         and fr.ts_dropped_bytes is not None]
+                ts = self._first_sustained_delivering(
+                    time_s, flows, start, window_s, violation_ceiling)
+                if ts is None:
+                    n_never += 1
+                else:
+                    durations_ms.append((ts - start) * 1000.0)
+            by_path[path] = {
+                "n_events": len(events), "n_never_recovered": n_never,
+                "p50_ms": _percentile(durations_ms, 0.50) if durations_ms else None,
+                "p95_ms": _percentile(durations_ms, 0.95) if durations_ms else None,
+                "max_ms": max(durations_ms) if durations_ms else None,
+                "window_s": window_s, "violation_ceiling": violation_ceiling,
+            }
+        return MetricResult(
+            "M21", "slo_recovery_time_by_delivery", {"by_path": by_path},
+            "ok", "ms",
+            f"green = a {window_s}s window in which the UE's flows drop or "
+            f"deliver-late <= {violation_ceiling:.0%} of arriving bytes; "
+            f"companion to M19, which cannot report red because expire() "
+            f"caps head-of-line age at pdb_ms")
+
+    def _first_sustained_delivering(
+        self, time_s: list[float], ue_flows: list[FlowRecord], start_ts_s: float,
+        window_s: float, ceiling: float,
+    ) -> Optional[float]:
+        """First timestamp >= start_ts_s from which every flow keeps its
+        dropped-byte fraction at or below `ceiling` for `window_s`."""
+        if not ue_flows or not time_s:
+            return None
+        n = len(time_s)
+        dt = (time_s[1] - time_s[0]) if n > 1 else 0.0
+        if dt <= 0:
+            return None
+        need = max(1, int(round(window_s / dt)))
+        # A WINDOWED ratio, not a per-slot one. The first version compared
+        # bytes dropped in slot i against bytes that ARRIVED in slot i --
+        # but a chunk is dropped `pdb_ms` AFTER it arrived (expire()), so
+        # those are different bytes and the ratio was near-meaningless. It
+        # returned 0.25 ms on a UE that had just lost 1.4 MB. Summing both
+        # over the same window removes the offset and matches M02's own
+        # byte-weighted form, which is what M19's caveat names as the fix.
+        for start_i, ts in enumerate(time_s):
+            if ts < start_ts_s:
+                continue
+            end_i = start_i + need
+            if end_i > len(time_s):
+                return None           # not enough run left to confirm a window
+            ok = True
+            for fr in ue_flows:
+                arr = sum(fr.ts_arrived_bytes[start_i:end_i])
+                drp = sum(fr.ts_dropped_bytes[start_i:end_i])
+                if arr <= 0:
+                    continue          # nothing offered in the window
+                if drp / arr > ceiling:
+                    ok = False
+                    break
+            if ok:
+                return ts
+        return None
 
     def _first_sustained_green(
         self, time_s: list[float], ue_flows: list[FlowRecord], start_ts_s: float, dwell_s: float,
