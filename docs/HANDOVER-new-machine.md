@@ -1,7 +1,10 @@
 # Handover — moving this project to another machine
 
-Written 2026-09-01, for moving `feat/high-fidelity-sim` to an
-overnight-capable PC over remote VS Code. **Start a session on the new
+Written 2026-09-01; **revised 2026-09-01 after G9 and G12 closed** (this
+document was first written at `eefe1d1`, before Part C, G9, G12 and four
+journal rules landed — every section below is current as of `74789ed`). For
+moving `feat/high-fidelity-sim` to an overnight-capable PC over remote VS
+Code. **Start a session on the new
 machine from this document, not from a chat transcript.**
 
 Every figure below was derived on **this laptop** (24 cores, 290 G disk,
@@ -43,7 +46,8 @@ raw per-cell `RunRecord` JSONL is not.
 | `stage3/` | **1.8 G** | the run that died at cell 51/52; superseded, no committed CSV — **do not copy** |
 | `stage4/records.jsonl` | **968 M** | needed for any C5-style bit-identity check |
 | `stage5/records.jsonl` | **906 M** | as above |
-| `stage6_g6_n40_records.jsonl` | ~230 M | the 240 records §27–§29 were computed from |
+| `stage6_g6_n40_records.jsonl` | **251 M** | the 240 records §27–§29 were computed from |
+| `part_c_records.jsonl` | **652 M** | **added after this document was first written** (Part C, §30). Its scored `part_c_rows.csv` IS committed and covers every published Part-C claim, so this is skippable on the same grounds as stage 2. |
 
 ### 1.3 The consequence, stated concretely
 
@@ -64,9 +68,70 @@ re-run the cells.** This is not hypothetical — it has already bitten twice:
   laptop*; re-probe first, §4).
 
 **Recommended to copy by hand** if you want full re-analysis capability:
-`stage1/records.jsonl` (1.5 G), `stage4/records.jsonl` (968 M),
-`stage6_g6_n40_records.jsonl` — **2.6 GB total** (measured with `du -ch`). Skip stage 2 (5.1 G,
-its CSV covers every published claim) and stage 3 entirely (superseded).
+`stage1/records.jsonl` (1.4 G), `stage4/records.jsonl` (937 M),
+`stage6_g6_n40_records.jsonl` (251 M) — **2.6 GB total** (`du -ch`,
+re-measured 2026-09-01). Skip `stage2/` (5.1 G, its CSV covers every
+published claim), `part_c_records.jsonl` (652 M, same grounds), and `stage3/`
+entirely (1.8 G, superseded).
+
+**RE-CHECKED after G9 and G12: the 2.6 GB figure is UNCHANGED, and that is a
+property of how those two campaigns were built, not luck.** Neither persists
+raw `RunRecord` JSONL. `scripts/g9_campaign.py` and `scripts/g12_campaign.py`
+score online and write only their scored JSON, so **every G9 and G12 artefact
+is tracked and travels in the clone**:
+
+| artefact | size | in a clone? |
+|---|---|---|
+| `g9_campaign.json` / `.log` | 7 KB / 4 KB | **yes** |
+| `g12_campaign.json` | 115 KB | **yes** — carries per-ramp-point telemetry M02, bg throughput and per-class worst fractions, so **§36 is fully re-analysable from a clone alone** |
+| `g12_campaign.log`, `g12_score.log`, `g12_ramp_probe.log`, `g12_timed_cell.log` | 14 KB total | **yes** |
+
+**So nothing from G9 or G12 needs hand-copying.** The whole `sweeps/` tree is
+**11 G**; the 2.6 GB subset is the part that is neither committed nor cheaply
+reproducible.
+
+---
+
+## 1.4 THE HAND-COPY MANIFEST — exactly what to move, measured
+
+Everything else comes from `git clone`. Sizes measured 2026-09-01 on this
+laptop; `du` totals, not `ls` sums.
+
+| # | path | size | why it cannot be cloned |
+|---|---|---|---|
+| 1 | `sweeps/wp9/stage1/records.jsonl` | **1.4 G** | Part A's per-flow input; `.gitignore`d raw records |
+| 2 | `sweeps/wp9/stage4/records.jsonl` | **937 M** | needed for any C5-style bit-identity check against stage 5 |
+| 3 | `sweeps/wp9/stage6_g6_n40_records.jsonl` | **251 M** | the 240 records §27–§29 were computed from |
+| | **subtotal** | **2.6 G** | |
+| 4 | `~/.claude/plans/` | **220 K**, 13 files | outside the repo entirely; not in git |
+| | **TOTAL** | **≈ 2.6 G** | |
+
+**Deliberately NOT copied, with the reason for each:**
+
+| path | size | why skip |
+|---|---|---|
+| `sweeps/wp9/stage2/records.jsonl` | 5.1 G | `stage2_rows.csv` is committed and covers every published stage-2 claim |
+| `sweeps/wp9/stage3/` | 1.8 G | the run that died at 51/52, superseded, no committed CSV |
+| `sweeps/wp9/part_c_records.jsonl` | 652 M | `part_c_rows.csv` is committed; same grounds as stage 2 |
+| `sweeps/wp9/stage5/records.jsonl` | 836 M | `stages5_rows.csv` is committed; re-runnable |
+| G9 / G12 artefacts | 140 K | **all tracked** — they travel in the clone |
+
+**Sanity check on arrival**, before trusting any of it:
+
+```bash
+du -ch sweeps/wp9/stage1/records.jsonl \
+       sweeps/wp9/stage4/records.jsonl \
+       sweeps/wp9/stage6_g6_n40_records.jsonl | tail -1   # expect ~2.6G
+ls ~/.claude/plans/ | wc -l                                # expect 13
+uv sync && uv run pytest sim/tests -q                      # expect 879 passed
+uv run python scripts/regression_corpus.py --check         # expect "no drift"
+```
+
+**If `--check` reports drift on a fresh machine, that is a finding about
+portability, not a reason to `--capture`.** The corpus is frozen
+(CLAUDE.md); re-baselining to make a cross-machine diff disappear would
+destroy the only evidence that the simulator is not bit-reproducible across
+hosts.
 
 ---
 
@@ -80,9 +145,10 @@ deliverables, and a clone does not get them. **Copy the directory.**
 
 ## 3. State of the working tree at handover
 
-- Branch `feat/high-fidelity-sim`, **49 commits ahead of origin, unpushed.**
-  A new machine should clone and then `git pull` from this one, or this
-  laptop should push first.
+- Branch `feat/high-fidelity-sim`, **pushed to both `origin`
+  (rahulnetsc/5g-qos-stack-personal) and `upstream`
+  (artpark-hub/5g-qos-stack) as of `74789ed`.** A clone of either is
+  complete; nothing needs pulling from this laptop.
 - Untracked and safe to ignore: `sweeps/wp9/stage3.{log,crash1.log}` —
   leftovers from the dead stage-3 run.
 - **`sweeps/wp9/part_c*` may be mid-run.** `part_c_rows.csv` is written
@@ -154,22 +220,47 @@ not to `/tmp` session directories.
 ## 6. Current state and the agreed next sequence
 
 **Guarantee inventory: `docs/wp9-regime-map.md` §2.1** — one status per
-guarantee with its reason. Summary: 3 answered (G4, G6, G10), 1 measured
-failure (G5), 3 partial (G1, G3, G8), 3 unrun-but-buildable (G9, G11, G12),
-1 blocked on a named mechanism (G2), 1 structurally out (G7).
+guarantee with its reason. Summary as of `74789ed`: **3 answered** (G4, G6,
+G10), **2 measured failures** (G5, and G12's clause 4 — filed under G1/G3),
+**3 partial** (G1, G3, G8), **2 run with clause-level answers** (G9, G12),
+**1 unrun** (G11), **1 blocked on a named mechanism** (G2), **1 structurally
+out** (G7). **G9 and G12 have both closed since this document was written.**
 
-**The two entries not to skip:** G5 is a measured base-cell failure on both
-QoS-aware arms (median worst-flow PDU-set completeness **0.0000**) and is
-the most operationally serious thing WP9 has found; G6 **passes** on
-measurement while being **unscoreable as specified** (regime map §0.6.1–3).
+**The three entries not to skip:**
+
+1. **G5** — a measured base-cell failure on both QoS-aware arms (median
+   worst-flow PDU-set completeness **0.0000**), still the most operationally
+   serious thing WP9 has found.
+2. **G12's clause 4, filed under G1/G3** — telemetry M02 reaches **1.000**
+   (every resolved byte PDB-violated) **while background 5QI 9 still carries
+   11.6 Mbps**, which is GT-7.3's own worked FAIL example. PF and Reservation
+   from 102 % of the measured ceiling; **TwoTier from NOMINAL LOAD on 9 of 10
+   seeds**. Two qualifications travel with it and are on G12's row: the arm
+   difference is **untested under flow-list permutation**, and G12's clean
+   ramp-bottom control **does not cover telemetry** (it reads M13's GBR
+   classes; 5QI 1 is `Delay`).
+3. **G6** — **passes** on measurement while being **unscoreable as
+   specified** (regime map §0.6.1–3).
+
+**And one standing confound a new session must know about before running
+anything on the fleet workloads: FLOW DECLARATION ORDER.** Measured in
+`docs/wp9-plan.md` §35.5/§36.1: reordering `ScenarioConfig.flows`, with
+everything else byte-identical, **changes which 5QI class violates first**,
+and on TwoTier it can break a bearer at nominal load outright. PF's
+permutation 104 gives the opposite first-violation order from 101/102/103, on
+all 5 seeds each — a *deterministic* function of list position, not noise.
+**The mechanism is untraced.** Three candidates are named in §35.5 and all
+three are position-dependent, so tracing to any of them confirms the artefact
+rather than refuting it.
 
 ### Next items, none started, each needing its own plan
 
 | item | why it is not started |
 |---|---|
-| **G12** | Needs a workload with **≥ 2 GBR 5QI classes** — every WP9 workload has exactly one, so M13 has nothing to order. Scenario work. |
-| **G9** | Unrun, buildable, with a **measured** argument: M18/M19 read `pending` on every row of every stage because no scenario configures `UEConfig.join`. |
-| **G11** | Unrun; see §5.1 — revisit the seed count on the new machine. |
+| **G11** | **The only unrun guarantee left, and the reason for this move.** See §5.1 — revisit the seed count on the new machine. |
+| **The declaration-order trace** | §35.5's confound. Needs a worktree-instrumented direct-cause trace; the promotion bar for calling any ordering result a scheduler property is registered in `wp9-plan.md` §35.13 and must be applied as written, **including its edge** — the three candidate mechanisms are all position-dependent, so finding one of them CONFIRMS the artefact. |
+| **G12 clause 1** | Scored weakly: 5QI 9 has no contract, so there is no breach event to order it against the GBR classes. **Answerable from `g12_campaign.json` without a re-run** (§36.7 item 4), but it was never registered as an expectation, so it needs registering before it is scored. |
+| **G9's two open threads** | TwoTier's self-selected event shortfall (§34.5 — the scripted restart period must exceed the slowest arm's handshake) and the unexplained neighbour Δp98 (§34.2, r = −0.028 against the obvious explanation). |
 | **§15.5's discriminator** | Two fleet profiles holding flow count and GBR fraction fixed while varying tight-PDB density and LCG co-location. |
 | **§23.4's UL/DL pair** | One UL and one DL flow identical in size, cadence, PDB and priority, to isolate the SR-resumption cost. |
 | **TB-size quantisation** | Fully specified and deliberately unbuilt (`docs/wp9-plan.md` §20.10): `scheduler/tbs.py` is the home, whoever takes it up **starts at commit 2, not at scoping**. |
@@ -177,17 +268,59 @@ measurement while being **unscoreable as specified** (regime map §0.6.1–3).
 ### Working discipline that must survive the move
 
 `CLAUDE.md` carries the standing rules; `prediction-journal.md` carries the
-pre-registration ones. The two earned most recently:
+pre-registration ones.
+
+**`prediction-journal.md` now has FOUR standing form rules. They govern how
+an expectation is written and are not optional:**
+
+1. **Predict the SHAPE, not the mechanism.** Say what the data will look
+   like and fix each look's meaning *in advance*. A mechanism prediction is
+   unscoreable until someone traces code; a shape prediction scores on
+   arrival and cannot be re-fitted.
+2. **A two-level axis reading can INVERT.** Two levels support *"this axis
+   has an effect"*, never *"more of it does more of that"*. Breadth
+   establishes existence; depth establishes shape.
+3. **Check the instrument has DYNAMIC RANGE before registering a delta.** On
+   the control condition alone, ask whether the statistic can move at all. A
+   delta on a floored metric is unfalsifiable however well it is written —
+   J5 satisfied every other rule and could not have been contradicted.
+   **G12 extended this to non-deltas:** a first-violation *order* has the
+   same failure mode (stage 5's lidar was pinned at "fails", capped at
+   `duration_s/horizon_s`), and the check on an order **leaks part of the
+   answer**, so declare when an expectation is pilot-informed rather than
+   blind.
+4. **A rule can be violated by the code that IMPLEMENTS it.** `g12_score.py`
+   cites the decompose rule in its docstring and then pooled a minimum
+   across arms. **Analysis code is a claim in advance**: decompose by the
+   grouping the report will present, at the time the line is written. What
+   caught it was suspicion of the tool's *output*, not a code review.
+
+**And from `docs/wp9-regime-map.md` §4.1 — the clause-by-clause default.**
+Two guarantees have now produced their most consequential finding for a
+*different* row: G6's work produced G5's failure, G12's produced G1/G3's. In
+both cases the clause that went unscored longest was the one **whose
+instrument differed from the guarantee's headline instrument** (G6: headline
+a delta, unscored clause a bound; G12: headline an ordering via M13, unscored
+clause a PDB rate via M02). **So score every guarantee clause by clause, with
+each clause's own instrument named** — the discipline G9's row introduced.
+This is the default now, not something adopted when a guarantee turns out to
+be complicated.
+
+**Also still standing, from CLAUDE.md:**
 
 - **Decompose before attributing** — for any aggregate about a protected
   set, name the rows it sums over, the rows the claim is about, and whether
-  they are the same set. Four errors in one item, identical shape.
-- **Predict the shape, not the mechanism** — and if the shape is
-  quantitative, name the cut in advance.
+  they are the same set. Four errors in one item, identical shape; a fifth
+  and sixth since, one of them inside the tool built to apply it.
+- **Assert the EXPECTED count, not merely non-zero** — a partially
+  degenerate run is not a smaller sample of the same thing, because the
+  surviving events are self-selected (G9 §34.5). G12 applied this at
+  **cell** granularity for the same reason: dropping only the failing seeds
+  would have self-selected the survivors.
 
 ### Verification, run after every commit
 
 ```bash
-uv run pytest sim/tests -q                            # 826 passing
+uv run pytest sim/tests -q                            # 879 passing
 uv run python scripts/regression_corpus.py --check    # must say "no drift"
 ```
