@@ -33,6 +33,7 @@ from sim.join import JoinConfig, JoinEvent
 QFI_TELEMETRY = 1
 QFI_VIDEO = 2
 QFI_COMMAND = 82
+QFI_AGGRESSOR = 8      # GT-6's "bg saturation"; in NON_PROTECTED_5QI
 QFI_HANDSHAKE_UL = 70
 QFI_HANDSHAKE_DL = 71
 
@@ -130,7 +131,7 @@ def _handshake_flows(ue_id: int) -> list[FlowConfig]:
 
 def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
            horizon_slots: int, fade: ScriptedFadeWindow | None = None,
-           joiner_id: int = 1) -> ScenarioConfig:
+           joiner_id: int = 1, bg: bool = True) -> ScenarioConfig:
     flows: list[FlowConfig] = []
     ues: list[UEConfig] = []
 
@@ -147,6 +148,21 @@ def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
         ues.append(UEConfig(ue_id=nid, mean_snr_db=_BASE_SNR_DB,
                             coherence_slots=_COHERENCE_SLOTS))
 
+    if bg:
+        # GT-6's own load condition -- "Asset A full profile + bg
+        # saturation" (GT-6.1), "against a loaded cell" (GT-6.2). WITHOUT
+        # IT THE NEIGHBOURS CLAUSE IS VACUOUS: measured at 22% UL
+        # utilisation the neighbours drop and delay nothing, so the
+        # neighbours delta is 0.000000 on every arm and every seed -- an
+        # arithmetically correct PASS from a statistic with no dynamic
+        # range, which J5 could never falsify. 5QI 8 is in
+        # Scorecard.NON_PROTECTED_5QI, so the aggressor is excluded from
+        # the neighbours statistic automatically.
+        flows.append(FlowConfig(
+            ue_id=ues[-1].ue_id, qfi=QFI_AGGRESSOR, direction="UL",
+            flow_class="PF", pdb_ms=300.0, lcg=6, traffic_kind="poisson",
+            traffic_params={"rate_bps": 50_000_000.0}))
+
     sc = ScenarioConfig(name=name, horizon_slots=horizon_slots,
                         carrier=CarrierConfig(bandwidth_hz=40_000_000,
                                               numerology=2),
@@ -158,8 +174,8 @@ def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
 
 def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
                      n_cycles: int = 10, horizon_slots: int = 20_000,
-                     first_slot: int = 2000, period_slots: int = 1600
-                     ) -> ScenarioConfig:
+                     first_slot: int = 2000, period_slots: int = 1600,
+                     bg: bool = True) -> ScenarioConfig:
     """GT-6.1: repeated app restarts on the joiner under neighbour load.
 
     `n_cycles` restarts because the pass line is a **p95 over cycles**; one
@@ -171,13 +187,13 @@ def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
     join = JoinConfig(events=events, handshake_ul_qfi=QFI_HANDSHAKE_UL,
                       handshake_dl_qfi=QFI_HANDSHAKE_DL)
     return _build(f"g9_gt61_warm_n{n_neighbours}", n_neighbours=n_neighbours,
-                  join=join, seed=seed, horizon_slots=horizon_slots)
+                  join=join, seed=seed, horizon_slots=horizon_slots, bg=bg)
 
 
 def gt62_cold_attach(seed: int = 1, n_neighbours: int = 7, n_cycles: int = 5,
                      horizon_slots: int = 20_000, first_slot: int = 2000,
-                     off_slots: int = 800, period_slots: int = 3000
-                     ) -> ScenarioConfig:
+                     off_slots: int = 800, period_slots: int = 3000,
+                     bg: bool = True) -> ScenarioConfig:
     """GT-6.2: repeated power-cycles. GT-6.2's own pass line is "10
     consecutive cycles", which is why `JoinConfig.events` is a list.
 
@@ -196,7 +212,7 @@ def gt62_cold_attach(seed: int = 1, n_neighbours: int = 7, n_cycles: int = 5,
                       handshake_ul_qfi=QFI_HANDSHAKE_UL,
                       handshake_dl_qfi=QFI_HANDSHAKE_DL)
     return _build(f"g9_gt62_cold_n{n_neighbours}", n_neighbours=n_neighbours,
-                  join=join, seed=seed, horizon_slots=horizon_slots)
+                  join=join, seed=seed, horizon_slots=horizon_slots, bg=bg)
 
 
 # sim/rlf.py's RlfDetectorConfig, from the gNB startup banner: t310 = 2000 ms,
@@ -210,8 +226,8 @@ T310_SLOTS_MU2 = int(_T310_MS / _SLOT_MS_MU2)   # 8,000
 
 def gt63_rlf_recovery(seed: int = 1, n_neighbours: int = 7,
                       horizon_slots: int = 30_000, fade_start_slot: int = 4000,
-                      fade_slots: int = 12_000, fade_extra_loss_db: float = 35.0
-                      ) -> ScenarioConfig:
+                      fade_slots: int = 12_000, fade_extra_loss_db: float = 35.0,
+                      bg: bool = True) -> ScenarioConfig:
     """GT-6.3: a scripted deep fade drives RLF, then recovery.
 
     RLF is **never scripted as an event** -- it is emergent, driven by
@@ -242,4 +258,5 @@ def gt63_rlf_recovery(seed: int = 1, n_neighbours: int = 7,
                               end_slot=fade_start_slot + fade_slots,
                               extra_loss_db=fade_extra_loss_db)
     return _build(f"g9_gt63_rlf_n{n_neighbours}", n_neighbours=n_neighbours,
-                  join=join, seed=seed, horizon_slots=horizon_slots, fade=fade)
+                  join=join, seed=seed, horizon_slots=horizon_slots, fade=fade,
+                  bg=bg)

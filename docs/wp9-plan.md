@@ -5379,3 +5379,61 @@ age**. The metrics that can see a flow failing are the delivery-based ones
 **When choosing which metric answers a question about whether traffic got
 through, prefer a delivery-based statistic — an age-based one can be
 capped by the very mechanism that drops the traffic.**
+
+
+---
+
+## 33. G9 commit 4 — the campaign runner, and a neighbours statistic that could not fail
+
+Two assertions run before any metric is read, and the runner refuses to
+report if either fails (`scripts/g9_campaign.py`).
+
+### 33.1 The two registered assertions, both firing
+
+**Event-count assertion** (CLAUDE.md's sixth empty-selection instance):
+per case, assert non-zero events **of the expected path** — `warm` for
+GT-6.1, `cold` for GT-6.2, `reestablish` for GT-6.3 — not merely "some
+events". A scenario producing none reads identically to one where
+everything went well, which is exactly how the t310 defect hid.
+
+**Neighbours-population assertion** (§31.6): the runner **prints** the flow
+set that enters the statistic and asserts the joiner's flows are absent.
+Measured: 9 protected flows from `ue2`/`ue3`/`ue4`, none from `ue1`.
+
+### 33.2 THE FINDING — the neighbours clause was VACUOUS as first built
+
+The first campaign returned **ΔM02 = 0.000000 on every arm, every case,
+every seed, with `worse 0%`.** An exact zero everywhere is the signature
+this project has recorded twice — a statistic that cannot move, wearing a
+result.
+
+**Decomposed before quoting, per the standing check:** the neighbours'
+absolute M02 was **0.0 in both conditions**, at **22 % UL utilisation**,
+with every protected flow at zero drops and zero late bytes. **ΔM02 = 0 − 0
+is arithmetically correct and detects nothing** — J5 could never have been
+falsified.
+
+**Cause: the scenarios omitted the load GT-6 specifies.** GT-6.1 says
+*"while Asset A runs full profile **+ bg saturation**"*; GT-6.2 *"against a
+**loaded cell**"*. The builders had no `bg`. Added as a 50 Mbps 5QI-8
+aggressor — which `Scorecard.NON_PROTECTED_5QI` already excludes from the
+neighbours statistic, so it loads the cell without entering the population.
+**UL utilisation 0.222 → 0.876.**
+
+### 33.3 And even loaded, M02 on the neighbours is FLOORED
+
+At 0.876 UL utilisation the neighbours' protected flows still show **m02 =
+0.0** and **p98 = 15.5 ms against a 100 ms PDB — roughly 6× headroom.**
+The QoS-aware arms are doing exactly what they should: a best-effort flood
+is deprioritised and protected bearers are untouched.
+
+**But a delta of a floored statistic still cannot move.** So the campaign
+reports **both**: ΔM02, which is the guarantee's own currency, and **Δp98,
+which is the instrument with dynamic range**. A "neighbours unaffected"
+pass read off ΔM02 alone would be a statement about the floor, not about
+containment — the same error shape as §28.1's M02 and §24.2's M03, caught
+here **before** any number was quoted rather than after.
+
+**Consequence for J5:** it is now falsifiable. If neighbours are genuinely
+disturbed by a join, Δp98 can show it; if ΔM02 and Δp98 are both flat, that
+is a real null rather than a floored one.
