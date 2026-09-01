@@ -1,0 +1,42 @@
+G12 ramp stop-condition probe -- mixed N=8 seed=12345 horizon=20000
+  GBR flow census (computed from the built scenario): {4: 2, 2: 5}
+  contract fraction 0.95 (panel default), canonical declaration order, no permutation
+
+--- PF
+  x1.0   committed   28.0 Mbps (   44% of ceiling) | 5QI2 5/5 min 0.953 | 5QI4 2/2 min 1.000 | 5QI9  35.784 | ul_util 0.897 | 2.4s
+  x1.5   committed   42.0 Mbps (   66% of ceiling) | 5QI2 5/5 min 0.953 | 5QI4 2/2 min 1.000 | 5QI9  22.848 | ul_util 0.914 | 2.5s
+  x2.0   committed   56.0 Mbps (   88% of ceiling) | 5QI2 3/5 min 0.780 | 5QI4 2/2 min 1.000 | 5QI9  13.939 | ul_util 0.933 | 2.5s
+  x3.0   committed   84.0 Mbps (  132% of ceiling) | 5QI2 0/5 min 0.121 | 5QI4 2/2 min 1.000 | 5QI9  11.835 | ul_util 0.933 | 2.6s
+  x4.0   committed  112.0 Mbps (  177% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.869 | 5QI9  11.818 | ul_util 0.933 | 2.6s
+  x6.0   committed  168.0 Mbps (  265% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.580 | 5QI9  11.818 | ul_util 0.933 | 2.6s
+  x8.0   committed  224.0 Mbps (  353% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.435 | 5QI9  11.818 | ul_util 0.933 | 2.7s
+  x12.0  committed  336.0 Mbps (  530% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.290 | 5QI9  11.818 | ul_util 0.933 | 2.8s
+
+--- Reservation
+  x1.0   committed   28.0 Mbps (   44% of ceiling) | 5QI2 5/5 min 0.953 | 5QI4 2/2 min 1.000 | 5QI9  31.288 | ul_util 0.900 | 3.1s
+  x1.5   committed   42.0 Mbps (   66% of ceiling) | 5QI2 5/5 min 0.952 | 5QI4 2/2 min 1.000 | 5QI9  18.547 | ul_util 0.913 | 3.3s
+  x2.0   committed   56.0 Mbps (   88% of ceiling) | 5QI2 5/5 min 0.953 | 5QI4 2/2 min 1.000 | 5QI9   6.831 | ul_util 0.927 | 3.6s
+  x3.0   committed   84.0 Mbps (  132% of ceiling) | 5QI2 0/5 min 0.399 | 5QI4 2/2 min 1.000 | 5QI9   0.019 | ul_util 0.932 | 4.0s
+  x4.0   committed  112.0 Mbps (  177% of ceiling) | 5QI2 2/5 min 0.155 | 5QI4 2/2 min 0.997 | 5QI9   0.009 | ul_util 0.931 | 4.0s
+  x6.0   committed  168.0 Mbps (  265% of ceiling) | 5QI2 0/5 min 0.001 | 5QI4 0/2 min 0.718 | 5QI9   0.005 | ul_util 0.932 | 4.1s
+  x8.0   committed  224.0 Mbps (  353% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.539 | 5QI9   0.005 | ul_util 0.932 | 4.2s
+  x12.0  committed  336.0 Mbps (  530% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.360 | 5QI9   0.005 | ul_util 0.932 | 4.3s
+
+--- TwoTier
+  x1.0   committed   28.0 Mbps (   44% of ceiling) | 5QI2 5/5 min 0.953 | 5QI4 2/2 min 1.000 | 5QI9  36.299 | ul_util 0.925 | 9.2s
+  x1.5   committed   42.0 Mbps (   66% of ceiling) | 5QI2 4/5 min 0.948 | 5QI4 2/2 min 1.000 | 5QI9  25.202 | ul_util 0.933 | 9.2s
+  x2.0   committed   56.0 Mbps (   88% of ceiling) | 5QI2 5/5 min 0.953 | 5QI4 2/2 min 1.000 | 5QI9   8.936 | ul_util 0.932 | 8.0s
+  x3.0   committed   84.0 Mbps (  132% of ceiling) | 5QI2 0/5 min 0.564 | 5QI4 2/2 min 0.966 | 5QI9   0.755 | ul_util 0.933 | 9.4s
+  x4.0   committed  112.0 Mbps (  177% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 1/2 min 0.906 | 5QI9   0.004 | ul_util 0.933 | 8.8s
+  x6.0   committed  168.0 Mbps (  265% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 1/2 min 0.583 | 5QI9   0.004 | ul_util 0.932 | 8.8s
+  x8.0   committed  224.0 Mbps (  353% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.450 | 5QI9   0.004 | ul_util 0.932 | 8.8s
+  x12.0  committed  336.0 Mbps (  530% of ceiling) | 5QI2 0/5 min 0.000 | 5QI4 0/2 min 0.308 | 5QI9   0.004 | ul_util 0.932 | 9.1s
+
+==========================================================================
+Ceiling (UL delivered at the ramp's own bottom, PF): 63.4 Mbps
+First committed-load multiplier at which 5QI 4 breaches (contract 0.95), CANONICAL order:
+  PF           4.0
+  Reservation  6.0
+  TwoTier      4.0
+
+[exited with code 0]

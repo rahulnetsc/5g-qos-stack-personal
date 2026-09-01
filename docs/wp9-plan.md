@@ -5933,3 +5933,69 @@ Full suite + `--check` after each. **`--check` is predicted CLEAN
 throughout**: every commit is a new scenario module, a script and docs, and
 no corpus scenario builds a fleet. If it moves, `sim/fleet.py` is less
 inert than D2 claims, and that is a finding about D2.
+
+### 35.12 Commit 2 — the stop-condition probe RAN, and where 5QI 4 breaches is the finding
+
+`scripts/g12_ramp_probe.py`, `mixed`/N=8/seed 12345/horizon 20,000, **canonical
+declaration order, no permutation**, one seed — this fixes a grid parameter,
+it scores nothing.
+
+**§35.5's stop condition does NOT fire.** 5QI 4 breaches its contract on every
+arm: **PF ×4.0, Reservation ×6.0, TwoTier ×4.0**. So `RAMP` can be set and
+`order_5qi` can have two elements.
+
+**But where it breaches is outside the guarantee's own ramp, and that is the
+result this probe actually produced.** GT-7.3 specifies *"+10 % steps of the
+measured ceiling … to 145 %"*. Measured ceiling (UL delivered when the cell is
+already saturated, at the ramp's bottom): **63.4 Mbps**, against **28.0 Mbps**
+committed at ×1.0.
+
+| mult | committed | % of ceiling | 5QI 2 (worst flow) | 5QI 4 (worst flow) | 5QI 9 |
+|---|---|---|---|---|---|
+| ×1.0 | 28.0 | 44 % | 5/5 met, 0.953 | 2/2 met, 1.000 | 35.8 Mbps |
+| ×2.0 | 56.0 | 88 % | 3/5, 0.780 | 2/2, 1.000 | 13.9 |
+| ×3.0 | 84.0 | 132 % | 0/5, 0.121 | **2/2, 1.000** | 11.8 |
+| **×3.3** | **92.4** | **146 %** | — | — | *GT-7.3's own top* |
+| ×4.0 | 112.0 | 177 % | 0/5, 0.000 | **0/2, 0.869** | 11.8 |
+| ×6.0 | 168.0 | 265 % | 0/5, 0.000 | 0/2, 0.580 | 11.8 |
+
+(PF shown; Reservation and TwoTier are in the probe's own output. Reservation
+holds 5QI 4 at `2/2, 0.997` as far as ×4.0 and breaks at ×6.0.)
+
+**Within GT-7.3's own ramp only 5QI 2 breaches, on all three arms — so the
+order there is a ONE-ELEMENT list.** That is F4's result recurring, but for a
+newly *measured* reason rather than a workload-census one, and it is a
+materially different statement: F4 said the data had nothing to order; this
+says the guarantee's own load range does not overload the class the guarantee
+says fails first.
+
+**And the two-element order, once the ramp is extended, is `[2, 4]` — 5QI 2
+before 5QI 4, which is G12's own inversion**, on every arm, under the
+canonical order. §35.5 has already shown the permuted order gives the
+conforming answer instead. **So the declaration-order confound is not a side
+issue for this guarantee; it decides the verdict**, and D4's control stops
+being a hygiene measure and becomes the load-bearing experiment.
+
+**On the legitimacy of extending the ramp.** Extending until a class breaches
+is the procedure §35.5 registered in advance — *"if no feasible load does so,
+that is itself the result"* — so the extension is not a result being bought.
+What would have been illegitimate is picking the **declaration order** that
+produces a breach, and that is not done: every number above is canonical
+order. The ramp therefore spans the guarantee's range **and** extends past it,
+`GUARANTEE_RAMP_TOP_MULT = 3.3` marks the boundary in code, and the analyser
+reports the two regions separately rather than averaging across them.
+**Reporting the beyond-145 % ordering as if it were the guarantee's own would
+be the error that constant exists to prevent.**
+
+**What commit 2 landed:** `sim/scenarios/g12.py` (no `sim/fleet.py` change —
+D2 verified, `build_fleet`'s existing parameters carry the whole ramp),
+`scripts/g12_ramp_probe.py`, and 26 tests. §35.7's five degeneracy guards are
+executable (`assert_cell_is_scoreable`, `assert_ramp_bottom_clean`,
+`assert_order_non_degenerate`), and `permute_flows` makes D4 a first-class
+control rather than an ad-hoc reshuffle.
+
+**A cell-exclusion fact worth having in advance:** `sensor_dense` allocates
+3 % UGVs, so at N=4 and N=8 it carries **no 5QI 4 flow at all** and cannot
+produce an ordering. `assert_cell_is_scoreable` refuses it by name rather than
+scoring it to a one-element "order" — the same 28-of-48 pattern stage 5's own
+census shows.
