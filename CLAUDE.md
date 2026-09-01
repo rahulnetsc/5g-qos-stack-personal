@@ -520,6 +520,29 @@ carried no caveat, the stale list would have kept passing while silently
 checking less than it claimed to. That is worse precisely because a test is
 the thing meant to catch this class of drift. Derive the set inside the
 test (`{m["id"] for m in load_panel()["metrics"] if m.get("caveats")}`).
+**A fifth instance, and it is in the BUDGETING path rather than the
+measurement path — which is why it belongs beside the empty-selection
+family rather than inside it.** WP9's G12 campaign runner has a
+`--time-cell` mode that times one cell and extrapolates to the grid. The
+flag also truncates the cell list to one entry so only that cell runs, and
+the extrapolation was computed from `len(kept)` *after* the truncation, so
+it reported **"22 min for the grid"** when the real grid was three
+scoreable cells and 64 min. A list silently reduced to one element and then
+summed over: structurally the same as the empty selection, the one-element
+"order", and the 1,710-row `None`-base.
+
+**What is new is the failure mode, and it is worth separating because the
+mitigation differs.** Every earlier instance corrupts a RESULT — a wrong
+claim gets published and has to be retracted. **A wrong budget publishes
+nothing.** It fails by making someone launch a run they abandon, or decline
+work that was actually affordable, or size a grid against a cost that was
+never real. There is no artefact to check it against afterwards, and no
+`--check` that moves. So the guard cannot be "verify the number later"; it
+has to be **derive the extrapolation from the population BEFORE any mode
+flag narrows it**, and say which population it is extrapolating over. The
+fix was one line — capture `n_real_cells` before the truncation — and it is
+only findable by reading the code, never by reading the output, because
+"22 min" is exactly as plausible as "64 min".
 
 **DECOMPOSE BEFORE ATTRIBUTING: for any aggregate about a protected set,
 ask what rows actually entered the sum before quoting it.** Not an instinct

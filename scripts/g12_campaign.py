@@ -67,6 +67,9 @@ _TT = str(Path(__file__).resolve().parent.parent / "scheduler"
           / "scheduler_config.yaml")
 CQI_DELAY_SLOTS = 8
 HORIZON_SLOTS = 20_000
+# The panel's own pre-registered value (config/metric_panel.yml
+# `defaults.gbr_contract_fraction`), read rather than re-typed.
+CONTRACT_FRACTION = Scorecard().defaults["gbr_contract_fraction"]
 QFI_TELEMETRY = 1                     # G12's clause 4, "never 5QI 1"
 
 # Candidate cells. Which of these are actually SCOREABLE is derived from
@@ -236,6 +239,63 @@ def order_for(ramped: dict[str, Any], ramp: tuple[float, ...], label: str,
             "is_scoreable": verdict.is_scoreable}
 
 
+def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int]
+                 ) -> tuple[list[tuple[str, int]], dict[str, Any]]:
+    """E1's control, run at CELL granularity BEFORE any ordering.
+
+    WHY THIS EXISTS, AND WHY IT IS NOT A RELAXED GUARD. The first real
+    campaign launch aborted at `ugv_heavy/PF/seed579362555` with 5QI 2
+    breaching at ramp index 0 -- x1.0, nominal load, CANONICAL declaration
+    order, no permutation. §35.9 E1 registered that as a stop condition and
+    it stopped, correctly: a cell whose control is contaminated measures
+    provisioning, not overload.
+
+    WHY THE CELL AND NOT THE SEED IS THE UNIT. Dropping only the failing
+    seeds would leave the surviving ones SELF-SELECTED -- precisely the
+    partially-degenerate-run trap CLAUDE.md records from G9, where TwoTier's
+    3.8-of-10 events were the fastest ones and the arms stopped being
+    comparable. A cell is therefore excluded WHOLE, on a criterion
+    registered before any of this ran (§35.7 case 2), and the contaminated
+    count is reported rather than quietly dropped.
+
+    Costs one ramp point x arms x seeds per cell -- a few minutes -- and it
+    runs first, so no ordering is ever computed on a contaminated cell.
+    """
+    print("=" * 78)
+    print("E1's CONTROL PASS -- ramp bottom only, every cell, read FIRST")
+    print("=" * 78)
+    clean, report = [], {}
+    bottom = (RAMP[0],)
+    for comp, n in cells:
+        bad = []
+        for arm_name, factory in arms.items():
+            for seed in seeds:
+                r = run_ramp(comp, n, arm_name, factory, seed, bottom)
+                worst = r["per_point"][0]["worst_by_class"]
+                dirty = sorted(qi for qi, v in worst.items()
+                               if v < CONTRACT_FRACTION)
+                if dirty:
+                    bad.append({"arm": arm_name, "seed": seed, "5qi": dirty,
+                                "worst": {k: round(v, 4)
+                                          for k, v in worst.items()}})
+        n_groups = len(arms) * len(seeds)
+        report[f"{comp}_n{n}"] = {"n_groups": n_groups, "contaminated": bad}
+        if bad:
+            print(f"  {comp}_n{n:<3} CONTAMINATED: {len(bad)}/{n_groups} "
+                  f"(arm, seed) groups breach at x{RAMP[0]}; EXCLUDED WHOLE")
+            for b in bad[:4]:
+                print(f"      {b['arm']}/seed{b['seed']}: 5QI {b['5qi']} "
+                      f"worst {b['worst']}")
+            if len(bad) > 4:
+                print(f"      ... and {len(bad) - 4} more")
+        else:
+            print(f"  {comp}_n{n:<3} clean: 0/{n_groups} groups breach at "
+                  f"x{RAMP[0]}")
+            clean.append((comp, n))
+    print(f"\n  cells with a clean control: {clean}")
+    return clean, report
+
+
 def order_for_permutation(ramped: dict[str, Any], ramp: tuple[float, ...],
                           label: str, allow_one_element: bool) -> dict[str, Any]:
     """`order_for` for the D4 control, where a FAILED GUARD IS THE
@@ -309,6 +369,14 @@ def main(argv: list[str]) -> int:
     print(f"  {len(arms)} arms x {n_seeds} seeds; "
           f"{len(kept) * len(arms) * n_seeds * len(ramp)} runs", flush=True)
 
+    control_report: dict[str, Any] = {}
+    if not args.time_cell:
+        kept, control_report = control_pass(kept, arms, seeds)
+        if not kept:
+            print("\nNO CELL HAS A CLEAN CONTROL. E1 fails outright and no "
+                  "ordering is computed -- that is the result (§35.9 E1).")
+            return 1
+
     if args.time_cell:
         t0 = time.time()
         comp, n = REFERENCE_CELL
@@ -334,6 +402,7 @@ def main(argv: list[str]) -> int:
 
     out: dict[str, Any] = {"ramp": list(ramp), "in_range": list(in_range),
                            "excluded_cells": [[list(c), w] for c, w in excluded],
+                           "control_pass": control_report,
                            "cells": {}}
 
     for comp, n in kept:

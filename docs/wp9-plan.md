@@ -6142,3 +6142,156 @@ permutations and `[4,2]` on the fourth** — the order flipping under
 reordering alone, at one seed. §35.13's bar is unchanged by it: that is what
 an artefact looks like, and promotion still requires an arm difference
 surviving *every* permutation or a position-independent mechanism.
+
+## 36. G12 campaign — E1–E5 scored, and clause 4 fails inside the guarantee's own ramp
+
+`scripts/g12_campaign.py` → `sweeps/wp9/g12_campaign.json`; scored by
+`scripts/g12_score.py` → `sweeps/wp9/g12_score.log`. Reproduce with
+`uv run python scripts/g12_score.py sweeps/wp9/g12_campaign.json`.
+
+### 36.0 E1's control fired on real data, and it cost two of three cells
+
+§35.9 registered E1 as a stop condition, and **it stopped the first launch**
+at `ugv_heavy/PF/seed579362555` — 5QI 2 breaching at ramp index 0, ×1.0,
+nominal load, **canonical declaration order, no permutation**. The response
+was a cell-level control pass, not a relaxed guard:
+
+| cell | contaminated at ×1.0 | pattern |
+|---|---|---|
+| `mixed_n8` | **0/30** | clean |
+| `ugv_heavy_n8` | **3/30** | all three arms, the *same* seed, 5QI 2 ≈ 0.947 |
+| `drone_heavy_n8` | **9/30** | **TwoTier-dominated**, 5QI 2 down to **0.7505** |
+
+**5QI 4 is at 1.000 in every contaminated group** — it is always the camera
+that is marginal at nominal load, never the lidar.
+
+**The unit of exclusion is the CELL, and that choice is the load-bearing
+one.** Dropping only the failing seeds would leave the survivors
+**self-selected** — G9's partially-degenerate-run trap, where the surviving
+events were the fastest ones and the arms stopped being comparable. So a
+contaminated cell goes whole. **E1: MISS**, 12/90 groups, and the ordering
+analysis rests on **one** cell rather than three. That is a real loss of
+scope and is stated as one.
+
+### 36.1 The permutation control, read FIRST (§35.13)
+
+| arm | unscoreable permuted runs | orders across permutations |
+|---|---|---|
+| PF | 0/20 | `[2,4]`×15, `[4,2]`×5 — **2 distinct** |
+| Reservation | 0/20 | `[2,4]`×12, `[4,2]`×8 — **2 distinct** |
+| TwoTier | **7/20** | `[2,4]`×13 |
+
+**PF's split is clean and total: permutations 101/102/103 give `[2,4]` on all
+5 seeds each, permutation 104 gives `[4,2]` on all 5.** The order is a
+deterministic function of the flow list's order, not a noisy one — which is
+worse for the ordering's status as a result, not better.
+
+**And 7 of TwoTier's 20 permuted runs cannot produce a clean ramp bottom at
+all**, at ×1.0. Reordering the flow list alone breaks a bearer in the control
+condition.
+
+### 36.2 Region 1 — inside GT-7.3's own ramp. THE PRIMARY FINDING, and it is worse than "unobservable"
+
+**The ordering cannot be observed**: 3 of 30 groups produce a ≥2-element
+order at or below 145 % of ceiling (all three from TwoTier; PF and
+Reservation give `[2]` on all 10 seeds each). So G12's specified degradation
+order is not visible at the load G12 specifies — the specification finding
+§35.13 registered, and **not** F4's: F4's cause was one GBR class on disk,
+fixed by building a workload (done); this one is fixed by changing GT-7.3's
+ramp or accepting G12 is not testable as written. Different cause, different
+fix, **different owner**.
+
+**But the campaign found something the ordering was never going to show, and
+it is the headline: clause 4 — "never 5QI 1 while any lower class still has
+throughput" — FAILS, on every arm, inside the guarantee's own ramp.**
+
+| arm | worst telemetry M02 | seeds degraded | earliest degradation |
+|---|---|---|---|
+| PF | 1.000 | 10/10 | ×2.3 (**102 % of ceiling**) |
+| Reservation | 1.000 | 10/10 | ×2.3 (**102 %**) |
+| **TwoTier** | **1.000** | **10/10** | **×1.0 — NOMINAL LOAD** |
+
+`telemetry_m02 = 1.0` means **every resolved telemetry byte was
+PDB-violated**, while 5QI 9 was still carrying **11.6 Mbps**. That is
+GT-7.3's own worked example of a FAIL — *"telemetry gap grows while bg still
+moves bytes"* — realised exactly.
+
+**TwoTier's is the striking number: 9 of 10 seeds show telemetry degradation
+at ×1.0**, M02 0.009–0.068, rising to **0.92–0.98 by ×1.6**. PF and
+Reservation stay clean until ×2.3.
+
+**Two qualifications this must carry, both stated rather than discovered
+later.** First, **whether the arm difference survives permutation is
+UNTESTED**: D4's control was built for the *ordering* and measures M13's
+output, not telemetry M02, so nothing here rules out declaration-order
+sensitivity in this statistic too. Second, **E1's control pass could not have
+caught it** — that check reads M13's GBR classes, and 5QI 1 is `Delay`, so
+"the ramp bottom is clean" meant *clean for the ordering*, never *clean for
+clause 4*. Both are gaps in this campaign's own instrumentation, named here.
+
+**And this finding does not belong to G12.** A telemetry flow PDB-violated at
+nominal load is a **G1/G3** result (drive-command p98 within PDB; no
+false-failsafe); G12's clause 4 is only where it surfaced. Filed accordingly,
+per §29's precedent of promoting the G5 failure out of the G6 item rather
+than leaving it buried.
+
+### 36.3 Region 2 — beyond 145 %, with the control beside it
+
+`[2, 4]` on all 30 groups, all three arms, under the canonical order — 5QI 2
+before 5QI 4, **G12's own inversion**. §36.1 is the control: PF's own
+permutation 104 produces `[4, 2]` on all 5 of its seeds.
+
+**The registered qualifier applies verbatim and is not softened here: this
+ordering is a property of declaration order.** It is not reported as an
+inversion finding.
+
+### 36.4 The promotion bar, applied as written — including its edge
+
+- **Clause 1 — an arm difference surviving every permutation.** Does not
+  fire: the arms **do not differ** under the canonical order (all three give
+  `[2,4]`), so there is no difference to survive anything. **E5: HIT.**
+- **Clause 2 — a mechanism traced to something position-independent.** Not
+  run, and the edge stands: all three candidates §35.5 named are
+  position-dependent, so tracing to any of them would **confirm** the
+  artefact. "We found the mechanism" is not promotion.
+
+**Neither fires, so the conclusion registered in §35.13 applies word for
+word:** the Region-2 ordering is **not established as a scheduler property
+and is consistent with a declaration-order artefact.** G12's row says that,
+not an inversion.
+
+### 36.5 Scoreboard
+
+| # | expectation | verdict |
+|---|---|---|
+| **E1** | ramp bottom clean on all arms at every composition | **MISS** — 12/90 groups breach at ×1.0; two of three cells excluded whole |
+| **E2** | two-element order on every arm | **HIT** — 30/30, but only beyond the guarantee's own range |
+| **E3** *(clause 4)* | 5QI 1 intact wherever 5QI 9 still moves bytes | **MISS**, and the largest result here — M02 reaches 1.000 on every arm, TwoTier from ×1.0 |
+| **E4** | "5QI 9 exhausted" not literally satisfied | **HIT** — median 3.836 Mbps still flowing at the first GBR breach |
+| **E5** *(most-likely-wrong)* | order the same across arms | **HIT** — `[2,4]` on all three, canonical order |
+
+**E5 was the registered most-likely-wrong and it HIT** — the first time in
+this WP that slot has not carried the most interesting finding. It did not
+need to: **the pattern held in substance rather than in form**, because the
+result that mattered came from the expectation that missed. E3 is the largest
+finding in the item, and it arrived through clause 4, which M13 never touches.
+
+### 36.6 A defect in this scorer, found by decomposing its own output
+
+`g12_score.py`'s first E3 implementation scored clause 4 on the **liveness
+gap alone** and returned **UNSCOREABLE**. That was a defect, not a null:
+`telemetry_max_gap_ms` is `None` on **116** ramp points because the flow
+stops completing messages entirely, and a flow with no completions has no gap
+between completions to measure. **The gap is blind exactly where the failure
+is total** — the same shape as M19's registered caveat, and §33.3's
+dynamic-range rule one level over. E3 as registered said *"no liveness-gap
+**or PDB** degradation"*; the implementation had simply dropped half the
+criterion. Scoring on M02 restores fidelity to the registration rather than
+loosening it — and it moved E3 from UNSCOREABLE to **MISS**, i.e. against the
+expectation, which is the honest direction for a post-hoc correction to run.
+
+**Its second version then pooled across arms and reported "first degradation
+at ×1.0"** — true of TwoTier only. **That is the standing decompose check
+failing inside the tool built to apply it**, caught by asking which rows
+entered the minimum before quoting it. Both fixes are in the committed
+scorer.

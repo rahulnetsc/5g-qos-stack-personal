@@ -1,0 +1,84 @@
+G12 campaign scoring -- sweeps/wp9/g12_campaign.json
+ramp [1.0, 1.6, 2.3, 2.7, 3.3, 4.0, 6.0, 8.0], in-range [1.0, 1.6, 2.3, 2.7, 3.3]
+excluded cell ['sensor_dense', 8]: g12_sensor_dense_n8_x1.0: GBR classes [4] absent (census {2: 1})
+
+==============================================================================
+E1's CONTROL PASS -- the ramp bottom, per cell
+==============================================================================
+  mixed_n8           0/30 groups breach at x1.0  clean
+  ugv_heavy_n8       3/30 groups breach at x1.0  -> EXCLUDED WHOLE
+      PF/seed579362555: 5QI [2] worst {'2': 0.9472, '4': 1.0}
+      Reservation/seed579362555: 5QI [2] worst {'2': 0.9472, '4': 1.0}
+      TwoTier/seed579362555: 5QI [2] worst {'2': 0.9412, '4': 1.0}
+  drone_heavy_n8     9/30 groups breach at x1.0  -> EXCLUDED WHOLE
+      TwoTier/seed1826701614: 5QI [2] worst {'2': 0.8556, '4': 1.0}
+      TwoTier/seed1367864806: 5QI [2] worst {'2': 0.7565, '4': 0.9992}
+      TwoTier/seed1097657231: 5QI [2] worst {'2': 0.752, '4': 1.0}
+
+  Cell-level, not seed-level: dropping only the failing seeds
+  would leave the survivors SELF-SELECTED -- G9's partially-
+  degenerate-run trap, where the surviving events were the
+  fastest ones and the arms stopped being comparable.
+
+==============================================================================
+0. D4 PERMUTATION CONTROL -- read BEFORE any ordering (§35.13)
+==============================================================================
+  PF           0/20 runs UNSCOREABLE (reordering broke the ramp bottom); 0/4 permutations produced nothing
+               orders across permutations: [2, 4]x15  [4, 2]x5
+               ** THE ORDER IS NOT STABLE UNDER REORDERING: 2 distinct orders **
+  Reservation  0/20 runs UNSCOREABLE (reordering broke the ramp bottom); 0/4 permutations produced nothing
+               orders across permutations: [2, 4]x12  [4, 2]x8
+               ** THE ORDER IS NOT STABLE UNDER REORDERING: 2 distinct orders **
+  TwoTier      7/20 runs UNSCOREABLE (reordering broke the ramp bottom); 0/4 permutations produced nothing
+               orders across permutations: [2, 4]x13
+
+  ACROSS ARMS: 7/60 permuted runs cannot produce a clean control.
+
+==============================================================================
+1. REGION 1 -- INSIDE GT-7.3's OWN RAMP (<= x3.3, 145 % of ceiling).  THE PRIMARY FINDING
+==============================================================================
+  mixed_n8           PF           [2]x10
+  mixed_n8           Reservation  [2]x10
+  mixed_n8           TwoTier      [2]x7  [2, 4]x3
+
+  3 of 30 (cell, arm, seed) groups produce an ORDERING (>= 2 classes) inside the guarantee's own ramp.
+
+==============================================================================
+2. REGION 2 -- BEYOND 145 %.  Not printed without the control.
+==============================================================================
+  mixed_n8           PF           [2, 4]x10
+  mixed_n8           Reservation  [2, 4]x10
+  mixed_n8           TwoTier      [2, 4]x10
+
+  QUALIFIER, REGISTERED IN ADVANCE AND TRAVELLING WITH EVERY
+  NUMBER ABOVE: this ordering is CURRENTLY A PROPERTY OF
+  DECLARATION ORDER. §35.5 measured the same workload under a
+  permuted flow list giving the opposite order. On its own it
+  reads as a scheduler finding and is not established as one.
+
+==============================================================================
+3. E1-E5, scored against §35.9
+==============================================================================
+  E1  MISS         12/90 (cell, arm, seed) groups breach at ramp index 0 across 3 candidate cells; contaminated cells excluded WHOLE: ['drone_heavy_n8', 'ugv_heavy_n8']
+  E2  HIT          30/30 full-ramp groups give a two-element order; per-arm two-element counts {'PF': '10/10', 'Reservation': '10/10', 'TwoTier': '10/10'}. Note E2 is satisfied only on ramp points BEYOND the guarantee's own range (§35.12)
+  E3  MISS         5QI 1 IS degraded while 5QI 9 still moves bytes -- PF: worst M02 1.000, degrades on 10/10 seeds, earliest at x2.3 (INSIDE the guarantee's ramp); Reservation: worst M02 1.000, degrades on 10/10 seeds, earliest at x2.3 (INSIDE the guarantee's ramp); TwoTier: worst M02 1.000, degrades on 10/10 seeds, earliest at x1.0 (INSIDE the guarantee's ramp). The gap statistic is BLIND on 116 ramp points (the flow delivered nothing, so it has no completions to measure between) -- M02 is the instrument with range here
+  E4  HIT          5QI 9 still carries a median 3.836 Mbps at the first GBR breach (n=30); 'exhausted' is not a satisfied precondition
+  E5  HIT          canonical-order full-ramp orders by arm -- PF: [[2, 4]]; Reservation: [[2, 4]]; TwoTier: [[2, 4]]
+
+==============================================================================
+THE PROMOTION BAR (§35.13), applied as written
+==============================================================================
+  arms differ under the CANONICAL order: False
+
+  CLAUSE 2 -- a mechanism traced to something POSITION-INDEPENDENT.
+  Not run here, and the edge matters: all three candidates §35.5
+  named (pf.py's declaration-order tie-break, per-UE LCP iteration
+  order, HarqProcessPool._pools' insertion order) are POSITION-
+  DEPENDENT. Tracing the effect to any of them CONFIRMS the
+  artefact -- it does not promote it. 'We found the mechanism' is
+  not promotion unless the mechanism is position-independent.
+
+  => NEITHER CLAUSE FIRES. The registered conclusion applies verbatim:
+     the Region-2 ordering is NOT ESTABLISHED as a scheduler property and
+     is CONSISTENT WITH A DECLARATION-ORDER ARTEFACT. G12's row says that,
+     not an inversion (§35.13, committed before the numbers existed).
