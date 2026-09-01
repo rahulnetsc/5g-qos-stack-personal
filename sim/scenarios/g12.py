@@ -380,6 +380,7 @@ def assert_order_non_degenerate(
     first_fail_at_index: dict[int, int],
     terminal_fraction: dict[int, float],
     label: str = "",
+    allow_one_element: bool = False,
 ) -> OrderVerdict:
     """Every §35.7 degeneracy, asserted rather than discovered.
 
@@ -387,6 +388,23 @@ def assert_order_non_degenerate(
     ALONGSIDE the order rather than in place of it -- "never failed" and
     "never present" read identically in a bare `order_5qi`, which is the
     empty-selection signature CLAUDE.md records six times.
+
+    `allow_one_element` exists for exactly one caller and is not a general
+    escape hatch. It permits any order with FEWER THAN TWO elements --
+    zero as well as one; the smoke run produced an empty order on a seed
+    where nothing breached anywhere in range, which is the same finding
+    only more so. **Inside GT-7.3's own ramp such an order is G12's
+    primary FINDING, not a defect** (§35.12): only 5QI 2 breaches at or
+    below 145 % of the measured ceiling, so the guarantee's specified
+    ordering cannot be observed at the load the guarantee specifies. The
+    campaign must be able to REPORT that rather than crash on it -- and
+    catching the raise in a `try` would have worked too, which is precisely
+    why this is a named parameter instead: a caught assertion is
+    indistinguishable from a bypassed one when someone reads the campaign
+    six months later. Everywhere else -- the full ramp, where a one-element
+    order really would mean the instrument is pinned -- it stays raising.
+    `is_scoreable` is False either way, so nothing downstream can mistake a
+    one-element order for an ordering.
     """
     assert_ramp_bottom_clean(first_fail_at_index, label)
 
@@ -404,7 +422,7 @@ def assert_order_non_degenerate(
     never = tuple(qi for qi in sorted(terminal_fraction)
                   if qi not in first_fail_at_index)
 
-    if len(order_5qi) < 2:
+    if len(order_5qi) < 2 and not allow_one_element:
         raise AssertionError(
             f"{label}: order {order_5qi} has fewer than two elements, which "
             f"is not an ordering -- F4's own result recurring (docs/"

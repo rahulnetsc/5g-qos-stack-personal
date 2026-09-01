@@ -5999,3 +5999,146 @@ control rather than an ad-hoc reshuffle.
 produce an ordering. `assert_cell_is_scoreable` refuses it by name rather than
 scoring it to a one-element "order" — the same 28-of-48 pattern stage 5's own
 census shows.
+
+### 35.13 How G12's row must READ — registered before the campaign runs
+
+The campaign produces two orderings from one grid, and they are **not two
+views of one result**. One is a statement about the test specification; the
+other is not yet a statement about anything. Fixing the reporting structure
+now, before the numbers exist, is what stops the more dramatic of the two
+from becoming the headline by default.
+
+#### Region 1 — inside GT-7.3's own ramp. THE PRIMARY FINDING, stated first.
+
+**Within the guarantee's own load range — "+10 % steps of the measured
+ceiling … to 145 %" — only one GBR class breaches, so G12's specified
+degradation order cannot be observed at the load G12 specifies.** The
+ordering is a one-element list on every arm.
+
+**This is a specification finding, and it is the more useful of the two**,
+because it says the test as written cannot produce the evidence it asks for.
+A reader who acts on it changes GT-7.3 or accepts that G12 is not testable
+as specified; no scheduler work follows from it at all.
+
+**It is NOT F4's result, and the two must never be merged.** They share a
+symptom and nothing else:
+
+| | **F4 (§22.5)** | **§35.12, this campaign** |
+|---|---|---|
+| symptom | one-element `order_5qi` | one-element `order_5qi` |
+| **cause** | the workload carried **one** GBR class — literally nothing to order | the workload carries **two**, both present at every ramp point, and the **guarantee's own load range does not overload the class it names as failing first** |
+| what it is a claim about | the **data on disk** | the **test specification** |
+| **fix** | build a workload with ≥ 2 GBR classes — **done, commit 2** | raise GT-7.3's ramp top, or accept G12 is not testable as written |
+| **who acts on it** | whoever builds the next sweep | whoever owns the test plan and signs the Guarantee Sheet |
+
+**The "different fix / different owner" row is the reason for the
+distinction.** Writing this up as "G12 is still unscoreable" would hand a
+reader F4's fix — build a better workload — which has already been done and
+would not help.
+
+#### Region 2 — beyond 145 %. Its own header, and never without the control.
+
+Extending past the guarantee's ramp does produce a two-element order:
+**`[2, 4]` under the canonical declaration order — 5QI 2 before 5QI 4, which
+is G12's own inversion — on every arm.**
+
+**This must not be reported without the permutation result beside it, in the
+same table.** §35.5 measured the same workload under a permuted flow list
+giving the *conforming* order instead. **On its own the inversion reads as a
+scheduler finding and it is not established as one.** The registered wording
+is that the Region-2 verdict is *currently a property of declaration order*,
+and the regime map's G12 row carries that qualifier inline — the same
+discipline as M19's standing caveat and §34.5's bias note, both of which
+exist because a number without its qualifier travels further than the
+qualifier does.
+
+#### What would make the inversion a REAL finding — named now, not after
+
+E5's most-likely-wrong slot is only honest if the bar for promoting the
+inversion is fixed before the data arrives. **Exactly two things would do
+it, and neither is "the effect was large".**
+
+1. **An arm difference that SURVIVES permutation.** Not "the arms differ
+   under the canonical order" — that is what a position artefact looks
+   like. The criterion is that the arms' order distributions differ **in
+   the same direction under every permutation tested**, canonical included.
+   A difference present under canonical and absent under any permutation is
+   the artefact, reported as such.
+2. **A mechanism traced to something OTHER than list position.** And this
+   clause has a sharp edge worth stating in advance: **all three candidate
+   mechanisms §35.5 named are position-dependent** — `pf.py`'s
+   declaration-order tie-break, per-UE LCP iteration order, and
+   `HarqProcessPool._pools`' insertion-ordered iteration. **Tracing the
+   effect to any of them CONFIRMS the artefact; it does not refute it.**
+   Promotion needs a position-*independent* mechanism — priority actually
+   being consumed, GBR deficit accounting, something that would produce the
+   same ordering from any flow list.
+
+**If neither fires, the registered conclusion is already written:** the
+Region-2 ordering is *not established as a scheduler property and is
+consistent with a declaration-order artefact*, and G12's row says exactly
+that rather than reporting an inversion. **That sentence is committed to
+here so it cannot be softened later**, when a striking result is in hand and
+the temptation runs the other way.
+
+**And a limit on the control itself, so it is not over-read.** Four
+permutations at one cell can say *whether* the order is stable under
+reordering. They **cannot** characterise a distribution over permutations,
+and no claim of that shape may be made from them — the two-level-axis rule
+in the journal, applied to a factor whose levels are permutations.
+
+### 35.14 Commit 3 — the campaign runner, and two things the smoke run found
+
+**Built:** `scripts/g12_campaign.py` — the ramp runner, the three
+pre-report assertions, D4's permutation control, and a report structured as
+§35.13 requires (Region 1 first, Region 2 only beside the control). Cell
+selection is **derived**: `scoreable_cells()` builds each candidate and asks
+`assert_cell_is_scoreable`, printing exclusions with their reason —
+`sensor_dense` N=8 is excluded automatically, `GBR classes [4] absent
+(census {2: 1})`, because 3 % UGVs rounds to none.
+
+**§6.3a's timed cell, measured with the real post-processing** (`--time-cell`,
+`record_timeseries=True`, full scorecard): **128 s for 3 arms × 1 seed × 8
+ramp points = 5.4 s/run.** Main grid 21 min/cell × 3 scoreable cells = 64 min;
+D4 control 480 runs = 43 min; **107 min serial** for commit 4.
+
+**Two things the smoke run found, both by a guard firing.**
+
+**1. A permutation can break the CONTROL, not just the ordering.** On
+TwoTier, two of four permutations put 5QI 2 in breach **at ramp index 0** —
+at ×1.0, nominal load, before any overload at all — and
+`assert_ramp_bottom_clean` refused them. This is stronger than §35.5's
+result, which was about which class breaches *under load*; here reordering
+the flow list alone breaks a bearer in the condition the whole ramp is
+measured against.
+
+**It is one seed and is reported as one** — commit 4 quantifies it over the
+real seed set. But it sharpens §35.13's promotion bar rather than blurring
+it: a permutation that cannot even produce a clean control cannot contribute
+an ordering, so **the count of unscoreable permutations is itself part of
+the control's answer** and is printed beside the orders.
+
+**And it required a design decision, made explicitly rather than by
+`try`/`except`.** In the main grid a dirty ramp bottom is E1's stop
+condition — the workload is mis-provisioned and nothing computed from it is
+interpretable. In the permutation arm the identical failure is *the
+measurement*. So there are two named entry points, `order_for` (raising) and
+`order_for_permutation` (recording), for the same reason `allow_one_element`
+is a named parameter and not a caught exception: **a swallowed assertion and
+an honoured one must not look alike to a later reader.**
+
+**2. An EMPTY order, not just a one-element one.** On one smoke seed nothing
+breached anywhere in range, on two arms — `order_5qi == []`. That is the
+same in-range finding *more so*, and it is why `allow_one_element` permits
+fewer-than-two rather than exactly-one. It also makes the reporting choice
+load-bearing: the order distribution prints `[2]×1  []×1` rather than a
+single pooled order, so "one class breached" and "nothing breached" stay
+distinguishable. Pooling them would have been the empty-selection signature
+one more time.
+
+**A pre-result the campaign must not be allowed to inherit uncritically.**
+Smoke already shows PF's permuted orders splitting **`[2,4]` on three
+permutations and `[4,2]` on the fourth** — the order flipping under
+reordering alone, at one seed. §35.13's bar is unchanged by it: that is what
+an artefact looks like, and promotion still requires an arm difference
+surviving *every* permutation or a position-independent mechanism.

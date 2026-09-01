@@ -286,3 +286,27 @@ def test_reference_committed_load_matches_the_built_scenario():
     committed = sum(f.gfbr_bps for f in sc.flows
                     if f.flow_class == "GBR" and f.gfbr_bps > 0)
     assert committed == pytest.approx(REFERENCE_COMMITTED_BPS, rel=1e-9)
+
+
+def test_one_element_order_is_reportable_only_when_explicitly_allowed():
+    """Inside GT-7.3's own ramp a one-element order is the FINDING (§35.12),
+    so the campaign must report it; everywhere else it means the instrument
+    is pinned and must raise. A named parameter rather than a `try` around
+    the raise, because a caught assertion and a bypassed one read alike."""
+    v = assert_order_non_degenerate([2], {2: 3}, {2: 0.5, 4: 1.0},
+                                    allow_one_element=True)
+    assert v.order_5qi == (2,)
+    assert v.never_failed == (4,)
+    assert not v.is_scoreable, (
+        "a one-element order must never read as scoreable, however it "
+        "was obtained")
+    with pytest.raises(AssertionError):
+        assert_order_non_degenerate([2], {2: 3}, {2: 0.5, 4: 1.0})
+
+
+def test_allow_one_element_does_not_disable_the_bottom_of_ramp_check():
+    """The two guards are independent: a class breaching at ramp index 0 is
+    a stop condition in EVERY region, in-range included."""
+    with pytest.raises(AssertionError, match="ramp index 0"):
+        assert_order_non_degenerate([2], {2: 0}, {2: 0.5, 4: 1.0},
+                                    allow_one_element=True)

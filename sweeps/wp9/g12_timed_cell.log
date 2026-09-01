@@ -1,0 +1,9 @@
+G12 campaign -- ramp [1.0, 1.6, 2.3, 2.7, 3.3, 4.0, 6.0, 8.0] (8 points), in-range <= x3.3: [1.0, 1.6, 2.3, 2.7, 3.3]
+  scoreable cells (1): [('mixed', 8)]
+  EXCLUDED ('sensor_dense', 8): g12_sensor_dense_n8_x1.0: GBR classes [4] absent (census {2: 1})
+  3 arms x 10 seeds; 240 runs
+
+§6.3a TIMED CELL (real post-processing, record_timeseries=True): 128s for 3 arms x 1 seed x 8 points = 5.4s/run
+  main grid : 21 min/cell x 3 scoreable cells = 64 min serial
+  D4 control: 480 runs = 43 min serial
+  TOTAL     : 107 min serial
