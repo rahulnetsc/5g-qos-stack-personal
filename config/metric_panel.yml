@@ -465,18 +465,24 @@ metrics:
       rule exists for").
     caveats:
       - >
-        WP-Join commit 8's own GT-6.3 acceptance demo found a sharper,
-        concrete instance of the proxy gap above: sim/buffer.py's
-        expire() continuously evicts the head of a queue once it turns
-        pdb_ms old, so a flow being MASSIVELY PDB-violated (65% of bytes
-        dropped, in the demo's own reestablish arm) can still show
-        ts_hol_delay_s never exceeding pdb_ms at all -- the queue head is
-        never allowed to age past the point expire() removes it, so this
-        metric's "green" test reads the same as a flow with zero
-        violations. Not fixed here (a distinct mechanism change, out of
-        this commit's scope): a true fix needs the PDB-violation rate
-        itself (M02-style), not head-of-line age alone, folded into the
-        "green" definition.
+        THIS METRIC CANNOT REPORT RED FOR A DROPPING FLOW -- not "can
+        fail to", DOES NOT, BY CONSTRUCTION. sim/buffer.py::expire() pops
+        any chunk older than the PDB EVERY SLOT (`while chunks and
+        (now_s - chunks[0][0]) > pdb_s`), so head-of-line age is CAPPED at
+        pdb_s and this metric's `hol <= pdb_ms` green test is always true.
+        WP-Join commit 8 first saw it (65% of bytes dropped, still green);
+        WP9 G9 commit 3 MEASURED the general case: on the G9 scenarios the
+        recovering UE shows 0 of 20,000 and 0 of 30,000 slots over PDB,
+        max HoL exactly pdb_ms, while dropping 1,396,203 bytes of video --
+        M19 reports a recovery time of 0.0 ms throughout a total outage.
+        The earlier wording ("can still show") reads as a rare case a
+        reader may quote around; it is not rare, it is universal for this
+        class, and a reader must not quote M19 alone for any
+        delivery-related question. M21
+        (slo_recovery_time_by_delivery) is the companion that CAN see it,
+        or M02 for the rate itself. M19 is deliberately NOT edited -- it
+        measures head-of-line age correctly and every historical reading
+        must keep meaning what it meant.
 
 # Statistical policy (docs/p5g-sim-plan.md sec 7 / sec 5.3): the rule of
 # three. Demonstrating a miss rate <= eps at 95% confidence with zero

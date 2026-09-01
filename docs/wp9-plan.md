@@ -5359,3 +5359,23 @@ arrived, so those are different bytes — the ratio was near-meaningless and
 the same window removes the offset and matches M02's byte-weighted form.
 Pinned by a test with arrivals and drops deliberately offset, which a
 per-slot ratio scores as recovered.
+
+
+### 32.4 Did §29's G5 finding rest on M19? CHECKED — no
+
+Asked because if M19 had been quoted there it would have been reporting
+green on exactly the flows M05 showed completing nothing.
+
+**It was not.** M19 does not appear anywhere in §29, and could not have:
+it has read `pending` on every row of every WP9 stage (§21.2a), so it never
+produced a value to quote. **§29's G5 finding rests on M05 alone and is
+unaffected.**
+
+**But the near-miss is worth naming, because it is the same fault line.**
+M05 caught the zero-completeness flows precisely because it measures
+**completion**; M19 could not have, because it measures **head-of-line
+age**. The metrics that can see a flow failing are the delivery-based ones
+(M02, M05, now M21); the age-based one is blind to it by construction.
+**When choosing which metric answers a question about whether traffic got
+through, prefer a delivery-based statistic — an age-based one can be
+capped by the very mechanism that drops the traffic.**
