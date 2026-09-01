@@ -62,8 +62,30 @@ def _arms():
             "TwoTier": lambda: load_two_tier(_TT, min_rb=5)}
 
 
-def assert_events_fired(rec: RunRecord, want_path: str, label: str) -> int:
-    """ASSERTION 1. Zero events reads as success; refuse to report on it."""
+def expected_event_count(sc, want_path: str) -> int | None:
+    """How many events the SCENARIO SPECIFIES -- derived from the schedule,
+    never restated. `reestablish` is emergent (sim/rlf.py observing the SNR
+    trace), so it has no scheduled count and returns None."""
+    if want_path == "reestablish":
+        return None
+    joiner = [ue for ue in sc.ues if ue.join is not None][0]
+    kinds = {"warm": ("app_restart",), "cold": ("power_on",)}[want_path]
+    return sum(1 for e in joiner.join.events if e.kind in kinds)
+
+
+def assert_events_fired(rec: RunRecord, want_path: str, label: str,
+                        expected: int | None = None) -> int:
+    """ASSERTION 1, STRENGTHENED: assert the EXPECTED count, not non-zero.
+
+    The first version asked only "did the mechanism fire at all". That is a
+    WEAKER QUESTION than "did it fire as often as the scenario specifies",
+    and the gap between them is exactly where a PARTIALLY degenerate run
+    hides. It did: TwoTier recorded 3.8 of 10 scripted warm restarts and
+    1.0 of 5 cold cycles, and the non-zero check passed on every one --
+    so M18/M19/M21 were computed over a different, smaller and
+    self-selected event set than the other arms, and the arms were compared
+    as though they were not.
+    """
     events = [e for e in (rec.join_events or []) if e.path == want_path]
     if not events:
         raise AssertionError(
@@ -71,6 +93,15 @@ def assert_events_fired(rec: RunRecord, want_path: str, label: str) -> int:
             f"would be correct-for-nothing and read as instant success -- "
             f"CLAUDE.md's sixth empty-selection instance. Check the scenario "
             f"fired at all (for reestablish: is the fade longer than t310?).")
+    if expected is not None and len(events) != expected:
+        raise AssertionError(
+            f"{label}: {len(events)} '{want_path}' events but the scenario "
+            f"schedules {expected}. A partially-degenerate run is NOT a "
+            f"smaller sample of the same thing -- the events that survive "
+            f"are self-selected (here: the ones whose predecessor finished "
+            f"in time), so arms with different counts are not comparable. "
+            f"Known cause: a handshake slower than the scripted period "
+            f"overlaps the next event, which is then dropped (§34.4).")
     return len(events)
 
 
@@ -141,7 +172,9 @@ def main(argv):
                 sc, rec = run_one(build, want_path, arm_name, factory, seed,
                                   n_nb, joiner_on=True)
                 joiner, neighbours = joiner_ue_id(sc), neighbour_ue_ids(sc)
-                n_ev.append(assert_events_fired(rec, want_path, f"{label}/{arm_name}"))
+                n_ev.append(assert_events_fired(
+                    rec, want_path, f"{label}/{arm_name}",
+                    expected=expected_event_count(sc, want_path)))
                 keys = assert_neighbour_population(rec, joiner, neighbours,
                                                    f"{label}/{arm_name}")
                 if not printed_population:

@@ -5520,3 +5520,41 @@ hypothesis, not a finding, and the event-count assertion passed because it
 checks non-zero, not the expected count.** Worth its own investigation;
 **strengthening that assertion to check the expected count is the cheap
 guard**, and it would have flagged this on the first run.
+
+### 34.5 TwoTier's event shortfall — EXPLAINED, and it makes the arms non-comparable
+
+Checked rather than left beside J5's unexplained result. Same scenario,
+same seed, GT-6.1, per-event duration in slots from trigger to attached:
+
+| arm | events recorded | durations (first six) |
+|---|---|---|
+| PF | **10 / 10** | 36, 46, 26, 6, 6, 6 |
+| **TwoTier** | **7 / 10** | **337, 851, 441, 411, 282, 241** |
+
+**TwoTier's app handshake takes 6–24× longer than PF's**, against a scripted
+restart period of **1,600 slots**. When a handshake is still in progress as
+the next scripted restart fires, the FSM has no in-progress restart to
+restart and the event is **dropped**. So the shortfall is neither purely a
+scheduler property nor purely a scenario one — **it is the interaction**:
+a slow arm against a fixed period silently loses events.
+
+**Two consequences, and the second is the serious one.**
+
+1. **It confirms J2's named branch with a mechanism.** J2 predicted a narrow
+   distribution near the configured floor and said a heavy tail would mean
+   *"the handshake is queueing behind load, which is the one genuinely
+   informative thing GT-6.1 can tell us"*. It is queueing, and these are the
+   durations.
+2. **The arms in §34.1 were not comparable.** PF's M18 is computed over 10
+   events per run and TwoTier's over 3.8 — and the survivors are
+   **self-selected**: precisely the restarts whose predecessor finished in
+   time, i.e. the *fastest* ones. **TwoTier's 79.6 ms warm p95 is therefore
+   biased optimistic**, and the true gap to PF's 16.6 ms is wider than
+   reported, not narrower. The strengthened assertion now refuses to report
+   this rather than averaging over it.
+
+**The fix is a scenario change, not a metric one** — the restart period must
+exceed the slowest arm's handshake — and it is deliberately **not** made
+here: re-running the campaign with a longer period is its own commit with
+its own before/after, and §34.1's numbers stand as what the current
+scenario produced, now with the bias direction stated.

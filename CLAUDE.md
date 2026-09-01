@@ -438,10 +438,20 @@ measuring actually occur?".
 
 **So the standing rule — run it at scale and ask whether the precondition
 occurs at all — applies to MECHANISMS FIRING, not only to rows selecting.**
-Before trusting any metric over an event-driven mechanism, assert the event
-count is non-zero and roughly what the scenario should produce; a scenario
-that produces no events reads identically to one where everything went
-well.
+
+**And "at all" is too weak — assert the EXPECTED COUNT.** The G9 campaign
+implemented this rule as a non-zero check and it passed on every run, while
+TwoTier recorded **3.8 of 10 scripted warm restarts and 1.0 of 5 cold
+cycles**. *"Did the mechanism fire at all"* is a weaker question than *"did
+it fire as often as the scenario specifies"*, **and the gap between them is
+exactly where a PARTIALLY degenerate run hides.**
+
+**A partially-degenerate run is not a smaller sample of the same thing.**
+The events that survive are **self-selected** — in that case, the ones
+whose predecessor finished before the next was scheduled — so an arm with
+fewer events is measuring a different population, and comparing it to a
+full arm compares two things. Derive the expected count from the schedule
+(never restate it) and assert equality.
 
 **The concrete diagnosis, kept verbatim because a later reader will hit
 this exact trap: depth arms t310, duration expires it.** Two identically
