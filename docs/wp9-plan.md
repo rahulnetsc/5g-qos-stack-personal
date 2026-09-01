@@ -5079,3 +5079,167 @@ two-level reading of it (which is all Part A had) can invert.
 line was run but is not analysed here. M03 in these cells carries its
 **cadence caveat** automatically at `duty_cycle` ≤ 0.5 (Step 4) and is not
 quoted above for that reason.
+
+---
+
+## 31. G9 — the join/re-join campaign (plan, registered before any code)
+
+### 31.1 What G9 asks, from the test plan's own text
+
+`docs/IA_P5G_Factory_Guarantee_Test_Plan.md:103`:
+
+> **G9** | A robot joins (or re-joins after an outage) quickly, even on a
+> busy cell. | Warm app re-handshake p95 ≤ ▷ 1 s; full attach-to-streaming
+> ≤ ▷ 15 s; post-RLF time-to-SLO ≤ ▷ 10 s; **neighbours unaffected
+> throughout**.
+
+**Four distinct measurements with three different instruments, and this
+simulator cannot produce all four.** Taken one at a time rather than
+assumed:
+
+| # | clause | instrument | can this sim produce it? |
+|---|---|---|---|
+| 1 | warm app re-handshake **p95 ≤ 1 s** (GT-6.1) | M18, `path="warm"` | **YES** — the app-handshake message pair exists (`JoinConfig.handshake_ul_qfi`/`handshake_dl_qfi`, WP-Join commit 6) |
+| 2 | full **attach-to-streaming ≤ 15 s** (GT-6.2) | M18, `path="cold"` | **PARTIALLY** — the sim models RACH+RRC, PDU-session and handshake as *sampled* delays from `JoinConfig`'s floors/ceilings, which are **calibration-log timers, not a measured attach trace**. It produces a number; that number is a restatement of its own configured distribution, not an independent measurement. **Reported as such or not at all.** |
+| 3 | post-RLF **time-to-SLO ≤ 10 s** (GT-6.3) | M19, `path="reestablish"`, measured from RF-restore | **YES in mechanism** — `sim/rlf.py` detection + `sim/join.py` recovery + `ScriptedFadeWindow` — but see §31.4 on M19's own blindness. |
+| 4 | **neighbours unaffected throughout** | a delta on the *non-recovering* UEs | **YES**, and it is the clause most at risk of the §24 error — see §31.6. |
+
+**Clause 2 is the one to be honest about.** `JoinConfig`'s
+`rach_rrc_setup_floor_ms=20` / `ceiling=400`, `cell_search_ceiling_ms=3000`
+and the reestablishment floor are **t300/t301/t311 ceilings from the
+calibration log plus one RACH trace**, with the module's own comment
+recording that the reestablishment floor is *"a BORROW from the one RACH
+trace, not a reestablishment-specific measurement"*. A p95 computed from
+sampling those bounds tells you what you configured. **Clause 2 is
+`SIM-informative` at best and its plan row must say so.**
+
+### 31.2 What already exists — established by reading, not from §6.3's budget note
+
+**Built and live:** `sim/join.py` (the FSM: `JoinConfig`, `JoinState`,
+`JoinPhase`, `JoinRngStreams`, `JoinAwareBufferView`), `sim/rlf.py`
+(n310-armed t310 dwell, n311-gated cancel), the driver wiring (`rlf.step()`
+per UE per slot; `JoinAwareBufferView` composed outermost),
+`SchedulerContextReset` on TwoTier, `ScriptedFadeWindow`, `JoinEventRecord`,
+and M18/M19 in the panel. `sim/tests/test_join*.py` and
+`test_wpjoin_rlf_recovery.py` cover the transitions.
+
+**NOT built: a scenario.** `grep` finds **no `JoinConfig` anywhere** outside
+`sim/join.py` and `sim/config.py` — no scenario, no script, no sweep.
+That is the whole of §21.2a's finding, confirmed directly.
+
+**So G9 is scenario + runner + analyser work, not mechanism work** — which
+makes it lighter than "needs implementation" implied, and the §6.3 budget
+note (~72 min for 50 cycles) is a runtime estimate, not a build estimate.
+
+### 31.3 The M18/M19 check — RUN, not assumed
+
+A throwaway probe (2 UEs, one with a scripted `app_restart`, 8,000 slots):
+
+```
+join_events recorded: 1     path=warm  trigger_slot=1000  attached_slot=None
+M18: status=ok      by_path.warm = {n_events: 1, n_never_completed: 1, p50_ms: None, ...}
+M19: status=proxy   by_path.warm = {n_events: 1, n_never_recovered: 0, p50_ms: 0.0, ...}
+```
+
+**This settles §21.2a's gap concretely: M18 flips `pending` → `ok` and M19
+`pending` → `proxy` the moment a single join event exists.** Nothing else in
+the panel can do that.
+
+**And it exposes two degeneracies a naive scenario produces**, both of which
+the real campaign must avoid:
+
+1. **`attached_slot=None`, `n_never_completed=1`** — the event never
+   completed, so every latency is `None`. M18's own panel note predicts
+   exactly this: the handshake needs `handshake_ul_qfi`/`handshake_dl_qfi`
+   **set to QFIs the UE actually has flows for**. My probe set neither.
+2. **M19 reports `p50_ms = 0.0` with `n_never_recovered: 0`** — "recovered
+   instantly", because the UE's flows were never outside PDB to begin with.
+   **A recovery time of zero is not a pass, it is an absent event.**
+
+**Both are scenario-design requirements, and both are pre-registered here so
+the first run cannot be mistaken for a result.**
+
+### 31.4 M19's registered blindness must travel with every G9 number
+
+`config/metric_panel.yml`'s M19 row already carries the caveat WP-Join
+commit 8 found: `sim/buffer.py::expire()` evicts the queue head before it
+can age past `pdb_ms`, **so a flow that never delivers anything can read as
+"green"**. M19's SLO-green test is head-of-line age, not delivery.
+
+**Consequence for G9, stated in advance:** a UE whose flows are being
+dropped wholesale during recovery can produce a *short* time-to-SLO. **Any
+M19 number in this campaign is reported beside that UE's M02 (PDB-violation
+rate) for the same window**, exactly as §29 had to do for M05. A G9 pass on
+M19 alone is not a pass.
+
+### 31.5 Scope, and corpus exposure
+
+**Three scenarios, one runner, one analyser. No `sim/` or `scheduler/`
+behaviour change.** Every mechanism G9 needs is already wired and already
+runs on every scenario — a scenario that sets `UEConfig.join` merely
+*exercises* paths that are otherwise inert.
+
+**Prediction registered: `regression_corpus.py --check` CLEAN on all 20
+records.** The corpus scenarios configure no `join`, so `join_states` is
+empty and both wrappers are no-ops. **If it moves, the mechanism is not as
+opt-in as WP-Join claimed, and that is a finding about WP-Join, not about
+G9.**
+
+### 31.6 The neighbours clause — decompose BEFORE attributing
+
+**"Neighbours unaffected throughout" is a delta guarantee of exactly G6's
+shape**, and the G6 item cost four corrections to the same error. So the
+population is fixed here, in advance, before any number exists:
+
+- **The statistic is computed over: every UE EXCEPT the one joining or
+  recovering** — and, within those, over its **protected** bearers only
+  (`Scorecard.NON_PROTECTED_5QI` excluded), because a background flow's own
+  service is not what "neighbours unaffected" is about.
+- **The claim is about: the same set.** Named so the two cannot drift.
+- **The comparison is paired within seed**, joining-UE-present vs a control
+  with the same seed and no join event — not a before/after within one run,
+  because the recovering UE's traffic is absent from the "before" window by
+  construction.
+- **The estimator is `robust_delta_summary`** (median + IQR + `frac_worse`
+  + n_seeds), never a bare mean — Step 4's default, and M18/M19 are
+  max-type.
+
+**Registered check, to be run before any neighbours number is quoted:** for
+each statistic, print the flow set that entered it and assert the
+recovering UE's flows are absent. **A neighbours statistic that includes the
+recovering UE is measuring the event, not the containment.**
+
+### 31.7 Pre-registered expectations — shapes, with each shape's meaning
+
+Written in the form the journal now requires: **what the data will look
+like, and what each look would mean.** No mechanism is predicted.
+
+| # | expectation | what each outcome would mean |
+|---|---|---|
+| **J1** | With `handshake_*_qfi` correctly wired, **`n_never_completed` drops to ≈0** on the warm path and M18 reports real p50/p95. | Still 100 % never-completed ⇒ the handshake pair is not being delivered at all, and the scenario, not the FSM, is wrong. |
+| **J2** | Warm-path M18 p95 is **bounded by `app_restart_delay` + one handshake round trip**, i.e. it will look like a *narrow* distribution near its configured floor, not a heavy tail. | A heavy tail ⇒ the handshake is queueing behind load, which is the one genuinely informative thing GT-6.1 can tell us and would be the finding. |
+| **J3** | **Cold-path M18 restates its own configured distribution** — p95 near the sampled ceiling sum, insensitive to offered load. | Load-sensitivity ⇒ the sampled delays are *not* dominating and the number is more than a restatement, which would upgrade clause 2 from `SIM-informative`. |
+| **J4** | **M19's reestablish path produces a non-degenerate number** (not 0.0) once a scripted fade actually breaks SLO. | Still 0.0 ⇒ §31.4's blindness is active and M19 is unusable for G9 without the M02 companion. |
+| **J5** *(most-likely-wrong)* | **Neighbours are NOT unaffected: at least one protected neighbour statistic shifts with an interval excluding zero** during a cold attach, because a joining UE takes PRBs and PDCCH from a loaded cell. | Unaffected ⇒ the containment is real and G9's fourth clause passes cleanly, which given §0.1's concentrate-vs-spread pattern would be genuinely surprising. |
+
+**J5 carries the standing trace obligation.** It is this stage's registered
+most-likely-wrong, and that slot has produced the more interesting finding
+four times in this WP. **If J5 misses — if neighbours really are unaffected
+— it gets a worktree-instrumented direct-cause trace before write-up**,
+distinguishing "the scheduler contains the join" from "the join is too
+small to see at this load", which are different claims and only the first
+is G9 passing.
+
+### 31.8 Commit sequence
+
+1. This section. Docs only.
+2. The three scenarios (GT-6.1 warm, GT-6.2 cold, GT-6.3 RLF) + their
+   tests, including a test that `handshake_*_qfi` matches a real flow —
+   the defect §31.3 found by probe.
+3. The runner, persisting records (`PersistingRecordSink`), and the
+   neighbours-population assertion from §31.6.
+4. The campaign run; **J1–J5 scored, hits and misses both**.
+5. Regime-map G9 row + the guarantee inventory updated from results.
+
+Full suite + `--check` after each. **§31.5's clean-corpus prediction is
+scored at commit 2**, the first point at which it could move.
