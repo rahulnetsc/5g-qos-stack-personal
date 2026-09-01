@@ -42,6 +42,7 @@ E1's CONTROL PASS -- the ramp bottom, per cell
   mixed_n8           TwoTier      [2]x7  [2, 4]x3
 
   3 of 30 (cell, arm, seed) groups produce an ORDERING (>= 2 classes) inside the guarantee's own ramp.
+      mixed_n8: 3/30
 
 ==============================================================================
 2. REGION 2 -- BEYOND 145 %.  Not printed without the control.
@@ -60,7 +61,7 @@ E1's CONTROL PASS -- the ramp bottom, per cell
 3. E1-E5, scored against §35.9
 ==============================================================================
   E1  MISS         12/90 (cell, arm, seed) groups breach at ramp index 0 across 3 candidate cells; contaminated cells excluded WHOLE: ['drone_heavy_n8', 'ugv_heavy_n8']
-  E2  HIT          30/30 full-ramp groups give a two-element order; per-arm two-element counts {'PF': '10/10', 'Reservation': '10/10', 'TwoTier': '10/10'}. Note E2 is satisfied only on ramp points BEYOND the guarantee's own range (§35.12)
+  E2  HIT          30/30 full-ramp groups give a two-element order; per (cell, arm) two-element counts {'mixed_n8/PF': '10/10', 'mixed_n8/Reservation': '10/10', 'mixed_n8/TwoTier': '10/10'}. Note E2 is satisfied only on ramp points BEYOND the guarantee's own range (§35.12)
   E3  MISS         5QI 1 IS degraded while 5QI 9 still moves bytes -- PF: worst M02 1.000, degrades on 10/10 seeds, earliest at x2.3 (INSIDE the guarantee's ramp); Reservation: worst M02 1.000, degrades on 10/10 seeds, earliest at x2.3 (INSIDE the guarantee's ramp); TwoTier: worst M02 1.000, degrades on 10/10 seeds, earliest at x1.0 (INSIDE the guarantee's ramp). The gap statistic is BLIND on 116 ramp points (the flow delivered nothing, so it has no completions to measure between) -- M02 is the instrument with range here
   E4  HIT          5QI 9 still carries a median 3.836 Mbps at the first GBR breach (n=30); 'exhausted' is not a satisfied precondition
   E5  HIT          canonical-order full-ramp orders by arm -- PF: [[2, 4]]; Reservation: [[2, 4]]; TwoTier: [[2, 4]]

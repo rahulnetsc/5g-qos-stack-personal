@@ -120,8 +120,17 @@ def report_regions(data: dict) -> dict[str, Any]:
     n_ordering = sum(1 for o in all_in if len(o) >= 2)
     out["region1_summary"] = {"n_groups": len(all_in),
                               "n_with_an_ordering": n_ordering}
+    per_cell = {c: (sum(1 for d in a.values() for o in d["in_range_orders"]
+                        if len(o) >= 2),
+                    sum(len(d["in_range_orders"]) for d in a.values()))
+                for c, a in data["cells"].items()}
     print(f"\n  {n_ordering} of {len(all_in)} (cell, arm, seed) groups produce "
           f"an ORDERING (>= 2 classes) inside the guarantee's own ramp.")
+    # Per cell as well as pooled: the pooled figure is only meaningful while
+    # one cell survives the control pass, and a reader must be able to see
+    # that rather than infer it (end-of-item review).
+    for c, (k, n) in per_cell.items():
+        print(f"      {c}: {k}/{n}")
     if n_ordering == 0:
         print("  ** G12's SPECIFIED DEGRADATION ORDER CANNOT BE OBSERVED AT THE\n"
               "     LOAD G12 SPECIFIES. This is a SPECIFICATION finding: the\n"
@@ -173,11 +182,16 @@ def score_expectations(data: dict, ctl: dict) -> list[tuple[str, str, str]]:
     all_full = [o for a in data["cells"].values() for d in a.values()
                 for o in d["full_orders"]]
     n2 = sum(1 for o in all_full if len(o) >= 2)
-    per_arm_two = {}
+    # KEYED ON (cell, arm), NOT arm. Keying on arm alone pools across cells,
+    # which is the SAME defect shape as E3's pooled "first degradation at
+    # x1.0" (§36.6) -- harmless while the grid has one scoreable cell and
+    # silently wrong the moment it has two. Caught in the end-of-item review
+    # by looking for the E3 defect's shape elsewhere in the same file rather
+    # than treating it as a one-off.
+    per_arm_two: dict[tuple[str, str], list[bool]] = {}
     for cell, arms in data["cells"].items():
         for arm, d in arms.items():
-            per_arm_two.setdefault(arm, []).extend(
-                len(o) >= 2 for o in d["full_orders"])
+            per_arm_two[(cell, arm)] = [len(o) >= 2 for o in d["full_orders"]]
     # E2 as REGISTERED reads "a TWO-element list on every arm". Scored at
     # that strength: HIT only if every group gives two elements; PARTIAL if
     # every arm produces some but not all; MISS if any arm produces none.
@@ -190,8 +204,8 @@ def score_expectations(data: dict, ctl: dict) -> list[tuple[str, str, str]]:
     verdict = "HIT" if all_groups else ("PARTIAL" if some_per_arm else "MISS")
     rows.append(("E2", verdict,
                  f"{n2}/{len(all_full)} full-ramp groups give a two-element "
-                 f"order; per-arm two-element counts "
-                 f"{ {a: f'{sum(v)}/{len(v)}' for a, v in per_arm_two.items()} }. "
+                 f"order; per (cell, arm) two-element counts "
+                 f"{ {f'{c}/{a}': f'{sum(v)}/{len(v)}' for (c, a), v in per_arm_two.items()} }. "
                  f"Note E2 is satisfied only on ramp points BEYOND the "
                  f"guarantee's own range (§35.12)"))
 

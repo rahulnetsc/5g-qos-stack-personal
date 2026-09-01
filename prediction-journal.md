@@ -464,3 +464,60 @@ retraction.** The floored-metric shape now has three instances:
 when the question was asked**, not how hard it was to answer. Each time the
 question is the same: *what does this statistic do in the condition I am
 comparing against?*
+
+---
+
+## Standing rule — a rule can be violated by the code that IMPLEMENTS it
+
+Fourth of the form rules, and it is about a failure the other three cannot
+reach: not forgetting a rule, but **breaking it inside the tool built to
+apply it.**
+
+**The instance.** `scripts/g12_score.py` exists to apply this project's
+checks to G12's campaign. Its own docstring names the decompose rule. Its
+second version computed E3's "first ramp point at which telemetry degrades"
+as a **minimum over every (arm, seed) group** and printed *"first degradation
+at ×1.0"*. That is true of **TwoTier only** — PF and Reservation do not
+degrade until ×2.3. **An aggregate over one population, quoted as a
+statement about another**, which is the decompose rule's exact subject,
+committed by the scorer that cites it.
+
+### Why this is not the same as forgetting the rule
+
+**The rule was present, correct, and in scope, and it still did not fire.**
+CLAUDE.md's decompose entry is written as a mechanical check — name (a) the
+rows the aggregate sums over, (b) the rows the claim is about, (c) whether
+they are the same set. Applying it to `min(first_bad)` takes ten seconds and
+gives the right answer immediately.
+
+**What failed was the trigger, not the rule.** The check is framed as
+something you do *before quoting an aggregate*, and writing a scorer does not
+feel like quoting — it feels like plumbing. The aggregate was quoted later,
+by the tool, at a point where nobody was reading it as a claim yet.
+
+### The generalisation
+
+**Analysis code is a claim in advance.** Every aggregate a scorer computes is
+a sentence somebody will read as a finding, and it is written at the moment
+when the discipline that governs findings feels least applicable. So the
+checks that apply to a published number apply to the **line of code that will
+produce it**, at the time it is written.
+
+**Concretely, for any aggregate inside an analysis tool:** decompose by the
+grouping the report will present. If the output is per-arm, the statistic is
+per-arm — a `min`/`max`/`mean` that collapses the reporting dimension is a
+defect even when the number is arithmetically correct.
+
+### The asymmetry, again, and it is the sharpest instance yet
+
+| | when caught | cost |
+|---|---|---|
+| §24.2, §28.1 | after publication | **retraction** |
+| §33.2 | before any number was quoted | a scenario fix |
+| **§36.6** | **before publication, by re-running the tool's own check on its output** | **an edit, and the correct result** |
+
+**What caught it was suspicion of the tool's own output** — "first
+degradation at ×1.0" disagreed with a per-seed table read minutes earlier —
+not a review of the code. **The scorer had already been read and approved by
+its author.** Reading analysis code does not catch this; decomposing its
+output does.

@@ -6295,3 +6295,64 @@ at ×1.0"** — true of TwoTier only. **That is the standing decompose check
 failing inside the tool built to apply it**, caught by asking which rows
 entered the minimum before quoting it. Both fixes are in the committed
 scorer.
+
+### 36.7 End-of-item judgment-calls review
+
+CLAUDE.md's standing step, run over the four G12 commits (`07da6fd`,
+`6a37815`, `4abc657`, `b29c02d`). Four things found; two fixed here, two
+recorded.
+
+**1. FIXED — E2 pooled across cells, the same shape as §36.6's E3 defect.**
+`score_expectations` keyed its per-arm two-element counts on `arm` alone, so
+two scoreable cells would have merged into one figure reported as per-arm.
+**Harmless in this run because the control pass left exactly one cell, and
+silently wrong the moment it leaves two.** Found by deliberately looking for
+E3's defect *shape* elsewhere in the same file rather than treating E3 as a
+one-off — now keyed on `(cell, arm)`. Region 1's headline count now also
+prints per cell beside the pooled figure, for the same reason: the pooled
+number is only meaningful while one cell survives, and a reader should see
+that rather than infer it.
+
+**2. RECORDED, not fixed — `MEASURED_CEILING_BPS` is a measured constant
+with no guard.** `sim/scenarios/g12.py` carries `63_400_000.0` from the
+probe, and the whole ×-to-%-of-ceiling mapping rests on it.
+`REFERENCE_COMMITTED_BPS` *is* guarded — a test recomputes it from the
+builder — but the ceiling cannot be, because it is an outcome of running the
+simulator, not a property of the scenario. **So a RAN-config change (`min_rb`,
+bandwidth, TDD pattern) would silently invalidate "×3.3 = 146 % of ceiling"
+and nothing would fail.** Not fixed because the honest fix is to re-run the
+probe whenever the RAN changes, which is a procedure rather than a test.
+Flagged so the next reader treats the percentage column as dated to this RAN.
+
+**3. RECORDED — the campaign calls a private Scorecard method.**
+`scripts/g12_campaign.py` calls `sc_card._m02_pdb_violation_rate(tele)` on a
+5QI-restricted sub-record. **Deliberate:** it reuses M02's exact registered
+definition rather than reimplementing the numerator/denominator, and M02's
+denominator subtlety (resolved bytes, not arrived) is precisely the kind of
+thing a reimplementation gets wrong — WP3 shipped a real M02 denominator bug
+once (`c7baba9`). The cost is that a `scorecard.py` refactor can break a
+study script silently. **The alternative — a public "score M02 over this flow
+subset" entry point — is a panel-layer change and is not made inside G12's
+own item**, on the one-fidelity-change-per-commit rule. Noted as the cheapest
+future cleanup.
+
+**4. RECORDED — clause 1 is scored more weakly than clauses 2–4.** E4 asks
+only whether 5QI 9 still moves bytes at the first GBR breach, and answers
+yes (median 3.836 Mbps). **It does not test the guarantee's actual ordering
+claim about 5QI 9** — that best-effort is exhausted *before* anything else
+degrades — because 5QI 9 has no contract and therefore no breach event to
+order against the GBR classes. The bg trajectory is recorded per ramp point
+in the campaign JSON, so the question is answerable from stored data without
+a re-run; it simply was not registered as an expectation. **Left as a named
+gap rather than answered post hoc**, since scoring an unregistered claim
+after seeing the data is what the pre-registration discipline exists to
+prevent.
+
+**And one thing checked and found clean.** The `allow_one_element` /
+`order_for_permutation` pair was re-read specifically for whether either had
+become a general escape hatch. Neither has: `allow_one_element` is passed
+`True` only for the in-range region and for a ramp with no out-of-range
+points (derived, not hardcoded), and `order_for_permutation` is called only
+from the D4 control. `assert_ramp_bottom_clean` is never bypassed anywhere —
+the permutation arm records its failures, and the main grid still stops on
+them.
