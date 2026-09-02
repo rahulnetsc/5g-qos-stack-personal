@@ -730,8 +730,27 @@ class Scorecard:
         time_s = record.timeseries_time_s
         per_flow_ratio_by_sec: dict[int, list[float]] = {}
         for fr in flows:
-            for sec, delivered_list in _bucket_by_second(time_s, fr.ts_delivered_bytes).items():
-                arrived_list = _bucket_by_second(time_s, fr.ts_arrived_bytes)[sec]
+            # Both series are bucketed ONCE per flow. The arrived bucketing
+            # used to sit inside the per-second loop below, which re-scanned
+            # the whole arrived array once per second and discarded all but
+            # one bucket each time -- O(flows x seconds x slots), i.e.
+            # QUADRATIC in horizon. Measured on one record: 0.215 s at 20,000
+            # slots, 3.627 s at 80,000, 17.792 s at 160,000, and the sweep
+            # evaluates M09 13 times per record. Extrapolated to a 30-minute
+            # soak (7.2M slots) that is 10-31 h PER EVALUATION depending on
+            # which growth exponent you fit, against 43 s-5.1 min hoisted.
+            # G11 is not runnable without this (docs/wp9-plan.md §37,
+            # docs/wp9-g11-plan.md §4.1).
+            #
+            # The VALUE is unchanged and that is asserted, not assumed:
+            # sim/tests/test_m09_hoist.py checks bit-identity against a
+            # reference implementation of the original nesting, and a
+            # SCALING test pins the complexity class -- an output test
+            # cannot catch a re-introduced quadratic.
+            delivered_by_sec = _bucket_by_second(time_s, fr.ts_delivered_bytes)
+            arrived_by_sec = _bucket_by_second(time_s, fr.ts_arrived_bytes)
+            for sec, delivered_list in delivered_by_sec.items():
+                arrived_list = arrived_by_sec[sec]
                 delivered = sum(delivered_list)
                 arrived = sum(arrived_list)
                 ratio = (delivered / arrived) if arrived > 0 else 1.0
