@@ -1309,6 +1309,71 @@ nothing. **This is H6 ("contract count and max-min floor pick different
 winners in the same cell") confirmed directly**, and it means any
 single-metric statement about who wins at high N is wrong by construction.
 
+### D4-3a — ADMISSIBLE FLEET SIZE, computed at last: PF 8, Reservation 4, TwoTier 4
+
+**G10's headline deliverable is the admissible fleet size, and until this
+subsection nobody had computed it.** What the documents carried instead —
+*"admissible N bounded by 8 at load ≥ 1.0 and by 16 below it"* — is D4-3's
+**arm-separation boundary**, the fleet size at which the arms start to
+differ. **That is a different quantity**, it is not per-arm, and reading it
+as the admissible fleet overstates the two arms that matter operationally.
+
+**The criterion is the pre-registered one** (§5(a): *"M07, M08 all-pass at
+5/5 seeds → admissible N"*; test plan G10: *"largest asset count with
+G1–G8 all-pass in 5/5 runs"*): a seed passes when `M07.met == M07.total`
+**and** `M08.fraction ≥ 0.95`; admissible N is the largest fleet passing on
+**every** seed. Emitted by `scripts/g10_admissible.py`, not restated:
+
+| arm | N=2 | N=4 | N=8 | N=16 | N=24 | N=32 | **admissible** |
+|---|---|---|---|---|---|---|---|
+| PF | 10/10 | 10/10 | **10/10** | 0/10 | 0/10 | 0/10 | **8** |
+| Reservation | 10/10 | 10/10 | 3/10 | 0/10 | 0/10 | 0/10 | **4** |
+| TwoTier | 10/10 | 10/10 | 1/10 | 0/10 | 0/10 | 0/10 | **4** |
+
+*(load ×1.0, base slice `k2_slots=2`/`shared_lcg=False`, 10 seeds/cell —
+the sweep has 10 where the rule registered 5; a first-5-seeds subsample
+gives the identical verdict, so the deviation is conservative.)*
+
+**Four robots run clean on every scheduler. Eight is where the QoS-aware
+arms fail and PF does not.** "The schedulers separate at 8" — D4-3's
+result — is the *supporting detail*; the headline is that **the deployed
+product admits half the fleet PF does.**
+
+**And TwoTier is last on both metrics at 8 and 16 robots**, from the same
+run (`scripts/g10_admissible.py` prints the ranks):
+
+| N | M07 rank | M08 rank |
+|---|---|---|
+| 8 | PF 1, Reservation 2, **TwoTier 3** | PF 1, Reservation 2, **TwoTier 3** |
+| 16 | PF 1, Reservation 2, **TwoTier 3** | PF 1, then Reservation and **TwoTier tied at exactly 0.000** |
+
+**One word of qualification, because §0.1's rule cuts both ways:** at N=16
+on M08 the two QoS-aware arms are at **exactly 0.0000 on all 10 seeds** — a
+dead tie, so TwoTier is *joint*-last there, not last. On M07 it is
+unambiguously last at both sizes. And above N=16 the ranking inverts (PF
+meets zero contracts while holding the best floor), which is D4-3's own
+correction — so "TwoTier last" is a statement about N ∈ {8, 16} and must
+not be carried upward.
+
+**Two caveats that travel with the number.**
+
+- **PF's 8 is knife-edge; the QoS-aware arms' 4 is not.** PF's worst seed
+  at N=8 has `M08.fraction = 0.9503`, a margin of **0.0003** over the bar.
+  Across the six `(k2_slots, shared_lcg)` slices the answer is 8/4/4 on
+  five of six and flips PF to 4 on one.
+- **M08 adds nothing to the conjunct at this bar.** `M07.met == M07.total`
+  and `M08.fraction ≥ 0.95` disagree on **0 of 7,560 rows** — M08's min is
+  over the same GBR flow set M07 counts, so the registered "M07, M08
+  all-pass" is effectively M07 alone. Widening toward the full G1–G8 (adding
+  M05 ≥ 0.99 and M09 ≥ 0.9) leaves 8/4/4 unchanged and drops TwoTier's N=8
+  from 1/10 seeds to 0/10.
+
+**Scope**, per §0.1/§0.3: stage 2's uniform parametric mix at the deployed
+`min_rb=5`, one base slice, 20,000-slot horizon. G5's row records that the
+concentrate-vs-spread signature this number is built from has a
+**workload-dependent onset**, so 8/4/4 is this workload's answer, not a
+fleet-general one.
+
 ### D4-4 at N=4 — HIT, and stronger than the N=2 control
 
 Zero qualifying M07/M08 separations at N=4, max effect size 0.30-0.36
