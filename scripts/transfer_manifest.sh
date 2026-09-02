@@ -9,8 +9,19 @@
 # difference, not a cardinality test; this script is that check, wired to
 # the copy so the two cannot drift apart.
 #
-#   ./scripts/transfer_manifest.sh <ssh-host>            # copy + verify
+#   ./scripts/transfer_manifest.sh <ssh-host>            # PULL from host
 #   ./scripts/transfer_manifest.sh <ssh-host> --verify   # verify only
+#   ./scripts/transfer_manifest.sh <ssh-host> --push     # PUSH to host
+#
+# DIRECTION MATTERS, and on this pair it is not symmetric. The desktop's
+# ~/.ssh/authorized_keys carries two keys commented "laptop" and its sshd
+# listens; the laptop's does not carry the desktop's. So the laptop can ssh
+# INTO the desktop and the desktop CANNOT ssh into the laptop -- a pull run
+# on the desktop fails at authentication every time, no matter how the
+# manifest is written. Run --push FROM THE LAPTOP instead:
+#
+#   # on the laptop, from its own checkout
+#   ./scripts/transfer_manifest.sh smart@<desktop-ip> --push
 #
 # <ssh-host> is anything ssh(1) accepts -- an alias from ~/.ssh/config, or
 # user@address. This script does no credential handling: if the host needs
@@ -22,6 +33,7 @@ HOST="${1:-}"
 MODE="${2:-copy}"
 [ -z "$HOST" ] && { echo "usage: $0 <ssh-host> [--verify]" >&2; exit 2; }
 [ "$MODE" = "--verify" ] && MODE=verify
+[ "$MODE" = "--push" ] && MODE=push
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_REPO="${SRC_REPO:-projects/5g-qos-stack-personal}"   # path on the SOURCE host
@@ -41,11 +53,52 @@ bad() { printf '  \033[31mFAIL\033[0m  %s\n' "$*"; fail=1; }
 say "== source: $HOST:$SRC_REPO   destination: $REPO"
 if ! ssh -o ConnectTimeout=10 "$HOST" true 2>/dev/null; then
   say "cannot reach $HOST over ssh (no key, wrong host, or password required)."
-  say "Nothing was copied. Run this from a shell where 'ssh $HOST' works."
+  say "Nothing was copied."
+  say ""
+  say "If you are on the DESKTOP trying to pull from the laptop, this will"
+  say "never work: the trust is one-way (laptop -> desktop). Run the push"
+  say "form from the laptop instead:"
+  say "    ./scripts/transfer_manifest.sh smart@<desktop-ip> --push"
   exit 3
 fi
 
 # ---------- items 1-3: the .gitignore'd record files ----------
+if [ "$MODE" = push ]; then
+  say "== PUSHING items 1-3 (~2.6 G) to $HOST =="
+  for rel in "${ITEMS[@]}"; do
+    [ -f "$REPO/$rel" ] || { bad "source missing: $rel"; continue; }
+    say "  -> $rel"
+    ssh "$HOST" "mkdir -p '$SRC_REPO/$(dirname "$rel")'" || bad "mkdir failed: $rel"
+    rsync -aP --info=progress2 "$REPO/$rel" "$HOST:$SRC_REPO/$rel" || bad "rsync failed: $rel"
+  done
+  say "== PUSHING item 4 (~/.claude/plans/) =="
+  ssh "$HOST" "mkdir -p .claude/plans" || bad "mkdir failed: plans"
+  rsync -a --ignore-existing "$PLANS/" "$HOST:.claude/plans/" || bad "rsync failed: plans"
+
+  say ""
+  say "== verifying the DESTINATION against this machine =="
+  for rel in "${ITEMS[@]}"; do
+    [ -f "$REPO/$rel" ] || continue
+    want=$(stat -c%s "$REPO/$rel")
+    got=$(ssh "$HOST" "stat -c%s '$SRC_REPO/$rel' 2>/dev/null" || echo "")
+    if [ -z "$got" ]; then bad "$rel -- ABSENT on destination"
+    elif [ "$want" = "$got" ]; then ok "$rel  ($(numfmt --to=iec "$got"))"
+    else bad "$rel -- size mismatch: here $want, destination $got"; fi
+  done
+  # identity, not cardinality: every plan HERE must exist THERE
+  missing=$(comm -23 <(ls "$PLANS" 2>/dev/null | sort) \
+                     <(ssh "$HOST" "ls .claude/plans/ 2>/dev/null" | sort))
+  if [ -z "$missing" ]; then
+    ok "~/.claude/plans/ -- every plan on this machine is present on $HOST"
+  else
+    bad "~/.claude/plans/ -- MISSING on destination:"
+    printf '          %s\n' $missing
+  fi
+  say ""
+  [ "$fail" -eq 0 ] && say "MANIFEST COMPLETE (pushed)" || say "MANIFEST INCOMPLETE -- see FAIL lines above"
+  exit "$fail"
+fi
+
 if [ "$MODE" = copy ]; then
   say "== copying items 1-3 (~2.6 G) =="
   for rel in "${ITEMS[@]}"; do

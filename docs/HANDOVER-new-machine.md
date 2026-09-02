@@ -165,8 +165,34 @@ sentence saying the counts were derived.
 the copy and its verification cannot drift apart:
 
 ```bash
-./scripts/transfer_manifest.sh <ssh-host>            # copy + verify
+./scripts/transfer_manifest.sh <ssh-host>            # PULL from host
 ./scripts/transfer_manifest.sh <ssh-host> --verify   # verify only
+./scripts/transfer_manifest.sh <ssh-host> --push     # PUSH to host
+```
+
+**RUN IT FROM THE LAPTOP, IN `--push` FORM. The trust between these two
+machines is one-way and a pull can never work.** Measured on the desktop:
+
+- the desktop's `~/.ssh/authorized_keys` holds **two keys commented
+  `laptop`**, and its `sshd` is listening — so **laptop → desktop works**;
+- the desktop has **no private key at all** (`~/.ssh/` contains
+  `authorized_keys`, `config`, `known_hosts` and nothing else) and its
+  ssh-agent holds no identities — so **desktop → laptop cannot
+  authenticate**, and no amount of retrying from this side changes that.
+
+**And the `lab` alias in `~/.ssh/config` is NOT the laptop — it is this
+desktop.** `HostName 172.25.70.124` is the desktop's own `wlp7s0` address,
+and its `User smartpc` does not exist on the desktop. `ssh lab` is a
+loopback to a nonexistent user; it fails for everyone, and anyone reading
+the alias as "the other machine" will spend the same time on it twice.
+**There is no configured route from the desktop to the laptop.**
+
+So the transfer is driven from the laptop:
+
+```bash
+# on the LAPTOP, from its own checkout
+./scripts/transfer_manifest.sh smart@172.25.70.124 --push   # same LAN
+./scripts/transfer_manifest.sh smart@100.101.171.63 --push  # tailscale
 ```
 
 It rsyncs items 1–3 with `-P` (a dropped 1.4 G transfer resumes rather than
