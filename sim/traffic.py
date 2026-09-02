@@ -208,11 +208,34 @@ class TrafficModel:
         #
         # Additive by construction: no existing scenario sets these keys, so
         # every pre-WP9 flow is unaffected and the frozen corpus cannot move.
-        af = p.get("active_from_s")
-        au = p.get("active_until_s")
-        if af is not None and now_s < float(af):
-            return []
-        if au is not None and now_s >= float(au):
+        # WP9 G11 commit 4. GENERALISED FROM ONE WINDOW TO A LIST, because
+        # GT-7.1 scripts three things the single pair cannot express: a
+        # duty-cycled teleop stream (repeating on/off), waypoint pauses
+        # (gaps), and a STOP drill at one instant. All three are "active
+        # during any of these intervals".
+        #
+        # STRICT GENERALISATION, and that is the whole design. The single
+        # pair is normalised into a one-element list and both go through the
+        # SAME predicate below -- not a second branch that happens to agree.
+        # Equivalence is then a property of the code rather than a
+        # coincidence of two implementations, and it is asserted directly in
+        # sim/tests/test_activation_windows.py.
+        #
+        # The predicate is the De Morgan dual of what stood here:
+        #     skip iff (af set and now < af) or (au set and now >= au)
+        #   active iff (af is None or now >= af) and (au is None or now < au)
+        # -- half-open [from, until), the same convention as
+        # scripts/wp9_window.py::Window.contains.
+        windows = p.get("active_windows")
+        if windows is None:
+            af = p.get("active_from_s")
+            au = p.get("active_until_s")
+            if af is not None or au is not None:
+                windows = ((af, au),)
+        if windows is not None and not any(
+            (f is None or now_s >= float(f)) and (u is None or now_s < float(u))
+            for f, u in windows
+        ):
             return []
 
         if kind == "deterministic":
