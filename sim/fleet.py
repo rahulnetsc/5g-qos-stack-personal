@@ -142,7 +142,16 @@ DRONE = DeviceProfile(
               "flight control 20 Hz, delay-critical"),
         _Flow(2, "UL", "GBR", 4_000_000.0, "xr_video",
               {"period_ms": 33.0, "avg_bytes": 16_000, "fragment_bytes": 1500},
-              "H.264 720p30 with GOP bursts"),
+              # OFFERED IS BELOW GFBR, deliberately recorded rather than
+              # fixed: 16_000 B / 33.0 ms = 3.879 Mbps against a 4.000 Mbps
+              # GFBR, so gfbr_fraction has an arithmetic ceiling of ~0.970
+              # and this flow starts any load ramp ~0.007 above the 0.95
+              # contract line. The 5QI-4 lidar is provisioned offered =
+              # guarantee and starts ~0.05 above it, so "camera degrades
+              # first" is partly provisioning, not scheduling
+              # (docs/wp9-plan.md §36.3). Changing avg_bytes would move the
+              # regression corpus and every G10/G12 number -- its own commit.
+              "H.264 720p30 with GOP bursts -- offered 3.879 Mbps vs GFBR 4.000, ratio 0.9697"),
         _Flow(9, "UL", "PF", 0.0, "periodic_control",
               {"period_ms": 1000.0, "bytes_per_period": 64},
               "1 Hz heartbeat"),
@@ -158,7 +167,9 @@ UGV = DeviceProfile(
               "LIDAR -- duty-cycled, gated by LidarActivation"),
         _Flow(2, "UL", "GBR", 4_000_000.0, "xr_video",
               {"period_ms": 33.0, "avg_bytes": 16_000, "fragment_bytes": 1500},
-              "forward camera"),
+              # Same under-provisioning as DRONE's camera above; see that
+              # comment. docs/wp9-plan.md §36.3.
+              "forward camera -- offered 3.879 Mbps vs GFBR 4.000, ratio 0.9697"),
         _Flow(83, "UL", "Delay", 0.0, "periodic_control",
               {"period_ms": 20.0, "bytes_per_period": 200},
               "odometry 50 Hz"),
@@ -180,7 +191,11 @@ CAMERA = DeviceProfile(
     flows=(
         _Flow(2, "UL", "GBR", 6_000_000.0, "xr_video",
               {"period_ms": 33.0, "avg_bytes": 25_000, "fragment_bytes": 1500},
-              "continuous 1080p30"),
+              # Provisioned the OTHER way -- 25_000 B / 33.0 ms = 6.061 Mbps
+              # against a 6.000 GFBR, ratio 1.0101. Recorded because it is
+              # why exactly 4 of the 5 5QI-2 flows in the mixed/N=8 cell are
+              # under-provisioned and one is not (docs/wp9-plan.md §36.3).
+              "continuous 1080p30 -- offered 6.061 Mbps vs GFBR 6.000, ratio 1.0101"),
         _Flow(82, "DL", "Delay", 0.0, "periodic_control",
               {"period_ms": 1000.0, "bytes_per_period": 64},
               "PTZ / config"),

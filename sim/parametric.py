@@ -241,6 +241,15 @@ def sweep_scenario(
                 # after fragmentation can emit a fragment larger than
                 # fragment_bytes, breaking that generator's MTU-cap claim.
                 # Scaling the mean frame size is the documented workaround.
+                # OFFERED IS BELOW GFBR at every duty: _burstify holds the
+                # mean rate constant, so this is 16_000 B / 33.0 ms =
+                # 3.879 Mbps against 4.000 Mbps, ratio 0.9697 -- an
+                # arithmetic ceiling of ~0.970 on gfbr_fraction. The same
+                # shortfall exists independently in sim/fleet.py's DRONE and
+                # UGV camera flows, so it reaches both the WP9 sweep (G6,
+                # G10) and the G12 ramp. Recorded, not fixed: changing
+                # avg_bytes moves the regression corpus (docs/wp9-plan.md
+                # §36.3).
                 vp_ms, vp_bytes = _burstify(33.0, 16_000.0, duty_cycle)
                 gfbr = 4_000_000.0
                 flows.append(FlowConfig(

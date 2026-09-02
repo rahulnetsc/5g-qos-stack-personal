@@ -6278,9 +6278,64 @@ than leaving it buried.
 before 5QI 4, **G12's own inversion**. §36.1 is the control: PF's own
 permutation 104 produces `[4, 2]` on all 5 of its seeds.
 
-**The registered qualifier applies verbatim and is not softened here: this
-ordering is a property of declaration order.** It is not reported as an
+**A STRUCTURAL COMPETING EXPLANATION THE CAMPAIGN DID NOT DISCLOSE: the two
+GBR classes do not start the ramp on equal terms.** Recomputed from the
+scenario builder, not from a document:
+
+| class | offered | GFBR | ratio | headroom above the 0.95 line at ramp bottom |
+|---|---|---|---|---|
+| 5QI 2 camera (4 of 5 flows) | 16,000 B / 33.0 ms = **3.879 Mbps** | 4.000 Mbps | **0.9697** | measured **0.9571–0.9724**, i.e. ~**0.007** |
+| 5QI 4 lidar (both flows) | `int(3e6·m/8·0.1)` per 100 ms = **3.000·m Mbps** | 3.000·m | **1.0000** | measured **0.9978–1.0000**, i.e. ~**0.048–0.050** |
+
+**The camera class is provisioned below its own guarantee**, so its
+`gfbr_fraction` has an arithmetic ceiling of ~0.970 *in expectation* and it
+begins the ramp roughly **7× closer to the contract line than the lidar
+class does**. "Camera degrades first" is therefore **biased by the
+workload's own provisioning, independently of any scheduler and
+independently of flow-list order.**
+
+**This is additive to the declaration-order artefact, not a replacement for
+it** — permutation 104 flips the order with the provisioning byte-identical,
+so position matters too. But it means the canonical `[2, 4]` order has a
+structural explanation that owes nothing to scheduling, and any future
+attempt to promote the ordering to a scheduler property must defeat *both*.
+
+**Note the shape: this is §35.4's own trap (c) — "a GFBR provisioned above
+what the flow offers can never be met" — recurring on a different class.**
+`sim/scenarios/g12.py`'s docstring states that rule and applies it only to
+5QI 1, where the mismatch is ~21×; the 3 % camera shortfall is the same
+defect small enough to survive the check that was built for it. The same
+pair appears independently in `sim/parametric.py`'s `factory` mix, so it
+reaches the WP9 sweep's G10 and G6 cells too.
+
+*(The deck that surfaced this rounded 3.879 → 3.89 before dividing and
+reported a 0.973 ceiling; the exact value is 0.9697 → **0.970**. Fixing the
+workload — e.g. 16,000 → 16,500 B — would be a fidelity change moving the
+regression corpus and every G10/G12 number, so it needs its own commit
+under the one-change-per-commit rule. Nothing here changes a number.)*
+
+**The registered qualifier applies verbatim and is not softened here:** the
+Region-2 ordering is **not established as a scheduler property and is
+consistent with a declaration-order artefact.** It is not reported as an
 inversion finding.
+
+> **CORRECTED. This sentence previously read "*this ordering IS a property
+> of declaration order*" — which is not what §35.13 registered**, and the
+> difference is not cosmetic: the registered form is a **non-establishment**
+> ("not established as X, consistent with Y"), and the replacement asserts
+> a positive causal claim the permutation control does not license. The
+> control shows the order *changes* with list position; it does not show
+> position is *the* cause, and §36.4's own clause-2 edge says a traced
+> mechanism would confirm the artefact rather than promote anything.
+>
+> **What makes this worth recording is the direction.** §35.13 committed
+> the sentence in advance *"so it cannot be softened later, when a striking
+> result is in hand"*. **The drift was not a softening — it was a
+> hardening**, and the guard was written against only one direction. A
+> pre-registered sentence needs to be protected against being made
+> *stronger* as much as weaker; an over-claim is the more natural error
+> when the result is striking, which is exactly the situation the guard
+> anticipated. Found while building the client deck.
 
 ### 36.4 The promotion bar, applied as written — including its edge
 

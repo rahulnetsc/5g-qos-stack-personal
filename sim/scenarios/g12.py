@@ -37,6 +37,20 @@ THE THREE TRAPS THIS MODULE EXISTS TO CLOSE, all measured in §35.4/§35.5:
     index 0, i.e. telemetry leads every ordering. This module therefore
     leaves 5QI 1 exactly as `sim/fleet.py` declares it -- `flow_class=
     "Delay"`, GFBR 0 -- and clause 4 is a gap statistic.
+
+    **AND THE SAME DEFECT IS PRESENT, SMALL, ON THE CLASS THIS MODULE
+    ACTUALLY SCORES -- found after the fact, docs/wp9-plan.md §36.3.** The
+    trap above was written for a ~21x mismatch on 5QI 1 and caught it. The
+    5QI 2 camera is under-provisioned by 3 %: 16_000 B / 33.0 ms =
+    3.879 Mbps against a 4.000 Mbps GFBR (`sim/fleet.py`'s DRONE and UGV
+    video flows), so its `gfbr_fraction` ceiling is ~0.970 and it starts
+    the ramp ~0.007 above the 0.95 line, while both 5QI 4 lidar flows are
+    provisioned offered = guarantee and start ~0.05 above it. **So the two
+    classes this module orders do not start on equal terms, and "camera
+    degrades first" is partly provisioning rather than scheduling.** The
+    guard built for trap 2 did not fire because it was shaped for a gross
+    mismatch; a 3 % one is the same defect below the threshold anyone
+    thought to check.
  3. **Flow DECLARATION ORDER inverts which class violates first.** Measured:
     moving the 5QI 4 flows to the end of `ScenarioConfig.flows`, everything
     else byte-identical, takes 5QI 4 from `2/2` meeting to `0/2` (min
