@@ -210,6 +210,12 @@ class RunRecord:
     system: SystemRecord
     timeseries_time_s: Optional[list[float]] = None
     timeseries_slot_index: Optional[list[int]] = None
+    # WP9 G11 commit 2. True when driver.run() drained the message ledger
+    # per window. Without this flag a consumer cannot tell None-because-
+    # EVICTED from None-because-PRE-WP7, and scorecard.py's M01/M15 would
+    # silently fall back to the head-of-line proxy -- a different estimator
+    # reported under the same metric id.
+    message_ledger_windowed: bool = False
     meta: dict[str, Any] = field(default_factory=dict)
     # WP-Join commit 4/5 (docs/wp-join-plan.md sec5): None means "this
     # record was produced by a driver.run() that predates commit 5's
@@ -237,7 +243,7 @@ class RunRecord:
         return out
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "schema_version": self.schema_version,
             "scenario_name": self.scenario_name,
             "scheduler_name": self.scheduler_name,
@@ -252,6 +258,13 @@ class RunRecord:
                 [asdict(e) for e in self.join_events] if self.join_events is not None else None
             ),
         }
+        # WP9 G11 commit 2. Emitted ONLY when true, so a non-windowed
+        # record serialises byte-identically to before this commit and the
+        # frozen regression corpus is untouched. from_dict defaults to
+        # False on absence, so the round trip is total either way.
+        if self.message_ledger_windowed:
+            d["message_ledger_windowed"] = True
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "RunRecord":
@@ -265,6 +278,7 @@ class RunRecord:
             system=SystemRecord(**d["system"]),
             timeseries_time_s=d.get("timeseries_time_s"),
             timeseries_slot_index=d.get("timeseries_slot_index"),
+            message_ledger_windowed=bool(d.get("message_ledger_windowed", False)),
             meta=d.get("meta", {}),
             join_events=(
                 [JoinEventRecord(**e) for e in d["join_events"]]
@@ -367,6 +381,7 @@ class RunRecord:
             system=system,
             timeseries_time_s=ts.get("time_s"),
             timeseries_slot_index=ts.get("slot_index"),
+            message_ledger_windowed=bool(summary.get("_ledger_windowed", False)),
             meta=dict(meta or {}),
             # WP-Join commit 5: "join_events" in summary at all (even an
             # empty list) is the signal a WP-Join-aware driver.run() ran --

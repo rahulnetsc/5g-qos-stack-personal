@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -33,6 +34,8 @@ def run(
     harq_round_max: int = 4,
     harq_combining_mode: str = "ir",
     truncated_bsr: str = "off",
+    window_slots: Optional[int] = None,
+    window_sink: Optional[Callable[[int, list], None]] = None,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -739,6 +742,16 @@ def run(
             for completion in buffers.pop_completions(ue_id, qfi):
                 message_ledger.record(completion)
 
+        # WP9 G11 commit 2 -- windowed eviction. Hand each window's
+        # completions to the consumer and let them go, so a 30-minute soak
+        # retains one window rather than the whole run (docs/wp9-plan.md
+        # §37). Boundary is END-OF-WINDOW: slot_index+1 so the window
+        # [0, window_slots) closes at slot_index == window_slots-1.
+        if window_sink is not None and window_slots:
+            if (slot_index + 1) % window_slots == 0:
+                window_sink((slot_index + 1) // window_slots - 1,
+                            message_ledger.drain())
+
         metrics.snapshot_slot(
             slot_index=slot_index,
             time_s=now_s,
@@ -785,10 +798,41 @@ def run(
     # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
     # the message ledger and merged into the same per-flow summary dict the
     # proxy fields already live in -- RunRecord.from_summary picks both up.
+    windowed_ledger = window_sink is not None and bool(window_slots)
+    if windowed_ledger and scenario.horizon_slots % window_slots:
+        # THE RESIDUAL WINDOW. Without this, a horizon that is not an exact
+        # multiple of window_slots silently loses its last partial window --
+        # the consumer would score one window fewer than the run contains
+        # and have no way to notice. Emitted only when there IS a residual,
+        # so the window count is exactly ceil(horizon / window_slots) and a
+        # consumer can assert it against the schedule.
+        window_sink(scenario.horizon_slots // window_slots,
+                    message_ledger.drain())
     for f in scenario.flows:
         key = f"ue{f.ue_id}_qfi{f.qfi}"
         if key not in summary["flows"]:
             continue  # flow generated no traffic at all this run
+        # WP9 G11 commit 2. If a window sink drained the ledger, everything
+        # below would be computed over the LAST PARTIAL WINDOW only, and
+        # would look like a whole-run number. Percentiles are not
+        # associative, so they cannot be reassembled from per-window
+        # summaries either -- there is no honest run-level value to emit.
+        # Emit None and a reason, per config/metric_panel.yml's rule that a
+        # pending metric emits a row rather than being omitted; the windowed
+        # consumer holds the real numbers, per window.
+        if windowed_ledger:
+            fl = summary["flows"][key]
+            for fld in ("delay_p50_ms", "delay_p95_ms", "delay_p98_ms",
+                        "delay_p99_ms", "message_count"):
+                fl[fld] = None
+            fl["completion_ts_by_role_s"] = None
+            fl["frame_completions"] = None
+            fl["message_stats_unavailable_reason"] = (
+                "ledger drained per window (window_slots set); run-level "
+                "message aggregates are not reconstructible from window "
+                "summaries -- score per window instead"
+            )
+            continue
         completions = message_ledger.completions_for(f.ue_id, f.qfi)
         stats = message_latency_percentiles_ms(completions)
         summary["flows"][key]["delay_p50_ms"] = round(stats["p50"], 3)
@@ -838,6 +882,10 @@ def run(
     # metrics contract. Lets a study inspect raw per-message completions
     # beyond the percentiles already merged into summary["flows"] above.
     summary["_message_ledger"] = message_ledger
+    # Tells a consumer the ledger is a TAIL, not the run. Without this a
+    # caller cannot distinguish "no messages completed" from "the ones that
+    # did were already handed to the window sink".
+    summary["_ledger_windowed"] = windowed_ledger
     if record_timeseries:
         summary["timeseries"] = metrics.timeseries()
     return summary

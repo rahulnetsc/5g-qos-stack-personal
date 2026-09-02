@@ -35,7 +35,31 @@ One row. If it needs more than a row, it is probably a verdict change.
 
 ## OPEN
 
-*(none — the batch below was cleared by the deck-corrections pass)*
+| # | document / file | what is wrong | correct value | cited downstream by | verdict? |
+|---|---|---|---|---|---|
+| 10 | `wp9-g11-plan.md` §4.2 | claims eviction takes per-run retention to **~1 GiB**, restoring 16-wide parallelism | eviction alone leaves **~5.6 GiB/run** at 7.2 M slots; ~49 % of the residual is `sim/metrics.py::FlowMetrics.hol_delay_samples_s`, which neither commit 2 nor commit 3 touches | §7.3's option (c) makespan, ≈2.15 h | no — changes a budget, not a verdict; commit 8's `--time-cell` measures the real cell anyway |
+| 11 | `wp9-g11-plan.md` §10 | commit-2 row says `--check` is blind "because eviction is scoring-layer" | the mechanism is in `sim/driver.py` and the corpus stores driver output; **`--check` BINDS** — see the registered-expectation miss below | the commit table's own binding/blind split | no |
+| 12 | `sim/metrics.py` | `hol_delay_samples_s` is a `list` of Python floats — ~32 B/sample, ~87 M samples at 7.2 M slots | `array("d")` at 8 B/sample takes the evicted floor ~5.6 → ~2.0 GiB, value-identical (`_percentile` sorts a copy either way) | §7.3's budget | no — its own commit, `--check`-neutral |
+
+**A REGISTERED EXPECTATION MISSED, recorded rather than absorbed.** The
+commit table registered *"commit 2: `--check` is BLIND"*. **It is not.** The
+commit adds `RunRecord.message_ledger_windowed`, the corpus serialises
+`RunRecord`s, and `--check` failed on the first run with
+`study3/latency_bound/TwoTier.message_ledger_windowed: MISSING in baseline`.
+
+**The prediction was wrong for the reason the rule it came from exists.** I
+applied *"name what the check reads and what the commit touches"* using the
+commit's **headline** (ledger eviction, scoring-adjacent) rather than its
+**diff** (which reaches `RunRecord`). The intersection test is only sound
+against what a commit actually changes, and at registration time that was
+not yet known — which is an argument for re-running the test when the diff
+exists, not only when the row is written.
+
+**Resolved without re-baselining**: the field is serialised **only when
+true**, so a non-windowed record's `to_dict()` is byte-identical to before
+and the frozen corpus is untouched (`--check` clean at `--rel-tol 0`).
+Re-baselining would have been the wrong move — the change is not *intended*
+to move any number.
 
 ---
 

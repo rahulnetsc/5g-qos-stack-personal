@@ -163,6 +163,14 @@ class Scorecard:
                               + list(result.caveats or []))
         return out
 
+    _WINDOWED_REASON = (
+        "message ledger drained per window (WP9 G11 commit 2): run-level "
+        "message aggregates are not reconstructible from window summaries "
+        "-- score per window. Reported pending rather than falling back to "
+        "the head-of-line proxy, which would be a DIFFERENT ESTIMATOR under "
+        "the same metric id."
+    )
+
     def _has_true_latency(self, record: RunRecord) -> bool:
         """WP7: True per-message latency is available iff every flow in the
         record was produced by a WP7-aware driver.run() (message_count is
@@ -174,6 +182,15 @@ class Scorecard:
         return bool(flows) and all(fr.message_count is not None for fr in flows)
 
     def _m01_latency_percentiles(self, record: RunRecord) -> MetricResult:
+        # The eviction case must NOT fall through to the proxy below: a
+        # windowed record has message_count=None on every flow, which
+        # _has_true_latency reads as "pre-WP7" and answers with the
+        # head-of-line proxy -- silently swapping estimators. Pending is the
+        # honest answer, and the panel's own rule is that a pending metric
+        # emits a row with a reason rather than being omitted.
+        if record.message_ledger_windowed:
+            return MetricResult("M01", "flow_latency_percentiles", None,
+                                "pending", "ms", self._WINDOWED_REASON)
         if self._has_true_latency(record):
             all_flows = list(record.flows.values())
             # A flow that never fully delivered a single message (chronic
@@ -786,6 +803,9 @@ class Scorecard:
                              "ok", "fraction")
 
     def _m15_command_jitter(self, record: RunRecord) -> MetricResult:
+        if record.message_ledger_windowed:
+            return MetricResult("M15", "command_jitter_p99_p50", None,
+                                "pending", "ms", self._WINDOWED_REASON)
         have_true = self._has_true_latency(record)
         worst = None
         worst_jitter = -1.0

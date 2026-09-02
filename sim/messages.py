@@ -72,6 +72,8 @@ class MessageLedger:
     def __init__(self) -> None:
         self._id_counter = count(1)
         self._completions: list[MessageCompletion] = []
+        self._drain_calls = 0
+        self._drained_count = 0
 
     def new_id(self) -> int:
         return next(self._id_counter)
@@ -79,10 +81,57 @@ class MessageLedger:
     def record(self, completion: MessageCompletion) -> None:
         self._completions.append(completion)
 
+    @property
+    def drained(self) -> bool:
+        return self._drain_calls > 0
+
+    @property
+    def drained_count(self) -> int:
+        """Completions handed to a window sink and forgotten."""
+        return self._drained_count
+
+    def _refuse_if_drained(self, what: str) -> None:
+        if self._drain_calls:
+            raise RuntimeError(
+                f"{what} on a ledger that was drained {self._drain_calls} "
+                f"time(s) by windowed eviction: this would return only the "
+                f"tail since the last drain, which is indistinguishable from "
+                f"a small real run. {self._drained_count} completions were "
+                f"already handed to the window sink -- score per window."
+            )
+
     def completions(self) -> list[MessageCompletion]:
+        self._refuse_if_drained("completions()")
         return list(self._completions)
 
+    def drain(self) -> list[MessageCompletion]:   # noqa: D401
+        """Return everything recorded since the last drain, and forget it.
+
+        WP9 G11 commit 2. A 30-minute soak generates completions without
+        bound -- measured at ~24 GiB of per-message bookkeeping at 7.2M
+        slots, HALF of it surviving ``record_timeseries=False``, with no
+        flag to disable it (``docs/wp9-plan.md`` §37). G11 scores in 60 s
+        windows and never needs the whole run at once, so a windowed
+        consumer takes each window's completions and lets them go.
+
+        DRAINING BREAKS RUN-LEVEL AGGREGATES AND THAT IS NOT HIDDEN.
+        ``sim/driver.py``'s end-of-run per-flow block computes latency
+        percentiles, ``completion_ts_by_role_s`` and ``frame_completions``
+        from ``completions_for()``; after a drain those would be computed
+        over the last partial window only. Percentiles are not associative,
+        so they cannot be reassembled from per-window summaries either.
+        The driver therefore emits them as ``None`` when a window sink is
+        active, rather than a number that looks right -- see its
+        ``window_sink`` parameter.
+        """
+        out = self._completions
+        self._completions = []
+        self._drain_calls += 1
+        self._drained_count += len(out)
+        return out
+
     def completions_for(self, ue_id: int, qfi: int) -> list[MessageCompletion]:
+        self._refuse_if_drained("completions_for()")
         return [
             c for c in self._completions
             if c.message.ue_id == ue_id and c.message.qfi == qfi
