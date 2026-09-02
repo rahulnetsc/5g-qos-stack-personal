@@ -1418,20 +1418,20 @@ numbers that move recorded with the reason. Commits 1–3 are
 **preconditions** — without all three G11 does not run at all (§4.1, §7.2,
 §7.3).
 
-| # | commit | `--check` expectation |
+| # | commit | can this check FAIL? (CLAUDE.md: establish it could have) |
 |---|---|---|
-| **0** | **Pre-flight probe** (§3) in `scripts/`, output verbatim to `sweeps/wp9/`. **Run-aggregate metrics on short runs of the CURRENT base cell** — it cannot use per-window instruments, which do not exist until commit 5, nor the scripted scenario, which does not exist until commit 4. See the note below on what this can and cannot decide. | no code change |
-| **1** | **M09 hoist** (§4.1), alone, plus a **scaling** guard test (time at N and 2N, assert the ratio). | **`--check` is structurally BLIND here — see the box below.** The real guard is a bit-identity test against the original nesting. **LANDED** (`d1b8834`): 2.9×/11.6×/23.0× at 20 k/80 k/160 k, value bit-identical |
-| **2** | **Windowed ledger eviction** (§4.2) — removes the message-bookkeeping half of memory. Settles the run-level-percentile question the eviction forces. Needs its own worker-retention test: neither `_run_one_cell_s3` nor `_s4` has one. | **WILL MOVE, and that is expected.** §4.2 says percentiles are not associative, so a run-level M01 p98 built from evicted windows is a *different estimator* unless inputs are retained. The commit states which it chose and re-baselines deliberately, or retains enough to keep `--check` clean — **decided in the commit, not assumed here** |
-| **3** | **Per-second timeseries fold** (§4.2) — removes the other half. M09 and M08w preserved *exactly*; M04/M19/M21 lose per-slot resolution. | **must not move for M09/M08**; M04/M19/M21 move and the commit says so |
-| **4** | **Multi-window activation gate** in `sim/traffic.py` (§4.5) — one mechanism covering teleop duty cycle, waypoint pauses and the STOP drill. Strict generalisation of the single `(from, until)` pair. | **must not move** — a one-element list must reproduce the current path exactly |
-| **5** | `sim/scenarios/g11.py` — the GT-7.1 scenario **and its guards**: expected-count assertions for all four scripted ingredients, **derived from the schedule** and asserted at **equality** (G9 §34.5). Settles §7.4's fleet-size and horizon-unit questions in code. | no change |
-| **6** | **60 s window partition + M03w / M05w / M06w / M09w / M15w** (§4.3, §4.4), with completion pre-bucketing. **M05w carries a C3-style calibration obligation** — see below. `config/metric_panel.yml` is **not** edited. | no change |
-| **7** | **Drift detector** (§4.7) — C2's instrument, per-internal (E3), with the exclusions encoded in the tool. | no change |
-| **8** | `scripts/g11_campaign.py` — per-run resumability (§5), `horizon_slots` as a grid axis, LPT ordering, worker memory guard, live RSS instrumentation with a kill threshold, worker PIDs logged. **Includes a `--time-cell` pass that measures SCORING cost**, which §7.3's makespan excludes. | no change |
-| **9** | **Re-run the pre-flight** (§3) with the real scenario and the real windowed instruments — the check commit 0 could only approximate. **Go/no-go on the campaign.** | no change |
-| **10** | **The campaign**, including §9's 4-permutation control. Log to `sweeps/wp9/g11_campaign.log` in the repo tree, never a scratchpad (handover §5.2). | no change |
-| **11** | Scoring: five clause verdicts each with its own instrument named, M14 emitted with `survival_time_ms=0` inline, the regime-map row with its seed count and CI status inline, and prediction scoring — hits **and** misses. | no change |
+| **0** | **Pre-flight probe** (§3) in `scripts/`, output verbatim to `sweeps/wp9/`. **Run-aggregate metrics on short runs of the CURRENT base cell** — it cannot use per-window instruments, which do not exist until commit 5, nor the scripted scenario, which does not exist until commit 4. See the note below on what this can and cannot decide. | **nothing to verify** — no code change. The probe's own output is the artefact |
+| **1** | **M09 hoist** (§4.1), alone, plus a **scaling** guard test (time at N and 2N, assert the ratio). | **`--check` is BLIND** (corpus stores `RunRecord`s, hoist touches `sim/scorecard.py` — disjoint). Binding guard: `test_m09_hoist.py`'s bit-identity + scaling + guards-the-guard. **LANDED** `d1b8834`: 2.9×/11.6×/23.0×, value identical |
+| **2** | **Windowed ledger eviction** (§4.2) — removes the message-bookkeeping half of memory. Settles the run-level-percentile question the eviction forces. Needs its own worker-retention test: neither `_run_one_cell_s3` nor `_s4` has one. | **`--check` is BLIND** — eviction is scoring-layer. Binding guard: a **before/after diff of M01/M03/M05 on a retained record**, since eviction changes what percentiles are computed from (§4.2). This commit must SAY which estimator it chose and show the two values |
+| **3** | **Per-second timeseries fold** (§4.2) — removes the other half. M09 and M08w preserved *exactly*; M04/M19/M21 lose per-slot resolution. | **`--check` BINDS PARTIALLY.** The fold changes `RunRecord.timeseries_*`, which the corpus *does* store — so `--check` **will** move, and that is expected, not a regression. Binding guards: M09/M08w bit-identical (they consume per-second buckets), M04/M19/M21 move and are re-baselined deliberately |
+| **4** | **Multi-window activation gate** in `sim/traffic.py` (§4.5) — one mechanism covering teleop duty cycle, waypoint pauses and the STOP drill. Strict generalisation of the single `(from, until)` pair. | **`--check` BINDS — the only commit where it fully does.** A one-element window list must reproduce the current path exactly, so a clean `--check` here IS evidence: the gate is in `sim/traffic.py`, the corpus stores driver output, they intersect |
+| **5** | `sim/scenarios/g11.py` — the GT-7.1 scenario **and its guards**: expected-count assertions for all four scripted ingredients, **derived from the schedule** and asserted at **equality** (G9 §34.5). Settles §7.4's fleet-size and horizon-unit questions in code. | **`--check` is BLIND** — a new scenario module changes no existing scenario. Binding guard: the expected-count assertions, at **equality**, derived from the schedule |
+| **6** | **60 s window partition + M03w / M05w / M06w / M09w / M15w** (§4.3, §4.4), with completion pre-bucketing. **M05w carries a C3-style calibration obligation** — see below. `config/metric_panel.yml` is **not** edited. | **`--check` is BLIND** — study layer. Binding guard: **M05w's C3-style calibration against panel M05** at the `full` window, since E2 makes M05 C1's binding conjunct |
+| **7** | **Drift detector** (§4.7) — C2's instrument, per-internal (E3), with the exclusions encoded in the tool. | **`--check` is BLIND** — new statistic over existing counters. Binding guard: the drift detector must return a **non-flat** trend on a synthetic drifting input, or it cannot report the leak it exists to find |
+| **8** | `scripts/g11_campaign.py` — per-run resumability (§5), `horizon_slots` as a grid axis, LPT ordering, worker memory guard, live RSS instrumentation with a kill threshold, worker PIDs logged. **Includes a `--time-cell` pass that measures SCORING cost**, which §7.3's makespan excludes. | **`--check` is BLIND** — runner only. Binding guards: the worker-retention memory test, and an assertion that the realised `scenario.horizon_slots` is the intended one |
+| **9** | **Re-run the pre-flight** (§3) with the real scenario and the real windowed instruments — the check commit 0 could only approximate. **Go/no-go on the campaign.** | **nothing to verify** — this IS the check. Its own go/no-go is the artefact |
+| **10** | **The campaign**, including §9's 4-permutation control. Log to `sweeps/wp9/g11_campaign.log` in the repo tree, never a scratchpad (handover §5.2). | **nothing to verify** — the run is the artefact |
+| **11** | Scoring: five clause verdicts each with its own instrument named, M14 emitted with `survival_time_ms=0` inline, the regime-map row with its seed count and CI status inline, and prediction scoring — hits **and** misses. | **nothing to verify** — scoring. The verdicts are the artefact |
 
 **Why the pre-flight is split across commits 0 and 9.** §3 asks whether
 each instrument varies *across windows* of the real scenario — and neither
@@ -1454,33 +1454,28 @@ calibrate. **M05 is C1's binding conjunct on this plan's own prediction
 (E2)**, so shipping M05w without a C3-style calibration at the `full`
 window would put the whole C1 verdict on an uncalibrated instrument.
 
-**Commits 1, 3 and 4 each assert `--check` does not move; commit 2 asserts
-it does.** Three preconditions that change cost or capacity without
-changing behaviour, and one that genuinely changes an estimator — stating
-which is which in advance is the point.
+**Applying CLAUDE.md's "establish it could have failed" rule to every row
+above changed three of them, and the exercise cost about ten minutes.**
 
-> **CORRECTION, found when commit 1 landed: `--check` cannot verify commit
-> 1 at all, and this table claimed it could.** The regression corpus stores
-> **`RunRecord`s** — `flows`, `system`, `timeseries_*`, `join_events` — and
-> **no scorecard output whatsoever** (verified against
-> `regression/baseline_studies_1_3.json`). M09 is a scorecard metric, so a
-> change to `_m09_per_second_jain` is **structurally invisible** to
-> `--check`. Its passing is *no evidence at all* for commit 1, and quoting
-> it as the verification would have been **a check that never looked** —
-> the same shape as G12's clean-ramp-bottom control not covering telemetry,
-> and the reason that row is written the way it is.
->
-> **The real guard is `sim/tests/test_m09_hoist.py`**: it diffs the hoisted
-> implementation against a verbatim copy of the original nesting and
-> asserts bit-identity, plus a scaling test, plus a *guards-the-guard* test
-> asserting the reference is still quadratic — so the identity test cannot
-> silently degenerate into comparing the shipped code with itself.
->
-> **This extends to commits 2, 3 and 5–7**, to varying degrees: anything
-> touching only the scoring layer is invisible to `--check`. **Commit 4**
-> (`sim/traffic.py`'s activation gate) is the one where `--check` genuinely
-> binds, because it changes the simulator. Each remaining commit should say
-> which of the two it is *before* it lands.
+- **`--check` binds on exactly TWO commits: 3 and 4.** Commit 4 changes
+  `sim/traffic.py` and the corpus stores driver output — they intersect, so
+  a clean `--check` there *is* evidence. **Commit 3 also binds, and an
+  earlier statement of mine said it did not**: the per-second fold rewrites
+  `RunRecord.timeseries_*`, which the corpus **does** store, so `--check`
+  **will move** and its expectation flips from *"must not move"* to *"will
+  move, deliberately, and M09/M08w must not"*.
+- **On the other ten it is structurally blind**, and each row now names the
+  guard that actually binds instead. Three of those guards did not exist
+  before this pass: commit 2's before/after estimator diff, commit 6's
+  M05w calibration, and commit 7's non-flat-trend check — a drift detector
+  that cannot return a non-flat trend on a synthetic drifting input cannot
+  report the leak it exists to find, and nothing in the plan had said so.
+
+**The column header is now the question rather than the answer.** *"`--check`
+expectation"* invited a yes/no about a check whose relevance nobody had
+established; *"can this check FAIL?"* forces the intersection test — name
+what the check reads, name what the commit touches, confirm they overlap —
+which is the whole rule and takes one sentence per row.
 
 ## 10.1 Defects found while scoping this, all now FIXED
 

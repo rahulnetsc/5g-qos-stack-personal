@@ -436,6 +436,48 @@ separating: a caveat qualifies a computed value, and here the value was
 right. The catch has to happen one level up, at "did the thing I am
 measuring actually occur?".
 
+**BEFORE CITING A CHECK AS PASSING, ESTABLISH IT COULD HAVE FAILED.** The
+same shape as the journal's dynamic-range rule (`prediction-journal.md`,
+third form rule) but applied to a **verification step** rather than to an
+expectation — and worse than J5's case in one specific way: **J5 was an
+unfalsifiable prediction that was never scored against anything; this was
+an unfalsifiable check ALREADY CITED AS EVIDENCE THAT A COMMIT WAS SAFE.**
+
+The instance. `docs/wp9-g11-plan.md` §10 registered, for the M09 hoist,
+*"`--check` must not move"*. It did not move — and **it could not**:
+`regression/baseline_studies_1_3.json` stores `RunRecord`s (`flows`,
+`system`, `timeseries_*`, `join_events`) and **no scorecard output at
+all**, so a change to `Scorecard._m09_per_second_jain` is structurally
+invisible to it. The green `--check` was **zero evidence** and was written
+into the plan as the commit's verification.
+
+**Why this is its own class and not just "pick a better check".** A failing
+check is information; a passing one is information *only if failure was
+reachable*. The three fault shapes are distinct and the third is the one
+that hides:
+
+| | what happens | how it is caught |
+|---|---|---|
+| the check fails | you learn something | trivially |
+| the check passes and could have failed | you learn something | trivially |
+| **the check passes and could NOT have failed** | **you learn nothing, and believe you learned something** | **only by asking what would make it fail** |
+
+**The mechanical form, and it costs one sentence per check:** name the input
+the check reads and the artefact the change touches, and confirm they
+intersect. `--check` reads `RunRecord`s; the hoist touched
+`sim/scorecard.py`; they do not intersect; therefore the check is blind.
+That is the whole test, and it is the same question §33.3 asks of an
+instrument and §35.4 asks of a control.
+
+**This is a recurring shape in this project, now with three instances at
+three levels** — an *expectation* that could not be contradicted (J5), a
+*control* that read a different population than the claim (G12's clean
+ramp bottom, which checks M13's GBR classes while clause 4 is about a
+Delay-class flow), and now a *regression check* structurally insensitive to
+the layer being changed. **Treat "the check passed" as a claim requiring
+the same decomposition as any other aggregate: what did it look at, what
+did the change touch, are they the same set?**
+
 **So the standing rule — run it at scale and ask whether the precondition
 occurs at all — applies to MECHANISMS FIRING, not only to rows selecting.**
 
