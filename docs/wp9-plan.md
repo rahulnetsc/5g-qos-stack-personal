@@ -4371,11 +4371,14 @@ merely imprecise: **it was inverted.**
 > unambiguous fleet impairment and a genuine G6 failure". **It is not.** Put
 > through the same aggressor/filler decomposition this very section applied
 > to M03, M02's rise is **entirely the aggressor's own bytes** — the
-> protected-fleet delta is −0.0019 / −0.0022 / +0.0010 with every interval
-> containing zero. The error was attributing an aggregate to the fleet
+> protected-fleet delta is **+0.0000 / −0.0104 / −0.0270** with every
+> interval containing zero. *(This sentence originally read −0.0019 /
+> −0.0022 / +0.0010, which is the aggressor-excluded row and not the
+> protected fleet — see the correction box in §28.1.)* The error was attributing an aggregate to the fleet
 > **without decomposing it**, immediately after decomposing M03 and finding
 > exactly that mistake. Read §28.1 for the settled result: **G6 passes on
-> the protected fleet on every arm and both statistics.** The arm the test singled out as
+> the protected fleet on M02, on every arm; M20 is INCONCLUSIVE on
+> TwoTier** (+29.35 % [+4.81, +56.18], an interval excluding zero). The arm the test singled out as
 failing is the best-performing arm on the statistic that actually measures
 what G6 is about. Corroborated by the diagnostic seed, where fleet
 telemetry loses messages under `bg` (ue6_qfi1: 50 → 32 delivered) — real
@@ -4757,15 +4760,38 @@ excluding 5QIs 8 and 9).
 **Background traffic does not impair the fleet.** Neither statistic that
 appeared to fail G6 does so once it is measured on the bearers G6 is about:
 
-| | M03 (worst liveness gap) | M02 (PDB violation rate) |
+| | M03/M20 (worst liveness gap) | M02 (PDB violation rate) |
 |---|---|---|
-| PF | PASS | PASS — Δ **−0.0019** [−0.0075, +0.0041] |
-| Reservation | PASS | PASS — Δ **−0.0022** [−0.0075, +0.0036] |
-| TwoTier | INCONCLUSIVE, median −0.44 % | PASS — Δ **+0.0010** [−0.0109, +0.0133] |
+| PF | PASS | PASS — Δ **+0.0000** |
+| Reservation | PASS | PASS — Δ **−0.0104** [−0.0284, +0.0049] |
+| TwoTier | INCONCLUSIVE, median −0.44 % | PASS — Δ **−0.0270** [−0.0724, +0.0191] |
 
 **Every protected-fleet M02 interval contains zero, on all three arms, at
 n_seeds=40 paired.** The fleet's PDB-violation rate does not move when a
 50 Mbps saturating flood is added beside it.
+
+> **CORRECTED. This table previously quoted −0.0019 / −0.0022 / +0.0010,
+> which is the `no qfi 8` row of §28.1a's decomposition — the AGGRESSOR
+> excluded, but the per-UE best-effort filler still in.** The protected
+> fleet is defined in code as `Scorecard.NON_PROTECTED_5QI = frozenset({8,
+> 9})`, so it drops **5QI 9 as well**, and the matching row is `no
+> best-effort (no qfi 8, 9)`: **+0.0000 / −0.0104 / −0.0270**.
+>
+> **The verdict is unchanged** — every interval still contains zero and two
+> of the three deltas are now more negative, so G6 passes more comfortably
+> than the wrong numbers said. **But the error is the same one this whole
+> section exists to correct, committed inside the correction:** §28.1a
+> decomposed "all flows" → "aggressor excluded" and *stopped one population
+> short of the definition it was invoking*. **An under-decomposition is
+> still a decompose-rule failure**, and it is harder to see than the
+> original because the population moved in the right direction — just not
+> far enough.
+>
+> **§28.3 of this same document already had it right** — *"on the protected
+> fleet PF's M02 is exactly 0.0 in both conditions on every seed"*, i.e.
+> Δ = +0.0000 — so the document disagreed with itself for as long as
+> neither passage was read beside the other. Caught while building the
+> client deck, not by review.
 
 **This is a stronger and more useful result than the failure was.** It says
 the schedulers do the thing G6 exists to check — a non-GBR flood is
@@ -4781,8 +4807,8 @@ bytes**:
 | flow subset | PF | Reservation | TwoTier |
 |---|---|---|---|
 | **ALL flows** (as implemented) | **+0.2313** [+0.2264, +0.2362] | **+0.2270** [+0.2224, +0.2320] | **+0.2055** [+0.1951, +0.2164] |
-| **aggressor excluded** (no qfi 8) | **−0.0019** [−0.0075, +0.0041] | **−0.0022** [−0.0075, +0.0036] | **+0.0010** [−0.0109, +0.0133] |
-| no best-effort (no qfi 8, 9) | +0.0000 | −0.0104 [−0.0284, +0.0049] | −0.0270 [−0.0724, +0.0191] |
+| aggressor excluded (no qfi 8) — **NOT the protected fleet** | −0.0019 [−0.0075, +0.0041] | −0.0022 [−0.0075, +0.0036] | +0.0010 [−0.0109, +0.0133] |
+| **PROTECTED FLEET** — no best-effort (no qfi 8, 9), matching `NON_PROTECTED_5QI` | **+0.0000** | **−0.0104** [−0.0284, +0.0049] | **−0.0270** [−0.0724, +0.0191] |
 | telemetry only (qfi 1) | +0.0000 | −0.0104 [−0.0285, +0.0054] | −0.0150 [−0.0534, +0.0216] |
 
 *(absolute deltas — M02 is a fraction, so a relative delta off a near-zero
@@ -4941,9 +4967,20 @@ M03's, which is telemetry.
 *(PF and Reservation breach nothing on M01, M03 or M06 in either cell.)*
 
 **Nothing is aggressor-created — no statistic goes from 0 breaches at base
-to non-zero under `bg`. So G6 passes its FIRST conjunct too**, and
-§28.1's headline stands unqualified: **G6 passes both clauses, on the
-protected fleet, on every arm.**
+to non-zero under `bg`. So G6 passes its FIRST conjunct too**, on every
+arm.
+
+**The SECOND conjunct is where the qualification lives, and this sentence
+previously dropped it.** It read *"§28.1's headline stands unqualified:
+G6 passes both clauses, on the protected fleet, on every arm."* Corrected:
+**clause 1 passes on every arm; clause 2 passes on M02 on every arm and is
+INCONCLUSIVE on M20 for TwoTier** (+29.35 % [+4.81, +56.18], interval
+excluding zero, straddling the +20 % bar — §27.2, §28.1).
+
+*(`prediction-journal.md`'s P2 entry carries the same "stands unqualified"
+phrasing and is **deliberately not edited** — it is a pre-registration
+written before the data, and its value is that it is unedited. The live
+claim is this one.)*
 
 **M06's +5 is the messiest outcome P3 named in advance**, and it lands
 exactly where predicted: non-zero in both cells but materially higher under
