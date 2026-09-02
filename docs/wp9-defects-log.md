@@ -57,6 +57,32 @@ against what a commit actually changes, and at registration time that was
 not yet known — which is an argument for re-running the test when the diff
 exists, not only when the row is written.
 
+**COMMIT 3's REGISTERED `--check` PREDICTION: MISS.** Registered *"BINDS
+AND MOVES — the `ts_*` arrays shorten on all 20 records"*. **`--check` came
+back clean.** The fold is **opt-in** (`timeseries_resolution="slot"` by
+default), because making it the default would rewrite every existing study
+and the frozen corpus — precisely what the one-change-per-commit and
+do-not-recapture rules forbid. No corpus case opts in, so nothing moves.
+
+**The registered outcome→meaning map was ALSO wrong.** It said a clean
+`--check` *"would mean the fold is not reaching the serialised record"*. It
+means no such thing: clean is the *correct* result for an opt-in change.
+
+**Two misses in two commits, in OPPOSITE directions, from one cause.**
+Commit 2 registered *blind* and it **bound** (I reasoned from the commit's
+headline, not its diff). Commit 3 registered *binds* and it is **blind** (I
+registered before deciding opt-in versus default). **The blind/binds call
+depends on a design decision, and registering it before that decision is
+made registers a guess about the design, not a prediction about behaviour.**
+
+Unlike a shape prediction about data — which is exactly the thing the
+journal's first form rule says *can* be fixed in advance — this one cannot
+be, and pretending otherwise produced two confident wrong answers.
+**Corrected practice: register the blind/binds call at the moment the design
+is settled and before the code is run** — still in advance of the evidence,
+which is what the rule is for, but not in advance of the decision it
+depends on.
+
 **AND THE WATCHDOG IS THE COULD-HAVE-FAILED SHAPE AGAIN (#14).** The guard
 that killed the 7.2 M-slot probe at 21.8 GiB is a **per-process** threshold,
 and it worked there because that run was one process. The soak is 8–16

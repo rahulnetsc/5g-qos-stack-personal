@@ -216,6 +216,13 @@ class RunRecord:
     # silently fall back to the head-of-line proxy -- a different estimator
     # reported under the same metric id.
     message_ledger_windowed: bool = False
+    # WP9 G11 commit 3. "slot" (default) or "second". Under "second" the
+    # per-flow COUNT series are per-second sums -- lossless for M09 and
+    # M08w, which bucket by second anyway -- and the LEVEL series
+    # (backlog_bytes, hol_delay_s) are absent, because a sum of levels is
+    # meaningless and a max would be a different statistic under the same
+    # name. M04/M19/M21 report pending rather than reading one as the other.
+    timeseries_resolution: str = "slot"
     meta: dict[str, Any] = field(default_factory=dict)
     # WP-Join commit 4/5 (docs/wp-join-plan.md sec5): None means "this
     # record was produced by a driver.run() that predates commit 5's
@@ -264,6 +271,8 @@ class RunRecord:
         # False on absence, so the round trip is total either way.
         if self.message_ledger_windowed:
             d["message_ledger_windowed"] = True
+        if self.timeseries_resolution != "slot":
+            d["timeseries_resolution"] = self.timeseries_resolution
         return d
 
     @classmethod
@@ -279,6 +288,7 @@ class RunRecord:
             timeseries_time_s=d.get("timeseries_time_s"),
             timeseries_slot_index=d.get("timeseries_slot_index"),
             message_ledger_windowed=bool(d.get("message_ledger_windowed", False)),
+            timeseries_resolution=d.get("timeseries_resolution", "slot"),
             meta=d.get("meta", {}),
             join_events=(
                 [JoinEventRecord(**e) for e in d["join_events"]]
@@ -350,11 +360,15 @@ class RunRecord:
                 xr_frame_period_ms=(
                     fc.traffic_params.get("period_ms") if fc.traffic_kind == "xr_video" else None
                 ),
-                ts_backlog_bytes=fts["backlog_bytes"] if fts else None,
-                ts_hol_delay_s=fts["hol_delay_s"] if fts else None,
-                ts_delivered_bytes=fts["delivered_bytes"] if fts else None,
-                ts_arrived_bytes=fts["arrived_bytes"] if fts else None,
-                ts_dropped_bytes=fts["dropped_bytes"] if fts else None,
+                # .get, not [...]: under WP9 G11 commit 3's per-second fold
+                # the LEVEL series are absent by design (a sum of levels is
+                # meaningless), so a folded record carries only the COUNT
+                # series. Absent must read as None, not raise.
+                ts_backlog_bytes=fts.get("backlog_bytes") if fts else None,
+                ts_hol_delay_s=fts.get("hol_delay_s") if fts else None,
+                ts_delivered_bytes=fts.get("delivered_bytes") if fts else None,
+                ts_arrived_bytes=fts.get("arrived_bytes") if fts else None,
+                ts_dropped_bytes=fts.get("dropped_bytes") if fts else None,
             )
 
         sysd = ts.get("system", {})
@@ -382,6 +396,7 @@ class RunRecord:
             timeseries_time_s=ts.get("time_s"),
             timeseries_slot_index=ts.get("slot_index"),
             message_ledger_windowed=bool(summary.get("_ledger_windowed", False)),
+            timeseries_resolution=summary.get("timeseries_resolution", "slot"),
             meta=dict(meta or {}),
             # WP-Join commit 5: "join_events" in summary at all (even an
             # empty list) is the signal a WP-Join-aware driver.run() ran --

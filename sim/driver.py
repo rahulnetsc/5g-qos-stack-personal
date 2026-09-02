@@ -36,6 +36,7 @@ def run(
     truncated_bsr: str = "off",
     window_slots: Optional[int] = None,
     window_sink: Optional[Callable[[int, list], None]] = None,
+    timeseries_resolution: str = "slot",
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -117,7 +118,8 @@ def run(
     traffic = TrafficModel(
         scenario.flows, buffers, grid.slot_duration_s, rng, ledger=message_ledger
     )
-    metrics = Metrics(record_timeseries=record_timeseries)
+    metrics = Metrics(record_timeseries=record_timeseries,
+                      timeseries_resolution=timeseries_resolution)
     # WP5 (docs/wp5-plan.md). Commit 3 landed process-pool gating,
     # provably inert (delivery was still synchronous). Commit 4a made DL
     # retry load-bearing; commit 4b extends it to UL. An Allocation's
@@ -886,6 +888,7 @@ def run(
     # caller cannot distinguish "no messages completed" from "the ones that
     # did were already handed to the window sink".
     summary["_ledger_windowed"] = windowed_ledger
+    summary["timeseries_resolution"] = timeseries_resolution
     if record_timeseries:
         summary["timeseries"] = metrics.timeseries()
     return summary

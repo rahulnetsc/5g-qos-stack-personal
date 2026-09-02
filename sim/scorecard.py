@@ -163,6 +163,13 @@ class Scorecard:
                               + list(result.caveats or []))
         return out
 
+    _FOLDED_REASON = (
+        "timeseries recorded at per-SECOND resolution (WP9 G11 commit 3): "
+        "this metric needs per-SLOT levels (hol delay / backlog), which a "
+        "per-second fold does not carry. Reported pending rather than "
+        "reading a per-second aggregate as a per-slot series."
+    )
+
     _WINDOWED_REASON = (
         "message ledger drained per window (WP9 G11 commit 2): run-level "
         "message aggregates are not reconstructible from window summaries "
@@ -686,6 +693,9 @@ class Scorecard:
         return MetricResult("M02", "pdb_violation_rate", rate, "ok", "fraction", note)
 
     def _m04_survival_time_failures(self, record: RunRecord, survival_n: int) -> MetricResult:
+        if record.timeseries_resolution != "slot":
+            return MetricResult("M04", "survival_time_failures", None,
+                                "pending", "count", self._FOLDED_REASON)
         if not record.has_timeseries():
             return MetricResult(
                 "M04", "survival_time_failures", None, "pending", "count",
@@ -892,6 +902,9 @@ class Scorecard:
         )
 
     def _m19_slo_recovery_time(self, record: RunRecord, slo_green_dwell_s: float) -> MetricResult:
+        if record.timeseries_resolution != "slot":
+            return MetricResult("M19", "slo_recovery_time", None,
+                                "pending", "ms", self._FOLDED_REASON)
         """WP-Join commit 4. Same always-pending-today shape as M18 above
         -- see that method's docstring."""
         if record.join_events is None:
@@ -980,6 +993,9 @@ class Scorecard:
         no more than `violation_ceiling` of their arriving bytes -- the
         M02-style test M19's own caveat names as the true fix.
         """
+        if record.timeseries_resolution != "slot":
+            return MetricResult("M21", "slo_recovery_time_by_delivery", None,
+                                "pending", "ms", self._FOLDED_REASON)
         if record.join_events is None:
             return MetricResult("M21", "slo_recovery_time_by_delivery", None,
                                 "pending", "ms",

@@ -11,7 +11,8 @@ class FlowMetrics:
 
 
 class Metrics:
-    def __init__(self, record_timeseries: bool = False) -> None:
+    def __init__(self, record_timeseries: bool = False,
+                 timeseries_resolution: str = "slot") -> None:
         self._flow: dict[tuple[int, int], FlowMetrics] = defaultdict(FlowMetrics)
         self._dl_prbs_used = 0
         self._ul_prbs_used = 0
@@ -22,6 +23,29 @@ class Metrics:
 
         # Per-slot time series (opt-in to keep memory footprint small).
         self.record_ts = record_timeseries
+        # WP9 G11 commit 3. "second" folds each series to ONE ENTRY PER
+        # SIMULATED SECOND instead of per slot -- 7.2M -> 1,800 at the soak
+        # horizon, a 4,000x reduction (docs/wp9-plan.md §37).
+        #
+        # OPT-IN, DELIBERATELY. Making it the default would rewrite every
+        # existing study and the frozen regression corpus, which is exactly
+        # what the one-change-per-commit and do-not-recapture rules forbid.
+        # Every current caller gets "slot" and is byte-identical.
+        #
+        # WHAT FOLDS EXACTLY AND WHAT DOES NOT. delivered/arrived/dropped
+        # are COUNTS: summing them per second is lossless for every
+        # consumer that buckets by second, which is M09 (by definition) and
+        # M08w (sums over a window). backlog_bytes and hol_delay_s are
+        # LEVELS -- a sum is meaningless and a max/mean would be a
+        # DIFFERENT STATISTIC wearing the same field name. They are emitted
+        # as None instead, so M04/M19/M21 report pending rather than
+        # silently reading a per-second aggregate as a per-slot series.
+        if timeseries_resolution not in ("slot", "second"):
+            raise ValueError(
+                f"timeseries_resolution must be 'slot' or 'second', "
+                f"got {timeseries_resolution!r}")
+        self.ts_resolution = timeseries_resolution
+        self._ts_sec: int | None = None      # second currently accumulating
         self._ts_slot_index: list[int] = []
         self._ts_time_s: list[float] = []
         self._ts_per_flow: dict[tuple[int, int], dict[str, list]] = {}
@@ -91,6 +115,44 @@ class Metrics:
         """Record one per-slot snapshot. No-op if record_timeseries is False."""
         if not self.record_ts:
             return
+        dl_avail = slot_grid.prb_count if slot_grid.dl_symbols > 0 else 0
+        ul_avail = slot_grid.prb_count if slot_grid.ul_symbols > 0 else 0
+
+        if self.ts_resolution == "second":
+            sec = int(time_s)
+            if sec != self._ts_sec:
+                # open a new second: one entry, then accumulate into it
+                self._ts_sec = sec
+                self._ts_slot_index.append(slot_index)
+                self._ts_time_s.append(float(sec))
+                for k in ("dl_prbs_used", "ul_prbs_used", "dl_prbs_avail",
+                          "ul_prbs_avail", "cce_used", "cce_budget"):
+                    self._ts_system[k].append(0)
+                for key in buffers.keys():
+                    ts = self._ts_per_flow.setdefault(
+                        key, {"delivered_bytes": [], "arrived_bytes": [],
+                              "dropped_bytes": []})
+                    for k in ("delivered_bytes", "arrived_bytes", "dropped_bytes"):
+                        ts[k].append(0)
+            for key in buffers.keys():
+                ts = self._ts_per_flow.setdefault(
+                    key, {"delivered_bytes": [], "arrived_bytes": [],
+                          "dropped_bytes": []})
+                # a flow first seen mid-second still needs its slot
+                for k in ("delivered_bytes", "arrived_bytes", "dropped_bytes"):
+                    if len(ts[k]) < len(self._ts_time_s):
+                        ts[k].extend([0] * (len(self._ts_time_s) - len(ts[k])))
+                ts["delivered_bytes"][-1] += per_flow_delivered.get(key, 0)
+                ts["arrived_bytes"][-1] += per_flow_arrived.get(key, 0)
+                ts["dropped_bytes"][-1] += per_flow_dropped.get(key, 0)
+            self._ts_system["dl_prbs_used"][-1] += dl_prbs_used
+            self._ts_system["ul_prbs_used"][-1] += ul_prbs_used
+            self._ts_system["dl_prbs_avail"][-1] += dl_avail
+            self._ts_system["ul_prbs_avail"][-1] += ul_avail
+            self._ts_system["cce_used"][-1] += cce_used
+            self._ts_system["cce_budget"][-1] += slot_grid.pdcch_cce_budget
+            return
+
         self._ts_slot_index.append(slot_index)
         self._ts_time_s.append(time_s)
         for key in buffers.keys():
@@ -111,12 +173,8 @@ class Metrics:
             ts["dropped_bytes"].append(per_flow_dropped.get(key, 0))
         self._ts_system["dl_prbs_used"].append(dl_prbs_used)
         self._ts_system["ul_prbs_used"].append(ul_prbs_used)
-        self._ts_system["dl_prbs_avail"].append(
-            slot_grid.prb_count if slot_grid.dl_symbols > 0 else 0
-        )
-        self._ts_system["ul_prbs_avail"].append(
-            slot_grid.prb_count if slot_grid.ul_symbols > 0 else 0
-        )
+        self._ts_system["dl_prbs_avail"].append(dl_avail)
+        self._ts_system["ul_prbs_avail"].append(ul_avail)
         self._ts_system["cce_used"].append(cce_used)
         self._ts_system["cce_budget"].append(slot_grid.pdcch_cce_budget)
 
