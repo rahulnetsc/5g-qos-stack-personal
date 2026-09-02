@@ -483,12 +483,12 @@ tell *what would change each one*.
 | **G8** | **partially answered** | M09 per-second Jain across the sweeps; **PF arm contaminated** by `pf.py`'s declaration-order tie-break — Reservation-vs-TwoTier is the trustworthy pair. |
 | **G9** | **run — 1 clause scored, 1 scored via a companion metric, 1 weak-form only, 1 not producible** | The four clauses have four different answers and the row above states them separately. §21.2a's argument is discharged: M18/M19 flip out of `pending` the moment a join event exists, and M18/M21 now carry real numbers. **Open, each needing its own commit:** **(a) why TwoTier's app handshake never completes** — 0 of 50 cold attaches, the joiner receiving zero UL grants after re-attach while its flow is reported and backlogged (§34.5a); this REPLACES the former "self-selected event shortfall", whose overlap mechanism is refuted, and the instruction changes from *lengthen the restart period* to *find why the handshake never completes*. **(b) two silent-stall defects in `sim/join.py`** — `APP_HANDSHAKE` has no ceiling and no retransmission, and scripted events are consumed-by-index regardless of phase, so later cycles are discarded rather than deferred. **(c) the unexplained neighbour Δp98** (§34.2) — which now has a *candidate*, the joiner being radio-gated out of the cell for 86 % of the horizon, though §34.2's own correlation test (r = −0.028) is not overturned by it. |
 | **G10** | **ANSWERED — the headline, and it is PER ARM** | **Admissible fleet size: PF 8 robots, Reservation 4, TwoTier 4** — the pre-registered per-seed all-pass read (`M07.met == M07.total` and `M08.fraction ≥ 0.95` on **every** seed), emitted by `scripts/g10_admissible.py` from `stage2_rows.csv`, load ×1.0. **Four robots run clean on every scheduler; eight is where the QoS-aware arms fail and PF does not** — per-seed pass counts at N=8 are PF 10/10, Reservation 3/10, TwoTier 1/10. **The deployed product admits half the fleet PF does.** *"The schedulers separate at 8"* is the supporting detail, not the headline — and the **8/16 figure this row previously carried is D4-3's ARM-SEPARATION boundary, a different quantity worn as the admissible fleet** (`docs/wp9-plan.md` §8d D4-3a). **TwoTier is last on both metrics at 8 and 16 robots** (at N=16 on M08 it is *joint*-last — Reservation and TwoTier are at exactly 0.0000 on all 10 seeds); above 16 the ranking inverts, so that statement must not be carried upward. **PF's 8 is knife-edge** (worst seed M08 = 0.9503 against a 0.95 bar); the QoS-aware arms' 4 is not. §0.1 and §0.3 apply. |
-| **G11** | **unrun, buildable** | The soak was budgeted and never implemented. No WP9 evidence. |
+| **G11** | **unrun — and NOT RUNNABLE AS SPECIFIED, measured** | The soak was budgeted and never implemented, and the budget was taken on the wrong resource. **At GT-7.1's 7.2 M-slot horizon one run needs ~48 GiB with `record_timeseries=True` — which G8/M09 requires — on a 30 GB host, and ~24 GiB with it off** (`docs/wp9-plan.md` §37). Confirmed by a guarded run: the cheapest arm reached **21.8 GiB and was killed with 2.4 GB left**. Half the footprint is per-message bookkeeping that no flag disables, and it is **not** a saturation artefact (halving `load_mult` moves it 2.6 %). **So the 3-seed deviation solved a TIME budget while the blocker was MEMORY, and cutting seeds cannot fix an OOM in a single run** — 3 seeds and 10 OOM identically, on run one. Needs two mechanisms (per-window ledger eviction, per-second timeseries fold) before it can run at all; with them the 10-seed campaign fits in ≈2.15 h. **Scope: measured at the 32-flow base cell; GT-7.1's literal two-asset reading is ~7–12 flows and untested.** Plan: `docs/wp9-g11-plan.md`. |
 | **G12** | **RUN — clause 4 FAILS inside the guarantee's own ramp; the ordering is unobservable there** | Telemetry M02 **1.000** with 5QI 9 still moving 11.6 Mbps — GT-7.3's own worked FAIL example. PF/Reservation from 102 % of ceiling, **TwoTier from nominal load on 9/10 seeds**. Filed as **G1/G3**. Two qualifications inline on G12's row: the arm difference is **untested under permutation**, and **E1's clean control does not cover telemetry** (it reads GBR classes; 5QI 1 is Delay). The order itself is not observable in range, and the beyond-range `[2,4]` inversion is **not established as a scheduler property and is consistent with a declaration-order artefact** — §35.13's registered wording, restored here after this row had hardened it into "is a property of declaration order", a positive causal claim the control does not license. **A third qualification: 4 of 5 camera flows are provisioned BELOW their own GFBR (3.879 vs 4.000 Mbps, ceiling ~0.970), beginning the ramp ~0.007 above the 0.95 line against the lidar class's ~0.05 — so "camera degrades first" is partly the workload's own provisioning, independent of any scheduler (`docs/wp9-plan.md` §36.3).** |
 
 **Read as a whole: 3 answered (G4, G6, G10), 1 measured failure (G5),
 3 partially answered (G1, G3, G8), 2 run with clause-level answers
-(G9, G12), 1 unrun-but-buildable (G11), 1 blocked on a named mechanism
+(G9, G12), 1 unrun (G11), 1 blocked on a named mechanism
 (G2), 1 structurally out (G7).**
 
 **Derived, and now actually derivable:** `uv run python
@@ -517,12 +517,21 @@ dropping out of the count.
 > `docs/HANDOVER-new-machine.md` §6**, written after G9 and G12 closed. Two
 > documents disagreed for as long as this one went unread.
 
-**The two entries a reader should not skip** are G5 — the most
+**The three entries a reader should not skip** are G5 — the most
 operationally serious thing WP9 has found, and a *base-cell* failure with
-no aggressor — and G6, which passes on measurement — **on M02;
-M20 leaves one TwoTier cell unresolved** — while being **unscoreable as
-specified**, a finding about the guarantee rather than about the
-schedulers.
+no aggressor — G6, which passes on measurement **on M02 while leaving one
+TwoTier cell unresolved on M20** and is **unscoreable as specified** — and
+**G11, which is not RUNNABLE as specified**, for reasons that were
+measurable at any point in the last six months and were not measured.
+
+**G6 and G11 are the same shape one level apart, and that is worth naming.**
+G6's finding is that a guarantee can be *unscoreable* as written — its bar
+is undefined when the denominator can be zero. G11's is that a guarantee can
+be *unrunnable* as written — its horizon and its required instrument
+together exceed the machine. **Both are findings about the guarantee
+document rather than about the schedulers**, and neither surfaced until
+someone tried to execute the clause literally. A campaign plan that only
+ever asks "what did the arms do" will not find either.
 
 ---
 

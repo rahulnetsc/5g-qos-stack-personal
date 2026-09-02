@@ -6629,3 +6629,145 @@ points (derived, not hardcoded), and `order_for_permutation` is called only
 from the D4 control. `assert_ramp_bottom_clean` is never bypassed anywhere —
 the permutation arm records its failures, and the main grid still stops on
 them.
+
+---
+
+## 37. G11 IS NOT RUNNABLE AS SPECIFIED — a feasibility finding, not a soak result
+
+Measured on the overnight machine before any G11 code was written. **This
+is a finding about the guarantee, not about the campaign that would have
+scored it**: G11 could not have been run at 3 seeds, at 10 seeds, or at 1,
+on the laptop or on the machine bought to replace it. The soak was never
+budget-limited in the way §6.3 recorded.
+
+### 37.1 The measurement
+
+Base cell (`sweep_scenario` N=8, 32 flows, `cqi_delay_slots=8`),
+`driver.run` only, horizons 20 k → 2.56 M, three arms. Peak RSS is **affine
+in horizon with R² ≥ 0.99991** on every (arm, `record_timeseries`) series —
+`85 MiB + 6.78 GiB per Mslot` with the timeseries on, `+3.36 GiB per Mslot`
+with it off. GT-7.1's ≥30 min is **7,200,000 slots** at numerology 2.
+
+| arm | peak RSS at 7.2 M, `record_timeseries=True` | with it **off** |
+|---|---|---|
+| PF | **47.7 GiB** | 23.7 GiB |
+| Reservation | **47.7 GiB** | 23.5 GiB |
+| TwoTier | **49.5 GiB** | 24.5 GiB |
+
+**Both machines have 30 GB of RAM** (`§6.3b` for the laptop; re-measured on
+the desktop), of which ~24 GiB is usable beside a desktop session.
+
+**And the extrapolation was checked against a real run rather than
+trusted.** One guarded 7,200,000-slot run, `record_timeseries=False`, PF —
+*the cheapest arm* — under a 22 GiB watchdog:
+
+```
+14:06:00 pid=868929 rss=22317MB avail=2441MB
+14:06:00 KILL pid=868929 rss=22317MB exceeded 22000MB
+```
+
+**It reached 21.8 GiB, was still climbing, and was stopped with 2.4 GB of
+system memory left.** The fit said PF would pass 22 GiB before finishing;
+it did.
+
+### 37.2 Why `record_timeseries=True` is not optional
+
+`scripts/wp9_sweep.py:101` sets it by default with the reason attached —
+*"M04/M09/M19 are `pending` without it"*. **GT-7.1's KPI is that every 60 s
+window passes G1/G3/G5/G8, and G8 is M09.** So the 48 GiB column is the one
+G11 actually needs; the 24 GiB column is what you get by forfeiting a
+quarter of the guarantee.
+
+### 37.3 It is NOT the per-slot arrays — that is only half
+
+The obvious reading is that per-slot timeseries are the problem
+(`sim/metrics.py:91-121` appends one sample per slot per flow with no
+stride). At 1.28 M they are **4,382 of 8,757 MiB — almost exactly half.**
+
+The other half survives `record_timeseries=False` and grows linearly with
+horizon. `tracemalloc` on a ts=0 run attributes it by line:
+
+| MiB (h=80,000) | objects | site |
+|---|---|---|
+| 93.8 | 1,378,969 | `sim/traffic.py:178` — `Message(...)`, every message generated |
+| 50.6 | 843,192 | `sim/buffer.py:161` — `MessageCompletion(...)` on drain |
+| 32.1 | 535,722 | `sim/buffer.py:249` — `MessageCompletion(...)` on expiry |
+| 19.3 | 689,228 | `sim/messages.py:77` — the message-**id** integers |
+
+**It is per-message bookkeeping**, allocated in `traffic.py`/`buffer.py` and
+retained by `MessageLedger._completions` and `BufferModel._completed`. Two
+things that a coarser look gets wrong:
+
+- **A filename-level read blames `sim/messages.py`**, which holds 19.3 of
+  222 MiB — and even that row is the id counter, not the completions list.
+  **The object size identified the line, not the line number**: 19.3 MB over
+  689 k objects is 28 bytes, which is a CPython int.
+- **It is not a saturation artefact.** 4× the horizon gives **4.04×** the
+  objects, and **halving `load_mult` moves it 2.6 %** — the count is driven
+  by the periodic flows' cadence, which `load_mult` does not scale. A
+  gentler soak workload does not avoid it.
+
+**And there is no flag.** `sim/driver.py:113-115` constructs the
+`MessageLedger` unconditionally; `TrafficModel`'s `ledger=None` path
+(`sim/traffic.py:80`) exists and is unreachable through `run()`.
+
+### 37.4 What the deviation actually solved
+
+§6.3 cut the soak from 10 seeds to 3 because *"3 arms × 10 seeds ≈ 21 h,
+which does not fit alongside stage 2"*, and §5.1 of the handover recorded
+it as reversible on a machine that runs unattended overnight.
+
+**The time arithmetic was right.** Measured mean is 45.8 min/run against
+§6.3's ≈43 — close, even though §6.3a found the cell table beside it 5–7×
+low. **The memory budget was never taken at all**, and it is the binding
+one: ~1.6× the whole machine, on a resource that **did not improve with the
+new hardware** — both hosts have 30 GB.
+
+So the deviation **solved a constraint that was not the blocker**, and its
+reversibility was recorded against a machine property (cores) that is not
+the one that binds. **Cutting seeds cannot fix an out-of-memory condition
+in a single run**: 3 seeds and 10 seeds OOM identically, on run one.
+
+### 37.5 The rule this leaves behind
+
+§6.3a's rule was *time the thing you are actually going to run — same
+horizon, same flags, same post-processing — or state explicitly that the
+number is a lower bound.* It was written after a 5–7× timing miss and it is
+about **time**.
+
+**Extend it to every resource the run consumes, and to memory first**,
+because the failure modes differ in kind:
+
+- **A wrong time budget degrades.** You discover it late, the run takes
+  longer than planned, and the result still arrives.
+- **A wrong memory budget does not degrade — it terminates.** The run dies
+  partway with nothing scored, which is how stage 1 lost 25 GB and how G11
+  would have died ~20 minutes into its first 30-minute run.
+
+**A budget that reports only time is a partial budget**, and the partiality
+is invisible because time is what the cost model happens to measure. The
+cheap guard is the one that caught this: **run one instance at the real
+horizon under a watchdog with a kill threshold before committing to a
+grid** — hours, against a work package.
+
+### 37.6 What it does NOT say
+
+- **Not "the simulator leaks."** The retention is a ledger doing its job;
+  every completion is retained because run-aggregate metrics consume the
+  whole run. It is a *scaling* mismatch with a 360×-longer horizon, not a
+  defect.
+- **Not "G11 is unanswerable."** It needs two mechanisms first — evicting
+  each 60 s window's completions as it closes, and folding the per-slot
+  arrays to per-second accumulators (which preserves M09 and M08w
+  *exactly*). Both are things G11's own windowed scoring wants anyway. With
+  them, per-run retention drops to ~1 GiB and the campaign fits 16-wide in
+  **≈2.15 h**.
+- **Not a fleet-size-general claim.** Every number here is the 32-flow
+  parametric base cell. GT-7.1's literal two-asset workload is ~7–12 flows,
+  where §13's cost model puts it 2.9–5.2× cheaper — it may well fit
+  unmodified. **At the fleet size WP9 has been running, G11 does not fit;
+  at GT-7.1's literal reading it is untested.** Which reading G11 answers
+  is a scoping decision, and it must be made before the scenario is built.
+
+Full plan: `docs/wp9-g11-plan.md`. Probe harness and raw measurements:
+`sweeps/wp9/g11_probes/`, `sweeps/wp9/g11_*.jsonl`.

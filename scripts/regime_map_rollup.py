@@ -37,7 +37,10 @@ _BUCKETS: list[tuple[str, str]] = [
     (r"measured failure", "measured failure"),
     (r"structurally out", "structurally out"),
     (r"blocked on a named mechanism", "blocked on a named mechanism"),
-    (r"unrun", "unrun-but-buildable"),
+    # "unrun-but-buildable" until G11 was measured NOT runnable as
+    # specified (wp9-plan §37): the row carries the qualification, so the
+    # roll-up must not contradict it with an optimistic label.
+    (r"unrun", "unrun"),
     (r"partially answered", "partially answered"),
     (r"^run\b|^run —|^run --", "run with clause-level answers"),
     (r"answered", "answered"),
@@ -49,7 +52,7 @@ _ORDER = [
     "measured failure",
     "partially answered",
     "run with clause-level answers",
-    "unrun-but-buildable",
+    "unrun",
     "blocked on a named mechanism",
     "structurally out",
 ]

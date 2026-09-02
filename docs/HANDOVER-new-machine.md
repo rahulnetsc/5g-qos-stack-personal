@@ -254,6 +254,34 @@ decision was a *budget* constraint, not a methodological one, and it should
 not be inherited as permanent. Restoring 10 seeds also restores the
 cross-seed claims §6.3 currently rules out of bounds.
 
+> **CORRECTION, measured on the new machine before any G11 code was written
+> (`docs/wp9-plan.md` §37). The paragraph above is right about the seeds and
+> wrong about the constraint.**
+>
+> **G11 was not runnable as specified at ANY seed count, on either
+> machine.** At GT-7.1's 7.2 M-slot horizon one run needs **~48 GiB** with
+> `record_timeseries=True` — which G8/M09 requires — against **30 GB on
+> both hosts**; ~24 GiB with the timeseries off, and a guarded run of the
+> cheapest arm was killed at **21.8 GiB with 2.4 GB left**.
+>
+> **The time arithmetic here was fine** — 43 min/run against a measured
+> 45.8. **The memory budget was never taken**, and it is the binding one, on
+> the one resource this move did not improve: both machines have 30 GB.
+>
+> **So "21 h fits" was true and irrelevant.** Cutting seeds cannot fix an
+> out-of-memory condition inside a single run — 3 seeds and 10 seeds OOM
+> identically, on run one. G11 needs two mechanisms first (per-window ledger
+> eviction, per-second timeseries fold); with them the 10-seed campaign fits
+> in **≈2.15 h** and the reversal in this section is not merely affordable
+> but comfortable.
+>
+> **The transferable part is §37.5's rule.** §6.3a says *time the thing you
+> are actually going to run*; extend it to every resource, **memory first** —
+> a wrong time budget degrades and still delivers a result, a wrong memory
+> budget terminates with nothing scored. **A budget that reports only time
+> is a partial budget**, and the partiality is invisible because time is
+> what the cost model happens to measure.
+
 ### 5.2 Part C is a live example of why this matters
 
 Part C (24 cells, 720 runs) died **twice** on this laptop — once to an OS
@@ -312,7 +340,7 @@ rather than refuting it.
 
 | item | why it is not started |
 |---|---|
-| **G11** | **The only unrun guarantee left, and the reason for this move.** See §5.1 — revisit the seed count on the new machine. |
+| **G11** | **The only unrun guarantee left, and the reason for this move.** **Measured NOT runnable as specified** — see §5.1's correction and `docs/wp9-plan.md` §37; it needs two memory mechanisms before any seed count matters. Plan: `docs/wp9-g11-plan.md`. |
 | **The declaration-order trace** | §35.5's confound. Needs a worktree-instrumented direct-cause trace; the promotion bar for calling any ordering result a scheduler property is registered in `wp9-plan.md` §35.13 and must be applied as written, **including its edge** — the three candidate mechanisms are all position-dependent, so finding one of them CONFIRMS the artefact. |
 | **G12 clause 1** | Scored weakly: 5QI 9 has no contract, so there is no breach event to order it against the GBR classes. **Answerable from `g12_campaign.json` without a re-run** (§36.7 item 4), but it was never registered as an expectation, so it needs registering before it is scored. |
 | **G9's two open threads** | TwoTier's self-selected event shortfall (§34.5 — the scripted restart period must exceed the slowest arm's handshake) and the unexplained neighbour Δp98 (§34.2, r = −0.028 against the obvious explanation). |
