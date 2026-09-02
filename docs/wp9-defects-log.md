@@ -39,6 +39,8 @@ One row. If it needs more than a row, it is probably a verdict change.
 |---|---|---|---|---|---|
 | 10 | `wp9-g11-plan.md` §4.2 | claims eviction takes per-run retention to **~1 GiB**, restoring 16-wide parallelism | eviction alone leaves **~5.6 GiB/run** at 7.2 M slots; ~49 % of the residual is `sim/metrics.py::FlowMetrics.hol_delay_samples_s`, which neither commit 2 nor commit 3 touches | §7.3's option (c) makespan, ≈2.15 h | no — changes a budget, not a verdict; commit 8's `--time-cell` measures the real cell anyway |
 | 11 | `wp9-g11-plan.md` §10 | commit-2 row says `--check` is blind "because eviction is scoring-layer" | the mechanism is in `sim/driver.py` and the corpus stores driver output; **`--check` BINDS** — see the registered-expectation miss below | the commit table's own binding/blind split | no |
+| 13 | `wp9-g11-plan.md` §7.3 | option (c) prices the campaign at **16 workers**; the measured evicted residual is 2.83 GiB/run at N=4, so 16 would need 45 GiB against 24.2 available | **8 workers**; makespan ≤3.33 h (N=8 costs, N=4 is cheaper), still comfortably overnight | §7.3's ≈2.15 h | no — the campaign still fits, at ~35 % more wall clock |
+| **14** | `sweeps/wp9/g11_probes/memwatch.sh`, and commit 8's runner | the watchdog threshold is **PER-PROCESS (22 GiB)**. At 2.83 GiB/run **no single worker ever approaches it**, so it would not fire — while the real failure mode at 16 workers is **aggregate** exhaustion (45 GiB against 24.2) | an **aggregate** threshold across workers, or a per-worker one derived as `budget ÷ workers`; ideally both | commit 8's "live RSS instrumentation with a kill threshold" | no — but it is a **prerequisite for commit 8**, not batchable, since the guard is the thing that makes a 3-hour run safe |
 | 12 | `sim/metrics.py` | `hol_delay_samples_s` is a `list` of Python floats — ~32 B/sample, ~87 M samples at 7.2 M slots | `array("d")` at 8 B/sample takes the evicted floor ~5.6 → ~2.0 GiB, value-identical (`_percentile` sorts a copy either way) | §7.3's budget | no — its own commit, `--check`-neutral |
 
 **A REGISTERED EXPECTATION MISSED, recorded rather than absorbed.** The
@@ -54,6 +56,17 @@ commit's **headline** (ledger eviction, scoring-adjacent) rather than its
 against what a commit actually changes, and at registration time that was
 not yet known — which is an argument for re-running the test when the diff
 exists, not only when the row is written.
+
+**AND THE WATCHDOG IS THE COULD-HAVE-FAILED SHAPE AGAIN (#14).** The guard
+that killed the 7.2 M-slot probe at 21.8 GiB is a **per-process** threshold,
+and it worked there because that run was one process. The soak is 8–16
+processes of 2.83 GiB each: **no individual worker ever gets near 22 GiB, so
+the watchdog cannot fire**, while the machine runs out of memory at ~8
+concurrent runs. A guard aimed at the wrong aggregation level is a guard
+that cannot fail — the third instance of that shape this week, after J5's
+expectation and commit 1's `--check`. Fixed in commit 8, where the runner
+lives; **not batched**, because the guard is what makes an unattended
+multi-hour run safe.
 
 **Resolved without re-baselining**: the field is serialised **only when
 true**, so a non-windowed record's `to_dict()` is byte-identical to before
