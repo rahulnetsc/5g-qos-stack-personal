@@ -506,6 +506,36 @@ any `watch`/monitor whose own command line contains the pattern, and will
 match the *shell running the check itself* — which killed a relaunch
 mid-session when a cleanup loop matched its own command line.
 
+**A THIRD instance, and it generalises the family past liveness: a NAMED
+ALIAS IS A CLAIM ABOUT TOPOLOGY, and claims about topology get verified
+against `ip addr`, not against the config that makes them.** Moving to the
+desktop, `~/.ssh/config` carried `Host lab → HostName 172.25.70.124, User
+smartpc`, and it read exactly like the route to the other machine. It is
+not. **172.25.70.124 is the desktop's own `wlp7s0` address** (`ip -4 addr`),
+and **`smartpc` is not a user on the desktop** (`id smartpc` → no such
+user). `ssh lab` is a loopback to a nonexistent account; it fails for
+everyone, always, and the failure it returns —
+`Permission denied (publickey,password)` — **looks exactly like a missing
+credential**, which is the wrong diagnosis and the expensive one. It cost
+two investigations before `hostname -I` settled it, and would have cost a
+third.
+
+**Why this belongs beside the other two rather than in a networking note.**
+The `pgrep` and buffered-stdout cases are an observation channel asserting
+a *process state* that was not real; this is an observation channel
+asserting a *route* that never existed. Same shape, same mitigation — go to
+the primary source (`ps` for state, `ip addr` for topology) instead of the
+proxy that is easier to read.
+
+**And the corollary that actually matters here: check DIRECTION before
+concluding you lack access.** The desktop has no private key at all, while
+its `authorized_keys` holds two keys commented `laptop` — so the trust is
+**one-way, laptop → desktop**, and no amount of retrying from the desktop
+can pull anything. The transfer had to be *pushed* from the other side.
+**"I cannot authenticate" and "the trust runs the other way" produce the
+same error message and have completely different fixes**, and only the
+second one is actionable.
+
 **A value crossing a serialization boundary must be coerced back to its
 declared type at that boundary, and any aggregate over a selection must
 assert the selection is non-empty and the expected size.** WP9's stage-1
