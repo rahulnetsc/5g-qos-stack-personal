@@ -161,6 +161,22 @@ destination that may already be non-empty needs a set difference, not a
 count — the same reason `scripts/regime_map_rollup.py` exists rather than a
 sentence saying the counts were derived.
 
+**`scripts/transfer_manifest.sh` does the whole thing in one command**, so
+the copy and its verification cannot drift apart:
+
+```bash
+./scripts/transfer_manifest.sh <ssh-host>            # copy + verify
+./scripts/transfer_manifest.sh <ssh-host> --verify   # verify only
+```
+
+It rsyncs items 1–3 with `-P` (a dropped 1.4 G transfer resumes rather than
+restarting), copies the plans with `--ignore-existing` so the destination's
+own history survives, then verifies **items 1–3 by byte size against the
+source** and **item 4 by set difference** — a superset passes, a missing
+file fails. It reports on item 5 without copying it. If ssh cannot reach
+the host it exits without copying anything, rather than leaving a partial
+that reads like a success.
+
 **If `--check` reports drift on a fresh machine, that is a finding about
 portability, not a reason to `--capture`.** The corpus is frozen
 (CLAUDE.md); re-baselining to make a cross-machine diff disappear would
