@@ -1,0 +1,1562 @@
+[
+  {
+    "arm": "PF",
+    "seed": 1826701614,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2906,
+        "phases": {
+          "rrc_establish": 23.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.2500000000000853
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6166,
+        "phases": {
+          "rrc_establish": 89.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999999734
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9032,
+        "phases": {
+          "rrc_establish": 53.0,
+          "pdu_session": 0.25,
+          "app_handshake": 4.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 4.5000000000001705
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12126,
+        "phases": {
+          "rrc_establish": 79.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999997513
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15016,
+        "phases": {
+          "rrc_establish": 50.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.5000000000002807
+      }
+    ],
+    "secs": 2.1
+  },
+  {
+    "arm": "PF",
+    "seed": 1367864806,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3356,
+        "phases": {
+          "rrc_establish": 136.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.4999999999999467
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6426,
+        "phases": {
+          "rrc_establish": 154.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8966,
+        "phases": {
+          "rrc_establish": 39.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12262,
+        "phases": {
+          "rrc_establish": 110.75,
+          "pdu_session": 0.25,
+          "app_handshake": 4.500000000000001
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 4.250000000000309
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15036,
+        "phases": {
+          "rrc_establish": 55.25,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 1097657231,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3326,
+        "phases": {
+          "rrc_establish": 128.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.0000000000000027
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 5956,
+        "phases": {
+          "rrc_establish": 35.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.5000000000000586
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8926,
+        "phases": {
+          "rrc_establish": 29.750000000000004,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2500000000001954
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12886,
+        "phases": {
+          "rrc_establish": 268.5,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.4999999999999467
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14976,
+        "phases": {
+          "rrc_establish": 40.25,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 579362555,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2976,
+        "phases": {
+          "rrc_establish": 41.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.2499999999999742
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6216,
+        "phases": {
+          "rrc_establish": 102.25000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999999734
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8996,
+        "phases": {
+          "rrc_establish": 45.5,
+          "pdu_session": 0.25,
+          "app_handshake": 3.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.0000000000001137
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12016,
+        "phases": {
+          "rrc_establish": 50.75,
+          "pdu_session": 0.25,
+          "app_handshake": 3.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.7500000000002522
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14916,
+        "phases": {
+          "rrc_establish": 26.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7500000000003624
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 661058651,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2952,
+        "phases": {
+          "rrc_establish": 34.5,
+          "pdu_session": 0.25,
+          "app_handshake": 3.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.0000000000000027
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6177,
+        "phases": {
+          "rrc_establish": 91.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.0000000000000018
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8992,
+        "phases": {
+          "rrc_establish": 43.75000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 4.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.749999999999698
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12106,
+        "phases": {
+          "rrc_establish": 74.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.000000000000224
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14906,
+        "phases": {
+          "rrc_establish": 24.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2500000000001954
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 87989972,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3026,
+        "phases": {
+          "rrc_establish": 52.75,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6472,
+        "phases": {
+          "rrc_establish": 164.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.5000000000000586
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9232,
+        "phases": {
+          "rrc_establish": 102.50000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 5.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 4.999999999999893
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11896,
+        "phases": {
+          "rrc_establish": 22.0,
+          "pdu_session": 0.25,
+          "app_handshake": 1.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.4999999999996128
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15296,
+        "phases": {
+          "rrc_establish": 120.5,
+          "pdu_session": 0.25,
+          "app_handshake": 3.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.0000000000001137
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 161576974,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3476,
+        "phases": {
+          "rrc_establish": 166.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7500000000000293
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 5896,
+        "phases": {
+          "rrc_establish": 22.0,
+          "pdu_session": 0.25,
+          "app_handshake": 1.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.5000000000000568
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9076,
+        "phases": {
+          "rrc_establish": 65.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.5000000000002807
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11906,
+        "phases": {
+          "rrc_establish": 24.5,
+          "pdu_session": 0.25,
+          "app_handshake": 1.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.4999999999996128
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15536,
+        "phases": {
+          "rrc_establish": 180.25,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 35492826,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3317,
+        "phases": {
+          "rrc_establish": 126.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.0000000000000018
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 5926,
+        "phases": {
+          "rrc_establish": 29.750000000000004,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999999734
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9256,
+        "phases": {
+          "rrc_establish": 111.5,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.000000000000224
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11986,
+        "phases": {
+          "rrc_establish": 44.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.9999999999997797
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14926,
+        "phases": {
+          "rrc_establish": 28.5,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.4999999999999467
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 376383645,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2896,
+        "phases": {
+          "rrc_establish": 21.750000000000004,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7500000000000293
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6336,
+        "phases": {
+          "rrc_establish": 131.5,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.0000000000000018
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8996,
+        "phases": {
+          "rrc_establish": 46.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.500000000000391
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12132,
+        "phases": {
+          "rrc_establish": 79.75,
+          "pdu_session": 0.25,
+          "app_handshake": 3.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.749999999999808
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15016,
+        "phases": {
+          "rrc_establish": 51.75000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "PF",
+    "seed": 1746484539,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3206,
+        "phases": {
+          "rrc_establish": 99.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.0000000000000018
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6056,
+        "phases": {
+          "rrc_establish": 61.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.4999999999999467
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9506,
+        "phases": {
+          "rrc_establish": 174.00000000000003,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.000000000000224
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11976,
+        "phases": {
+          "rrc_establish": 41.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15646,
+        "phases": {
+          "rrc_establish": 209.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      }
+    ],
+    "secs": 2.2
+  },
+  {
+    "arm": "Reservation",
+    "seed": 1826701614,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2907,
+        "phases": {
+          "rrc_establish": 23.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.5000000000000577
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6166,
+        "phases": {
+          "rrc_establish": 89.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999999734
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9031,
+        "phases": {
+          "rrc_establish": 53.0,
+          "pdu_session": 0.25,
+          "app_handshake": 4.500000000000001
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 4.249999999999865
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12126,
+        "phases": {
+          "rrc_establish": 79.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999997513
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15016,
+        "phases": {
+          "rrc_establish": 50.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.5000000000002807
+      }
+    ],
+    "secs": 2.9
+  },
+  {
+    "arm": "Reservation",
+    "seed": 1367864806,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3361,
+        "phases": {
+          "rrc_establish": 136.0,
+          "pdu_session": 0.25,
+          "app_handshake": 4.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.74999999999992
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6426,
+        "phases": {
+          "rrc_establish": 154.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8966,
+        "phases": {
+          "rrc_establish": 39.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12256,
+        "phases": {
+          "rrc_establish": 110.75,
+          "pdu_session": 0.25,
+          "app_handshake": 3.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.7500000000002522
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15036,
+        "phases": {
+          "rrc_establish": 55.25,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      }
+    ],
+    "secs": 2.9
+  },
+  {
+    "arm": "Reservation",
+    "seed": 1097657231,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3362,
+        "phases": {
+          "rrc_establish": 128.0,
+          "pdu_session": 0.25,
+          "app_handshake": 12.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 12.00000000000001
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 5991,
+        "phases": {
+          "rrc_establish": 35.0,
+          "pdu_session": 0.25,
+          "app_handshake": 12.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 12.250000000000094
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 8926,
+        "phases": {
+          "rrc_establish": 29.750000000000004,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2500000000001954
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12886,
+        "phases": {
+          "rrc_establish": 268.5,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.4999999999999467
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14992,
+        "phases": {
+          "rrc_establish": 40.25,
+          "pdu_session": 0.25,
+          "app_handshake": 7.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 7.249999999999979
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "Reservation",
+    "seed": 579362555,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2976,
+        "phases": {
+          "rrc_establish": 41.25,
+          "pdu_session": 0.25,
+          "app_handshake": 2.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.2499999999999742
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6266,
+        "phases": {
+          "rrc_establish": 102.25000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 14.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 13.750000000000151
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9036,
+        "phases": {
+          "rrc_establish": 45.5,
+          "pdu_session": 0.25,
+          "app_handshake": 13.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 12.9999999999999
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12016,
+        "phases": {
+          "rrc_establish": 50.75,
+          "pdu_session": 0.25,
+          "app_handshake": 3.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.7500000000002522
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14916,
+        "phases": {
+          "rrc_establish": 26.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7500000000003624
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "Reservation",
+    "seed": 661058651,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2967,
+        "phases": {
+          "rrc_establish": 34.5,
+          "pdu_session": 0.25,
+          "app_handshake": 7.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 6.750000000000034
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6176,
+        "phases": {
+          "rrc_establish": 91.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9041,
+        "phases": {
+          "rrc_establish": 43.75000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 16.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 16.000000000000014
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12106,
+        "phases": {
+          "rrc_establish": 74.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.000000000000224
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14907,
+        "phases": {
+          "rrc_establish": 24.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.5000000000000568
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "Reservation",
+    "seed": 87989972,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3026,
+        "phases": {
+          "rrc_establish": 52.75,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6466,
+        "phases": {
+          "rrc_establish": 164.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.0000000000000018
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9226,
+        "phases": {
+          "rrc_establish": 102.50000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.4999999999998366
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11941,
+        "phases": {
+          "rrc_establish": 22.0,
+          "pdu_session": 0.25,
+          "app_handshake": 13.000000000000002
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 12.749999999999595
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15296,
+        "phases": {
+          "rrc_establish": 120.5,
+          "pdu_session": 0.25,
+          "app_handshake": 3.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.0000000000001137
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "Reservation",
+    "seed": 161576974,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3496,
+        "phases": {
+          "rrc_establish": 166.75,
+          "pdu_session": 0.25,
+          "app_handshake": 7.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 6.750000000000034
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 5896,
+        "phases": {
+          "rrc_establish": 22.0,
+          "pdu_session": 0.25,
+          "app_handshake": 1.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.5000000000000568
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9076,
+        "phases": {
+          "rrc_establish": 65.0,
+          "pdu_session": 0.25,
+          "app_handshake": 3.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.5000000000002807
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11931,
+        "phases": {
+          "rrc_establish": 24.5,
+          "pdu_session": 0.25,
+          "app_handshake": 8.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 7.749999999999702
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15536,
+        "phases": {
+          "rrc_establish": 180.25,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      }
+    ],
+    "secs": 2.9
+  },
+  {
+    "arm": "Reservation",
+    "seed": 35492826,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3356,
+        "phases": {
+          "rrc_establish": 126.75,
+          "pdu_session": 0.25,
+          "app_handshake": 12.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 11.749999999999927
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 5926,
+        "phases": {
+          "rrc_establish": 29.750000000000004,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999999734
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9301,
+        "phases": {
+          "rrc_establish": 111.5,
+          "pdu_session": 0.25,
+          "app_handshake": 13.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 13.250000000000206
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11986,
+        "phases": {
+          "rrc_establish": 44.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.9999999999997797
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 14981,
+        "phases": {
+          "rrc_establish": 28.5,
+          "pdu_session": 0.25,
+          "app_handshake": 16.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 16.249999999999876
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "Reservation",
+    "seed": 376383645,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 2896,
+        "phases": {
+          "rrc_establish": 21.750000000000004,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7500000000000293
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6336,
+        "phases": {
+          "rrc_establish": 131.5,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.0000000000000018
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9041,
+        "phases": {
+          "rrc_establish": 46.0,
+          "pdu_session": 0.25,
+          "app_handshake": 14.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 13.750000000000373
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 12126,
+        "phases": {
+          "rrc_establish": 79.75,
+          "pdu_session": 0.25,
+          "app_handshake": 1.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.2499999999997513
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15022,
+        "phases": {
+          "rrc_establish": 51.75000000000001,
+          "pdu_session": 0.25,
+          "app_handshake": 3.5
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 3.249999999999975
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "Reservation",
+    "seed": 1746484539,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 5,
+    "n_completed": 5,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": 3221,
+        "phases": {
+          "rrc_establish": 99.0,
+          "pdu_session": 0.25,
+          "app_handshake": 6.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 5.750000000000033
+      },
+      {
+        "trigger_slot": 5800,
+        "attached_slot": 6056,
+        "phases": {
+          "rrc_establish": 61.0,
+          "pdu_session": 0.25,
+          "app_handshake": 2.75
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.4999999999999467
+      },
+      {
+        "trigger_slot": 8800,
+        "attached_slot": 9506,
+        "phases": {
+          "rrc_establish": 174.00000000000003,
+          "pdu_session": 0.25,
+          "app_handshake": 2.2500000000000004
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 2.000000000000224
+      },
+      {
+        "trigger_slot": 11800,
+        "attached_slot": 11976,
+        "phases": {
+          "rrc_establish": 41.75,
+          "pdu_session": 0.25,
+          "app_handshake": 2.0
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 1.7499999999999183
+      },
+      {
+        "trigger_slot": 14800,
+        "attached_slot": 15656,
+        "phases": {
+          "rrc_establish": 209.25,
+          "pdu_session": 0.25,
+          "app_handshake": 4.500000000000001
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": 4.250000000000309
+      }
+    ],
+    "secs": 3.0
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 1826701614,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 23.75,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 8.9
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 1367864806,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 136.0,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 9.1
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 1097657231,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 128.0,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 8.9
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 579362555,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 41.25,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 9.1
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 661058651,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 34.5,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 8.6
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 87989972,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 52.75,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 8.9
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 161576974,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 166.75,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 9.0
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 35492826,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 126.75,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 9.0
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 376383645,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 21.750000000000004,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 8.9
+  },
+  {
+    "arm": "TwoTier",
+    "seed": 1746484539,
+    "sched_power_on": 5,
+    "sched_power_off": 5,
+    "n_cold_events": 1,
+    "n_completed": 0,
+    "other_path_events": [],
+    "events": [
+      {
+        "trigger_slot": 2800,
+        "attached_slot": null,
+        "phases": {
+          "rrc_establish": 99.0,
+          "pdu_session": 0.25
+        },
+        "timer_expiries": {},
+        "handshake_rtt_ms": null
+      }
+    ],
+    "secs": 9.0
+  }
+]
