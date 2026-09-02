@@ -487,9 +487,35 @@ tell *what would change each one*.
 | **G12** | **RUN — clause 4 FAILS inside the guarantee's own ramp; the ordering is unobservable there** | Telemetry M02 **1.000** with 5QI 9 still moving 11.6 Mbps — GT-7.3's own worked FAIL example. PF/Reservation from 102 % of ceiling, **TwoTier from nominal load on 9/10 seeds**. Filed as **G1/G3**. Two qualifications inline on G12's row: the arm difference is **untested under permutation**, and **E1's clean control does not cover telemetry** (it reads GBR classes; 5QI 1 is Delay). The order itself is not observable in range, and the beyond-range `[2,4]` inversion is **a property of declaration order**, not of any scheduler. |
 
 **Read as a whole: 3 answered (G4, G6, G10), 1 measured failure (G5),
-3 partial (G1, G3, G8), 3 unrun-but-buildable (G9, G11, G12), 1 blocked on
-a named mechanism (G2), 1 structurally out (G7).** Counts derived from the
-rows above, not carried separately.
+3 partially answered (G1, G3, G8), 2 run with clause-level answers
+(G9, G12), 1 unrun-but-buildable (G11), 1 blocked on a named mechanism
+(G2), 1 structurally out (G7).**
+
+**Derived, and now actually derivable:** `uv run python
+scripts/regime_map_rollup.py` parses the rows above and emits this
+sentence; `--check` exits non-zero if the two disagree, and an
+unrecognised status is a hard error rather than a guarantee silently
+dropping out of the count.
+
+> **This sentence was wrong until the commit that added the deriver, and the way it was wrong is
+> worth keeping.** It read *"3 unrun-but-buildable (G9, G11, G12)"* —
+> **while the G9 row above it said `run` and the G12 row said `RUN`** — under
+> the words *"Counts derived from the rows above, not carried separately."*
+> The count went stale the moment those two campaigns closed, and **the
+> claim of derivation was itself the restatement.**
+>
+> That makes this the fifth instance of CLAUDE.md's restated-count rule and
+> the only one with an aggravating feature: **the earlier four failed
+> loudly by disagreeing with something a reader could check** — the
+> "22-record" corpus against `_cases()`, §6.3's timing table against the
+> real run, stage 1's "56 cells" against the runner's own printed count.
+> **This one asserted its own immunity**, so a reader had no reason to look.
+> A restated count is bad; a restated count wearing a derivation claim is
+> worse, because it disarms the check.
+>
+> Note also that the correct roll-up was **already sitting in
+> `docs/HANDOVER-new-machine.md` §6**, written after G9 and G12 closed. Two
+> documents disagreed for as long as this one went unread.
 
 **The two entries a reader should not skip** are G5 — the most
 operationally serious thing WP9 has found, and a *base-cell* failure with
