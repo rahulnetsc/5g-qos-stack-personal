@@ -104,7 +104,8 @@ laptop; `du` totals, not `ls` sums.
 | 3 | `sweeps/wp9/stage6_g6_n40_records.jsonl` | **251 M** | the 240 records §27–§29 were computed from |
 | | **subtotal** | **2.6 G** | |
 | 4 | `~/.claude/plans/` | **220 K**, 13 files | outside the repo entirely; not in git |
-| | **TOTAL** | **≈ 2.6 G** | |
+| **5** | **`~/Documents/artpark_projects/Oai_Ran_QoS_Supported_MultiDRB`** | *(size unmeasured — a full OAI checkout)* | **a separate upstream repository, not a subdirectory of this one.** `CLAUDE.md` names it as the evidence base whenever a constant looks sourceless from the vendored `oai-branches/` subset — the rule that settled `nrmac->min_grant_prb` at Phase 2 reservation commit 4. **Needed on demand, not on arrival** |
+| | **TOTAL** | **≈ 2.6 G** + the OAI checkout | |
 
 **Deliberately NOT copied, with the reason for each:**
 
@@ -116,16 +117,49 @@ laptop; `du` totals, not `ls` sums.
 | `sweeps/wp9/stage5/records.jsonl` | 836 M | `stages5_rows.csv` is committed; re-runnable |
 | G9 / G12 artefacts | 140 K | **all tracked** — they travel in the clone |
 
+**Why item 5 is on the list even though nothing is blocked without it.**
+It was missing from the first version of this manifest, and the first real
+move exposed exactly the failure it sets up: the vendored subset and
+`calibration-logs/` both travel in a clone, so **the day you need the full
+checkout is a day you are already deep in a question, and the manifest that
+should have told you to bring it says nothing.** A dependency that is only
+needed occasionally is the one most likely to be omitted and least likely to
+be missed at the moment of omission.
+
 **Sanity check on arrival**, before trusting any of it:
 
 ```bash
 du -ch sweeps/wp9/stage1/records.jsonl \
        sweeps/wp9/stage4/records.jsonl \
        sweeps/wp9/stage6_g6_n40_records.jsonl | tail -1   # expect ~2.6G
-ls ~/.claude/plans/ | wc -l                                # expect 13
-uv sync && uv run pytest sim/tests -q                      # expect 879 passed
+ls ~/.claude/plans/*.md | wc -l                            # expect 13 -- BUT SEE BELOW
+git remote -v | grep -c upstream                           # expect 1, not 0
+uv sync && uv run pytest sim/tests -q                      # expect 882 passed
 uv run python scripts/regression_corpus.py --check         # expect "no drift"
 ```
+
+**The `~/.claude/plans/` count check is WEAK, and the first move proved
+it.** On arrival that directory held **4 files** — not zero — because the
+new host had its own WP1/WP3/WP4-era plans from earlier sessions. **A
+non-empty directory reads like a success**, and worse, a count check is
+*ambiguous after a partial copy*: copy 13 laptop files into a directory that
+already holds 4, with some names overlapping, and the total lands anywhere
+between 13 and 17. **13 is then evidence of nothing.**
+
+So the check has to be on **identity, not cardinality**. Take a listing on
+the source machine and diff it:
+
+```bash
+# on the laptop
+ls ~/.claude/plans/ | sort > /tmp/plans.manifest
+# after copying, on the new machine
+comm -23 /tmp/plans.manifest <(ls ~/.claude/plans/ | sort)   # expect EMPTY
+```
+
+**This generalises past the plans directory.** Any arrival check on a
+destination that may already be non-empty needs a set difference, not a
+count — the same reason `scripts/regime_map_rollup.py` exists rather than a
+sentence saying the counts were derived.
 
 **If `--check` reports drift on a fresh machine, that is a finding about
 portability, not a reason to `--capture`.** The corpus is frozen
@@ -151,6 +185,11 @@ deliverables, and a clone does not get them. **Copy the directory.**
   complete; nothing needs pulling from this laptop.
 - Untracked and safe to ignore: `sweeps/wp9/stage3.{log,crash1.log}` —
   leftovers from the dead stage-3 run.
+- **A clone does not get the `upstream` remote** — `git clone` configures
+  only `origin`. Verified on the first move: the new host had `origin`
+  alone, so a push intended for `artpark-hub/5g-qos-stack` would have gone
+  silently to the fork. Fix on arrival:
+  `git remote add upstream https://github.com/artpark-hub/5g-qos-stack.git`
 - **`sweeps/wp9/part_c*` may be mid-run.** `part_c_rows.csv` is written
   ONLY on completion: if `part_c_records.jsonl` exists without it, the run
   died and the records are a partial. Delete both and re-run; do not
