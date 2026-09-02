@@ -4473,9 +4473,31 @@ G3's 500 ms bound):
 1000 ms** (`_burstify(100.0, 300.0, 0.1)`, `sim/parametric.py:122-137`), so
 a ~2000 ms inter-completion gap is **the cadence, not a liveness failure**.
 M03 breaches its bound in 10/10 seeds on **both** arms for a reason that
-has nothing to do with scheduling. **Any Part C M03 reading at
-`duty_cycle` ≤ 0.5 is measuring the duty cycle.** `snr_spread_db` shows no
-such coupling — it does not change any flow's cadence.
+has nothing to do with scheduling. `snr_spread_db` shows no such coupling —
+it does not change any flow's cadence.
+
+> **CORRECTED: the exclusion applies at `duty_cycle` 0.1, NOT at "≤ 0.5",
+> and the difference discards a real result.** This paragraph read *"any
+> Part C M03 reading at `duty_cycle` ≤ 0.5 is measuring the duty cycle"*.
+> At duty 0.5 the telemetry period is `_burstify(100.0, 300.0, 0.5)` =
+> **200 ms — well BELOW the 500 ms bound** — so `sim/scorecard.py`'s
+> caveat, whose predicate is `median_gap_ms > T_live/4`, **does not fire**
+> there. **TwoTier's 503.25 ms with 5/10 seeds breaching at duty 0.5 is a
+> real liveness breach against PF's 0/10**, and the over-generalisation
+> threw it away.
+>
+> **The direction is what makes this worth a box.** Every other cadence
+> note in this document guards against *crediting* a cadence artefact as a
+> breach. This one did the opposite — it **discarded a genuine arm
+> difference** by widening a correct exclusion one level past its own
+> arithmetic. A caveat applied too broadly destroys findings exactly as
+> efficiently as one applied too narrowly manufactures them, and it is much
+> harder to notice, because the result simply never gets reported.
+>
+> Note the caveat's predicate is a strict `>`, and at duty 0.1 the DL
+> command flow's period is exactly **500.0 ms**, so rows won by 5QI 82 sit
+> on the threshold and fire or not on float jitter. The caveat is not
+> exhaustive and should not be quoted as though it were.
 
 This is the same shape as §23.5's G4 scope note: `_burstify` holds mean
 rate constant by stretching the period, which is right for H2 and wrong for
@@ -5125,9 +5147,11 @@ not the ~15 min at 10 workers §21.7 implied — the runner is serial and was
 not parallelised, which is the honest cost of the grid as specified.
 
 **M03's cadence caveat is attached automatically** (Step 4,
-`sim/scorecard.py`): at `duty_cycle` ≤ 0.5 the telemetry source's own period
-approaches or exceeds the T_live/4 bound, so `max_gap_ms` reports cadence
-rather than a liveness failure. It is derived from each flow's own median
+`sim/scorecard.py`): at **`duty_cycle` 0.1** the telemetry source's own
+period (1000 ms) exceeds the 500 ms T_live/4 bound, so `max_gap_ms` reports
+cadence rather than a liveness failure. *(This read "≤ 0.5"; at duty 0.5
+the period is 200 ms and the caveat does not fire — see the correction box
+in §24.6. The wider wording discarded a real TwoTier breach.)* It is derived from each flow's own median
 gap and travels **in the record**, so Part C's M03 column cannot be read
 against that bound by mistake.
 

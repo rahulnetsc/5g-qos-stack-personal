@@ -8,10 +8,15 @@ full factorial, because a full factorial on three axes is what §0.4's cap
 existed to prevent.
 
 M03's readings here carry their own cadence caveat automatically
-(`sim/scorecard.py`, WP9 Step 4): at duty_cycle <= 0.5 the telemetry
-source's configured period approaches or exceeds the T_live/4 bound, so
+(`sim/scorecard.py`, WP9 Step 4): at duty_cycle 0.1 the telemetry source's
+configured period is 1000 ms, above the 500 ms T_live/4 bound, so
 max_gap_ms measures cadence rather than a liveness failure. The caveat is
 derived from each flow's own median gap and travels in the record.
+
+NOT "<= 0.5", which this header used to say: at duty_cycle 0.5 the period
+is 200 ms, the caveat does NOT fire, and TwoTier's 503.25 ms / 5-of-10
+breach there is a REAL liveness breach against PF's 0-of-10. The wider
+wording discarded a genuine arm difference (docs/wp9-plan.md §24.6).
 
 Usage:
     uv run python scripts/wp9_part_c.py [--smoke]
