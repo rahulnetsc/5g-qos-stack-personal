@@ -41,7 +41,8 @@ One row. If it needs more than a row, it is probably a verdict change.
 | 11 | `wp9-g11-plan.md` §10 | commit-2 row says `--check` is blind "because eviction is scoring-layer" | the mechanism is in `sim/driver.py` and the corpus stores driver output; **`--check` BINDS** — see the registered-expectation miss below | the commit table's own binding/blind split | no |
 | 13 | `wp9-g11-plan.md` §7.3 | option (c) prices the campaign at **16 workers**; the measured evicted residual is 2.83 GiB/run at N=4, so 16 would need 45 GiB against 24.2 available | **8 workers**; makespan ≤3.33 h (N=8 costs, N=4 is cheaper), still comfortably overnight | §7.3's ≈2.15 h | no — the campaign still fits, at ~35 % more wall clock |
 | **14** | `sweeps/wp9/g11_probes/memwatch.sh`, and commit 8's runner | the watchdog threshold is **PER-PROCESS (22 GiB)**. At 2.83 GiB/run **no single worker ever approaches it**, so it would not fire — while the real failure mode at 16 workers is **aggregate** exhaustion (45 GiB against 24.2) | an **aggregate** threshold across workers, or a per-worker one derived as `budget ÷ workers`; ideally both | commit 8's "live RSS instrumentation with a kill threshold" | no — but it is a **prerequisite for commit 8**, not batchable, since the guard is the thing that makes a 3-hour run safe |
-| 12 | `sim/metrics.py` | `hol_delay_samples_s` is a `list` of Python floats — ~32 B/sample, ~87 M samples at 7.2 M slots | `array("d")` at 8 B/sample takes the evicted floor ~5.6 → ~2.0 GiB, value-identical (`_percentile` sorts a copy either way) | §7.3's budget | no — its own commit, `--check`-neutral |
+| **15** | `wp9-g11-plan.md` §7.3–§7.4, defects-log #10/#13 | per-run memory at the **real** horizon is **~6–9 GB**, not the 2.83 GiB estimated by scaling the N=8 evicted residual to N=4 | **2 workers**, not 8; makespan ~5.7 h for 3 arms × 10 seeds | §7.3's option (c), #13's 8-worker figure | no — the campaign still fits overnight, at ~4× the wall clock |
+| ~~12~~ | `sim/metrics.py` | `hol_delay_samples_s` is a `list` of Python floats — ~32 B/sample, ~87 M samples at 7.2 M slots | `array("d")` at 8 B/sample takes the evicted floor ~5.6 → ~2.0 GiB, value-identical (`_percentile` sorts a copy either way) | §7.3's budget | no — its own commit, `--check`-neutral |
 
 **A REGISTERED EXPECTATION MISSED, recorded rather than absorbed.** The
 commit table registered *"commit 2: `--check` is BLIND"*. **It is not.** The
@@ -82,6 +83,30 @@ be, and pretending otherwise produced two confident wrong answers.
 is settled and before the code is run** — still in advance of the evidence,
 which is what the rule is for, but not in advance of the decision it
 depends on.
+
+**#15, AND #12 IS REFUTED AS ITS CAUSE.** The real-horizon budget probe
+(3 arms × 7,200,000 slots, 3 workers) **tripped the aggregate guard**: pool
+total 20,219 MB with the largest worker at **9,249 MB**, killed at 00:57:45.
+
+**The guard did exactly what #14 said it had to.** A per-process 22 GiB
+threshold would **not** have fired — 9.2 GB is nowhere near it — while the
+machine had 4.0 GB left. The aggregate guard is the only reason this was a
+measurement rather than an OOM.
+
+**And the cause is NOT `hol_delay_samples_s`.** Both the scoping pass and
+defects-log #12 named it as ~49 % of the residual, which made `array("d")`
+look like a lever. Measured directly, by patching the accumulator to retain
+nothing: **477 → 422 MiB at h=400,000, i.e. 55 MiB of 477 (12 %)**. So #12
+is struck through — it is real but it is worth ~12 %, not 49 %, and it
+would not change the worker count. **The 49 % figure came from a run with
+`record_timeseries=False` and no eviction; it did not survive the change of
+configuration it was quoted about.**
+
+**Where the memory actually goes is not yet established**, and that is
+recorded as unknown rather than guessed: `tracemalloc` at end-of-run shows
+~0 because the peak is transient and freed by return, so attributing it
+needs sampling *during* the run. Not chased — the campaign is runnable at
+2 workers and the attribution changes no decision today.
 
 **AND THE WATCHDOG IS THE COULD-HAVE-FAILED SHAPE AGAIN (#14).** The guard
 that killed the 7.2 M-slot probe at 21.8 GiB is a **per-process** threshold,
