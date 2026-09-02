@@ -478,6 +478,42 @@ the layer being changed. **Treat "the check passed" as a claim requiring
 the same decomposition as any other aggregate: what did it look at, what
 did the change touch, are they the same set?**
 
+**AND A CHECK CAN FAIL IN PRINCIPLE YET NOT AT THE LEVEL THE FAILURE
+HAPPENS — establish the SCOPE a check operates at, not only that it can
+fail.** The entry above asks whether a check *can* fail. This asks a second
+question that the first does not reach: **can it fail at the level where
+the thing goes wrong?** A guard aimed one level away from its failure mode
+is as silent as one that cannot fail at all, and it is harder to spot,
+because it demonstrably works — on the wrong quantity.
+
+**Three instances in one week, at three different layers**, which is why
+this is its own entry rather than an example of the one above:
+
+| layer | the check | why it could not fire |
+|---|---|---|
+| **expectation** | J5's ΔM02 on neighbours | the statistic was floored at 0 in both conditions — no *value* could contradict it |
+| **verification** | commit 1's `--check` on the M09 hoist | the corpus stores `RunRecord`s, the change was in `sim/scorecard.py` — wrong *layer* |
+| **runtime guard** | the 22 GiB per-process memory watchdog | at 2.83 GiB/run no single worker approaches it, while the machine exhausts at ~8 concurrent runs — wrong *aggregation level* |
+
+**The generalised form covers all three: before relying on any check,
+establish that the level it operates at is the level the failure occurs
+at.** Value, layer, scope — a check has to intersect the failure in all
+three or it is decoration.
+
+**The watchdog case is the sharpest because the guard was demonstrably
+working.** It had already killed a real run at 21.8 GiB, so there was
+direct evidence it fired — evidence that says nothing whatever about the
+*parallel* failure mode it was about to be pointed at. **"This guard has
+fired before" is not evidence it can fire against the next thing**, and a
+guard reused across a change of scale needs its scope re-derived, not its
+history cited.
+
+**Mechanically:** name the failure you are guarding against, name the level
+it manifests at (a value, a layer, an aggregate), and confirm the guard
+observes *that* level. For memory: per-process guards catch per-process
+leaks; machine exhaustion across N workers needs an aggregate threshold, or
+a per-worker one derived as `budget ÷ workers`.
+
 **So the standing rule — run it at scale and ask whether the precondition
 occurs at all — applies to MECHANISMS FIRING, not only to rows selecting.**
 

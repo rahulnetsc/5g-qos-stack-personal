@@ -380,6 +380,42 @@ the shape is quantitative, name the cut.*
 
 ---
 
+### Qualification — a prediction about your OWN forthcoming DESIGN is not a shape prediction
+
+The rule above governs predictions about **data**: say what the data will
+look like and fix each look's meaning in advance. That works because the
+data exists independently of the person predicting it.
+
+**It does not transfer to a prediction whose answer you are about to
+choose.** WP9 G11 registered, for each commit, whether
+`regression_corpus.py --check` would move. Two commits, two misses, in
+**opposite directions**, from one cause:
+
+| commit | registered | actual | why |
+|---|---|---|---|
+| 2 (ledger eviction) | `--check` **blind** | it **bound** and failed | reasoned from the commit's *headline* (scoring-adjacent) rather than its *diff*, which reached `RunRecord` |
+| 3 (per-second fold) | `--check` **binds and moves** | it was **blind** | registered before deciding **opt-in versus new default**; opt-in was then chosen, and no corpus case opts in |
+
+**Neither miss was about the world being surprising.** Both were about
+registering an answer that had not been decided yet. Commit 3's registered
+outcome→meaning map was wrong for the same reason — it read a clean
+`--check` as *"the fold is not reaching the serialised record"*, when clean
+is simply the **correct** result for an opt-in change.
+
+**So: a blind/binds call is registered AFTER the design is settled and
+BEFORE the code is run.** That is still in advance of the evidence, which
+is the whole point of pre-registration; it is not in advance of the
+decision the answer depends on. The test for whether this qualification
+applies is one question — **could I change the answer by choosing
+differently?** If yes, it is a design commitment, and a design commitment
+is recorded, not predicted.
+
+**This narrows the first rule rather than weakening it.** A shape
+prediction about data is exactly as binding as it was; what it never
+covered was the class of "predictions" the predictor gets to author.
+
+---
+
 ## Standing rule — a TWO-LEVEL axis reading can invert
 
 Beside the other two form rules, and it governs the **depth-versus-breadth**
