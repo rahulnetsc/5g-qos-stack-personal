@@ -1421,7 +1421,7 @@ numbers that move recorded with the reason. Commits 1–3 are
 | # | commit | `--check` expectation |
 |---|---|---|
 | **0** | **Pre-flight probe** (§3) in `scripts/`, output verbatim to `sweeps/wp9/`. **Run-aggregate metrics on short runs of the CURRENT base cell** — it cannot use per-window instruments, which do not exist until commit 5, nor the scripted scenario, which does not exist until commit 4. See the note below on what this can and cannot decide. | no code change |
-| **1** | **M09 hoist** (§4.1), alone, plus a **scaling** guard test (time at N and 2N, assert the ratio). | **must not move.** Measured value-identical at three horizons; any movement is a finding, not a re-baseline |
+| **1** | **M09 hoist** (§4.1), alone, plus a **scaling** guard test (time at N and 2N, assert the ratio). | **`--check` is structurally BLIND here — see the box below.** The real guard is a bit-identity test against the original nesting. **LANDED** (`d1b8834`): 2.9×/11.6×/23.0× at 20 k/80 k/160 k, value bit-identical |
 | **2** | **Windowed ledger eviction** (§4.2) — removes the message-bookkeeping half of memory. Settles the run-level-percentile question the eviction forces. Needs its own worker-retention test: neither `_run_one_cell_s3` nor `_s4` has one. | **WILL MOVE, and that is expected.** §4.2 says percentiles are not associative, so a run-level M01 p98 built from evicted windows is a *different estimator* unless inputs are retained. The commit states which it chose and re-baselines deliberately, or retains enough to keep `--check` clean — **decided in the commit, not assumed here** |
 | **3** | **Per-second timeseries fold** (§4.2) — removes the other half. M09 and M08w preserved *exactly*; M04/M19/M21 lose per-slot resolution. | **must not move for M09/M08**; M04/M19/M21 move and the commit says so |
 | **4** | **Multi-window activation gate** in `sim/traffic.py` (§4.5) — one mechanism covering teleop duty cycle, waypoint pauses and the STOP drill. Strict generalisation of the single `(from, until)` pair. | **must not move** — a one-element list must reproduce the current path exactly |
@@ -1458,6 +1458,29 @@ window would put the whole C1 verdict on an uncalibrated instrument.
 it does.** Three preconditions that change cost or capacity without
 changing behaviour, and one that genuinely changes an estimator — stating
 which is which in advance is the point.
+
+> **CORRECTION, found when commit 1 landed: `--check` cannot verify commit
+> 1 at all, and this table claimed it could.** The regression corpus stores
+> **`RunRecord`s** — `flows`, `system`, `timeseries_*`, `join_events` — and
+> **no scorecard output whatsoever** (verified against
+> `regression/baseline_studies_1_3.json`). M09 is a scorecard metric, so a
+> change to `_m09_per_second_jain` is **structurally invisible** to
+> `--check`. Its passing is *no evidence at all* for commit 1, and quoting
+> it as the verification would have been **a check that never looked** —
+> the same shape as G12's clean-ramp-bottom control not covering telemetry,
+> and the reason that row is written the way it is.
+>
+> **The real guard is `sim/tests/test_m09_hoist.py`**: it diffs the hoisted
+> implementation against a verbatim copy of the original nesting and
+> asserts bit-identity, plus a scaling test, plus a *guards-the-guard* test
+> asserting the reference is still quadratic — so the identity test cannot
+> silently degenerate into comparing the shipped code with itself.
+>
+> **This extends to commits 2, 3 and 5–7**, to varying degrees: anything
+> touching only the scoring layer is invisible to `--check`. **Commit 4**
+> (`sim/traffic.py`'s activation gate) is the one where `--check` genuinely
+> binds, because it changes the simulator. Each remaining commit should say
+> which of the two it is *before* it lands.
 
 ## 10.1 Defects found while scoping this, all now FIXED
 
