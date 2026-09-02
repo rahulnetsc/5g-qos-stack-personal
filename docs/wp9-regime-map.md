@@ -517,6 +517,9 @@ dropping out of the count.
 > `docs/HANDOVER-new-machine.md` §6**, written after G9 and G12 closed. Two
 > documents disagreed for as long as this one went unread.
 
+**And read §2.2 before quoting any single row: it states the aggregate
+across the deployed arm's results, which no individual row can.**
+
 **The three entries a reader should not skip** are G5 — the most
 operationally serious thing WP9 has found, and a *base-cell* failure with
 no aggressor — G6, which passes on measurement **on M02 while leaving one
@@ -532,6 +535,120 @@ together exceed the machine. **Both are findings about the guarantee
 document rather than about the schedulers**, and neither surfaced until
 someone tried to execute the clause literally. A campaign plan that only
 ever asks "what did the arms do" will not find either.
+
+---
+
+## 2.2 THE TWO-TIER PATTERN — an aggregate nobody had stated
+
+Every row above states its own finding. **This section states what they say
+together**, because the aggregate is visible only to a reader who works
+through all of them, and the arm it concerns is **the deployed product**.
+
+**This is a finding for the campaign — where to look and what to carry to
+hardware — not a scheduler indictment.** §2.2.3 says what the evidence does
+*not* support, and it is as long as what it does.
+
+### 2.2.1 What the corrected results say, together
+
+| guarantee | statistic | PF | Reservation | **TwoTier** |
+|---|---|---|---|---|
+| **G10** | admissible fleet (all-pass, every seed) | **8** | 4 | **4** |
+| **G10** | rank on M07 / M08 at N=8 | 1 / 1 | 2 / 2 | **3 / 3** |
+| **G10** | rank on M07 / M08 at N=16 | 1 / 1 | 2 / 2= | **3 / 2=** |
+| **G9** | cold attaches completed, of 50 scheduled | 50 | 50 | **0** |
+| **G6** | M20 liveness residual under the flood | +0.44 % PASS | +1.84 % PASS | **+29.35 % [+4.81, +56.18]** — the only interval excluding zero |
+| **G1** (§28.4) | M01 p98 ≤ 100 ms, base cell | 0/40 | 0/40 | **8/40 FAIL** |
+| **G3** (§28.4) | M03 gap ≤ 500 ms, base cell | 0/40 | 0/40 | **2/40 FAIL** |
+| **G5** (§28.4) | M06 frame age p95 ≤ 67 ms, base cell | 0/40 | 0/40 | **12/40 FAIL** |
+| **G5** (§28.4) | M05 completeness ≥ 0.99, base cell | 3/40 FAIL | 30/40 FAIL | **35/40 FAIL** |
+| **G3** (§24.6) | M03 gap ≤ 500 ms at `duty_cycle` 0.5 | 0/10 | — | **5/10 FAIL** |
+| **G1/G3** (§36.2) | load at which telemetry M02 degrades | ×2.3 (102 % of ceiling) | ×2.3 | **×1.0 — NOMINAL, on 9/10 seeds** |
+
+**The single strongest element is §28.4's clause-1 row set, because it is
+one cell, one population and all three arms at once.** Of the **five**
+statistics that carry a numeric bound there, **three fail on TwoTier and on
+no other arm** (M01, M03, M06), and the fourth (M05) fails on every arm with
+TwoTier worst. That is not five independent coincidences; it is one table.
+
+### 2.2.2 And the counter-evidence, which is real
+
+**TwoTier is not uniformly worst, and two results run the other way.**
+
+- **On G6's own currency it is the BEST arm.** The protected-fleet M02 delta
+  is PF **+0.0000**, Reservation **−0.0104**, TwoTier **−0.0270** — lower is
+  better for a violation rate, so under a 50 Mbps flood TwoTier's protected
+  bearers *improve most*. The G6 residual in §2.2.1 is on M20, a different
+  statistic.
+- **Above N=16 the G10 ranking inverts and TwoTier stops being last.** At
+  N=24/32 PF meets **zero** GBR contracts while holding the best max-min
+  floor. On contracts TwoTier is **2nd at N=24** (6.7 against Reservation's
+  10.4) and **1st at N=32** (**6.4 against 6.2**). §0.1's rule applies with
+  full force: any single-metric claim about who wins at high N is false by
+  construction, and "TwoTier last" is a statement about **N ∈ {8, 16}** that
+  must not be carried upward.
+
+  *(An earlier draft of this bullet said TwoTier "ties or beats Reservation"
+  at N=24 as well. It does not — Reservation leads 10.4 to 6.7 there. The
+  phrasing came from the deck and was corrected against
+  `scripts/g10_admissible.py`'s own rank output, which is the point of
+  having the deriver.)*
+
+### 2.2.3 What this does NOT establish — read before quoting §2.2.1
+
+1. **No mechanism has been traced across any two of these.** They are
+   separate measurements on separate guarantees, and nothing here shows a
+   common cause. A reader who converts the table into "TwoTier is broken"
+   has added a claim the evidence does not contain.
+2. **Several rows carry their own unresolved confound**, each already on its
+   own row above:
+   - **G5's lever is unisolated** — the failure is present at the base cell
+     with no aggressor, and which mechanism produces it is not established.
+   - **G12's declaration-order confound is untested on this statistic.**
+     The permutation control measured M13's ordering, not telemetry M02, and
+     **7 of TwoTier's 20 permuted runs could not produce a clean ramp bottom
+     at all** — so flow-list position demonstrably reaches this arm harder
+     than the others, and the ×1.0 result is not known to survive it.
+   - **G6's residual is one cell** (N=8, load ×1.0, uplink aggressor only),
+     and its verdict is INCONCLUSIVE — the interval straddles the bar.
+   - **G10's PF 8 is knife-edge** (worst seed M08 = 0.9503 against a 0.95
+     bar); the gap to TwoTier's 4 is real, but PF's own 8 is not robust.
+   - **G9's cold result has a traced proximate cause and an untraced root
+     one** — the joiner receives zero UL grants after re-attach, but *why*
+     is a lead (`reset_ue(scope="full")` / Tier-1 re-solve), not a finding.
+3. **Three of the eleven rows are the same underlying video failure.** M05,
+   M06 and G10's M08 at N≥8 all read the same chronically-incomplete
+   `xr_video` flows — and §29 established the breach counts are over
+   **seeds, not flows** (TwoTier's 35 come from **4 flows, one accounting
+   for 30**). Counting them as three independent signals overstates the
+   pattern's breadth.
+4. **It is not a comparison the campaign was designed to make.** WP9's arms
+   exist to locate regime boundaries, not to rank products, and no cell was
+   chosen to be fair to TwoTier specifically.
+
+### 2.2.4 Why it is worth stating anyway, and what would settle it
+
+**Because the deployed scheduler is the one a reader most needs the
+aggregate for**, and because two of these — G9's cold attach and G1/G3's
+nominal-load telemetry degradation — are **operationally serious on their
+own** and would each justify a hardware test without the pattern.
+
+**The pattern is a prompt, and it makes two things worth doing:**
+
+- **The cheapest discriminator is the permutation control widened.** If
+  TwoTier's results move under flow-list reordering where the other arms'
+  do not, a large part of §2.2.1 is an artefact of position, and §36.1
+  already shows this arm is the one position reaches hardest. If they do
+  **not** move, the pattern survives its most likely confound and becomes
+  much harder to dismiss. Either outcome is worth more than another cell.
+- **Carry G9's cold path and G12's nominal-load telemetry to hardware
+  first**, per §5 — they are the two with a measured failure and an
+  operational meaning, and neither depends on the aggregate being real.
+
+**What would refute it:** a traced mechanism showing a shared artefact (flow
+declaration order is the standing candidate), or the rows dissolving
+individually as their own confounds are closed. **What would confirm it:**
+the same ordering reproducing on a workload the arms were not tuned
+against, with position controlled.
 
 ---
 
