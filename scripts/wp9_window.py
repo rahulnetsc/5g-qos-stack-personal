@@ -33,12 +33,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence
 
-from sim.messages import MessageCompletion, message_latency_percentiles_ms
+from sim.messages import (FrameLedger, MessageCompletion,
+                          message_latency_percentiles_ms)
 
 __all__ = [
     "Window", "WindowedFlow", "DEFAULT_SUBSETS", "LIDAR_QFI", "ESTOP_QFI",
-    "TIGHT_PDB_MS", "lidar_windows", "windowed_flows_from_record",
-    "windowed_metrics",
+    "TIGHT_PDB_MS", "lidar_windows", "fixed_windows",
+    "windowed_flows_from_record", "windowed_metrics",
 ]
 
 # The UGV lidar bearer. `sim/fleet.py` gives 5QI 4 to exactly one flow in
@@ -82,6 +83,11 @@ class WindowedFlow:
     gfbr_bps: float
     pdb_ms: float
     ts_delivered_bytes: Optional[Sequence[int]] = None
+    # WP9 G11 commit 6. M09w's per-flow ratio needs the DENOMINATOR too;
+    # M05w/M06w need the frames. Added here rather than re-fetched from the
+    # record, so the metric functions stay pure over this flat view.
+    ts_arrived_bytes: Optional[Sequence[int]] = None
+    frame_completions: Optional[dict] = None
 
 
 # The four subsets of §16.4. Predicates rather than precomputed sets so a
@@ -131,9 +137,35 @@ def windowed_flows_from_record(record: Any) -> list[WindowedFlow]:
             key=fr.key, ue_id=fr.ue_id, qfi=fr.qfi, direction=fr.direction,
             flow_class=fr.flow_class, gfbr_bps=fr.gfbr_bps, pdb_ms=fr.pdb_ms,
             ts_delivered_bytes=fr.ts_delivered_bytes,
+            ts_arrived_bytes=fr.ts_arrived_bytes,
+            frame_completions=fr.frame_completions,
         )
         for fr in record.flows.values()
     ]
+
+
+def fixed_windows(horizon_s: float, width_s: float = 60.0) -> list[Window]:
+    """A contiguous partition of the run into fixed-width windows.
+
+    WP9 G11 commit 6: GT-7.1's KPI is "every 60 s window passes", which is a
+    PARTITION, unlike `lidar_windows`' five overlapping named intervals.
+    The last window is CLIPPED to the horizon rather than extending past it,
+    and it is emitted even when short -- M07w/M08w already normalise by
+    COVERED duration (samples x dt), so a clipped window is scored on the
+    time that actually existed. Dropping it instead would silently shorten
+    the run, which is the failure G11's own commit 2 exists to prevent one
+    layer down.
+    """
+    if horizon_s <= 0 or width_s <= 0:
+        raise ValueError(f"horizon_s and width_s must be positive, "
+                         f"got {horizon_s} and {width_s}")
+    out, k = [], 0
+    while k * width_s < horizon_s:
+        a = k * width_s
+        b = min(a + width_s, horizon_s)
+        out.append(Window(name=f"w{k:03d}", start_s=a, end_s=b))
+        k += 1
+    return out
 
 
 def _flow_key(c: MessageCompletion) -> str:
@@ -288,6 +320,187 @@ def _m07w_m08w(
     ]
 
 
+def _m03w(completions: list[MessageCompletion], keys: set, w: Window) -> dict:
+    """G3's liveness gap, windowed. SELECTS ON COMPLETION TIME.
+
+    This is the opposite of _m01w/_m02w's deliberate choice, and the reason
+    is that a liveness gap is a RECEIVER-SIDE inter-arrival statistic: the
+    question is "how long was this window silent", which is about when
+    messages ARRIVED, not when they were offered.
+
+    A window with fewer than two completions has no gap at all, so it emits
+    None with a reason rather than a 0 -- and the reason names the count,
+    because a structurally silent window and a healthy one are otherwise
+    indistinguishable (CLAUDE.md's mechanism-fired rule at window scale).
+    """
+    by_flow: dict[str, list[float]] = {}
+    for c in completions:
+        if not c.complete:
+            continue
+        k = _flow_key(c)
+        if k in keys and w.contains(c.completion_ts_s):
+            by_flow.setdefault(k, []).append(c.completion_ts_s)
+    worst_key, worst_gap = None, None
+    thin = 0
+    for k, ts in by_flow.items():
+        if len(ts) < 2:
+            thin += 1
+            continue
+        ts.sort()
+        g = max(b - a for a, b in zip(ts, ts[1:])) * 1000.0
+        if worst_gap is None or g > worst_gap:
+            worst_key, worst_gap = k, g
+    row = {"window": w.name, "metric": "M03w", "n_flows": len(by_flow),
+           "n_flows_too_thin": thin}
+    if worst_gap is None:
+        row["value"] = None
+        row["flow"] = None
+        row["reason"] = (f"no flow had >=2 completions in this window "
+                         f"({len(by_flow)} flow(s) present, {thin} too thin)")
+    else:
+        row["value"] = worst_gap
+        row["flow"] = worst_key
+    return row
+
+
+def _m15w(completions: list[MessageCompletion], keys: set, w: Window) -> dict:
+    """G1's jitter, windowed: p99 - p50 on the worst flow. Same population
+    and same generation-time selection as M01w, so the two are comparable."""
+    by_flow: dict[str, list[MessageCompletion]] = {}
+    for c in completions:
+        k = _flow_key(c)
+        if k in keys and w.contains(c.message.generation_ts_s):
+            by_flow.setdefault(k, []).append(c)
+    worst_key, worst = None, None
+    for k, cs in by_flow.items():
+        s = message_latency_percentiles_ms(cs)
+        if not s["count"]:
+            continue
+        j = s["p99"] - s["p50"]
+        if worst is None or j > worst:
+            worst_key, worst = k, j
+    row = {"window": w.name, "metric": "M15w", "n_flows": len(by_flow)}
+    if worst is None:
+        row["value"] = None
+        row["flow"] = None
+        row["reason"] = "no flow completed a message in this window"
+    else:
+        row["value"] = worst
+        row["flow"] = worst_key
+    return row
+
+
+def _m05w_m06w(completions: list[MessageCompletion], flows_by_key: dict,
+               keys: set, w: Window) -> list[dict]:
+    """G5's PDU-set completeness and frame age, windowed.
+
+    A DIFFERENT ESTIMATOR FROM PANEL M05, and that must travel with it.
+    Panel M05 reads `FlowRecord.frame_completions`, built by the driver over
+    the whole run; this regroups the WINDOW's completions by
+    `Message.frame_id` via `FrameLedger.group`. A frame straddling a window
+    boundary is counted differently by the two -- exactly the M02w-vs-M02
+    divergence this module's docstring already flags, and the reason
+    control C3 exists. G11 owes M05w the same calibration at the `full`
+    window before any windowed number is quoted (docs/wp9-g11-plan.md §10,
+    commit 6).
+    """
+    # Group by FLOW first, then frame. FrameCompletion carries frame_id and
+    # timings but NO flow identity (sim/messages.py:170), so grouping the
+    # other way round loses which flow a frame belonged to -- and M05 is a
+    # WORST-FLOW statistic, so that identity is the whole point.
+    per_flow_comps: dict[str, list] = {}
+    for c in completions:
+        k = _flow_key(c)
+        if k in keys and w.contains(c.message.generation_ts_s):
+            per_flow_comps.setdefault(k, []).append(c)
+    by_flow = {k: FrameLedger.group(cs) for k, cs in per_flow_comps.items()}
+    by_flow = {k: fcs for k, fcs in by_flow.items() if fcs}
+    frames = [fc for fcs in by_flow.values() for fc in fcs]
+
+    worst_key, worst_frac = None, None
+    ages: list[float] = []
+    for k, fcs in by_flow.items():
+        pdb = flows_by_key[k].pdb_ms if k in flows_by_key else None
+        # completion_ts_s is None unless complete (sim/messages.py:181)
+        done = [fc for fc in fcs if fc.complete and fc.completion_ts_s is not None]
+        if pdb is not None:
+            in_pdb = [fc for fc in done
+                      if (fc.completion_ts_s - fc.generation_ts_s) * 1000.0 <= pdb]
+        else:
+            in_pdb = done
+        frac = len(in_pdb) / len(fcs) if fcs else None
+        if frac is not None and (worst_frac is None or frac < worst_frac):
+            worst_key, worst_frac = k, frac
+        ages.extend((fc.completion_ts_s - fc.generation_ts_s) * 1000.0
+                    for fc in done)
+
+    m05 = {"window": w.name, "metric": "M05w", "n_flows": len(by_flow),
+           "n_frames": len(frames)}
+    if worst_frac is None:
+        m05["value"] = None
+        m05["flow"] = None
+        m05["reason"] = "no frame-bearing flow generated a frame in this window"
+    else:
+        m05["value"] = worst_frac
+        m05["flow"] = worst_key
+
+    m06 = {"window": w.name, "metric": "M06w", "n_frames_complete": len(ages)}
+    if not ages:
+        m06["value"] = None
+        m06["reason"] = "no frame completed in this window"
+    else:
+        ages.sort()
+        m06["value"] = ages[min(len(ages) - 1, int(len(ages) * 0.95))]
+    return [m05, m06]
+
+
+def _m09w(flows: list[WindowedFlow], keys: set, w: Window,
+          time_s: Optional[Sequence[float]]) -> dict:
+    """G8's per-second Jain, windowed.
+
+    Reuses the panel's own shape: per-flow delivered/arrived ratio per
+    SECOND, then Jain over the flow vector in each second, then the WORST
+    second in the window. Bucketing by second (not by window) is what keeps
+    it the same statistic panel M09 computes -- a Jain over window totals
+    would be a different, much smoother quantity under the same name.
+    """
+    row = {"window": w.name, "metric": "M09w"}
+    idx = _window_indices(time_s, w)
+    gbr = [f for f in flows if f.key in keys
+           and f.ts_delivered_bytes is not None and f.ts_arrived_bytes is not None]
+    if not idx or len(gbr) < 2:
+        row["value"] = None
+        row["reason"] = (f"{len(gbr)} flow(s) with both series and "
+                         f"{len(idx)} sample(s) in window; need >=2 and >=1")
+        return row
+    per_sec: dict[int, list[float]] = {}
+    for f in gbr:
+        acc: dict[int, list[int]] = {}
+        for i in idx:
+            if i >= len(f.ts_delivered_bytes):
+                continue
+            sec = int(time_s[i])
+            d, a = acc.setdefault(sec, [0, 0])
+            acc[sec] = [d + f.ts_delivered_bytes[i], a + f.ts_arrived_bytes[i]]
+        for sec, (d, a) in acc.items():
+            per_sec.setdefault(sec, []).append((d / a) if a > 0 else 1.0)
+    jains = []
+    for vals in per_sec.values():
+        if len(vals) < 2:
+            continue
+        s1, s2 = sum(vals), sum(v * v for v in vals)
+        if s2 > 0:
+            jains.append((s1 * s1) / (len(vals) * s2))
+    if not jains:
+        row["value"] = None
+        row["reason"] = "no second in this window had >=2 flows with offered load"
+    else:
+        row["value"] = min(jains)
+        row["mean"] = sum(jains) / len(jains)
+        row["seconds"] = len(jains)
+    return row
+
+
 def windowed_metrics(
     completions: list[MessageCompletion],
     flows: list[WindowedFlow],
@@ -313,14 +526,37 @@ def windowed_metrics(
     choice, so M07w/M08w are comparable to the panel numbers they window.
     """
     subsets = DEFAULT_SUBSETS if subsets is None else subsets
+    flows_by_key = {f.key: f for f in flows}
+    # PRE-BUCKET ONCE. Every metric below used to receive the WHOLE
+    # completion list and filter inside it, so the cost was
+    # n_subsets x n_windows x |completions|. Its only caller paid 4 x 5 over
+    # a 5 s run; G11 is 4 x 30 over 1,800 s, which is 240 full scans of a
+    # list ~360x longer. Bucketing by window index once makes it one scan.
+    by_gen: dict[int, list] = {}
+    by_done: dict[int, list] = {}
+    for c in completions:
+        for bucket, ts in ((by_gen, c.message.generation_ts_s),
+                           (by_done, c.completion_ts_s if c.complete else None)):
+            if ts is None:
+                continue
+            for wi, w in enumerate(windows):
+                if w.contains(ts):
+                    bucket.setdefault(wi, []).append(c)
+                    break
     rows: list[dict[str, Any]] = []
     for subset_name, pred in subsets.items():
         keys = {f.key for f in flows if pred(f)}
-        for w in windows:
+        for wi, w in enumerate(windows):
+            gen = by_gen.get(wi, [])
+            done = by_done.get(wi, [])
             emitted = [
-                _m01w(completions, keys, w),
-                _m02w(completions, keys, w),
+                _m01w(gen, keys, w),
+                _m02w(gen, keys, w),
                 *_m07w_m08w(flows, keys, w, time_s, contract_fraction),
+                _m03w(done, keys, w),
+                _m15w(gen, keys, w),
+                *_m05w_m06w(gen, flows_by_key, keys, w),
+                _m09w(flows, keys, w, time_s),
             ]
             for row in emitted:
                 row["subset"] = subset_name

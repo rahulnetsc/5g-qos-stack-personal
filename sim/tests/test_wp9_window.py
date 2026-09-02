@@ -254,7 +254,19 @@ def test_windowed_metrics_emit_a_row_for_every_window_subset_metric():
     row is indistinguishable from a forgotten one."""
     windows = lidar_windows(LidarActivation(), horizon_s=5.0)
     rows = windowed_metrics([], [_flow(1, 83)], None, windows)
-    assert len(rows) == len(windows) * len(DEFAULT_SUBSETS) * 4
+    # DERIVED, not restated. This read "* 4" and went stale the moment G11
+    # commit 6 added M03w/M05w/M06w/M09w/M15w -- CLAUDE.md's restated-count
+    # rule, fourth instance, whose aggravating feature is that a test which
+    # restates a count fails in the direction of PASSING when the new thing
+    # is absent. What must hold is that the grid is COMPLETE: every
+    # (window, subset) pair emits the same metric set, with none missing.
+    n_metrics = len({r["metric"] for r in rows})
+    assert n_metrics >= 4, "the metric set collapsed"
+    assert len(rows) == len(windows) * len(DEFAULT_SUBSETS) * n_metrics
+    from collections import Counter
+    per_cell = Counter((r["window"], r["subset"]) for r in rows)
+    assert set(per_cell.values()) == {n_metrics}, \
+        f"some (window, subset) cell is missing metrics: {per_cell}"
     for r in rows:
         assert {"window", "subset", "metric",
                 "window_start_s", "window_end_s"} <= set(r)
