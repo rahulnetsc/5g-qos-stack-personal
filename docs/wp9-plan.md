@@ -5623,7 +5623,11 @@ checks non-zero, not the expected count.** Worth its own investigation;
 **strengthening that assertion to check the expected count is the cheap
 guard**, and it would have flagged this on the first run.
 
-### 34.5 TwoTier's event shortfall — EXPLAINED, and it makes the arms non-comparable
+> **The hypothesis in the paragraph above was taken up and is REFUTED —
+> §34.5a.** The overlap never happens. And "cold 1.0 vs 5.0" counts events
+> *recorded*; the count of cold attaches *completed* is **0 of 50**.
+
+### 34.5 TwoTier's event shortfall — a mechanism proposed here, and REFUTED in §34.5a
 
 Checked rather than left beside J5's unexplained result. Same scenario,
 same seed, GT-6.1, per-event duration in slots from trigger to attached:
@@ -5660,6 +5664,94 @@ exceed the slowest arm's handshake — and it is deliberately **not** made
 here: re-running the campaign with a longer period is its own commit with
 its own before/after, and §34.1's numbers stand as what the current
 scenario produced, now with the bias direction stated.
+
+### 34.5a THE MECHANISM ABOVE IS REFUTED — the handshake never completes at all
+
+§34.5's overlap story was checked by re-running the campaign's exact
+configuration for all three arms across its own ten `paired_seeds(10)`
+seeds, counting both **events recorded** and **attaches completed**
+(`attached_ts_s is not None`, the same test M18's `n_never_completed` uses).
+
+| case | scheduled | PF | Reservation | TwoTier |
+|---|---|---|---|---|
+| **cold** (GT-6.2, 5/run × 10 seeds = 50/arm) | 50 | 50 events / **50 completed** | 50 / **50** | **10 events / 0 completed** |
+| **warm** (GT-6.1, 10/run × 10 seeds = 100/arm) | 100 | 100 / **100** | 100 / **100** | 38 / **29** |
+
+**TwoTier completed ZERO of its 50 scheduled cold attaches, on every one of
+the ten seeds.** Exactly one cold event is recorded per seed — always the
+*first*, at trigger slot 2800 — and the remaining four cycles produce no
+event at all. The warm arm reproduces the committed campaign's 3.8
+events/run bit-for-bit, which is how this re-run is known to be the same
+configuration.
+
+**Why the overlap mechanism cannot be what happened.**
+
+- **Cold: nothing ever completed**, so no event was displaced by a slow
+  predecessor. There is no survivor population to be self-selected *from*.
+- **Warm: no completed handshake ever collided with its successor.** Every
+  completed attach landed **21–1,086 slots** after its trigger against a
+  **1,600-slot** period. In all ten seeds the truncation is a **terminal
+  stall** — the last recorded event never completes and every later
+  scheduled restart is discarded, and the run simply ends there.
+- **§34.5's own table already showed this and it was not read that way.**
+  Its longest quoted duration is **851 slots against a 1,600-slot
+  period** — comfortably inside. The section's evidence contradicted its
+  mechanism on the page.
+
+**What actually happens** (traced, seed 1826701614, TwoTier, scheduler spy
+over `allocate()`): the joiner receives **122 UL grants, all at slots
+1–1997, and zero at any slot ≥ 2000** — none in the 4,000-slot PDB window
+after the 64-byte handshake request is injected at ~slot 2824. PF gets 823
+UL grants to the same UE after that instant. The request expires unserved
+(`ue1_qfi70`: 64 bytes dropped to PDB). **The masking/BSR path is ruled
+out**: `APP_HANDSHAKE` is inside `_RADIO_CONNECTED_PHASES` and the flow
+shows `bytes_reported > 0` on 1,296 slots — TwoTier saw a reported,
+unmasked, backlogged flow and never granted it.
+
+**Two `sim/join.py` properties then make the stall permanent and silent**,
+and they are defects in their own right:
+
+1. `JoinPhase.APP_HANDSHAKE` has **no ceiling and no retransmission** — it
+   waits only on `handshake_complete`, and nothing re-injects a dropped
+   request.
+2. Scripted events are **consumed by index whenever `candidate.slot ==
+   slot_index`, regardless of phase**, so the four later power_off/power_on
+   pairs are advanced past and **discarded rather than deferred**.
+
+The joiner is radio-gated out of the cell for **17,176 of 20,000 slots
+(86 %)**.
+
+**The instruction changes, and this is the operational point.** Not
+*"lengthen the scripted restart period"* — no period fixes a handshake that
+never completes. It is **(a) find why TwoTier stops issuing UL grants to
+the joiner after re-attach**, and **(b) fix the two silent-stall defects
+above.** For (a) the prime suspect is TwoTier's post-`reset_ue(scope=
+"full")` / Tier-1 re-solve state for a UE radio-gated across the re-solve —
+**a lead, not a finding**, and it needs its own trace before anything is
+written down.
+
+**Downstream consequences, because they change how §34.1 reads.**
+
+- TwoTier's cold numbers are **not a smaller sample — they are a
+  measurement of an absent UE.** M18 p95 is `None`, and M19/M21 read
+  **0.0 ms**, i.e. *instant recovery*, for a robot that never came back.
+- **§34.2's "unexplained" neighbour Δp98 acquires a candidate**: −8.995 ms
+  [−14.234, −3.085] is computed over a run in which the joiner's 4 Mbps
+  video left the cell for 86 % of the horizon. That is a **lead, not a
+  resolution** — §34.2's own correlation test against joiner absence
+  returned r = −0.028 and is not overturned by this.
+- **The strengthened assertion is still not strong enough.** It checks
+  event **count**; an arm can record its full scheduled count and complete
+  none. It should assert `n_never_completed == 0` alongside — M18 already
+  computes it.
+
+**The transferable lesson is one level up from the one §34.5 drew.** That
+section concluded "a slow arm against a fixed period loses events" and
+proposed a scenario fix. The truth is that **an arm can register events and
+complete none of them**, and every count-based guard — including the one
+this campaign added in response — passes on that. *Firing* and *finishing*
+are different questions, and a campaign that asserts only the first will
+report instant recovery for a UE that never returned.
 
 ---
 

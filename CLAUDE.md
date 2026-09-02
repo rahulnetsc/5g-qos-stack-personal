@@ -447,11 +447,38 @@ it fire as often as the scenario specifies"*, **and the gap between them is
 exactly where a PARTIALLY degenerate run hides.**
 
 **A partially-degenerate run is not a smaller sample of the same thing.**
-The events that survive are **self-selected** — in that case, the ones
-whose predecessor finished before the next was scheduled — so an arm with
-fewer events is measuring a different population, and comparing it to a
-full arm compares two things. Derive the expected count from the schedule
-(never restate it) and assert equality.
+The events that survive are **self-selected**, so an arm with fewer events
+is measuring a different population, and comparing it to a full arm
+compares two things. Derive the expected count from the schedule (never
+restate it) and assert equality.
+
+**AND THE COUNT IS STILL NOT ENOUGH — assert COMPLETIONS too.** Two
+corrections from re-running that campaign (`docs/wp9-plan.md` §34.5a),
+kept because the second is a stronger version of this whole invariant.
+
+*First, the mechanism this entry used to name is refuted.* It read *"the
+ones whose predecessor finished before the next was scheduled"*. That
+overlap never happens: every completed warm handshake landed 21–1,086
+slots after its trigger against a **1,600-slot** period, and §34.5's own
+table already showed a maximum of 851 — its evidence contradicted its
+mechanism on the page. What actually occurs is a **terminal stall**: the
+handshake never completes, and every later scripted event is
+consumed-and-discarded rather than deferred.
+
+*Second, and this is the transferable part:* **3.8 of 10 and 1.0 of 5
+count events RECORDED. The count of cold attaches COMPLETED is 0 of 50** —
+on every seed, against 50 of 50 on both other arms. **An arm can register
+its full scheduled count and complete none of them**, and a count-only
+assertion passes on that while the recovery metrics report **0.0 ms —
+instant recovery — for a UE that never came back.** *Firing* and
+*finishing* are different questions. Assert the expected count **and** that
+nothing failed to complete (M18 already computes `n_never_completed`).
+
+**The shape to carry: a guard added in response to a degenerate run can
+itself be degenerate.** This campaign's count assertion was written to
+close exactly this hole and closed only half of it — the same
+one-level-short failure as the under-decomposition in `docs/wp9-plan.md`
+§28.1.
 
 **The concrete diagnosis, kept verbatim because a later reader will hit
 this exact trap: depth arms t310, duration expires it.** Two identically

@@ -82,9 +82,18 @@ def assert_events_fired(rec: RunRecord, want_path: str, label: str,
     and the gap between them is exactly where a PARTIALLY degenerate run
     hides. It did: TwoTier recorded 3.8 of 10 scripted warm restarts and
     1.0 of 5 cold cycles, and the non-zero check passed on every one --
-    so M18/M19/M21 were computed over a different, smaller and
-    self-selected event set than the other arms, and the arms were compared
-    as though they were not.
+    so M18/M19/M21 were computed over a different, smaller event set than
+    the other arms, and the arms were compared as though they were not.
+
+    AND THE COUNT CHECK IS STILL NOT ENOUGH (§34.5a). Those figures count
+    events RECORDED. Re-running the campaign and counting attaches
+    COMPLETED gives TwoTier 0 of 50 scheduled cold cycles -- on every seed --
+    against PF and Reservation at 50 of 50. An arm can register its full
+    scheduled count and complete none of them, and a count assertion passes
+    on that while M19/M21 report 0.0 ms, i.e. INSTANT RECOVERY, for a robot
+    that never came back. Firing and finishing are different questions.
+    Assert `n_never_completed == 0` alongside the count -- M18 already
+    computes it.
     """
     events = [e for e in (rec.join_events or []) if e.path == want_path]
     if not events:
@@ -97,11 +106,15 @@ def assert_events_fired(rec: RunRecord, want_path: str, label: str,
         raise AssertionError(
             f"{label}: {len(events)} '{want_path}' events but the scenario "
             f"schedules {expected}. A partially-degenerate run is NOT a "
-            f"smaller sample of the same thing -- the events that survive "
-            f"are self-selected (here: the ones whose predecessor finished "
-            f"in time), so arms with different counts are not comparable. "
-            f"Known cause: a handshake slower than the scripted period "
-            f"overlaps the next event, which is then dropped (§34.4).")
+            f"smaller sample of the same thing -- the survivors are "
+            f"self-selected, so arms with different counts are not "
+            f"comparable. CAUSE, measured (§34.5a): NOT the overlap "
+            f"hypothesis §34.4 proposed -- no completed handshake ever "
+            f"collides with its successor. On TwoTier the app handshake "
+            f"never completes at all (0 of 50 cold attaches), the joiner "
+            f"gets zero UL grants after re-attach, and every later scripted "
+            f"event is consumed-and-discarded by sim/join.py rather than "
+            f"deferred. Lengthening the period does not fix it.")
     return len(events)
 
 
