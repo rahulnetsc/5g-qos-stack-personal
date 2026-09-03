@@ -190,3 +190,92 @@ is a `RunRecord` schema change, so **`--check` will bind AND move** — unlike
 every other fix in this pass, where a moved corpus would have signalled a
 second defect. That deserves its own registered prediction and its own
 commit, not to be slipped in beside a document pass.
+
+---
+
+## HIGH-PRIOR bucket — verified by hand, 2026-09-03
+
+Verified by reading and probing, not by agents. **Status is stated per
+finding, including the ones I could not settle from a read** — an unresolved
+finding recorded as unresolved is worth more than one promoted on a guess.
+
+### CONFIRMED (6)
+
+**#49 — `wp9_part_c.py`'s "the caveat does NOT fire at duty 0.5" is false,
+and it is #22 in real data.** Measured over the committed
+`sweeps/wp9/part_c_rows.csv` (720 rows): at duty 0.5 the cadence predicate
+fires on **4 of 44 breaches** (Reservation 3, TwoTier 1):
+
+| arm | max gap | median | configured period |
+|---|---|---|---|
+| TwoTier | 963.25 | 596.63 | 200 ms |
+| Reservation | 2815.00 | 602.25 | 200 ms |
+| Reservation | 2041.25 | 551.25 | 200 ms |
+| Reservation | 2063.75 | 525.00 | 200 ms |
+
+Medians ~2.7× the configured period — degraded by the network, not slow by
+design — with real 1–2.8 s breaches suppressed. **This is #22's case C
+occurring in a published dataset**, and it also shows the earlier correction
+(defects-log #8, "cadence exclusion said duty ≤ 0.5; arithmetic says 0.1")
+over-corrected: the replacement claim is wrong in the other direction.
+
+**#47 — PF's tie-break is declaration order, and it reaches M01/M15.**
+`sim/baselines/pf.py` sorts `scored` by the PF metric alone under Python's
+STABLE sort, and `scored` is built from `ue_flows.items()` — insertion order,
+i.e. flow declaration order. Since M01/M15 report the WORST flow, persistent
+starvation of a fixed UE subset lands directly in them. The plan scopes this
+contamination to M09 only; that scoping is too narrow.
+
+**#54 — stage-3's Q2 null control returns PASS over zero comparisons.** With
+no matching rows, `pick()` returns empty dicts, `compared` stays 0,
+`problems` stays empty, and the function returns `True`. Latent: stage 3 died
+at cell 51/52 and has no artefacts — but a died-partway run is exactly the
+input shape it would next see.
+
+**#55 — E3 and E4 are fed the breaking-N the same file documents as firing on
+noise.** `for comp, v in e2.items(): n = v["breaking_n"] ... e3_h6_split(w, comp, n)`.
+The post-hoc paired-CI correction is computed, printed, and never consumed.
+
+**#56 — `c4_pre_window` returns "identical" on an empty selection.** An empty
+metric yields `{"n": 0}`, which has no `separated` key, so `any(...)` is
+False and `branch` reads "identical" — indistinguishable from a measured
+negative result, in a pre-registered control.
+
+**#28 — the `bg` excursion is not single-axis.** The aggressor is 5QI 8
+(`lcg_for_5qi(8) = 5`) but is forced to `lcg=6` at `sim/parametric.py:298`,
+`g12.py:263` and `g9.py:163` — and `lcg_for_5qi(9) = 6`, the per-UE
+best-effort filler's LCG. So `bg=True` adds a flow AND creates a shared LCG
+on that UE, in a grid whose whole discipline is one axis at a time.
+
+**#38 — 10 "predates" reasons, 2 flag checks.** Only two methods consult
+`record.message_ledger_windowed`; the rest can emit "record predates WP7" for
+a record produced by today's driver, misattributing a scoring-configuration
+choice to a stale record — the exact distinction the flag was added to make.
+
+### REFUTED (1 additional, on mechanism)
+
+**#7 — `evaluate_axis` does filter to a cell.** `carries_axis()` exists
+specifically to kill the bug the finding describes, and its docstring names
+it: the `None`-base contamination that selected 1,710 of 1,770 rows. That
+defect is already fixed; the finding re-reports it as live. (The reachability
+lens had refuted it separately.) A residual question — whether a CORE-PLANE
+axis still mixes other axes' levels within a cell — is unresolved and gates
+nothing, since stage 1's gate is a completed selection Phase 2 does not
+re-run.
+
+### PREVIOUSLY REFUTED BY THE VERIFICATION PASS (11)
+
+#1, #5/9, #6, #8, #10, #11, #15, #16/37, #17, #19 — refuted on mechanism,
+reachability or novelty by the 55 verdicts that returned before the session
+limit. Not re-litigated.
+
+### UNRESOLVED FROM A READ (4)
+
+**#12** (%-of-ceiling denominator including the 50 Mbps flood), **#41** (G2's
+recorded next step moving the blocker the wrong way), **#53** (C4 pooling
+structurally-zero null cells), **#57** (E4 ranking nested subsets), **#62**
+(M21 counting drops only). Each needs the run's data rather than the source
+to settle. **None gates Phase 2**: #12 and #41 are framing claims about
+already-published G12/G2 text, and #53/#57/#62 concern stage-5 analysis and
+M21's secondary reading. Carried into the document pass, where #12 and #41
+are corrections to prose rather than code.
