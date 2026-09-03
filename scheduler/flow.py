@@ -100,6 +100,10 @@ FIVE_QI_PDB_MS: dict[int, float] = {
 # lcg_for_5qi.
 DERIVE_PDB_FROM_5QI = -1.0
 
+# Same convention for priority: -1 means "resolve from the 5QI table in
+# __post_init__". A real 5QI priority is always >= 1, so -1 is unambiguous.
+DERIVE_PRIORITY_FROM_5QI = -1
+
 
 def pdb_for_5qi(qfi: int) -> float:
     """Standardised PDB (ms) for a 5QI. Raises for an unlisted 5QI rather
@@ -166,10 +170,30 @@ class FlowConfig:
     # profile has no MFBR set, not an invented default.
     mfbr_bps: float = 0.0
     # Scheduling priority, 3GPP 5QI convention: lower value = higher priority.
-    # Used to tier SPS reservations and the MAC logical-channel multiplexer.
-    # Default is a single neutral level; set per-flow once the workload is
-    # mapped to standardised 5QIs.
-    priority_level: int = 100
+    # Read by scheduler/tier1.py::_weight_from_priority (the Delay-class
+    # threshold), two_tier.py's UL urgency weight, and sim/ue_lcp.py's
+    # uplink LCP sort.
+    #
+    # DERIVE_PRIORITY_FROM_5QI (-1) means "use priority_for_5qi(qfi)" --
+    # __post_init__ resolves it, exactly as lcg == -1 and
+    # pdb_ms == DERIVE_PDB_FROM_5QI already do, so an explicit priority
+    # always wins and every other FlowConfig gets its standardised value
+    # regardless of how it was constructed.
+    #
+    # WHY THIS IS THE DEFAULT AND 100 IS NOT (2026-09-03). The old default
+    # was the literal 100, i.e. DEFAULT_PRIORITY_LEVEL -- the fallback for a
+    # 5QI the standard does not list. sim/config_loader.py resolved from the
+    # table, so the three published-study scenarios got a real spread, but
+    # sim/parametric.py and sim/fleet.py construct FlowConfig directly and
+    # passed nothing: EVERY flow in EVERY WP9, G9, G11 and G12 scenario tied
+    # at 100. Tier-1's Delay class (p <= 20) was therefore never selected,
+    # two_tier's urgency priority weight clamped to its floor for every flow,
+    # and ue_lcp.py's stable sort on a constant key made the uplink split
+    # declaration-ordered. regression_corpus.py could not see it: its cases
+    # all come from scripts/scheduler_study.py, which never calls those two
+    # builders. Deriving here rather than at each call site is what stops the
+    # next builder from reintroducing it.
+    priority_level: int = DERIVE_PRIORITY_FROM_5QI
     # This flow's logical channel group, 0-7 (TS 38.321: BSR aggregates to
     # 8 LCGs). -1 means "use lcg_for_5qi(qfi)" -- __post_init__ resolves it,
     # so any explicit lcg always wins and every other FlowConfig still gets
@@ -257,6 +281,12 @@ class FlowConfig:
     def __post_init__(self) -> None:
         if self.pdb_ms == DERIVE_PDB_FROM_5QI:
             self.pdb_ms = pdb_for_5qi(self.qfi)
+        if self.priority_level == DERIVE_PRIORITY_FROM_5QI:
+            # priority_for_5qi falls back to DEFAULT_PRIORITY_LEVEL for an
+            # unlisted 5QI, so deriving never raises -- unlike pdb_for_5qi,
+            # which does, because inventing a *budget* is a scenario-
+            # authoring error while a neutral priority is a real default.
+            self.priority_level = priority_for_5qi(self.qfi)
         if self.lcg == -1:
             self.lcg = lcg_for_5qi(self.qfi)
         if not (0 <= self.lcg < LCG_COUNT):
