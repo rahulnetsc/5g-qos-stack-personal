@@ -117,9 +117,13 @@ not a special case of the OAI-comment rule, it's the same rule applied to
 a default this codebase itself chose.
 
 **Do not add SPS / Configured Grant to the schedulers.** `main`'s
-`scheduler/two_tier.py` has it (`_SPSReservation`, `_allocate_sps`); the real
+`scheduler/two_tier.py` had it (`_SPSReservation`, `_allocate_sps`); the real
 hardware scheduler defers SPS to a Phase 2 that was never built. The Python
-model must match the deployed scheduler, not exceed it.
+model must match the deployed scheduler, not exceed it. **This branch's
+`scheduler/two_tier.py` no longer contains any of it** — Phase 2 two-tier
+commit 1 deleted the lot, so the rule now reads as "do not re-add", and the
+only occurrences of those names are in the docstring recording the
+deletion.
 
 **The gNB cannot see a UE's intra-TB per-flow split.** Only aggregate
 per-LCG BSR. `main` has `_shadow_lcp_split` / `_occupancy_split` /
@@ -254,13 +258,26 @@ which bytes are "the ones already granted and in flight." A second grant
 issued to a masked flow while its first TB is still pending would drain
 whatever bytes are oldest by FIFO order, which may not be the pending
 ones, silently corrupting delivery/completion bookkeeping rather than
-just being a suboptimal scheduling choice. `scheduler/two_tier.py`'s SPS
-path defeats this non-destructively by pooling backlog across a UE's
-SPS-eligible flows before masking is applied (README §8,
-`harq_masked_flow_double_grant_count`) — that's a flagged, deliberately
-unfixed limitation of SPS specifically (Phase-2-doomed per this doc's own
-SPS rule above), not evidence that masking itself can be relaxed
-elsewhere.
+just being a suboptimal scheduling choice.
+
+**CORRECTED 2026-09-03: the SPS bypass this paragraph used to describe NO
+LONGER EXISTS in this branch.** It read that `scheduler/two_tier.py`'s SPS
+path "defeats this non-destructively by pooling backlog across a UE's
+SPS-eligible flows", presented as a live flagged limitation. **Phase 2
+two-tier commit 1 deleted `_SPSReservation`, `_allocate_sps`,
+`_is_sps_eligible` and everything that fed them** — `grep` now finds those
+names only inside the docstring recording their removal. **There is no
+masking bypass in the shipped scheduler**, and the accompanying
+`harq_masked_flow_double_grant_count = 877` was measured before the
+deletion, so it does not describe this code either.
+
+**The masking rule above is unchanged and is why this correction matters:**
+with the SPS path gone there is no longer any sanctioned exception to it,
+so a future author cannot cite SPS as precedent for relaxing the mask.
+Note also that `harq_masked_flow_double_grant_count` never reaches
+`RunRecord` and no test asserts it, so the "standing regression check"
+README §8 claims for it **cannot currently fail** — see the
+could-have-failed rule below.
 
 **`harq_exhausted_count` and `bytes_harq_lost` are two different counters
 measuring two different failure modes — do not conflate them.**
@@ -469,6 +486,62 @@ sentence**. If that configuration differs from the one being budgeted, the
 number is a lower or upper bound at best, and §16.1.4's "lower bound"
 framing is what has repeatedly saved this project from acting on one — the
 safety came from the framing, not from the model being right.
+
+**A TEST PROVES A MECHANISM BEHAVES. NOTHING HERE PROVES IT IS REACHED —
+and for twelve mechanisms the answer was that it is not.** This is the
+run-it-at-scale rule one layer up. That rule asks *did the precondition
+occur*; this asks the prior question, *was the code called at all*.
+
+**It is a structural property of how work has been verified in this
+project, not a list of oversights.** The 2026-09-03 audit found **twelve**
+instances, and the recurring shape is identical: a mechanism is built,
+unit-tested against its own inputs, green in the suite, and either has no
+non-test caller or emits nothing that would show it ran.
+
+| the mechanism | how it is unreachable / unobservable |
+|---|---|
+| WP6 blockage (`sim/blockage.py`, `UEConfig.blockage`) | no scenario, sweep or YAML key sets it; `is_blocked()` has no non-test caller |
+| `sync_group` / `phase_offset_ms`, `aggressor_multiplier` | set only in `sim/tests/test_traffic.py` |
+| `JoinConfig.app_restart_*`, `pdu_session_*` | never set: both phases last **0 slots in every G9 result** |
+| `RlfDetectorConfig` | hardcoded in the driver; unreachable from `run()` |
+| four `UlAccessModel` knobs incl. `sr_report_floor_bytes` | not passed by the driver |
+| `FlowConfig.survival_time_ms` | never non-zero, so **M14 has never measured what it defines** |
+| `slice_id` | never set, and no scheduler reads it |
+| five driver counters (HARQ exhaustion, RLF, double-grant) | emitted into `summary`, dropped by `from_summary` |
+| `harq_masked_flow_double_grant_count` | claimed as the standing Phase-2 guard; reaches no record, no corpus, no test |
+| TwoTier's UL floor (Tier 1.5, ~200 lines) | OAI's counters not ported; activation unknowable |
+| `analyse_stage5.py`'s `TransientExclusionError` | the guard against a bad aggregate has no caller outside its test |
+| G11 commit 7's drift detector | commit 8 never wired its counters in |
+
+**The two failure modes are different and both are here.** *Unreachable*:
+no caller, so the code never runs and the tests describe a hypothetical.
+*Unobservable*: the code runs and emits nothing, so a result cannot be
+distinguished from the mechanism never firing — which is exactly the sixth
+empty-selection instance, arrived at from the other direction.
+
+**Why nobody noticed for twelve of them.** Every one has a green test, and a
+green test is the signal this project trusts. Coverage answers *is this code
+correct when called*; nothing in the suite answers *is it called*. The
+G11 drift detector is the cleanest case: it was built, tested, merged, and
+its absence was discovered only when someone wrote the scorer that needed
+its output — i.e. by an unrelated task, not by any check.
+
+**Mechanically, at the moment a mechanism lands, ask two questions and
+write the answers down:**
+
+1. **Who calls this outside a test?** If the answer is "nothing yet", say so
+   in the docstring with the commit that will, or accept it is dormant and
+   label it so — `sim/power.py` and `sim/olla.py` do this correctly and are
+   not part of the problem.
+2. **What in a run's output would differ if it never fired?** If the answer
+   is "nothing", the mechanism is unfalsifiable in situ. Emit a counter, and
+   make sure the counter survives into whatever the campaign persists — five
+   of the twelve above emit one that `RunRecord.from_summary` then drops.
+
+**The cheap check for an existing mechanism is one grep**, and it is worth
+running before quoting any mechanism as active: `grep -rn <name> --include=*.py . | grep -v tests/`.
+If every hit is a test or a comment, the mechanism is not part of any
+result this project has published.
 
 **BEFORE CITING A CHECK AS PASSING, ESTABLISH IT COULD HAVE FAILED.** The
 same shape as the journal's dynamic-range rule (`prediction-journal.md`,

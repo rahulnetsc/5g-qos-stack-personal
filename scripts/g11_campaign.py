@@ -136,25 +136,52 @@ class AggregateMemoryGuard(threading.Thread):
     argv is the bootstrap.
     """
 
-    def __init__(self, budget_mb: int, log: Path, poll_s: float = 15.0):
+    def __init__(self, budget_mb: int, log: Path, poll_s: float = 15.0,
+                 min_avail_mb: int = 2_000):
         super().__init__(daemon=True)
         self.budget_mb, self.log, self.poll_s = budget_mb, log, poll_s
+        self.min_avail_mb = min_avail_mb
         self.stop_flag = threading.Event()
         self.tripped = False
+        self.victims: list[int] = []
 
-    def _workers(self) -> list[tuple[int, int]]:
+    # The spawn bootstrap's argv. multiprocessing spawn workers do NOT carry
+    # the script name -- which is why `pkill -f g11_campaign` misses them --
+    # so this is what identifies one.
+    _SPAWN_ARGV = "from multiprocessing.spawn import spawn_main"
+
+    def _workers(self) -> list[tuple[int, int, bool]]:
+        """EVERY spawn worker on this machine, not just our own children.
+
+        The first version filtered on `PPid: <me>`, and that is the same
+        scope defect as the per-process watchdog it replaced, one level
+        out: workers ORPHANED by a previous attempt are reparented to init,
+        so they are invisible to a children-only scan while still consuming
+        the machine's memory. Measured during the 2026-09-03 audit -- two
+        orphans from a killed 2-worker attempt held 13.5 GB and starved the
+        live run to 5.9 GB free, with this guard reporting the pool as
+        healthy the whole time.
+
+        Returns (pid, rss_mb, is_ours). Foreign workers are counted toward
+        the machine total but are never killed -- they may belong to another
+        session, and killing another job's work to protect ours is not this
+        guard's decision to make.
+        """
         me = os.getpid()
         out = []
         for p in Path("/proc").iterdir():
             if not p.name.isdigit():
                 continue
             try:
-                stat = (p / "status").read_text()
-                if f"PPid:\t{me}" not in stat:
+                cmd = (p / "cmdline").read_bytes().decode("utf8", "replace")
+                if self._SPAWN_ARGV not in cmd:
                     continue
+                stat = (p / "status").read_text()
                 rss = [l for l in stat.splitlines() if l.startswith("VmRSS")]
-                if rss:
-                    out.append((int(p.name), int(rss[0].split()[1]) // 1024))
+                if not rss:
+                    continue
+                ours = f"PPid:\t{me}" in stat
+                out.append((int(p.name), int(rss[0].split()[1]) // 1024, ours))
             except (OSError, ValueError):
                 continue
         return out
@@ -162,7 +189,9 @@ class AggregateMemoryGuard(threading.Thread):
     def run(self) -> None:
         while not self.stop_flag.wait(self.poll_s):
             ws = self._workers()
-            total = sum(m for _, m in ws)
+            ours = [(p, m) for p, m, o in ws if o]
+            total = sum(m for _, m, _ in ws)          # machine-wide
+            mine = sum(m for _, m in ours)
             avail = 0
             try:
                 for line in Path("/proc/meminfo").read_text().splitlines():
@@ -171,15 +200,29 @@ class AggregateMemoryGuard(threading.Thread):
             except OSError:
                 pass
             with self.log.open("a") as fh:
-                fh.write(f"{time.strftime('%H:%M:%S')} workers={len(ws)} "
+                fh.write(f"{time.strftime('%H:%M:%S')} workers={len(ours)}"
+                         f"(+{len(ws)-len(ours)} foreign) mine_rss={mine}MB "
                          f"total_rss={total}MB avail={avail}MB\n")
-            if total > self.budget_mb and ws:
-                pid, mb = max(ws, key=lambda x: x[1])
+
+            # TWO trip conditions, because an absolute budget is not enough.
+            # The first version compared the pool's own total against a fixed
+            # number and LOGGED MemAvailable without acting on it, so memory
+            # consumed by anything else -- orphans, another session, the
+            # desktop -- was invisible to the decision.
+            over_budget = mine > self.budget_mb
+            starved = 0 < avail < self.min_avail_mb
+            if (over_budget or starved) and ours:
+                pid, mb = max(ours, key=lambda x: x[1])
+                why = ("our pool total %dMB exceeded budget %dMB" % (mine, self.budget_mb)
+                       if over_budget else
+                       "machine MemAvailable %dMB fell below floor %dMB "
+                       "(total spawn RSS %dMB, of which %dMB foreign)"
+                       % (avail, self.min_avail_mb, total, total - mine))
                 self.tripped = True
+                self.victims.append(pid)
                 with self.log.open("a") as fh:
                     fh.write(f"{time.strftime('%H:%M:%S')} KILL pid={pid} "
-                             f"({mb}MB) -- pool total {total}MB exceeded "
-                             f"budget {self.budget_mb}MB\n")
+                             f"({mb}MB) -- {why}\n")
                 try:
                     os.kill(pid, 9)
                 except OSError:
@@ -243,17 +286,72 @@ def main() -> int:
     guard.start()
     t0 = time.time()
     results: list[dict] = []
+    failures: list[dict] = []
+    # A KILLED WORKER MUST PRODUCE A RECORDED FAILURE, NOT A GAP.
+    # `imap_unordered` never yields a result for a task whose worker was
+    # SIGKILLed -- no exception, no retry, and the iterator can block
+    # forever. That is the guard's own failure mode being the thing it was
+    # built to prevent: a run that neither completes nor reports. So each
+    # task is submitted individually and collected with a TIMEOUT, and a
+    # task that dies or overruns is written to the log and to a failures
+    # list rather than silently vanishing from the denominator.
+    #
+    # The timeout is derived from the horizon, not guessed: a run is ~1
+    # wall-second per 4,000 slots on the slowest arm at N=4, and 4x that
+    # plus an hour is generous enough that a healthy run can never trip it.
+    per_task_timeout_s = max(1800.0, horizon / 4_000.0 * 4.0 + 3600.0)
     with mp.get_context("spawn").Pool(a.workers) as pool:
-        for i, res in enumerate(pool.imap_unordered(run_one, todo), 1):
-            results.append(res)
-            with done_path.open("a") as fh:
-                fh.write(json.dumps(res) + "\n")
-            with log.open("a") as fh:
-                fh.write(f"  {i}/{len(todo)} {res['arm']}/seed{res['seed']}"
-                         f"/p{res['permutation']} wall={res['wall_s']}s "
-                         f"rss={res['peak_rss_mb']}MB "
-                         f"windows={res['n_windows']} "
-                         f"elapsed={(time.time()-t0)/60:.1f}m\n")
+        submitted = [(task, pool.apply_async(run_one, (task,))) for task in todo]
+        with log.open("a") as fh:
+            fh.write(f"submitted {len(submitted)} task(s); per-task timeout "
+                     f"{per_task_timeout_s/60:.0f} min\n")
+        done_n = 0
+        remaining = list(submitted)
+        while remaining:
+            progressed = False
+            for entry in list(remaining):
+                task, ar = entry
+                if not ar.ready():
+                    continue
+                remaining.remove(entry)
+                progressed = True
+                done_n += 1
+                arm, seed, _, _, perm = task
+                try:
+                    res = ar.get(timeout=1)
+                except Exception as exc:                     # noqa: BLE001
+                    fail = {"arm": arm, "seed": seed, "permutation": perm,
+                            "failed": True, "error": f"{type(exc).__name__}: {exc}"}
+                    failures.append(fail)
+                    with log.open("a") as fh:
+                        fh.write(f"  {done_n}/{len(submitted)} FAILED "
+                                 f"{arm}/seed{seed}/p{perm}: {fail['error']}\n")
+                    continue
+                results.append(res)
+                with done_path.open("a") as fh:
+                    fh.write(json.dumps(res) + "\n")
+                with log.open("a") as fh:
+                    fh.write(f"  {done_n}/{len(submitted)} {res['arm']}/seed{res['seed']}"
+                             f"/p{res['permutation']} wall={res['wall_s']}s "
+                             f"rss={res['peak_rss_mb']}MB "
+                             f"windows={res['n_windows']} "
+                             f"elapsed={(time.time()-t0)/60:.1f}m\n")
+            if remaining and not progressed:
+                if time.time() - t0 > per_task_timeout_s * len(submitted):
+                    for task, _ in remaining:
+                        arm, seed, _, _, perm = task
+                        failures.append({"arm": arm, "seed": seed,
+                                         "permutation": perm, "failed": True,
+                                         "error": "never returned -- worker "
+                                                  "killed, or hung past the "
+                                                  "per-task timeout"})
+                        with log.open("a") as fh:
+                            fh.write(f"  ABANDONED {arm}/seed{seed}/p{perm} "
+                                     f"-- no result; guard victims="
+                                     f"{guard.victims}\n")
+                    break
+                time.sleep(5)
+        pool.terminate()
     guard.stop_flag.set()
 
     if a.time_cell:
@@ -280,6 +378,8 @@ def main() -> int:
         "n_ues": a.n_ues, "horizon_slots": horizon,
         "window_s": WINDOW_S, "seeds": seeds,
         "memory_guard_tripped": guard.tripped,
+        "memory_guard_victims": guard.victims,
+        "failed_runs": failures,
         "scripted_windows": {k: [list(x) for x in v] for k, v in
                              scripted_windows(horizon * SLOT_S).items()},
         "runs": results,
@@ -287,7 +387,17 @@ def main() -> int:
     with log.open("a") as fh:
         fh.write(f"DONE {len(results)}/{n_real_runs} runs in "
                  f"{(time.time()-t0)/60:.1f} min; guard tripped="
-                 f"{guard.tripped}\n")
+                 f"{guard.tripped}; victims={guard.victims}; "
+                 f"failures={len(failures)}\n")
+    if failures:
+        # Loud, and non-zero exit: a short campaign must not be scored as a
+        # complete one. Per-run resume means re-invoking picks up only the
+        # missing runs.
+        with log.open("a") as fh:
+            fh.write(f"INCOMPLETE: {len(failures)} run(s) failed -- "
+                     f"{[(f['arm'], f['seed']) for f in failures]}. "
+                     f"Re-invoke to resume; completed runs are banked.\n")
+        return 1
     return 0
 
 
