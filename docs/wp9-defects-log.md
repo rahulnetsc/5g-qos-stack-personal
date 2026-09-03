@@ -5,8 +5,26 @@ already-committed result turns up *while doing something else*, **log it
 here and keep going.** Corrections are made in a **single pass across
 several findings**, not inline at the moment of discovery.
 
-**The one exception, and it should be rare: anything that would change a
-VERDICT rather than a number is fixed immediately.** A wrong number is
+**The boundary, stated as a test rather than a feeling: BATCH findings about
+RESULTS; FIX IMMEDIATELY anything that gates the NEXT ACTION.**
+
+- A wrong number in a finished result is read by whoever reads that line.
+  It waits for the batch.
+- A defect that gates what happens next — a guard an unattended run depends
+  on, a prerequisite without which the next commit cannot be verified —
+  cannot wait, because the thing it gates happens before the batch does.
+
+**Worked both ways, once each, on the same day.** The aggregate memory guard
+(#14) was **not** batched: it was a prerequisite for an unattended
+multi-hour run's safety, not a defect in a finished number — and the first
+real-horizon run tripped it, which is what "gates the next action" means in
+practice. The memory attribution (#15) **stays** batched by the same test:
+it gates nothing, the run fits without it, and chasing it would be depth on
+a number that does not matter.
+
+**The older phrasing — "anything that would change a VERDICT rather than a
+number" — is the same test read from the results side**, and both are kept
+because each catches cases the other states less clearly. A wrong number is
 read by whoever reads that line; a wrong verdict propagates into what the
 campaign does next.
 

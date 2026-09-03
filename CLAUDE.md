@@ -436,6 +436,40 @@ separating: a caveat qualifies a computed value, and here the value was
 right. The catch has to happen one level up, at "did the thing I am
 measuring actually occur?".
 
+**A MEASUREMENT CARRIES ITS CONFIGURATION. QUOTING IT OUTSIDE THAT
+CONFIGURATION IS A CATEGORY ERROR, NOT AN ESTIMATE.** Not "an approximation
+that might be off" — a statement about a different system, which is why the
+errors are large and one-directional rather than noisy.
+
+**Three instances, and the third cost a 3× and a 4× error in one week:**
+
+| the measurement | the configuration it was taken in | where it was quoted | error |
+|---|---|---|---|
+| §13's cost model `4.48 × flows^1.09` | **fleet-builder** compositions | the parametric `factory` mix | 1.23–1.87× low |
+| §6.3a's timing table | horizon **4,000**, `record_timeseries` **off** | horizon 20,000 with it **on** | 5–7× low |
+| **G11's 2.83 GiB/run** | **N=8**, `record_timeseries=False`, **no** fold, **no** scripted flows | N=4 **with** fold and scripted flows | **~3× low** |
+| **G11's "hol samples are 49 % of the residual"** | the same configuration | the real scenario, where it measures **12 %** | **~4× off, and it named the wrong lever** |
+
+**The last two are one week apart and both were mine.** The second is the
+more instructive: 49 % made `array("d")` look like the memory lever worth
+spending a commit on, and it is worth ~12 % — so the number did not merely
+mis-size a budget, **it pointed at the wrong fix.**
+
+**Why "category error" and not "stale number".** A stale number gets closer
+as you refine it. This one does not: `record_timeseries=False` and
+`record_timeseries="second"` are not near-neighbours on a scale, they are
+different runs. There is no error bar that makes the quote defensible,
+which is why the mitigation is not "add uncertainty" but **re-measure in
+the configuration you are about to use**, or state the configuration
+alongside the number so the reader can see the mismatch you could not.
+
+**Mechanically, and it is one line at the point of use:** when quoting a
+measured number, name the configuration it came from **in the same
+sentence**. If that configuration differs from the one being budgeted, the
+number is a lower or upper bound at best, and §16.1.4's "lower bound"
+framing is what has repeatedly saved this project from acting on one — the
+safety came from the framing, not from the model being right.
+
 **BEFORE CITING A CHECK AS PASSING, ESTABLISH IT COULD HAVE FAILED.** The
 same shape as the journal's dynamic-range rule (`prediction-journal.md`,
 third form rule) but applied to a **verification step** rather than to an
@@ -513,6 +547,22 @@ it manifests at (a value, a layer, an aggregate), and confirm the guard
 observes *that* level. For memory: per-process guards catch per-process
 leaks; machine exhaustion across N workers needs an aggregate threshold, or
 a per-worker one derived as `budget ÷ workers`.
+
+**CONFIRMED BY MEASUREMENT ONE COMMIT AFTER THE ARGUMENT WAS MADE.** G11's
+runner replaced the per-process watchdog with an aggregate one on exactly
+this reasoning, and the first real-horizon run tripped it:
+
+```
+00:57:45 workers=4 total_rss=20219MB avail=4001MB
+00:57:45 KILL pid=1517277 (9249MB) -- pool total 20219MB exceeded budget 20000MB
+```
+
+**Largest worker 9,249 MB against a 22 GiB per-process threshold, with
+4.0 GB of machine memory left.** The old guard could not have fired; the
+new one turned an OOM into a measurement. **The argument was made from
+arithmetic before any run — 2.83 GiB × 16 workers against 24 GiB — and the
+run confirmed it**, which is the cheap direction: a scope argument costs a
+sentence, and discovering it from a dead 5-hour job costs the job.
 
 **So the standing rule — run it at scale and ask whether the precondition
 occurs at all — applies to MECHANISMS FIRING, not only to rows selecting.**
