@@ -557,3 +557,150 @@ degradation at ×1.0" disagreed with a per-seed table read minutes earlier —
 not a review of the code. **The scorer had already been read and approved by
 its author.** Reading analysis code does not catch this; decomposing its
 output does.
+
+---
+
+## P1 — `priority_level` derives from the 5QI table (2026-09-03)
+
+**Registered before running anything.**
+
+**The change.** `scheduler/flow.py`: `priority_level` defaults to
+`DERIVE_PRIORITY_FROM_5QI` (-1) and `__post_init__` resolves it via
+`priority_for_5qi(qfi)`, exactly as `lcg == -1` and
+`pdb_ms == DERIVE_PDB_FROM_5QI` already do.
+
+**`--check` BINDS, and this corrects the framing I was given.** The
+instruction registered it as blind *"because the corpus does not call these
+builders"* — true of `sim/parametric.py` and `sim/fleet.py`, but the fix is
+not in either. It is in `FlowConfig.__post_init__`, which **every** corpus
+scenario constructs. Input and change therefore intersect: `--check` would
+fail if any corpus flow's priority moved.
+
+**So the intersection test says the check can fail, and that makes a clean
+result evidence rather than a structural inevitability** — evidence for the
+specific claim that the three published-study scenarios already set
+`priority_level` explicitly and are untouched by the derivation.
+
+**Registered prediction.**
+
+1. `regression_corpus.py --check` — **CLEAN**. Falsifier: any moved record.
+2. The full suite — **at risk, and I expect some failures.** Any test that
+   builds a `FlowConfig` without an explicit `priority_level` and asserts on
+   ordering, Tier-1 weights or the UL LCP split now sees a real priority
+   where it saw 100. A failure here is the change working, not a regression
+   — but each one must be read individually, because a test that was
+   *written* against the constant may have been pinning the defect.
+3. Builder histograms — non-degenerate on every builder. Falsifier: any
+   builder still emitting a single priority level. **This is the binding
+   check**, because it is the only one that reads the population the defect
+   was in.
+
+**Outcome→meaning, fixed in advance.** Clean `--check` + non-degenerate
+histograms = the fix reaches the WP9 builders and leaves the published
+studies alone. Clean `--check` + a still-degenerate builder = the fix did not
+reach the population it was for. A moved `--check` = a corpus scenario was
+relying on the 100 default, which would be a fourth place the defect lived.
+
+### P1 — SCORED
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | `--check` CLEAN, and it BINDS | **HIT** — `OK -- no drift beyond rel_tol=1e-06`. The corpus scenarios set `priority_level` explicitly, so the derivation leaves them untouched. The check could have failed and did not. |
+| 2 | full suite **at risk; some failures expected** | **MISS — 940 passed, 0 failed.** |
+| 3 | builder histograms non-degenerate | **HIT** — `sweep_scenario(8)` {19:8, 20:8, 40:8, 90:8}; `g11 N=4` {19:4, 20:4, 21:1, 40:4, 80:1, 90:4}; `build_fleet(8,mixed)` {19:8, 20:2, 21:2, 22:3, 40:5, 90:6}. Previously `{100: n}` in every case. |
+
+**The MISS is the informative one, and it is not a near-miss.** I predicted
+"some failures" because three mechanisms read `priority_level` —
+`tier1.py::_weight_from_priority`'s Delay threshold, `two_tier.py`'s UL
+urgency weight, `ue_lcp.py`'s uplink LCP sort — and the field went from a
+constant 100 to a real spread across every builder-made scenario. Zero tests
+noticed.
+
+**So the suite does not distinguish those three mechanisms being fed a
+constant from being fed real 3GPP priorities.** That is CLAUDE.md's
+built-but-unobservable shape arriving from the other direction: not a
+mechanism with no caller, but three mechanisms with callers and **no test
+whose result depends on their input being meaningful**. It is also why the
+defect survived: coverage answers *is this code correct when called*, and
+nothing asked *is it called with anything but a constant*.
+
+**Recorded as a gap, not fixed here** — a discriminating test for each of the
+three is its own commit, and bundling it would defeat the attribution this
+commit exists for.
+
+## P2 — M20's caveat forwarding and M22's addition (2026-09-03)
+
+**`--check` is BLIND to both, and this is the §10-commit-1 shape, so it is
+declared rather than discovered.** `regression/baseline_studies_1_3.json`
+stores `RunRecord`s — `flows`, `system`, `timeseries_*`, `join_events` — and
+**no scorecard output at all**. Both changes are in `sim/scorecard.py`. The
+input the check reads and the artefact the change touches do not intersect,
+so a clean `--check` here is **zero evidence** and must not be cited as
+verification. (This is exactly the trap `docs/wp9-g11-plan.md` §10 fell into
+for the M09 hoist, corrected in `ac8c5cc`.)
+
+**What BINDS instead:**
+
+1. `sim/tests/test_scorecard.py`'s caveat test derives the caveat-carrying
+   metric set **from the panel** (`{m["id"] for m in load_panel()["metrics"]
+   if m.get("caveats")}`), so adding M22's caveat changes that set. If the
+   test had hard-listed the ids — as it did until WP9 Step 2 — it would have
+   kept passing while checking less than it claimed.
+2. `sim/tests/test_m22_starvation.py`'s **pairing** guard: non-zero on a
+   starved flow AND zero on a served one, same fixture shape. Either half
+   alone passes for a broken metric (count-everything, or count-nothing).
+3. The M20 probe: same flow, same value, caveat count 1 → 2.
+
+**Registered: full suite green, `--check` clean and MEANINGLESS.**
+
+## P3 — does the priority fix explain G12's declaration-order confound? (2026-09-03)
+
+**Registered before Phase 2 runs. My first hypothesis is already REFUTED by
+a read, and it is recorded because it was the obvious one.**
+
+**Hypothesis (refuted).** `sim/ue_lcp.py:95` sorts a UE's uplink flows by
+`priority_level`; on a constant key Python's stable sort preserves input
+order, so the intra-TB split was declaration-ordered — proposed as *the*
+mechanism behind G12's `[2, 4]` inversion.
+
+**Why it cannot be, checked rather than assumed:** `ue_lcp` orders flows
+**within one UE's transport block**, and in `build_fleet(8, "mixed")`
+**zero UEs carry both 5QI 2 and 5QI 4 on the uplink**. The two classes G12's
+order is about never contend inside a transport block, so this sort never
+ranks them against each other. The mechanism is real and it is not this one.
+
+**What the fix DOES change for those two classes, quantified:**
+
+| 5QI | priority | Tier-1 weight | TwoTier UL urgency weight, before → after |
+|---|---|---|---|
+| 82 | 19 | Delay 5.0 | 0.350 → **0.869** |
+| 1 | 20 | Delay 5.0 | 0.350 → **0.861** |
+| 2 | 40 | PF 1.0 | 0.350 → **0.715** |
+| 4 | 50 | PF 1.0 | 0.350 → **0.642** |
+| 9 | 90 | PF 1.0 | 0.350 → 0.350 |
+
+Two separate readings, and they disagree, which is why both are stated:
+
+- **Tier-1 still does not separate 5QI 2 from 5QI 4** — the Delay threshold
+  is `p <= 20` and both are above it, so both keep `_PF_WEIGHT`. Whatever
+  else changed, this did not.
+- **TwoTier's UL urgency now separates them** — 0.715 against 0.642 where
+  both were previously clamped to the floor 0.35. That inter-class
+  difference **did not exist in any published WP9 number.**
+
+**Registered prediction, falsifiable.** Lower `priority_level` is higher
+priority, so 5QI 2 is now favoured over 5QI 4 in TwoTier's UL urgency.
+**If that term is what carries the order, G12's Region-2 sequence on TwoTier
+should move toward `[4, 2]` — 5QI 4 degrading first — where the canonical
+declaration order previously produced `[2, 4]`.**
+
+**Outcome→meaning, fixed in advance.** Order flips to `[4, 2]` = the urgency
+weight is a live lever on the ordering and the previous result was measured
+with it disabled. Order stays `[2, 4]` = the ordering does not come from
+this term, and declaration order remains the standing candidate with one
+sub-mechanism (`ue_lcp`) now eliminated. **Order becomes unstable across
+seeds = the previous stability was itself an artefact of the constant.**
+
+**This is a prediction about a MEASUREMENT, not a conclusion.** It is
+registered here so Phase 2 scores it either way, per the rule that a
+prediction exercise only cited when it is right is not one.

@@ -163,3 +163,74 @@ to move any number.
 **Nine defects, four of them verdict-changing.** The five that were not
 would all have been fine to batch; the four that were are why the exception
 exists.
+
+---
+
+## #17 — THE MEMORY BUDGET WAS MEASURED ON A DIFFERENT RUN, AND THE CAUSE IS FIXED (2026-09-03)
+
+**This retracts #10, #13 and #15's figures, and the regime map's, and the
+handover's, and `wp9-g11-plan.md` §7.3's.** Not refined — retracted. They
+describe a configuration the campaign does not use.
+
+**The provenance.** Every published per-run figure for G11 —
+`~48 GiB` / `~24 GiB` (regime map G11 row, `HANDOVER` §5.1,
+`wp9-g11-plan.md` §7.3, `wp9-plan.md` §6.3), `2.83 GiB` (#13, CLAUDE.md),
+`~6–9 GB` (#15) — traces to `sweeps/wp9/g11_probes/g11_probe_session1.py`.
+That probe builds **`sweep_scenario` at N=8** and calls `run(...)` with **no
+`window_sink` and no `window_slots`**. The campaign builds
+**`build_g11_scenario` at N=4, windowed, with ledger eviction and a
+retaining sink**. These are different runs. CLAUDE.md's own
+measurement-carries-its-configuration rule, for the fourth time, and the
+first three are in the same table.
+
+**#15 is additionally wrong on its own terms.** Its "~6–9 GB" comes from the
+largest worker of a 3-arm probe **observed mid-run and then killed** — a
+lower bound on a partial run, quoted as a per-run requirement. The one
+completed real-horizon measurement is `g11_horizon_battery.time`:
+`Maximum resident set size 22,851,440 KB` with `Exit status: 137`, i.e.
+**21.8 GiB and SIGKILLed at the 22 GiB threshold** — and that is the N=8
+unwindowed probe, not the campaign either.
+
+**Measured on the actual campaign path** (PF, N=4, `record_timeseries=True`,
+`timeseries_resolution="second"`, `window_slots=240000`, one mode per
+process because `ru_maxrss` is a high-water mark):
+
+| horizon | windows | completions | sink DROPS | sink KEEPS |
+|---|---|---|---|---|
+| 240,000 | 1 | 1,047,766 | 468.9 MiB | 470.7 MiB |
+| 480,000 | 2 | 2,095,774 | 519.8 MiB | 868.0 MiB |
+
+At one window the sink fires once at the end and costs nothing; at two, one
+window's completions are held while the next accumulates — **~348 bytes per
+retained completion.** The driver side is nearly flat (~212 MiB/M-slot on a
+~418 MiB intercept): commit 2's eviction works. **The sink was undoing it.**
+
+**Extrapolated to 7,200,000 slots — stated as an extrapolation, from two
+points:** driver ≈ **1.9 GB**, retained completions ≈ **10.6 GB**. So ~85 %
+of a run was `run_one`'s `pending` dict.
+
+**FIXED, and the fix is verified row-identical.** `run_one` now scores the
+completion-family metrics inside the sink and releases the batch;
+`windowed_metrics` grew a `families` selector so there is one code path, not
+two spellings. Measured at 480,000 slots: **peak RSS 877.1 → 556.0 MiB, and
+18 of 18 rows byte-identical.**
+
+**The operative numbers now, and their configuration, in the same sentence:**
+on the campaign path at N=4 with `record_timeseries=True` and the fold at
+`"second"`, a 7.2 M-slot run should cost **≈2 GB**, extrapolated from
+240k/480k measurements — which takes the affordable worker count within a
+22 GB budget from ~1 to ~10. **This has not yet been measured at the real
+horizon**, and it is the first thing the next real-horizon probe should
+confirm, because it is itself an extrapolation and this row exists because
+of one.
+
+**A guard landed with it, and it fired on its first run** — which is the
+point of adding it. `run_one` now compares the scenario's flow keys against
+the record's, because the two metric families are scored against different
+flow lists. It raised immediately on `ue1_qfi8` / `ue2_qfi85`: GT-7.1's
+firmware push (T+600 s) and STOP drill (T+1200 s) generate nothing on a
+120 s probe, so they never enter `record.flows`. That direction is benign
+and the guard is now directional — record-only keys raise, scenario-only
+keys are **emitted as `flows_declared_but_silent`**, because "a scripted
+flow that generated nothing" is exactly the did-the-mechanism-fire question
+and belongs in the artefact rather than in an assertion that stayed quiet.

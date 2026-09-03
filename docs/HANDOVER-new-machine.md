@@ -285,7 +285,7 @@ cross-seed claims §6.3 currently rules out of bounds.
 > wrong about the constraint.**
 >
 > **G11 was not runnable as specified at ANY seed count, on either
-> machine.** At GT-7.1's 7.2 M-slot horizon one run needs **~48 GiB** with
+> machine.** **RETRACTED — see `docs/wp9-defects-log.md` #17; the figure below was measured at N=8 with no window sink, not on the campaign path, and the dominant term has since been removed.** At GT-7.1's 7.2 M-slot horizon one run needs **~48 GiB** with
 > `record_timeseries=True` — which G8/M09 requires — against **30 GB on
 > both hosts**; ~24 GiB with the timeseries off, and a guarded run of the
 > cheapest arm was killed at **21.8 GiB with 2.4 GB left**.

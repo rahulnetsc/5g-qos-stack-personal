@@ -4842,7 +4842,14 @@ future.
 offered load ×1.0, evaluated on the **protected fleet** (M20's restriction,
 excluding 5QIs 8 and 9).
 
-### 28.1 THE RESULT: G6 PASSES on the protected fleet, on every arm, on both statistics
+### 28.1 THE RESULT: G6 PASSES on the protected fleet on M02, on every arm; M20 is INCONCLUSIVE on TwoTier
+
+> **The heading read "on both statistics" until 2026-09-03.** That is
+> the claim defect-log #3 corrected — M20 on TwoTier is **+29.35 %
+> [+4.81, +56.18]**, an interval EXCLUDING zero and STRADDLING the
+> +20 % bar, i.e. INCONCLUSIVE. The body below carried the correction
+> from `1cc4dbc`; the heading above it did not, so a reader scanning
+> headings got the retracted claim.
 
 **Background traffic does not impair the fleet.** Neither statistic that
 appeared to fail G6 does so once it is measured on the bearers G6 is about:
@@ -6264,8 +6271,12 @@ is G12's own inversion — on every arm.**
 same table.** §35.5 measured the same workload under a permuted flow list
 giving the *conforming* order instead. **On its own the inversion reads as a
 scheduler finding and it is not established as one.** The registered wording
-is that the Region-2 verdict is *currently a property of declaration order*,
-and the regime map's G12 row carries that qualifier inline — the same
+is that the Region-2 verdict is **not established as a scheduler property and
+is consistent with a declaration-order artefact** — a NON-establishment, not a
+positive causal claim (this site still carried the hardened form *"is
+currently a property of declaration order"* until 2026-09-03, the same
+overclaim `38248f9` corrected elsewhere) — and the regime map's G12 row
+carries that qualifier inline — the same
 discipline as M19's standing caveat and §34.5's bias note, both of which
 exist because a number without its qualifier travels further than the
 qualifier does.

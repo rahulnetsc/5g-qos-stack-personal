@@ -908,7 +908,7 @@ is the run that closes that gap.
 count, on either machine.** `record_timeseries=True` is not optional — the
 sweep sets it by default because *"M04/M09/M19 are `pending` without it"*
 (`wp9_sweep.py:101`) and C1's G8 conjunct **is** M09. At 7.2 M slots that
-run extrapolates to **~48 GiB on a 30 GiB host.**
+run extrapolates to **~48 GiB on a 30 GiB host.** **RETRACTED 2026-09-03 (`docs/wp9-defects-log.md` #17):** that extrapolation is from an N=8 probe with no window sink, and ~85 % of the campaign's real per-run cost was the runner retaining every window's completions — now fixed, ≈2 GB expected.
 
 The 3-seed deviation was taken to fit a 21-hour *time* budget. **The
 binding constraint is memory, it is ~1.6× the whole machine, and it would
