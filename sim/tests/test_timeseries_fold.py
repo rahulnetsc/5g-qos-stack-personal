@@ -27,7 +27,7 @@ from sim.baselines.pf import ProportionalFair
 from sim.driver import run
 from sim.parametric import sweep_scenario
 from sim.run_record import RunRecord
-from sim.scorecard import Scorecard
+from sim.scorecard import Population, Scorecard
 
 HORIZON = 20_000          # 5.0 s at numerology 2
 
@@ -74,7 +74,7 @@ def test_level_series_are_absent_not_summed():
 
 
 def test_M04_M19_M21_report_pending_not_a_misread_aggregate():
-    scores = Scorecard().score(_rec("second"))
+    scores = Scorecard().score(_rec("second"), population=Population.all_flows())
     for mid in ("M04", "M19", "M21"):
         assert scores[mid].status == "pending", (
             f"{mid} is {scores[mid].status!r} with value {scores[mid].value!r} "
@@ -90,7 +90,7 @@ def test_the_slot_default_is_completely_unchanged():
         "record in the frozen corpus changes shape")
     for fr in slot.flows.values():
         assert fr.ts_hol_delay_s is not None
-    scores = Scorecard().score(slot)
+    scores = Scorecard().score(slot, population=Population.all_flows())
     assert scores["M04"].status != "pending" or not slot.has_timeseries()
 
 

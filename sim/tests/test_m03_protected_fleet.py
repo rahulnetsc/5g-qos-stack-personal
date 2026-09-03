@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sim.run_record import RunRecord  # noqa: E402
-from sim.scorecard import Scorecard  # noqa: E402
+from sim.scorecard import Population, Scorecard  # noqa: E402
 
 
 def _flow(ue_id, qfi, gaps_s, flow_class="Delay", direction="UL"):
@@ -78,7 +78,7 @@ AGGRESSOR_RECORD = _record({
 def test_m03_still_reports_the_aggressor_semantics_unchanged():
     """M03 must NOT change. Its domain is every flow, by definition, and a
     historical reading has to keep meaning what it meant."""
-    res = Scorecard().score(AGGRESSOR_RECORD)["M03"]
+    res = Scorecard().score(AGGRESSOR_RECORD, population=Population.all_flows())["M03"]
     assert res.value["flow"] == "ue8_qfi8"
     assert abs(res.value["max_gap_ms"] - 2300.0) < 1e-6
 
@@ -126,14 +126,14 @@ def test_m03_flags_cadence_when_the_flow_is_slower_than_the_bound():
     failing (docs/wp9-plan.md §24.6). The caveat is derived from the flow's
     OWN median gap, so it fires for any slow flow from any producer."""
     rec = _record({"ue1_qfi1": _flow(1, 1, [1.00, 1.00, 1.05])})
-    res = Scorecard().score(rec)["M03"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M03"]
     assert res.value["median_gap_ms"] == 1000.0
     assert any("CADENCE, NOT LIVENESS" in c for c in res.caveats), res.caveats
 
 
 def test_m03_does_not_flag_cadence_for_a_normal_flow():
     rec = _record({"ue1_qfi1": _flow(1, 1, [0.10, 0.10, 0.60])})
-    res = Scorecard().score(rec)["M03"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M03"]
     assert abs(res.value["max_gap_ms"] - 600.0) < 1e-6, "a real gap above the bound"
     assert res.value["median_gap_ms"] == 100.0
     assert not any("CADENCE" in c for c in res.caveats), \
@@ -144,6 +144,6 @@ def test_panel_caveats_and_data_caveats_both_travel():
     """The panel loop used to ASSIGN caveats, discarding any a metric method
     had attached from the run's own data."""
     rec = _record({"ue1_qfi1": _flow(1, 1, [1.00, 1.00])})
-    results = Scorecard().score(rec)
+    results = Scorecard().score(rec, population=Population.all_flows())
     assert any("CADENCE" in c for c in results["M03"].caveats)
     assert results["M01"].caveats, "M01's registered panel caveat must survive"

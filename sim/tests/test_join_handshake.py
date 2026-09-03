@@ -15,7 +15,7 @@ from sim.driver import run
 from sim.join import JoinConfig, JoinEvent
 from sim.messages import MessageLedger
 from sim.run_record import RunRecord
-from sim.scorecard import Scorecard
+from sim.scorecard import Population, Scorecard
 from sim.traffic import TrafficModel
 from sim.baselines.round_robin import RoundRobin
 from scheduler.flow import FlowConfig
@@ -155,7 +155,7 @@ def test_m18_reports_a_real_completed_warm_path_event_not_just_synthetic_ones():
         scenario_name=sc.name, scheduler_name="RR", seed=sc.seed,
         flow_configs=sc.flows, summary=summary,
     )
-    res = Scorecard().score(rec)["M18"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M18"]
     assert res.status == "ok"
     warm = res.value["by_path"]["warm"]
     assert warm["n_events"] == 1
@@ -172,7 +172,7 @@ def test_m19_promoted_to_proxy_and_computes_on_a_real_completed_event():
         scenario_name=sc.name, scheduler_name="RR", seed=sc.seed,
         flow_configs=sc.flows, summary=summary,
     )
-    res = Scorecard().score(rec)["M19"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M19"]
     assert res.status == "proxy"  # commit 6's promotion, checked against the actual panel file
     warm = res.value["by_path"]["warm"]
     assert warm["n_events"] == 1

@@ -32,7 +32,7 @@ import numpy as np
 from sim.config import ScenarioConfig
 from sim.driver import run
 from sim.run_record import RunRecord
-from sim.scorecard import MetricResult, Scorecard
+from sim.scorecard import MetricResult, Population, Scorecard
 from scheduler.interfaces import Scheduler
 
 
@@ -182,7 +182,25 @@ def sweep(
                     run_sink(rec, axis_values, summary)
                 if record_sink is not None:
                     record_sink(rec, axis_values)
-                scores = scorecard.score(rec, **metric_overrides)
+                # BOTH POPULATIONS, EVERY ROW. Scorecard.score() now requires
+                # an explicit population because a worst-flow statistic has
+                # no meaning without one, and on a measured N=8 run the two
+                # give OPPOSITE VERDICTS on G1 and G8 (sim/scorecard.py::
+                # Population). Emitting one would just re-make the choice
+                # silently, one layer out.
+                #
+                # ADD BESIDE, NEVER REDEFINE -- the same disposition WP9
+                # Step 2 used for M20 against M03. The unsuffixed columns
+                # keep meaning exactly what they have always meant
+                # (all-flow), so no analyser or committed artefact changes
+                # interpretation; the protected-fleet reading arrives as new
+                # `.prot.` columns. A `.population` column records which is
+                # which, so a reader never has to know the convention.
+                scores = scorecard.score(
+                    rec, population=Population.all_flows(), **metric_overrides)
+                scores_prot = scorecard.score(
+                    rec, population=Population.protected_fleet(),
+                    **metric_overrides)
                 row: dict[str, Any] = {
                     **axis_values,
                     "scheduler": sched_name,
@@ -190,10 +208,19 @@ def sweep(
                 }
                 for mid, res in scores.items():
                     row[f"{mid}.status"] = res.status
+                    if res.population is not None:
+                        row[f"{mid}.population"] = res.population
                     if isinstance(res.value, dict):
                         row.update(_flatten({mid: res.value}))
                     else:
                         row[mid] = res.value
+                for mid, res in scores_prot.items():
+                    if res.population is None:
+                        continue          # system-level: one value, no subset
+                    if isinstance(res.value, dict):
+                        row.update(_flatten({f"{mid}.prot": res.value}))
+                    else:
+                        row[f"{mid}.prot"] = res.value
                 rows.append(row)
     return rows
 

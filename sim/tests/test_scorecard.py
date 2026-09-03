@@ -4,7 +4,7 @@ import pytest
 
 from sim.driver import run
 from sim.run_record import FlowRecord, JoinEventRecord, RunRecord, SystemRecord
-from sim.scorecard import Scorecard, load_panel
+from sim.scorecard import Population, Scorecard, load_panel
 from sim.scenarios import smoke_scenario, factory_robots_scenario
 from sim.baselines.pf import ProportionalFair
 
@@ -115,7 +115,7 @@ def test_caveats_travel_with_the_value_for_registered_metrics_only():
     WP-Join commit 8 (the hol-delay-vs-continuous-PDB-drops finding)."""
     rec, _ = _record()
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     # DERIVED from the panel, not hardcoded: a hand-listed set of
     # caveat-carrying ids is a count-in-prose that drifts the moment a
     # metric gains or loses a caveat (CLAUDE.md's derive-it rule). It did:
@@ -134,7 +134,7 @@ def test_caveats_travel_with_the_value_for_registered_metrics_only():
 def test_score_emits_every_scoreable_metric_row():
     rec, _ = _record()
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     # M13 and M16 need extra args and are called separately -- not part of
     # the automatic per-run scan.
     expected = set(PANEL_IDS) - {"M13", "M16"}
@@ -149,7 +149,7 @@ def test_score_emits_every_scoreable_metric_row():
 def test_pending_metrics_are_pending_without_timeseries():
     rec, _ = _record(record_timeseries=False)
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     for mid in ("M04", "M09"):
         assert results[mid].status == "pending"
         assert results[mid].value is None
@@ -158,7 +158,7 @@ def test_pending_metrics_are_pending_without_timeseries():
 def test_proxy_metrics_populate_with_timeseries():
     rec, _ = _record(record_timeseries=True)
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     assert results["M04"].status == "proxy"
     assert results["M04"].value is not None
     assert results["M09"].status in ("proxy",)
@@ -169,7 +169,7 @@ def test_proxy_metrics_populate_with_timeseries():
 def test_m07_and_m08_gbr_metrics_are_internally_consistent():
     rec, sc_cfg = _record(scenario_fn=factory_robots_scenario)
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     gbr_flows = rec.flows_by(flow_class="GBR")
     if not gbr_flows:
         pytest.skip("factory_robots_scenario has no GBR flows in this config")
@@ -186,7 +186,7 @@ def test_m07_and_m08_gbr_metrics_are_internally_consistent():
 def test_m11_and_m12_match_system_record_exactly():
     rec, _ = _record()
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     assert results["M11"].value == {
         "dl": rec.system.dl_prb_utilization,
         "ul": rec.system.ul_prb_utilization,
@@ -200,7 +200,7 @@ def test_m02_pdb_violation_rate_matches_hand_computation():
     for why bytes_arrived would be wrong."""
     rec, _ = _record()
     sc = Scorecard()
-    results = sc.score(rec)
+    results = sc.score(rec, population=Population.all_flows())
     total_delivered = sum(f.bytes_delivered for f in rec.flows.values())
     total_dropped = sum(f.bytes_dropped_pdb for f in rec.flows.values())
     total_late = sum(f.bytes_delivered_late_pdb for f in rec.flows.values())
@@ -238,7 +238,7 @@ def test_m02_excludes_bytes_still_queued_at_horizon_end():
         f"fraction, got {still_queued}/{total_arrived}"
     )
 
-    results = Scorecard().score(rec)
+    results = Scorecard().score(rec, population=Population.all_flows())
     resolved_rate = (total_dropped + total_late) / (total_delivered + total_dropped)
     wrong_rate_against_arrived = (total_dropped + total_late) / total_arrived
     assert abs(results["M02"].value - resolved_rate) < 1e-9
@@ -248,14 +248,14 @@ def test_m02_excludes_bytes_still_queued_at_horizon_end():
 
 def test_m01_flips_to_ok_and_uses_true_latency_when_every_flow_has_it():
     rec = _run_record([_flow_record("1", message_count=50, delay_p50=2.0, delay_p99=9.0)])
-    res = Scorecard().score(rec)["M01"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M01"]
     assert res.status == "ok"
     assert res.value["p99"] == 9.0
 
 
 def test_m01_falls_back_to_proxy_for_a_pre_wp7_record():
     rec = _run_record([_flow_record("1", message_count=None, proxy_p50=2.0, proxy_p99=9.0)])
-    res = Scorecard().score(rec)["M01"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M01"]
     assert res.status == "proxy"
     assert res.value["p99"] == 9.0
 
@@ -268,7 +268,7 @@ def test_m01_excludes_a_chronically_stalled_flow_from_worst():
     stalled = _flow_record("1", message_count=0, delay_p50=0.0, delay_p99=0.0)
     healthy = _flow_record("2", message_count=10, delay_p50=3.0, delay_p99=7.0)
     rec = _run_record([stalled, healthy])
-    res = Scorecard().score(rec)["M01"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M01"]
     assert res.status == "ok"
     assert res.value["flow"] == healthy.key
     assert res.value["p99"] == 7.0
@@ -278,7 +278,7 @@ def test_m01_excludes_a_chronically_stalled_flow_from_worst():
 def test_m01_notes_when_every_flow_is_stalled():
     stalled = _flow_record("1", message_count=0)
     rec = _run_record([stalled])
-    res = Scorecard().score(rec)["M01"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M01"]
     assert res.status == "ok"
     assert res.value["flow"] is None
     assert "excluded" in res.note
@@ -288,7 +288,7 @@ def test_m15_excludes_a_chronically_stalled_flow_from_worst():
     stalled = _flow_record("1", message_count=0, delay_p50=0.0, delay_p99=0.0)
     healthy = _flow_record("2", message_count=10, delay_p50=1.0, delay_p99=6.0)
     rec = _run_record([stalled, healthy])
-    res = Scorecard().score(rec)["M15"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M15"]
     assert res.status == "ok"
     assert res.value["flow"] == healthy.key
     assert res.value["jitter_ms"] == pytest.approx(5.0)
@@ -299,7 +299,7 @@ def test_m03_is_pending_for_a_pre_wp7_commit4_record():
     defaults, which don't set it) -- the same never-None-post-commit-4
     convention message_count uses for M01."""
     rec = _run_record([_flow_record("1", message_count=10)])
-    res = Scorecard().score(rec)["M03"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M03"]
     assert res.status == "pending"
     assert res.value is None
 
@@ -308,7 +308,7 @@ def test_m03_computes_max_gap_and_reports_the_t_live_it_used():
     fr = _flow_record("1", message_count=3,
                        completion_ts_by_role_s={"data": [0.0, 1.0, 3.0]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M03"]  # default t_live_s = 2.0 (panel)
+    res = Scorecard().score(rec, population=Population.all_flows())["M03"]  # default t_live_s = 2.0 (panel)
     assert res.status == "ok"
     assert res.value["flow"] == fr.key
     assert res.value["role"] == "data"
@@ -323,7 +323,7 @@ def test_m03_respects_a_t_live_s_override():
     fr = _flow_record("1", message_count=3,
                        completion_ts_by_role_s={"data": [0.0, 1.0, 3.0]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec, t_live_s=0.5)["M03"]
+    res = Scorecard().score(rec, population=Population.all_flows(), t_live_s=0.5)["M03"]
     assert res.value["t_live_s"] == pytest.approx(0.5)
     assert res.value["gap_count_over_t_live"] == 2  # both gaps (1.0, 2.0) > 0.5
 
@@ -338,7 +338,7 @@ def test_m03_excludes_a_role_with_fewer_than_two_completions_from_worst():
     noisy = _flow_record("2", message_count=5,
                           completion_ts_by_role_s={"telemetry": [0.0, 0.05, 5.0]})
     rec = _run_record([silent, noisy])
-    res = Scorecard().score(rec)["M03"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M03"]
     assert res.status == "ok"
     assert res.value["flow"] == noisy.key
     assert res.value["role"] == "telemetry"
@@ -353,21 +353,21 @@ def test_m03_selects_the_worst_role_within_one_multi_role_flow():
         "telemetry": [0.0, 0.1, 4.0],   # max gap 3.9s
     })
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M03"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M03"]
     assert res.value["role"] == "telemetry"
     assert res.value["max_gap_ms"] == pytest.approx(3900.0)
 
 
 def test_m05_is_pending_for_a_pre_wp7_commit6_record():
     rec = _run_record([_flow_record("1", message_count=10)])  # frame_completions defaults None
-    res = Scorecard().score(rec)["M05"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M05"]
     assert res.status == "pending"
     assert res.value is None
 
 
 def test_m06_is_pending_for_a_pre_wp7_commit6_record():
     rec = _run_record([_flow_record("1", message_count=10)])
-    res = Scorecard().score(rec)["M06"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M06"]
     assert res.status == "pending"
     assert res.value is None
 
@@ -377,7 +377,7 @@ def test_m05_excludes_flows_that_never_used_xr_video():
     xr = _flow_record("2", message_count=10, pdb_ms=50.0,
                        frame_completions={"total": 4, "complete_ages_ms": [10.0, 20.0, 60.0, 70.0]})
     rec = _run_record([non_xr, xr])
-    res = Scorecard().score(rec)["M05"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M05"]
     assert res.status == "ok"
     assert res.value["flow"] == xr.key
     assert res.value["frame_count"] == 4
@@ -395,7 +395,7 @@ def test_m05_scores_a_dropped_frame_as_failed_even_though_it_is_fast():
     fr = _flow_record("1", message_count=10, pdb_ms=1000.0,
                        frame_completions={"total": 3, "complete_ages_ms": [1.0, 2.0]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M05"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M05"]
     assert res.value["fraction"] == pytest.approx(2 / 3)  # 1 of 3 frames never completed
 
 
@@ -405,7 +405,7 @@ def test_m05_worst_flow_is_the_lowest_completeness_fraction():
     worse = _flow_record("2", message_count=10, pdb_ms=100.0,
                           frame_completions={"total": 2, "complete_ages_ms": [10.0]})
     rec = _run_record([better, worse])
-    res = Scorecard().score(rec)["M05"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M05"]
     assert res.value["flow"] == worse.key
     assert res.value["fraction"] == pytest.approx(0.5)
 
@@ -416,7 +416,7 @@ def test_m06_excludes_a_flow_that_generated_frames_but_completed_none():
     healthy = _flow_record("2", message_count=10,
                             frame_completions={"total": 3, "complete_ages_ms": [5.0, 6.0, 100.0]})
     rec = _run_record([silent, healthy])
-    res = Scorecard().score(rec)["M06"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M06"]
     assert res.status == "ok"
     assert res.value["flow"] == healthy.key
     assert silent.key in res.note  # excluded flow is named, not silently dropped
@@ -426,7 +426,7 @@ def test_m06_reports_p95_of_the_worst_flow():
     fr = _flow_record("1", message_count=10,
                        frame_completions={"total": 10, "complete_ages_ms": list(range(1, 11))})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M06"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M06"]
     assert res.status == "ok"
     assert res.value["flow"] == fr.key
     assert res.value["p95_ms"] == pytest.approx(10)  # k = min(9, int(10*0.95)) = 9 -> s[9] = 10
@@ -439,7 +439,7 @@ def test_m17_is_pending_for_a_pre_wp7_commit7_record():
     fr = _flow_record("1", message_count=10,
                        frame_completions={"total": 3, "complete_ages_ms": [1.0, 2.0, 3.0]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.status == "pending"
     assert res.value is None
 
@@ -448,7 +448,7 @@ def test_m17_excludes_flows_that_never_used_xr_video():
     non_xr = _flow_record("1", message_count=10,
                            frame_completions={"total": 0, "complete_ages_ms": [], "complete_ts_s": []})
     rec = _run_record([non_xr])
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.status == "ok"
     assert res.value is None
 
@@ -459,7 +459,7 @@ def test_m17_detects_a_freeze_when_a_gap_exceeds_2x_the_nominal_interval():
                        frame_completions={"total": 4, "complete_ages_ms": [1, 1, 1, 1],
                                           "complete_ts_s": [0.0, 0.02, 0.04, 0.09]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.status == "ok"
     assert res.value["freeze_count"] == 1  # only the 0.04->0.09 gap (0.05s) exceeds 0.04s
     assert res.value["freeze_total_duration_ms"] == pytest.approx(50.0)
@@ -471,7 +471,7 @@ def test_m17_no_freeze_when_all_gaps_are_within_2x_the_nominal_interval():
                        frame_completions={"total": 3, "complete_ages_ms": [1, 1, 1],
                                           "complete_ts_s": [0.0, 0.02, 0.04]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.value["freeze_count"] == 0
     assert res.value["freeze_total_duration_ms"] == pytest.approx(0.0)
 
@@ -481,7 +481,7 @@ def test_m17_reports_effective_and_source_fps():
                        frame_completions={"total": 4, "complete_ages_ms": [1, 1, 1, 1],
                                           "complete_ts_s": [0.0, 0.02, 0.04, 0.09]})
     rec = _run_record([fr])  # _run_record's SystemRecord uses horizon_s=1.0
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.value["source_fps"] == pytest.approx(50.0)
     assert res.value["effective_fps"] == pytest.approx(4.0)  # 4 complete frames / 1.0s horizon
     # Labelled explicitly rather than left as an inversion of source_fps
@@ -498,7 +498,7 @@ def test_m17_excludes_a_flow_with_fewer_than_two_complete_frames():
                             frame_completions={"total": 3, "complete_ages_ms": [1, 1, 1],
                                                "complete_ts_s": [0.0, 0.02, 0.04]})
     rec = _run_record([silent, healthy])
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.status == "ok"
     assert res.value["flow"] == healthy.key
     assert silent.key in res.note
@@ -512,14 +512,14 @@ def test_m17_worst_flow_has_the_most_freeze_events():
                            frame_completions={"total": 4, "complete_ages_ms": [1, 1, 1, 1],
                                               "complete_ts_s": [0.0, 0.1, 0.2, 0.3]})
     rec = _run_record([calm, freezy])
-    res = Scorecard().score(rec)["M17"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M17"]
     assert res.value["flow"] == freezy.key
     assert res.value["freeze_count"] == 3
 
 
 def test_m14_is_pending_for_a_pre_wp7_commit4_record():
     rec = _run_record([_flow_record("1", message_count=10)])  # completion_ts_by_role_s defaults None
-    res = Scorecard().score(rec)["M14"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M14"]
     assert res.status == "pending"
     assert res.value is None
 
@@ -528,7 +528,7 @@ def test_m14_collapses_to_within_pdb_ms_when_survival_time_is_zero():
     fr = _flow_record("1", message_count=3, pdb_ms=50.0,
                        completion_ts_by_role_s={"data": [0.0, 0.03, 0.1]})
     rec = _run_record([fr])  # survival_time_ms defaults to 0.0
-    res = Scorecard().score(rec)["M14"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M14"]
     assert res.status == "ok"
     # gaps = [0.03, 0.07]s = [30, 70]ms; budget = 50+0 = 50ms -> only the
     # first gap is within budget.
@@ -544,7 +544,7 @@ def test_m14_survival_time_extends_the_budget():
     fr = _flow_record("1", message_count=3, pdb_ms=50.0, survival_time_ms=30.0,
                        completion_ts_by_role_s={"data": [0.0, 0.03, 0.1]})
     rec = _run_record([fr])
-    res = Scorecard().score(rec)["M14"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M14"]
     # same gaps as above, but budget = 50+30 = 80ms -> both gaps qualify now.
     assert res.value["fraction"] == pytest.approx(1.0)
     assert res.value["survival_time_ms"] == pytest.approx(30.0)
@@ -556,7 +556,7 @@ def test_m14_excludes_a_role_with_fewer_than_two_completions():
     healthy = _flow_record("2", message_count=5, pdb_ms=50.0,
                             completion_ts_by_role_s={"telemetry": [0.0, 0.01, 0.02]})
     rec = _run_record([silent, healthy])
-    res = Scorecard().score(rec)["M14"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M14"]
     assert res.status == "ok"
     assert res.value["flow"] == healthy.key
     assert "1:heartbeat" in res.note
@@ -568,7 +568,7 @@ def test_m14_worst_is_the_lowest_fraction_across_flows():
     worse = _flow_record("2", message_count=3, pdb_ms=100.0,
                           completion_ts_by_role_s={"data": [0.0, 0.2, 0.4]})
     rec = _run_record([better, worse])
-    res = Scorecard().score(rec)["M14"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M14"]
     assert res.value["flow"] == worse.key
     assert res.value["fraction"] == pytest.approx(0.0)  # both gaps (0.2s, 0.2s) exceed 100ms budget
 
@@ -624,7 +624,7 @@ def test_first_violation_order_over_a_load_ramp():
 
 def test_m18_is_pending_when_join_events_predates_wpjoin():
     rec = _run_record([_flow_record("1", message_count=1)])  # join_events=None by default
-    res = Scorecard().score(rec)["M18"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M18"]
     assert res.status == "pending"
     assert res.value is None
     assert "predates" in res.note
@@ -632,7 +632,7 @@ def test_m18_is_pending_when_join_events_predates_wpjoin():
 
 def test_m18_is_pending_when_no_join_events_occurred():
     rec = _run_record([_flow_record("1", message_count=1)], join_events=[])
-    res = Scorecard().score(rec)["M18"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M18"]
     assert res.status == "pending"
     assert res.value is None
 
@@ -656,7 +656,7 @@ def test_m18_computes_per_path_breakdown_and_counts_never_completed():
         ),
     ]
     rec = _run_record([_flow_record("1", message_count=1)], join_events=events)
-    res = Scorecard().score(rec)["M18"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M18"]
     assert res.status == "ok"
 
     cold = res.value["by_path"]["cold"]
@@ -680,14 +680,14 @@ def test_m18_computes_per_path_breakdown_and_counts_never_completed():
 
 def test_m19_is_pending_when_join_events_predates_wpjoin():
     rec = _run_record([_flow_record("1", message_count=1)])
-    res = Scorecard().score(rec)["M19"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M19"]
     assert res.status == "pending"
 
 
 def test_m19_is_pending_without_timeseries_even_with_join_events():
     events = [JoinEventRecord(ue_id=1, path="cold", trigger_slot=0, trigger_ts_s=0.0)]
     rec = _run_record([_flow_record("1", message_count=1)], join_events=events)
-    res = Scorecard().score(rec)["M19"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M19"]
     assert res.status == "pending"
     assert "record_timeseries" in res.note
 
@@ -710,7 +710,7 @@ def test_m19_computes_recovery_time_from_sustained_green_hol_delay():
         JoinEventRecord(ue_id=2, path="cold", trigger_slot=0, trigger_ts_s=0.0),
     ]
     rec = _run_record([recovering, stuck], timeseries_time_s=time_s, join_events=events)
-    res = Scorecard().score(rec, slo_green_dwell_s=0.2)["M19"]
+    res = Scorecard().score(rec, population=Population.all_flows(), slo_green_dwell_s=0.2)["M19"]
     assert res.status == "proxy"
 
     cold = res.value["by_path"]["cold"]

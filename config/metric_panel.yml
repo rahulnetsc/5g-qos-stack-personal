@@ -26,6 +26,23 @@
 # actually flipped status -- a WP that doesn't change a status it claimed
 # to fix is itself a finding.
 #
+# `population` (optional) records WHICH FLOWS the guarantee this metric
+# binds to is about: `protected_fleet` (the fleet's own bearers, i.e. every
+# 5QI except Scorecard.NON_PROTECTED_5QI = {8, 9}) or `all_flows`. It is
+# DOCUMENTATION OF THE BINDING, not a default -- sim/scorecard.py::score()
+# refuses to compute without an explicit population, because a worst-flow
+# statistic has no meaning without the flows it ranges over and defaulting is
+# exactly how that went unnoticed for nine work packages. Added 2026-09-03,
+# additively, the same way WP5 Decision 6 added `caveats`: no metric's
+# DEFINITION changes, and every historical reading keeps its meaning.
+#
+# Measured consequence, on a fresh N=8 run: G1's M01 p98 FAILS on every arm
+# over all flows (~300 ms, pinned at the 5QI-9 filler's own PDB, three arms
+# agreeing to 0.25 ms) and PASSES on the protected fleet with 4.4x arm
+# separation; G8's TwoTier FAILS all-flow at Jain 0.8783 and passes protected
+# at 0.9584. G3 and G5 do not move, because their winners were already
+# protected bearers.
+
 # `caveats` (optional, list of str) records a limitation of the *simulator
 # mechanism* a metric is computed from, distinct from `status`/`requires`.
 # Added by docs/wp5-plan.md Decision 6: M01/M02/M14/M15 are exact per their
@@ -48,6 +65,7 @@ metrics:
       conformance statistic (TS 23.501 sec 5.7.3.4): while within GFBR,
       98% of packets shall not exceed the PDB.
     guarantees: [G1, G2]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -73,6 +91,7 @@ metrics:
       Byte-weighted fraction of traffic later than its PDB, plus bytes
       discarded on expiry.
     guarantees: [G1, G5, G12]
+    population: protected_fleet
     unit: fraction
     direction: lower_better
     status: ok
@@ -98,6 +117,7 @@ metrics:
       {T_live/4, T_live/2, T_live}. The false-failsafe bound: consecutive-
       loss tolerance, not average latency.
     guarantees: [G3]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -120,6 +140,7 @@ metrics:
       every 5QI except the GT-4.1/4.2 saturating aggressor and the per-UE
       best-effort filler. Same value shape as M03.
     guarantees: [G6]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -156,6 +177,7 @@ metrics:
       than `violation_ceiling` of their arriving bytes. M19's companion,
       judging "green" by DELIVERY instead of head-of-line age.
     guarantees: [G9, G3]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -190,6 +212,7 @@ metrics:
       Runs of >= N consecutive missed deadlines (TS 22.104: industrial
       applications fail on consecutive misses, not averages).
     guarantees: [G3, G11]
+    population: protected_fleet
     unit: count
     direction: lower_better
     status: proxy
@@ -207,6 +230,7 @@ metrics:
       >= 99% of frames complete within the set delay budget; partial
       frames count as failed.
     guarantees: [G5]
+    population: protected_fleet
     unit: fraction
     direction: higher_better
     status: ok
@@ -224,6 +248,7 @@ metrics:
     name: frame_age_at_mec
     definition: recv_ts - frame_generation_ts, p95.
     guarantees: [G5]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -240,6 +265,7 @@ metrics:
     name: gbr_contract_count
     definition: Count of GBR flows delivering >= 95% of GFBR.
     guarantees: [G10]
+    population: protected_fleet
     unit: count
     direction: higher_better
     status: ok
@@ -249,6 +275,7 @@ metrics:
     name: worst_flow_gfbr_fraction
     definition: "min_f(delivered_f / GFBR_f) over GBR flows -- the max-min floor."
     guarantees: [G8, G10]
+    population: protected_fleet
     unit: fraction
     direction: higher_better
     status: ok
@@ -261,6 +288,7 @@ metrics:
       (aggregate Jain over a whole run is known to mask short-timescale
       oscillation -- see docs/p5g-sim-plan.md sec 7).
     guarantees: [G8]
+    population: protected_fleet
     unit: index [0,1]
     direction: higher_better
     status: proxy
@@ -276,6 +304,7 @@ metrics:
       post-finish silence never count. Reported with the worst flow, the
       longest epoch, and the bound used.
     guarantees: ['G8']
+    population: protected_fleet
     unit: count
     direction: lower_better
     status: ok
@@ -307,6 +336,7 @@ metrics:
     name: aggregate_throughput
     definition: Total delivered bytes (cost side of every QoS gain).
     guarantees: []
+    population: all_flows
     unit: bps
     direction: neutral
     status: ok
@@ -316,6 +346,7 @@ metrics:
     name: prb_utilization
     definition: Used / available PRBs, per direction.
     guarantees: []
+    population: all_flows
     unit: fraction
     direction: neutral
     status: ok
@@ -326,6 +357,7 @@ metrics:
     name: pdcch_cce_utilization
     definition: Used / budget CCEs.
     guarantees: [G10]
+    population: all_flows
     unit: fraction
     direction: neutral
     status: ok
@@ -336,6 +368,10 @@ metrics:
     name: first_violation_order
     definition: Which 5QI class first breaches under a load ramp.
     guarantees: [G12]
+    # The ranking is over the FLEET's classes. The saturating background is
+    # 5QI 9, which a QoS-aware scheduler is meant to starve, so letting it
+    # into the order would rank the thing the arms are supposed to sacrifice.
+    population: protected_fleet
     unit: ordinal (5QI sequence)
     direction: null
     status: ok
@@ -351,6 +387,7 @@ metrics:
       TS 22.104: fraction of transfer intervals where the message arrived
       within (max latency + survival time).
     guarantees: [G11]
+    population: protected_fleet
     unit: fraction
     direction: higher_better
     status: ok
@@ -379,6 +416,7 @@ metrics:
     name: command_jitter_p99_p50
     definition: p99 minus p50 delay (not stddev), on a command/control flow.
     guarantees: [G1, G2]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -400,6 +438,11 @@ metrics:
       degrade together -- a robot both blind and unresponsive at once is a
       distinct, worse failure than either alone.
     guarantees: [G1, G2, G3]
+    # NEITHER subset: M16 correlates a NAMED FLOW PAIR, so its population
+    # is those two flows and nothing else. Recorded explicitly rather than
+    # left blank, because a blank here would be indistinguishable from the
+    # unstated default this field exists to abolish.
+    population: named_flow_pair
     unit: Pearson r, [-1,1]
     direction: null
     status: proxy
@@ -412,6 +455,7 @@ metrics:
       Freeze events (gaps > 2 frame intervals), count and duration; and
       effective fps at the MEC vs fps at the camera.
     guarantees: [G5]
+    population: protected_fleet
     unit: mixed (count, ms, fps)
     direction: lower_better
     status: ok
@@ -447,6 +491,7 @@ metrics:
       also reported from the RF-restore instant, which is what GT-6.3's
       own pass line is measured from -- not from RLF declaration.
     guarantees: [G9]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: ok
@@ -474,6 +519,7 @@ metrics:
       back inside its own PDB. Events where SLOs never go green before
       the run ends are counted, not excluded.
     guarantees: [G9, G3]
+    population: protected_fleet
     unit: ms
     direction: lower_better
     status: proxy

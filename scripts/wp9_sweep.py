@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from sim.parametric import sweep_scenario
 from sim.run_record import RunRecord
-from sim.scorecard import Scorecard
+from sim.scorecard import Population, Scorecard
 from sim.baselines.pf import ProportionalFair
 from scheduler.reservation import Reservation
 from scheduler import load_two_tier
@@ -397,14 +397,25 @@ def _online_rows_for(sc_card: Scorecard, record: RunRecord,
         pass
     for name, values in _SCORING_VARIATIONS:
         for v in values:
-            scores = sc_card.score(record, **{name: v})
+            # Both populations, same reason as regime_sweep: one would
+            # re-make the choice silently a layer out.
+            scores = sc_card.score(record, population=Population.all_flows(),
+                                   **{name: v})
+            scores_prot = sc_card.score(
+                record, population=Population.protected_fleet(), **{name: v})
             for mid in ("M03", "M04", "M07", "M08", "M14", "M19"):
-                r = scores.get(mid)
-                if r is None:
-                    continue
-                out.append({"metric": mid, "variation": name,
-                            "variation_value": v, **tag,
-                            "status": r.status, "value": r.value})
+                for src, pop_tag in ((scores, "all_flows"),
+                                     (scores_prot, "protected_fleet")):
+                    r = src.get(mid)
+                    if r is None:
+                        continue
+                    # The population is a COLUMN, not a convention a reader
+                    # has to know. An online row that did not carry it was
+                    # indistinguishable from one taken over any other subset.
+                    out.append({"metric": mid, "variation": name,
+                                "variation_value": v, **tag,
+                                "population": r.population or pop_tag,
+                                "status": r.status, "value": r.value})
     return out
 
 

@@ -53,7 +53,7 @@ from sim.config import CarrierConfig, ScenarioConfig, ScriptedFadeWindow, UEConf
 from sim.driver import run
 from sim.join import JoinConfig
 from sim.run_record import RunRecord
-from sim.scorecard import Scorecard
+from sim.scorecard import Population, Scorecard
 from sim.baselines.pf import ProportionalFair
 from scheduler import TwoTier
 from scheduler.flow import FlowConfig
@@ -120,7 +120,7 @@ def _run_and_score(fade_slots, scheduler):
         scenario_name=sc.name, scheduler_name=type(scheduler).__name__, seed=sc.seed,
         flow_configs=sc.flows, summary=summary,
     )
-    return summary, rec, Scorecard().score(rec)
+    return summary, rec, Scorecard().score(rec, population=Population.all_flows())
 
 
 @pytest.mark.parametrize("scheduler_factory", [TwoTier, ProportionalFair])

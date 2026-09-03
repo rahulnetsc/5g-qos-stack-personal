@@ -165,7 +165,7 @@ def test_M01_and_M15_report_PENDING_not_the_head_of_line_proxy():
     None cannot catch that; asserting what the scorecard DOES with None can.
     """
     from sim.run_record import RunRecord
-    from sim.scorecard import Scorecard
+    from sim.scorecard import Population, Scorecard
 
     sc_cfg = _scenario()
     summary, _ = _run(window=True)
@@ -174,7 +174,7 @@ def test_M01_and_M15_report_PENDING_not_the_head_of_line_proxy():
         flow_configs=sc_cfg.flows, summary=summary, arm={}, meta={})
     assert rec.message_ledger_windowed is True
 
-    scores = Scorecard().score(rec)
+    scores = Scorecard().score(rec, population=Population.all_flows())
     for mid in ("M01", "M15"):
         assert scores[mid].status == "pending", (
             f"{mid} is {scores[mid].status!r} with value {scores[mid].value!r} "

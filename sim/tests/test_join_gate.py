@@ -19,7 +19,7 @@ from sim.driver import run
 from sim.harq import HarqAwareBufferView, HarqProcessPool
 from sim.join import JoinAwareBufferView, JoinConfig, JoinPhase, JoinState
 from sim.run_record import RunRecord
-from sim.scorecard import Scorecard
+from sim.scorecard import Population, Scorecard
 from sim.baselines.round_robin import RoundRobin
 from scheduler.flow import FlowConfig
 
@@ -211,7 +211,7 @@ def test_real_reestablish_path_produces_the_shape_commit4s_synthetic_fixtures_as
         flow_configs=sc.flows, summary=summary,
     )
     assert rec.join_events[0].path == "reestablish"
-    res = Scorecard().score(rec)["M18"]
+    res = Scorecard().score(rec, population=Population.all_flows())["M18"]
     assert res.status == "ok"
     reest = res.value["by_path"]["reestablish"]
     assert reest["n_events"] == 1

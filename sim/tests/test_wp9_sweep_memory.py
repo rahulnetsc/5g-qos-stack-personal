@@ -66,7 +66,7 @@ def test_m13_projection_keeps_what_m13_actually_reads():
     Scorecard.first_violation_order can consume -- the point of projecting
     rather than hand-rolling a summary is that no scorecard logic is
     duplicated."""
-    from sim.scorecard import Scorecard
+    from sim.scorecard import Population, Scorecard
 
     recs = [m13_projection(_record(seed=s)) for s in (1, 2)]
     gbr = [fr for fr in recs[0].flows_by(flow_class="GBR")]
@@ -126,7 +126,7 @@ def test_retention_does_not_grow_with_the_number_of_records():
 
 
 def test_scoring_variations_are_the_four_pre_registered_ones():
-    """These drive 12 extra Scorecard.score() calls per record -- the cost
+    """These drive 12 extra Scorecard.score(, population=Population.all_flows()) calls per record -- the cost
     §8's original budget omitted entirely. Pinned so the count cannot drift
     silently and invalidate the re-derived timing."""
     assert tuple(name for name, _ in _SCORING_VARIATIONS) == (

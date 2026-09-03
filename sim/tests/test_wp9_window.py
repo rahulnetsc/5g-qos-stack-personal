@@ -31,7 +31,7 @@ from sim.fleet import LidarActivation
 from sim.messages import Message, MessageCompletion
 from sim.run_record import RunRecord
 from sim.scenarios import smoke_scenario
-from sim.scorecard import Scorecard
+from sim.scorecard import Population, Scorecard
 
 
 # --- synthetic fixtures ---------------------------------------------------
@@ -232,7 +232,7 @@ def test_m01w_equals_panel_m01_over_the_full_run():
         scenario_name=sc.name, scheduler_name="PF", seed=sc.seed,
         flow_configs=sc.flows, summary=summary, arm={}, meta={},
     )
-    panel = Scorecard().score(rec)["M01"]
+    panel = Scorecard().score(rec, population=Population.all_flows())["M01"]
     assert panel.status == "ok"
 
     time_s = rec.timeseries_time_s

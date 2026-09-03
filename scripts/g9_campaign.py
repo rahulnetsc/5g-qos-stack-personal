@@ -41,7 +41,7 @@ from sim.run_record import RunRecord  # noqa: E402
 from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,  # noqa: E402
                               gt63_rlf_recovery, joiner_ue_id,
                               neighbour_ue_ids)
-from sim.scorecard import Scorecard  # noqa: E402
+from sim.scorecard import Population, Scorecard  # noqa: E402
 from scheduler import load_two_tier  # noqa: E402
 from scheduler.reservation import Reservation  # noqa: E402
 
@@ -194,7 +194,12 @@ def main(argv):
                     print(f"  [{arm_name}] neighbours population ({len(keys)} flows): "
                           f"{keys[:4]}{' ...' if len(keys) > 4 else ''}", flush=True)
                     printed_population = True
-                scored = sc_card.score(rec)
+                # G9 is about what the FLEET receives across a join --
+                # the neighbours clause explicitly excludes the
+                # background aggressor -- so the population is the
+                # protected fleet, stated rather than inherited.
+                scored = sc_card.score(
+                    rec, population=Population.protected_fleet())
                 for store, key in ((m18, "M18"), (m19, "M19"), (m21, "M21")):
                     v = (scored[key].value or {}).get("by_path", {}).get(want_path)
                     if v and v.get("p95_ms") is not None:

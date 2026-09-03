@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sim.run_record import RunRecord  # noqa: E402
-from sim.scorecard import Scorecard  # noqa: E402
+from sim.scorecard import Population, Scorecard  # noqa: E402
 
 
 def _flow(ue_id, qfi, arrived, delivered):
@@ -49,7 +49,8 @@ def _record(flows, n):
 
 
 def _m22(flows, n=10):
-    return Scorecard().score(_record(flows, n))["M22"]
+    return Scorecard().score(_record(flows, n),
+                             population=Population.all_flows())["M22"]
 
 
 def test_served_flow_scores_zero_epochs():
@@ -96,7 +97,7 @@ def test_pending_without_timeseries():
         "system": {"horizon_s": 1.0, "dl_prb_utilization": 0.0,
                    "ul_prb_utilization": 0.0, "cce_utilization": 0.0},
     })
-    r = Scorecard().score(rec)["M22"]
+    r = Scorecard().score(rec, population=Population.all_flows())["M22"]
     assert r.value is None and r.status == "pending" and r.note
 
 

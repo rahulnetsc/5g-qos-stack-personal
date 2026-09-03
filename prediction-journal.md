@@ -704,3 +704,48 @@ seeds = the previous stability was itself an artefact of the constant.**
 **This is a prediction about a MEASUREMENT, not a conclusion.** It is
 registered here so Phase 2 scores it either way, per the rule that a
 prediction exercise only cited when it is right is not one.
+
+## P4 — population becomes a required argument (2026-09-03)
+
+**`--check` is BLIND to the substance and BINDS on a side-effect, and both
+halves are declared before running it.**
+
+- `regression/baseline_studies_1_3.json` stores `RunRecord`s and **no
+  scorecard output**, and `scripts/regression_corpus.py` never calls
+  `Scorecard.score()`. So the corpus cannot see the population logic at all:
+  a clean `--check` is **zero evidence** that the restriction is right.
+- It does bind on one thing: the change touches `scripts/regime_sweep.py`,
+  which the corpus does not use, and `sim/scorecard.py`, which it does not
+  call — so a clean result confirms only that nothing leaked into the
+  driver/record layer. Worth having, not worth citing as verification.
+
+**What BINDS instead**, and it is the pairing rather than either half:
+
+1. `test_restriction_inverts_g1_and_g8_and_leaves_g3_and_g5_alone` — the
+   ASYMMETRY. If restriction moved everything it would be a framing
+   preference; it moves the two whose contests the filler was winning and
+   leaves the two whose winners were already protected. A future change that
+   silently re-broadens the population breaks this.
+2. `test_score_refuses_to_compute_without_an_explicit_population` — the API
+   guarantee. Verified RED on HEAD behaviourally first, not just by the
+   missing import: HEAD accepted `score(rec)`, returned M01 won by
+   `ue9_qfi9`, and `MetricResult` had no `population` attribute.
+3. `test_population_sensitive_set_matches_what_score_actually_stamps` — one
+   constant drives both the restriction and the stamp, so a result cannot
+   report a population it was not computed over. That is exactly the failure
+   M20 had.
+
+**Registered prediction.** Full suite green after migrating 58 test call
+sites to `all_flows()` (the choice that preserves every existing assertion's
+meaning); `--check` clean and meaningless.
+
+**Registered consequence, to be scored when Phase 2 re-runs.** Every
+worst-flow number in `docs/wp9-regime-map.md` and `docs/wp9-plan.md` was
+computed over `all_flows`. The G1 and G8 rows are **known-wrong, not
+suspect**. G3, G5, G6 and G10's rows should be **unchanged** — G6 already
+restricted via M20, G10's M07/M08 select `flow_class == "GBR"` which excludes
+both non-protected 5QIs by construction, and G3/G5's winners were already
+protected. **If a re-run moves G10, that prediction is wrong and the
+`flow_class` argument was insufficient** — which is the falsifier worth
+naming, because it is the one row I am asserting is safe without having
+re-measured it.

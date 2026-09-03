@@ -29,6 +29,61 @@ from .run_record import FlowRecord, RunRecord
 _DEFAULT_PANEL_PATH = Path(__file__).resolve().parent.parent / "config" / "metric_panel.yml"
 
 
+@dataclasses.dataclass(frozen=True)
+class Population:
+    """WHICH FLOWS a statistic ranges over. Required, never defaulted.
+
+    A worst-flow statistic has no meaning without this. Every such metric in
+    this file used to range over EVERY flow in the record, silently -- so the
+    per-UE best-effort filler (5QI 9) and the GT-4.1/4.2 saturating aggressor
+    (5QI 8), which a QoS-aware scheduler is SUPPOSED to starve, entered the
+    contest for statistics the guarantees bind to the protected fleet.
+
+    MEASURED: on sweeps/wp9/stage2/stage2_rows.csv (7,560 rows) the 5QI-9
+    filler wins M01's contest in 85.4 % of runs and the 5QI-1 telemetry
+    bearer G1 is about wins it in 6. On a fresh N=8 run the VERDICT inverts,
+    in opposite directions -- G1 all-flow FAILs on every arm at ~300 ms
+    (pinned at 5QI 9's own PDB, three arms agreeing to 0.25 ms) and PASSes on
+    the protected fleet with 4.4x arm separation; G8's TwoTier FAILs
+    all-flow at Jain 0.8783 and passes protected at 0.9584. G3 and G5 do not
+    move at all, because their winners were already protected bearers. That
+    ASYMMETRY is what makes it a defect rather than a framing preference.
+
+    WHY REQUIRED AND NOT DEFAULTED TO PROTECTED. An unrestricted worst-flow
+    number is the right instrument for "is the cell saturated at all". Both
+    populations are legitimate; not saying which is not. Defaulting to
+    all-flow is what let this survive nine work packages, and defaulting to
+    protected would move the silence rather than remove it -- so score()
+    raises instead.
+
+    §24.2 diagnosed this class, fixed it for G6 by adding M20, and nobody
+    asked whether it applied elsewhere. It did, to every other worst-flow
+    metric. This type is the general form of that one-off fix.
+    """
+
+    name: str
+    excluded_5qi: frozenset
+
+    @staticmethod
+    def all_flows() -> "Population":
+        """Every flow. Correct for saturation and utilisation questions."""
+        return Population("all_flows", frozenset())
+
+    @staticmethod
+    def protected_fleet() -> "Population":
+        """The fleet's own bearers. Correct for every guarantee about what
+        the FLEET receives. Derived from Scorecard.NON_PROTECTED_5QI so the
+        two can never drift apart."""
+        return Population("protected_fleet", Scorecard.NON_PROTECTED_5QI)
+
+    def restrict(self, record: "RunRecord") -> "RunRecord":
+        if not self.excluded_5qi:
+            return record
+        keep = {k: fr for k, fr in record.flows.items()
+                if fr.qfi not in self.excluded_5qi}
+        return dataclasses.replace(record, flows=keep)
+
+
 @dataclass
 class MetricResult:
     id: str
@@ -44,6 +99,11 @@ class MetricResult:
     # Decision 6). Populated by Scorecard.score() from the panel, not by
     # each metric's own method -- see that method's docstring.
     caveats: list[str] = field(default_factory=list)
+    # WHICH FLOWS this value ranged over, reported inline the way M03/M14
+    # already report t_live_s and survival_time_ms -- never a bare number.
+    # None for the system-level metrics (M10/M11/M12), whose value does
+    # not depend on the flow set at all.
+    population: Optional[str] = None
 
 
 def load_panel(path: Path = _DEFAULT_PANEL_PATH) -> dict:
@@ -105,18 +165,52 @@ class Scorecard:
 
     # -- single-run metrics --------------------------------------------
 
-    def score(self, record: RunRecord, **overrides) -> dict[str, MetricResult]:
+    #: Metrics whose value depends on WHICH FLOWS are in the record. Derived
+    #: nowhere else and used both to restrict the record and to stamp the
+    #: population onto the result, so the two can never disagree. M10/M11/M12
+    #: are absent deliberately: aggregate throughput and PRB/CCE utilisation
+    #: are properties of the cell, not of a flow subset.
+    POPULATION_SENSITIVE: frozenset = frozenset({
+        "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09",
+        "M14", "M15", "M17", "M18", "M19", "M21", "M22",
+    })
+
+    def score(self, record: RunRecord, *, population: Optional[Population] = None,
+              **overrides) -> dict[str, MetricResult]:
         """Compute every metric in the panel for one RunRecord.
+
+        ``population`` is REQUIRED and has no default. A worst-flow statistic
+        has no meaning without the flows it ranges over, and every such metric
+        here used to range over all of them silently -- see Population's
+        docstring for the measured consequence, which is a VERDICT inversion
+        on G1 and G8 in opposite directions.
 
         ``overrides`` may set gbr_contract_fraction / survival_miss_n /
         t_live_s for this call; unset ones fall back to the panel's
         pre-registered defaults.
         """
+        if population is None:
+            raise TypeError(
+                "Scorecard.score() requires an explicit `population`. A "
+                "worst-flow statistic has no meaning without the flows it "
+                "ranges over: on a measured N=8 run, G1's M01 p98 reads 300 ms "
+                "and FAILS on every arm over all flows (pinned at the 5QI-9 "
+                "filler's own PDB) and 22-97 ms and PASSES over the protected "
+                "fleet. Pass Population.protected_fleet() for a guarantee "
+                "about what the FLEET receives, or Population.all_flows() for "
+                "a question about the cell as a whole (saturation, "
+                "utilisation). There is deliberately no default -- defaulting "
+                "to all-flow is how this survived nine work packages."
+            )
         cfg = {**self.defaults, **overrides}
+        # ONE restriction, applied once, used by every population-sensitive
+        # metric. Doing it per-metric is what let M20 be the only one that
+        # ever got it.
+        scoped = population.restrict(record)
         out: dict[str, MetricResult] = {}
-        out["M01"] = self._m01_latency_percentiles(record)
-        out["M02"] = self._m02_pdb_violation_rate(record)
-        out["M03"] = self._m03_liveness_gap_distribution(record, cfg["t_live_s"])
+        out["M01"] = self._m01_latency_percentiles(scoped)
+        out["M02"] = self._m02_pdb_violation_rate(scoped)
+        out["M03"] = self._m03_liveness_gap_distribution(scoped, cfg["t_live_s"])
         # M20 is auto-scored rather than left a study-layer call like
         # M13/M16. It needs no extra argument (its exclusion set has a
         # documented default) and the record_sink defect this WP just
@@ -130,34 +224,39 @@ class Scorecard:
         # M03: the pair must be readable together, and a statistic
         # absent from the scored row is one a later question cannot be
         # re-asked of without a re-run.
-        out["M21"] = self.slo_recovery_time_by_delivery(record)
+        out["M21"] = self.slo_recovery_time_by_delivery(scoped)
         # M22 auto-scored beside M09 for the reason M20 sits beside M03:
         # it is the OTHER half of a conjunction the panel binds to one
         # guarantee, and a conjunction scored on one conjunct is the
         # failure this panel exists to prevent.
-        out["M22"] = self._m22_starvation_epochs(record)
-        out["M04"] = self._m04_survival_time_failures(record, cfg["survival_miss_n"])
-        out["M05"] = self._m05_pdu_set_completeness(record)
-        out["M06"] = self._m06_frame_age_at_mec(record)
-        out["M07"] = self._m07_gbr_contract_count(record, cfg["gbr_contract_fraction"])
-        out["M08"] = self._m08_worst_flow_gfbr_fraction(record)
-        out["M09"] = self._m09_per_second_jain(record)
+        out["M22"] = self._m22_starvation_epochs(scoped)
+        out["M04"] = self._m04_survival_time_failures(scoped, cfg["survival_miss_n"])
+        out["M05"] = self._m05_pdu_set_completeness(scoped)
+        out["M06"] = self._m06_frame_age_at_mec(scoped)
+        out["M07"] = self._m07_gbr_contract_count(scoped, cfg["gbr_contract_fraction"])
+        out["M08"] = self._m08_worst_flow_gfbr_fraction(scoped)
+        out["M09"] = self._m09_per_second_jain(scoped)
         out["M10"] = self._m10_aggregate_throughput(record)
         out["M11"] = self._m11_prb_utilization(record)
         out["M12"] = self._m12_cce_utilization(record)
         # M13 (first_violation_order) is a cross-run metric -- see
         # first_violation_order() below, called by the study/sweep layer.
-        out["M14"] = self._m14_communication_service_availability(record)
-        out["M15"] = self._m15_command_jitter(record)
+        out["M14"] = self._m14_communication_service_availability(scoped)
+        out["M15"] = self._m15_command_jitter(scoped)
         # M16 (ul_dl_shared_bearer_correlation) needs a named flow pair --
         # see correlate_flows() below, not part of the automatic per-run scan.
-        out["M17"] = self._m17_frame_freeze_and_effective_fps(record)
-        out["M18"] = self._m18_rejoin_interruption_time(record)
-        out["M19"] = self._m19_slo_recovery_time(record, cfg["slo_green_dwell_s"])
+        out["M17"] = self._m17_frame_freeze_and_effective_fps(scoped)
+        out["M18"] = self._m18_rejoin_interruption_time(scoped)
+        out["M19"] = self._m19_slo_recovery_time(scoped, cfg["slo_green_dwell_s"])
         # Attach the panel's own pre-registered caveats here, uniformly,
         # rather than in each _mNN method -- a caveat is a property of the
         # metric's definition (config/metric_panel.yml), not of any one
         # run's data, so it shouldn't be up to each method to remember.
+        # STAMP THE POPULATION, from the same set used to restrict, so a
+        # result can never report a population it was not computed over.
+        for metric_id in self.POPULATION_SENSITIVE:
+            if metric_id in out:
+                out[metric_id].population = population.name
         for metric_id, result in out.items():
             # EXTEND, never overwrite. A metric method may attach a caveat
             # derived from THIS run's data (M03's cadence caveat), and the

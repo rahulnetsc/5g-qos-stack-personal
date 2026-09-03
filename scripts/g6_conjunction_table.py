@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from regime_sweep import bootstrap_ci  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
-from sim.scorecard import Scorecard, load_panel  # noqa: E402
+from sim.scorecard import Population, Scorecard, load_panel  # noqa: E402
 
 ARMS = ("PF", "Reservation", "TwoTier")
 BAR = 0.20
@@ -111,7 +111,13 @@ def main() -> int:
         return dataclasses.replace(rec, flows=keep)
 
     print(f"protected-fleet restriction: excluding 5QIs {sorted(excl)}\n")
-    scored = {k: (sc.score(protect(base[k])), sc.score(protect(exc[k])))
+    # G6 asks whether background traffic impairs THE FLEET, so the
+    # population is the fleet. This script already restricted the
+    # record by hand (`protect`); passing it explicitly makes the same
+    # choice checkable, and the double restriction is idempotent.
+    _pop = Population.protected_fleet()
+    scored = {k: (sc.score(protect(base[k]), population=_pop),
+                  sc.score(protect(exc[k]), population=_pop))
               for k in shared}
 
     hdr = (f"{'metric':<6}{'arm':<13}{'clause 1: within bound':<34}"
