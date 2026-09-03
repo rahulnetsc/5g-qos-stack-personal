@@ -157,7 +157,7 @@ to move any number.
 | 5 | `sim/fleet.py`, `sim/parametric.py`, `g12.py` | camera flows provisioned below their own GFBR, undisclosed | 3.879 vs 4.000 Mbps, ceiling ~0.970 | no | `38248f9` |
 | 6 | regime map G10 rows | "admissible N 8 / 16" was the arm-**separation** boundary, mislabelled, and not per-arm | PF 8, Reservation 4, TwoTier 4 | **yes** — changes the headline deliverable | `9ce9787` |
 | 7 | `wp9-plan.md` §34.4/§34.5, `CLAUDE.md`, `g9_campaign.py` | overlap mechanism refuted; cold count was events *recorded*, not attaches *completed* | 0 of 50 completed on TwoTier | **yes** — changes the operational instruction | `e9f7f65` |
-| 8 | `wp9-plan.md` §24.6, `wp9_part_c.py` | cadence exclusion said `duty ≤ 0.5`; arithmetic says `0.1`, discarding a real breach | TwoTier 503.25 ms, 5/10 vs PF 0/10 | no | `e598470` |
+| 8 | `wp9-plan.md` §24.6, `wp9_part_c.py` | cadence exclusion said `duty ≤ 0.5`; arithmetic says `0.1`, discarding a real breach | TwoTier 503.25 ms, 5/10 vs PF 0/10 | no | `e598470` — **and see #18 below: this correction ALSO over-shot** |
 | 9 | `wp9-g11-plan.md` §10 | cited `--check` as commit 1's verification; the corpus stores no scorecard output, so it cannot fail | per-commit intersection test, all 12 rows | **yes** — a check cited as evidence of safety | `ac8c5cc` + this pass |
 
 **Nine defects, four of them verdict-changing.** The five that were not
@@ -234,3 +234,38 @@ and the guard is now directional — record-only keys raise, scenario-only
 keys are **emitted as `flows_declared_but_silent`**, because "a scripted
 flow that generated nothing" is exactly the did-the-mechanism-fire question
 and belongs in the artefact rather than in an assertion that stayed quiet.
+
+
+---
+
+## #18 — THE #8 CORRECTION OVER-SHOT (2026-09-03)
+
+**A closed row reopened, and the reason is a failure class rather than a
+detail.** #8 fixed a cadence exclusion that was too broad (`duty ≤ 0.5`,
+discarding a real arm difference) by narrowing it to duty 0.1 and asserting
+*"at duty 0.5 the period is 200 ms, the caveat does NOT fire"*.
+
+**Measured over the committed `sweeps/wp9/part_c_rows.csv`: it fires on 4 of
+44 duty-0.5 breaches**, observed medians 596.63 / 602.25 / 551.25 / 525.00 ms
+against that 200 ms configured period.
+
+**The single wrong step: the correction inferred the predicate's STATE from
+the CONFIGURATION instead of reading the predicate's INPUT.** The predicate
+is `median_gap_ms > T_live/4`; `median_gap_ms` is measured. A flow configured
+at 200 ms that the network degrades to a 600 ms median trips it. The
+exclusion is a property of each ROW, not of the `duty_cycle` axis.
+
+**What survives:** #8's headline result. TwoTier's 503.25 ms / 5-of-10
+against PF's 0-of-10 is real — those rows are not among the four.
+**What withdraws:** the blanket claim that duty 0.5 is caveat-free.
+
+**This is triage #22 from the other direction**, and together they are why
+G3 cannot be scored honestly yet: the caveat silences real breaches on M03/
+M20, the metric G3 binds to.
+
+**Recorded as a new failure class** in `prediction-journal.md` — *an
+over-correction is its own class, distinct from a stale claim and a wrong
+claim, and it is the hardest to see because it reads as settled.* A stale
+claim is suspected by anyone who checks the date; a wrong claim is
+contradicted by the code; an over-correction arrives with a correction box
+and a citation, so nobody checks it twice.

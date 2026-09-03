@@ -1,5 +1,55 @@
 # Phase 2 — fast numbers on fixed code
 
+## SCOPE, FIXED BEFORE RUNNING — three states, not "every guarantee"
+
+Written down first so the output is **a list of what was measured and what
+was not**, rather than a table with silent gaps. A guarantee missing from a
+results table is indistinguishable from one that failed to produce a number,
+which is the empty-selection shape at the level of the report.
+
+### SCOREABLE NOW — re-measure all seven
+
+**G1, G4, G5, G6, G8, G10, G12.**
+
+**None of their existing numbers survive.** Every one was computed under BOTH
+defects: the population default (worst-flow statistics unrestricted, fixed in
+`9c23327`) and the `priority_level` default (every flow tied at 100, fixed in
+`8f9ad34`). G6 and G10 were argued to be population-immune — G6 restricted
+via M20, G10's M07/M08 select `flow_class == "GBR"` — **but neither is immune
+to the priority default**, so both re-run. That argument is registered as a
+falsifier in `prediction-journal.md` P9: if G10 moves under the population
+change specifically, the `flow_class` reasoning was insufficient.
+
+### SCOREABLE WITH A STATED LIMIT — three, each limit named in the output
+
+| G | limit | why |
+|---|---|---|
+| **G3** | **Do not measure before #22 lands.** | The cadence caveat silences real breaches on M03/M20, the metric G3 binds to. A verdict computed today is silent precisely on the flows that failed worst and reports the remainder as a pass — a selection effect that removes failures from the numerator, not a caveat. |
+| **G9** | Score 3 of 4 clauses; state the 4th OPEN. | **0 of 50 scheduled cold cycles completed attach.** Whether that is a scenario defect or a real scheduler finding is unestablished, and scoring it either way would assert something unmeasured. |
+| **G11** | Report WHAT WAS MEASURED, not a G11 verdict. | C2 was never wired (commit 7 built the drift detector, commit 8 never collected its inputs — defects-log #16). C3/C4/C5 cannot be scored at n=3: C3's CoV needs ≥5 per GT-7.4, and C4/C5 are cross-seed by construction. Only **C1** is a within-run check that survives at 3 seeds. |
+
+### NOT PARTICIPATING — two, and the reasons are structural
+
+| G | why it is out |
+|---|---|
+| **G2** | Needs TB-size quantisation, planned and unbuilt. **And separately**, its E-STOP flow is **DL** (`sim/fleet.py:179`) while its named failure mode — the BSR/SR desync — is an **uplink** mechanism. So the flow cannot reach the failure even once the mechanism exists. Two independent blockers, and building only the first would not produce a scoreable G2. |
+| **G7** | No MFBR enforcement anywhere in `sim/`. Containment is observable; **clipping is not**, and clipping is half the pass criterion. Structurally out. |
+
+**Count, derived from the rows above: 7 re-measured, 3 with a stated limit
+(one of which is gated on #22), 2 not participating. Twelve accounted for.**
+
+### Carried into Phase 4's budget
+
+**Overnight time goes to guarantees where more samples buy tighter numbers,
+not to ones blocked on missing code.** So the budget excludes G2 and G7
+entirely, and gives G3 nothing unless #22 has landed by then. G11's share is
+sized for C1 only — spending an overnight on C3/C4/C5 at n=3 buys nothing,
+because they are unscoreable at that seed count for reasons no amount of
+wall-clock changes.
+
+---
+
+
 **What this pass validates, stated before any number.** At 3 runs / 5–10
 minutes per guarantee these check **plumbing**, not statistics: that the code
 runs, that the instrument fires, and that the value is plausible. They do not

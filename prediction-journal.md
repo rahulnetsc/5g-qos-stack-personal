@@ -503,6 +503,66 @@ comparing against?*
 
 ---
 
+## Standing rule — "`--check` clean" MEANS NOTHING WITHOUT SAYING WHETHER IT COULD HAVE MOVED
+
+Two entries in this journal report the same two words and mean opposite
+things. Quoting either without the qualifier is quoting nothing.
+
+| | what was registered | why |
+|---|---|---|
+| **P7** (M20's caveat, M22) | `--check` **BLIND** | the corpus stores `RunRecord`s and **no scorecard output**, so a `sim/scorecard.py` change is structurally invisible. A clean result is **zero evidence**. |
+| **P10** (handshake arrivals) | `--check` **BINDING, predicted quiet** | the corpus stores `bytes_arrived` and the fix writes `bytes_arrived` — they intersect, so a moved record was REACHABLE. It stayed clean only because no corpus scenario has a join UE, checked rather than assumed. |
+
+**Only P10's clean result is quotable as evidence.** P7's is a structural
+inevitability wearing the same sentence.
+
+**The test is mechanical and costs one line:** name the INPUT the check reads
+and the ARTEFACT the change touches, and say whether they intersect. Do it
+from the DIFF, not the commit's headline — WP9 G11 commit 2 registered
+"blind" from its headline (ledger eviction, scoring-adjacent) while its diff
+reached `RunRecord`, and `--check` failed on the first run.
+
+**And a passing check that could not have failed is worse than no check,
+because it is recorded as verification.** That is the same shape as CLAUDE.md's
+could-have-failed rule, applied to the specific instrument this project
+reaches for most often.
+
+## Standing rule — AN OVER-CORRECTION IS ITS OWN FAILURE CLASS, AND IT IS THE HARDEST TO SEE
+
+Distinct from a stale claim (true when written) and a wrong claim (never
+true). **An over-correction is a claim that was WRONG, was CORRECTED, and the
+correction swung past the target — so it now reads as settled.** That is what
+makes it worse than either: a stale claim is suspected by anyone who checks
+the date, and a wrong claim is contradicted by the code. An over-correction
+carries a correction box, a citation, and the authority of having been
+already-investigated. Nobody checks it twice.
+
+**The instance, and it is fully worked.** `docs/wp9-plan.md` §24.6 and
+`docs/wp9-defects-log.md` #8:
+
+1. **Original claim:** *"any Part C M03 reading at `duty_cycle` ≤ 0.5 is
+   measuring the duty cycle"*. Too broad — it discarded a real arm difference.
+2. **The correction** narrowed it to duty 0.1 and asserted *"at duty 0.5 the
+   period is 200 ms, the caveat does NOT fire"*. Written as a correction box,
+   with the arithmetic shown.
+3. **The correction is also wrong.** Measured over the committed
+   `part_c_rows.csv`: at duty 0.5 the predicate fires on **4 of 44 breaches**,
+   with observed medians of 596/602/551/525 ms against that 200 ms period.
+
+**The mechanism of the over-correction is the reusable part: it inferred the
+predicate's STATE from the CONFIGURATION instead of reading the predicate's
+actual INPUT.** The caveat's predicate is `median_gap_ms > T_live/4`, and
+`median_gap_ms` is MEASURED, not configured. A flow configured at 200 ms
+whose network degrades it to a 600 ms median trips the predicate — which is
+finding #22 from the other direction. The correction reasoned about the
+scenario file when it could have read the column.
+
+**Mechanically:** when correcting a claim about a predicate, evaluate the
+predicate against the data it actually reads. If the correction's evidence is
+the CONFIGURATION and the predicate's input is a MEASUREMENT, the correction
+is a hypothesis, not a fix — and it will be believed harder than the original
+error was.
+
 ## Standing rule — a rule can be violated by the code that IMPLEMENTS it
 
 Fourth of the form rules, and it is about a failure the other three cannot
@@ -560,7 +620,7 @@ output does.
 
 ---
 
-## P1 — `priority_level` derives from the 5QI table (2026-09-03)
+## P6 — `priority_level` derives from the 5QI table (2026-09-03)
 
 **Registered before running anything.**
 
@@ -601,7 +661,7 @@ studies alone. Clean `--check` + a still-degenerate builder = the fix did not
 reach the population it was for. A moved `--check` = a corpus scenario was
 relying on the 100 default, which would be a fourth place the defect lived.
 
-### P1 — SCORED
+### P6 — SCORED
 
 | # | registered | outcome |
 |---|---|---|
@@ -628,7 +688,7 @@ nothing asked *is it called with anything but a constant*.
 three is its own commit, and bundling it would defeat the attribution this
 commit exists for.
 
-## P2 — M20's caveat forwarding and M22's addition (2026-09-03)
+## P7 — M20's caveat forwarding and M22's addition (2026-09-03)
 
 **`--check` is BLIND to both, and this is the §10-commit-1 shape, so it is
 declared rather than discovered.** `regression/baseline_studies_1_3.json`
@@ -653,7 +713,7 @@ for the M09 hoist, corrected in `ac8c5cc`.)
 
 **Registered: full suite green, `--check` clean and MEANINGLESS.**
 
-## P3 — does the priority fix explain G12's declaration-order confound? (2026-09-03)
+## P8 — does the priority fix explain G12's declaration-order confound? (2026-09-03)
 
 **Registered before Phase 2 runs. My first hypothesis is already REFUTED by
 a read, and it is recorded because it was the obvious one.**
@@ -705,7 +765,7 @@ seeds = the previous stability was itself an artefact of the constant.**
 registered here so Phase 2 scores it either way, per the rule that a
 prediction exercise only cited when it is right is not one.
 
-## P4 — population becomes a required argument (2026-09-03)
+## P9 — population becomes a required argument (2026-09-03)
 
 **`--check` is BLIND to the substance and BINDS on a side-effect, and both
 halves are declared before running it.**
@@ -750,7 +810,7 @@ protected. **If a re-run moves G10, that prediction is wrong and the
 naming, because it is the one row I am asserting is safe without having
 re-measured it.
 
-## P5 — the join handshake bypasses arrival accounting (#18), 2026-09-03
+## P10 — the join handshake bypasses arrival accounting (#18), 2026-09-03
 
 **Registered before the edit.**
 
@@ -795,13 +855,13 @@ non-join scenario reached the handshake path**, which would be a second
 defect, not a re-baselining occasion. Ratios still ≫ 1 = a third arrival site
 exists that neither `:397` nor `:720` covers.
 
-**This is the counterpart to P2's declaration and worth the contrast:** P2's
+**This is the counterpart to P7's declaration and worth the contrast:** P2's
 `--check` could not fail (the corpus stores no scorecard output, so a
-scorecard change is invisible to it). P5's **can** fail and is predicted not
+scorecard change is invisible to it). P10's **can** fail and is predicted not
 to. Same words, opposite epistemic status, and only the second makes a clean
 result worth quoting.
 
-### P5 — SCORED, 3 of 3 HIT
+### P10 — SCORED, 3 of 3 HIT
 
 | # | registered | outcome |
 |---|---|---|
@@ -811,12 +871,12 @@ result worth quoting.
 
 956 tests pass.
 
-**The contrast with P2 is the reusable part.** P2 declared `--check` BLIND:
+**The contrast with P2 is the reusable part.** P7 declared `--check` BLIND:
 the corpus stores `RunRecord`s and no scorecard output, so a scorecard change
-is structurally invisible and a clean result is worth nothing. P5 declared it
+is structurally invisible and a clean result is worth nothing. P10 declared it
 BINDING-BUT-QUIET: the corpus stores `bytes_arrived`, the change writes
 `bytes_arrived`, they intersect — and it stays clean only because the join
 path is never entered there. **Same two words, opposite epistemic status.**
-Only P5's clean result is quotable as evidence, and the difference is
+Only P10's clean result is quotable as evidence, and the difference is
 established by naming the input and the touched artefact, not by how the
 commit felt.

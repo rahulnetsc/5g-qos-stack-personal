@@ -1,0 +1,1773 @@
+<title>IA-P5G Guarantee Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root {
+  --bg: #E7E9EB;
+  --surface: #FCFCFD;
+  --surface-2: #F1F3F5;
+  --ink: #171A1E;
+  --ink-2: #545C66;
+  --ink-3: #7C848E;
+  --rule: #CBD1D7;
+  --rule-strong: #A7B0B9;
+  --accent: #8E6200;
+  --accent-tint: #EFE3C4;
+  --pass: #24614F;
+  --fail: #992E24;
+  --partial: #3A5D80;
+  --out: #5F666F;
+  --shadow: 0 1px 0 rgba(23,26,30,.06);
+
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --pad: clamp(28px, 4.2vw, 76px);
+  --maxw: 1200px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131519;
+    --surface: #1B1E23;
+    --surface-2: #22262C;
+    --ink: #E4E7EA;
+    --ink-2: #9AA2AB;
+    --ink-3: #767E88;
+    --rule: #2C3138;
+    --rule-strong: #3E454D;
+    --accent: #DCA83A;
+    --accent-tint: #352C13;
+    --pass: #63B79F;
+    --fail: #E27C6E;
+    --partial: #83ABD3;
+    --out: #979FA8;
+    --shadow: 0 1px 0 rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131519;
+  --surface: #1B1E23;
+  --surface-2: #22262C;
+  --ink: #E4E7EA;
+  --ink-2: #9AA2AB;
+  --ink-3: #767E88;
+  --rule: #2C3138;
+  --rule-strong: #3E454D;
+  --accent: #DCA83A;
+  --accent-tint: #352C13;
+  --pass: #63B79F;
+  --fail: #E27C6E;
+  --partial: #83ABD3;
+  --out: #979FA8;
+  --shadow: 0 1px 0 rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- deck scaffolding ------------------------------------------------ */
+
+#rail {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--rule); z-index: 60;
+}
+#rail > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .18s ease; }
+
+#deck {
+  height: 100vh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  #deck { scroll-behavior: auto; }
+  #rail > i { transition: none; }
+}
+
+.slide {
+  scroll-snap-align: start;
+  min-height: 100vh;
+  padding: calc(var(--pad) * .85) var(--pad) calc(var(--pad) * .7);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--bg);
+}
+.inner { width: 100%; max-width: var(--maxw); margin: 0 auto; display: flex; flex-direction: column; gap: 18px; flex: 1; }
+
+.railtop {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; padding-bottom: 9px; border-bottom: 2px solid var(--ink);
+}
+.eyebrow {
+  font-family: var(--f-mono); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+}
+.idx { font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); letter-spacing: .08em; white-space: nowrap; }
+
+h1, h2 {
+  font-family: var(--f-display); font-weight: 700; color: var(--ink);
+  margin: 0; text-wrap: balance; letter-spacing: -.015em; line-height: 1.08;
+}
+h1 { font-size: clamp(34px, 4.6vw, 58px); }
+h2 { font-size: clamp(23px, 2.65vw, 35px); }
+h3 {
+  font-family: var(--f-mono); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink-2);
+  margin: 0 0 7px; padding-bottom: 5px; border-bottom: 1px solid var(--rule);
+}
+p { margin: 0 0 10px; max-width: 68ch; }
+p:last-child { margin-bottom: 0; }
+.lead { font-size: clamp(17px, 1.42vw, 21px); color: var(--ink-2); max-width: 78ch; }
+.lead strong { color: var(--ink); font-weight: 600; }
+
+.body { flex: 1; display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+
+.foot {
+  font-family: var(--f-mono); font-size: 11px; line-height: 1.55;
+  color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 9px;
+  overflow-wrap: anywhere;
+}
+.foot b { color: var(--ink-2); font-weight: 600; }
+
+/* ---- structural blocks ---------------------------------------------- */
+
+.cols { display: grid; gap: clamp(18px, 2.4vw, 38px); align-items: start; }
+.c2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.c3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.c2u { grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); }
+.c2w { grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); }
+@media (max-width: 900px) {
+  .c2, .c3, .c2u, .c2w { grid-template-columns: minmax(0,1fr); }
+}
+
+ul { margin: 0; padding-left: 1.05em; }
+li { margin-bottom: 7px; }
+li:last-child { margin-bottom: 0; }
+li::marker { color: var(--ink-3); }
+
+.tight li { margin-bottom: 4px; }
+
+code, .m { font-family: var(--f-mono); font-size: .855em; }
+code { color: var(--ink-2); overflow-wrap: anywhere; }
+.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+.hi { color: var(--accent); font-weight: 600; }
+.bad { color: var(--fail); font-weight: 600; }
+.good { color: var(--pass); font-weight: 600; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--rule);
+  padding: 15px 17px; box-shadow: var(--shadow);
+}
+.card.flush { background: var(--surface-2); }
+
+.strip { border-left: 3px solid var(--accent); padding-left: 14px; }
+.strip.fail { border-left-color: var(--fail); }
+.strip.pass { border-left-color: var(--pass); }
+.strip.partial { border-left-color: var(--partial); }
+.strip.out { border-left-color: var(--out); }
+
+.kicker {
+  font-family: var(--f-mono); font-size: 12px; font-weight: 600;
+  letter-spacing: .05em; color: var(--ink);
+}
+
+/* ---- tables ---------------------------------------------------------- */
+
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 11px 6px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+th {
+  font-family: var(--f-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3);
+  border-bottom: 1px solid var(--rule-strong); white-space: nowrap;
+}
+td { font-family: var(--f-body); color: var(--ink-2); }
+td.num, th.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; padding-right: 16px; white-space: nowrap; }
+td.key { font-family: var(--f-mono); font-weight: 600; color: var(--ink); white-space: nowrap; font-size: 13px; }
+table:not(.mtx) tr:last-child td { border-bottom: none; }
+table.dense { font-size: 13px; }
+table.dense th, table.dense td { padding: 4px 10px 4px 0; }
+
+.chip {
+  display: inline-block; font-family: var(--f-mono); font-size: 10px;
+  font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  padding: 2px 7px; border: 1px solid currentColor; white-space: nowrap;
+}
+.chip.pass { color: var(--pass); }
+.chip.fail { color: var(--fail); }
+.chip.partial { color: var(--partial); }
+.chip.out { color: var(--out); }
+.chip.accent { color: var(--accent); }
+
+/* ---- title slide ----------------------------------------------------- */
+
+.title-slide { justify-content: center; }
+.title-slide .inner { flex: 0; gap: 30px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.stat { background: var(--surface); padding: 14px 16px; }
+.stat .v { font-family: var(--f-mono); font-size: clamp(20px, 2.3vw, 29px); font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat .l { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-top: 4px; }
+
+/* ---- loop diagram ---------------------------------------------------- */
+
+.loop { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+.step {
+  font-family: var(--f-mono); font-size: 11.5px; line-height: 1.35;
+  border: 1px solid var(--rule); background: var(--surface);
+  padding: 6px 9px; color: var(--ink-2); flex: 1 1 auto;
+}
+.step b { display: block; color: var(--ink); font-weight: 600; }
+.step.mark { border-color: var(--accent); background: var(--accent-tint); }
+.step.mark b { color: var(--ink); }
+
+/* ---- boundary matrix ------------------------------------------------- */
+
+.mtx { font-family: var(--f-mono); font-size: 12px; border-collapse: collapse; width: auto; }
+.mtx th { font-size: 10px; padding: 4px 8px; border: none; }
+.mtx td { border: 1px solid var(--rule); padding: 7px 10px; text-align: center; color: var(--ink-3); font-size: 11px; }
+.mtx td.sep { background: var(--accent-tint); color: var(--ink); font-weight: 600; border-color: var(--accent); }
+.mtx td.lab { border: none; text-align: right; color: var(--ink-2); font-weight: 600; padding-right: 12px; }
+
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); }
+.legend i { display: inline-block; width: 11px; height: 11px; border: 1px solid var(--rule); vertical-align: -1px; margin-right: 5px; }
+.legend i.on { background: var(--accent-tint); border-color: var(--accent); }
+
+hr.hair { border: none; border-top: 1px solid var(--rule); margin: 2px 0; }
+
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ---- experiment / result slide components ---------------------------- */
+
+/* The slide title on an experiment slide IS the operational question. */
+h2.q { font-size: clamp(25px, 3.05vw, 41px); letter-spacing: -.02em; }
+
+/* Section captions inside a slide body, above a table or block. */
+.blk { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.blk > h3 { margin-bottom: 0; }
+
+/* The grid arithmetic: shown as an equation, not asserted as a total. */
+.arith {
+  font-family: var(--f-mono); font-size: 13px; line-height: 1.7;
+  background: var(--surface-2); border: 1px solid var(--rule); padding: 11px 13px;
+  font-variant-numeric: tabular-nums;
+}
+.arith .row { display: flex; justify-content: space-between; gap: 14px; }
+.arith .row + .row { border-top: 1px solid var(--rule); margin-top: 5px; padding-top: 5px; }
+.arith .lbl { color: var(--ink-3); }
+.arith .val { color: var(--ink); font-weight: 600; white-space: nowrap; }
+.arith .tot .lbl, .arith .tot .val { color: var(--accent); }
+
+/* The operational instruction: the one actionable block on a result slide. */
+.instr {
+  background: var(--accent-tint); border: 1px solid var(--accent);
+  padding: 13px 15px; display: flex; flex-direction: column; gap: 6px;
+}
+.instr .lbl {
+  font-family: var(--f-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--accent);
+}
+.instr p { font-size: 16px; color: var(--ink); max-width: none; }
+
+/* Caveats: present but visually subordinate to the result. */
+.caveats { border-top: 1px solid var(--rule); padding-top: 9px; }
+.caveats ul { padding-left: 1em; }
+.caveats li { font-size: 14px; color: var(--ink-2); margin-bottom: 5px; }
+.caveats li::marker { color: var(--accent); }
+
+/* A result table read at projection distance. */
+table.big { font-size: 15.5px; }
+table.big th { font-size: 11px; }
+table.big td { padding: 8px 12px 8px 0; }
+table.big td.num { font-size: 16px; }
+td.num.good { color: var(--pass); }
+td.num.bad { color: var(--fail); }
+td.verdict { font-family: var(--f-mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* Backup slides carry a different eyebrow colour so they read as an appendix. */
+.slide.backup { background: var(--surface-2); }
+.slide.backup .eyebrow { color: var(--ink-2); }
+.slide.backup .railtop { border-bottom-color: var(--rule-strong); }
+.slide.backup .card { background: var(--bg); }
+
+/* A named error class on a backup slide, with its instances. */
+.klass { display: flex; flex-direction: column; gap: 9px; }
+.klass .name {
+  font-family: var(--f-display); font-weight: 700; font-size: 19px;
+  color: var(--ink); letter-spacing: -.01em; line-height: 1.2;
+}
+.inst { border-left: 2px solid var(--rule-strong); padding-left: 12px; }
+.inst .who {
+  font-family: var(--f-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .07em; color: var(--accent); text-transform: uppercase;
+}
+.inst p { font-size: 14.5px; margin: 3px 0 0; }
+
+@media (max-width: 700px) {
+  body { font-size: 15.5px; }
+  .slide { min-height: auto; }
+  #deck { scroll-snap-type: none; }
+}
+</style>
+
+<div id="rail"><i></i></div>
+
+<div id="deck">
+
+<!-- 1 ================================================================= -->
+<section class="slide title-slide">
+  <div class="inner">
+    <div class="railtop">
+      <span class="eyebrow">IA-P5G · Private-5G factory automation</span>
+      <span class="idx">feat/high-fidelity-sim · 2026-09-02</span>
+    </div>
+    <h1>A slot-level 5G simulator, and what it has settled about the twelve service guarantees</h1>
+    <p class="lead">The client asks one question: <em>if I put my robot fleet on this network, what am I promised?</em> The test plan turns that into twelve guarantees, G1–G12. This simulator exists to answer as many of them as can honestly be answered <strong>before</strong> testbed and real-RF time is committed — and to say precisely which ones it cannot.</p>
+    <div class="stats">
+      <div class="stat"><div class="v">407</div><div class="l">configurations run</div></div>
+      <div class="stat"><div class="v">12,210</div><div class="l">simulation runs</div></div>
+      <div class="stat"><div class="v">17.0 h</div><div class="l">simulated air time</div></div>
+      <div class="stat"><div class="v">≈5.9 h</div><div class="l">wall time</div></div>
+    </div>
+    <p class="lead">Three scheduler arms — the deployed <span class="m">two-tier</span>, the <span class="m">reservation</span> baseline, and <span class="m">PF</span> — both QoS-aware arms written fresh against verified OAI C source. 21 pre-registered metrics scored on every run. 10 paired seeds per cell.</p>
+    <div class="foot"><b>Sources for this deck:</b> docs/wp9-regime-map.md · docs/wp9-plan.md · docs/oai-port-map.md · docs/IA_P5G_Factory_Guarantee_Test_Plan.md · README.md §7/§8 · CLAUDE.md. Every figure on every slide traces to one of these; each slide names its own.</div>
+  </div>
+</section>
+
+<!-- 2 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">What it is</span><span class="idx">02 / 25</span></div>
+    <h2>What runs, each slot — and the boundary that is enforced through the whole thing</h2>
+    <div class="body">
+      <p class="lead">One slot loop, <span class="n">0.25 ms</span> per iteration. The scheduler under test is a library that <strong>imports nothing outside itself</strong>; everything it reads about the slot, the buffers and the channel arrives through structural Protocol views.</p>
+
+      <div>
+        <h3>The per-slot loop, in execution order</h3>
+        <div class="loop">
+          <div class="step"><b>1 · source gate</b>an app-gated UE admits no traffic</div>
+          <div class="step"><b>2 · channel</b>AR(1) SNR, blockage, fades</div>
+          <div class="step"><b>3 · RLF detect</b>n310-armed t310 dwell</div>
+          <div class="step"><b>4 · join FSM</b>attach / re-attach / recover</div>
+          <div class="step"><b>5 · HARQ due</b>resolve retries first — their PRB and CCE come out of this slot's budget before anything new is granted</div>
+          <div class="step"><b>6 · BSR triggers</b>regular / periodic / retx</div>
+          <div class="step mark"><b>7 · scheduler.allocate()</b>on a reduced slot, with masked buffers</div>
+          <div class="step"><b>8 · UE-side LCP</b>the UE fills its own TB</div>
+          <div class="step"><b>9 · deliver / expire</b>ledgers, metrics, handshakes</div>
+        </div>
+      </div>
+
+      <div class="cols c2u">
+        <div>
+          <h3>Where the boundary is, and why</h3>
+          <p>Nothing in <code>scheduler/</code> imports <code>sim/</code> — verified, not asserted. <code>sim/scorecard.py</code> consumes only a <code>RunRecord</code> and never touches the driver or the config, so it can score records produced by anything, including an OAI adapter.</p>
+          <p>The boundary is not tidiness. A scheduler that can reach into simulator state gets information no real gNB has, and a scheduler that cannot be built is not a result. The standing question for every abstraction is <em>which network element learns this, and how?</em></p>
+        </div>
+        <div>
+          <h3>The worked example</h3>
+          <p>On <code>main</code>, <code>TwoTier._mac_lcp_fill</code> chose the uplink intra-TB byte split using the gNB's own virtual queue. The gNB cannot see that split — it only ever sees aggregate per-LCG BSR; the <strong>UE</strong> decides, by its own logical-channel prioritisation.</p>
+          <p>That is why <code>sim/ue_lcp.py</code> lives in <code>sim/</code>. Putting it in the scheduler library would <em>be</em> the fidelity error it exists to correct.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/driver.py (loop order and its inline rationale) · scheduler/interfaces.py (the Protocol views) · sim/ue_lcp.py docstring · README.md §2 · CLAUDE.md, "The gNB cannot see a UE's intra-TB per-flow split".</div>
+  </div>
+</section>
+
+<!-- 3 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">What it is</span><span class="idx">03 / 25</span></div>
+    <h2>What is modelled — and, on the same slide, what is not</h2>
+    <div class="body">
+      <div class="cols c2">
+        <div>
+          <h3>Modelled</h3>
+          <ul class="tight">
+            <li><b>MAC scheduling against a real grid.</b> 55 PRB at 40 MHz, μ=2, DSUUU; PDCCH CCE budget 48 (D) / 32 (U) / 16 (S) at aggregation level 4.</li>
+            <li><b>The full uplink access chain.</b> SR on PUCCH → <span class="m">sr-ProhibitTimer</span> → grant → quantised per-LCG BSR → grant, with <span class="m">sr-TransMax</span> exhaustion falling back to RACH.</li>
+            <li><b>BSR realism.</b> Short/Long format selection and short-BSR aliasing, UE-side ceiling encode plus the gNB's +1 overestimation bump, the <code>sched_ul_bytes</code> crumb-collapse gate. Tables transcribed from <code>nr_mac_common.c</code> and checked byte-for-byte on every test run.</li>
+            <li><b>HARQ.</b> Per-UE-per-direction process pools, k1/k2 timing, incremental-redundancy combining gain by attempt, a <em>binary</em> per-TB success draw, and a retry cap with real residual loss.</li>
+            <li><b>UE-side LCP</b> — TS 38.321 §5.4.3.1, two rounds, the first PBR-bounded.</li>
+            <li><b>Channel.</b> AR(1) SNR over TR 38.901 InF path loss and LOS probability, two-state Markov blockage, CQI reporting delay.</li>
+            <li><b>Link adaptation.</b> A persistent per-UE-per-direction MCS index, computed at candidate-build time, matching the C's own timing.</li>
+            <li><b>Join / RLF</b> with this deployment's own timers, read from the gNB startup banner.</li>
+            <li><b>Per-message and per-frame ledgers</b> — PDU sets grouped by <span class="m">frame_id</span>, so completeness and frame age are measurable, not inferred from throughput.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Not modelled</h3>
+          <ul class="tight">
+            <li><b>No PHY.</b> No waveform, coding, channel estimation, or RACH contention resolution. BLER is a sigmoid, not a decoder.</li>
+            <li><b>No RLC segmentation or ARQ.</b> <code>sim/buffer.py</code> is a byte-count FIFO. It does not know which bytes are in flight — which is exactly why a flow with a pending HARQ process is masked <em>fully</em>, not proportionally.</li>
+            <li><b>No PDCP or SDAP.</b> QFI→LCG mapping goes through <span class="m">FIVE_QI_LCG</span>, which that table's own comment flags as invented and non-standardised.</li>
+            <li><b>No TCP coupling.</b> RTSP-pulled video's DL-control-into-UL-throughput back-pressure is deliberately unbuilt.</li>
+            <li><b>No MFBR enforcement</b> anywhere in <code>sim/</code>. The field is accepted and silently ignored. This is what makes G7 structurally unanswerable.</li>
+            <li><b>Continuous TB sizing.</b> No TBS lattice — grants are sized against demand, not quantised to a transport-block table.</li>
+            <li><b>No SPS / Configured Grant.</b> The deployed scheduler defers it to a Phase 2 that was never built, so the model must not exceed it.</li>
+            <li><b>No mobility, no MU-MIMO, no CU/DU split.</b></li>
+            <li><b>OLLA is present in structure and inert:</b> its offset is provably <span class="n">0</span>, because the round-1 telemetry its ratchet reads is structurally unobservable here.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/resource.py:33-57 · sim/bsr.py + oai-branches/two-tier/nr_mac_common.c · sim/ul_access.py · sim/harq.py · sim/ue_lcp.py · sim/pathloss.py · sim/messages.py · sim/config_loader.py:16 (MFBR ignored) · scheduler/two_tier.py:748-767 (<code>_OLLA_OFFSET = 0</code>) · README.md §2, §7, §8 · docs/p5g-sim-plan.md §6.</div>
+  </div>
+</section>
+
+<!-- 4 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Workload</span><span class="idx">04 / 25</span></div>
+    <h2>Traffic and fleet: five real device profiles, and why “N=16” is not an index</h2>
+    <div class="body">
+      <div class="cols c2w">
+        <div>
+          <h3>The profiles, and every field's provenance</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Profile</th><th class="num">Flows</th><th>Bearers (5QI · dir)</th></tr>
+            <tr><td class="key">drone</td><td class="num">4</td><td>1 UL telemetry · 82 DL flight control · 2 UL H.264 720p30 · 9 UL 1 Hz heartbeat</td></tr>
+            <tr><td class="key">ugv</td><td class="num">6</td><td>4 UL lidar (duty-cycled) · 2 UL camera · 83 UL odometry 50 Hz · 82 DL drive control · 85 DL <b>E-STOP</b> · 9 UL logs</td></tr>
+            <tr><td class="key">camera</td><td class="num">2</td><td>2 UL 1080p30 continuous · 82 DL PTZ/config</td></tr>
+            <tr><td class="key">sensor</td><td class="num">2</td><td>82 UL measurement 10 Hz · 9 DL config</td></tr>
+            <tr><td class="key">actuator</td><td class="num">2</td><td>82 DL command 50 Hz · 83 UL status ack 50 Hz</td></tr>
+          </table>
+          </div>
+          <p style="margin-top:12px"><span class="kicker">Provenance is per field, not per profile.</span> <b>PDB</b> and <b>priority</b> are <em>standardised</em> — derived from TS 23.501 Table 5.7.4-1 and the 5QI priority table, never authored. <b>GFBR</b> is <em>negotiated</em>: a per-bearer value an operator provisions, so it is authored and said to be. <b>Rates, periods and duty cycles</b> are <em>operational</em>, cited per profile — the lidar from Ouster OS1/OS2 (11.8–43 Mbps low-data-rate profile) and Velodyne VLP-16 (~19 Mbps). <b>LCG</b> is a <em>simulator default</em> and <span class="bad">invented</span>, flagged as an open hardware decision.</p>
+        </div>
+        <div>
+          <h3>Composition is a primary axis</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Composition</th><th class="num">Flows/UE</th><th class="num">Onset N</th><th class="num">Flows</th></tr>
+            <tr><td class="key">sensor_dense</td><td class="num">2.0</td><td class="num">none ≤32</td><td class="num">—</td></tr>
+            <tr><td class="key">mixed</td><td class="num">3.2</td><td class="num">32</td><td class="num">96</td></tr>
+            <tr><td class="key">drone_heavy</td><td class="num">3.8</td><td class="num">32</td><td class="num">111</td></tr>
+            <tr><td class="key">ugv_heavy</td><td class="num">4.0</td><td class="num hi">16</td><td class="num hi">63</td></tr>
+          </table>
+          </div>
+          <p style="margin-top:12px">Sixteen fixed sensors and sixteen UGVs differ by an order of magnitude in flow count, GBR fraction, burst structure, UL/DL split and LCG occupancy. So a fleet size alone is not an index.</p>
+          <p><strong>Both easy readings fail.</strong> Onset is not a function of N — <span class="m">sensor_dense</span> and <span class="m">ugv_heavy</span> would agree if it were. And it is not a function of flow count either: <span class="m">ugv_heavy</span> separates at 63 flows where <span class="m">drone_heavy</span> needs 111.</p>
+          <p><span class="kicker">Open hypothesis, not a finding.</span> The UGV profile carries three tight-PDB flows — odometry 10 ms, drive control 10 ms, e-stop <b>5 ms</b> — co-located on LCG 3. Onset may track tight-PDB density and LCG co-location rather than candidate count. Logged as open: not pre-registered, one grid, and the two compositions differ in several ways at once.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/fleet.py (profiles, <code>profile_qos_table()</code>, the provenance discipline in its module docstring) · docs/wp9-regime-map.md §1.1a (onset table, and the open hypothesis) · docs/wp9-plan.md §15.4-§15.5.</div>
+  </div>
+</section>
+
+<!-- 5 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Environment</span><span class="idx">05 / 25</span></div>
+    <h2>Channel: indoor-factory everywhere, and which parts are derived rather than chosen</h2>
+    <div class="body">
+      <div class="cols c3">
+        <div>
+          <h3>The five InF sub-scenarios</h3>
+          <p><span class="m">InF-SL</span>, <span class="m">InF-DL</span>, <span class="m">InF-SH</span>, <span class="m">InF-DH</span> — sparse/dense clutter crossed with low/high BS height — and <span class="m">InF-HH</span>, both antennas above clutter, whose LOS probability is unconditionally 1.0 so it never reaches an NLOS formula at all.</p>
+          <p><span class="kicker">A correction worth stating.</span> This project's own documents previously named four of these, omitting InF-DH, reconstructed from a session's recollection. Fixed by transcribing the tables from the actual spec text — Tables 7.4.1-1, 7.4.2-1, 7.2-4 and 7.8-7 — cited by table and page.</p>
+        </div>
+        <div>
+          <h3>Derived vs. authored</h3>
+          <p><b>Position-derived:</b> a UE with a <code>position</code> gets its mean SNR — the large-scale term the AR(1) process reverts to — from InF path loss and a link budget, computed once per link at construction.</p>
+          <p><b>Scenario-authored:</b> mean SNR and spread where no position is set (the base point is 20 dB uniform, coherence 2,000 slots), and scripted fades, which force SNR deterministically with no AR(1) noise so that “when exactly does it cross the sync floor” has an exact, repeatable answer.</p>
+          <p><b>Not a deployment value:</b> the clutter parameters are the spec's own <em>calibration-study example</em> figures, not a measurement of any real factory.</p>
+        </div>
+        <div>
+          <h3>Planned, not built</h3>
+          <p>Mobility and a floor plan. Every UE position is static geometry. Correlated blockage across UEs is deferred with it.</p>
+          <h3 style="margin-top:16px">One knob that is load-bearing</h3>
+          <p>A transport block's MCS-pick SNR freezes at its original grant and is reused across every retry. So <code>cqi_delay_slots</code> decides whether a time-varying channel can interact with HARQ at all.</p>
+          <p>Measured: at delay <span class="n">0</span> the blockage×HARQ effect was unreliable — <span class="n">0–6,193</span> bytes lost across 7 seeds, overlapping the no-blockage baseline. At a realistic delay <span class="n">8</span> it separated cleanly: <span class="n">5,200–21,514</span> against <span class="n">0–800</span>. Every study in this branch runs at 8.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/pathloss.py module docstring (spec citation, and the naming correction) · sim/channel.py · sim/blockage.py · docs/wp6-plan.md §0/§2, Decision 6, commit 4 · CLAUDE.md, "A TB's <code>Allocation.snr_used_db</code> freezes at its ORIGINAL grant".</div>
+  </div>
+</section>
+
+<!-- 6 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Execution</span><span class="idx">06 / 25</span></div>
+    <h2>Parallelism was accepted as a correctness property, not a speed-up</h2>
+    <div class="body">
+      <div class="cols c2u">
+        <div>
+          <h3>Sequential inside a run, parallel across runs</h3>
+          <p>Slot <span class="m">i</span> depends on slot <span class="m">i−1</span> through buffer occupancy, HARQ feedback arriving k1/k2 slots later, the per-UE throughput EWMAs and the virtual queues. That chain cannot be broken and is not.</p>
+          <p>What <em>is</em> independent is cells. Within a cell, seeds and arms stay ordered, <code>paired_seeds</code> is drawn up front from a fixed base seed, and every run is a pure function of <span class="m">(scenario, seed)</span>. Workers write nothing — the parent stays the single writer, so record ordering is the parent's, not a race.</p>
+
+          <h3 style="margin-top:18px">The acceptance criterion was byte-identity</h3>
+          <p>A smoke grid run at <code>--workers 0</code> and <code>--workers 4</code> produced <strong>bit-identical</strong> scored rows and an identical gate verdict. The online-metric computation was extracted into one function so the serial sink and the parallel worker share a code path — otherwise the determinism claim would rest on two implementations staying in step.</p>
+          <p><span class="kicker">Why it had to be correctness.</span> Every comparison in this study is within-seed: the same channel realisation replayed across arms. Paired seeds are the whole statistical basis. An unpaired look at one hypothesis produced a <em>confident answer opposite to the paired one</em> — so this is not a refinement, it is the difference between a right and a wrong result.</p>
+        </div>
+        <div>
+          <h3>Measured</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><td class="key">10 workers</td><td class="num n">6.75×</td><td>effective speed-up</td></tr>
+            <tr><td class="key">efficiency</td><td class="num n">68 %</td><td>not assumed — stage 1's 7.32 h serial-equivalent in ~65 min</td></tr>
+          </table>
+          </div>
+
+          <h3 style="margin-top:16px">Why 10 workers and not 24</h3>
+          <p><b>Memory binds first, measured.</b> Peak RSS is <span class="n">1.4–2.1 GiB</span> per worker at the largest cells, about <span class="n">20 GiB</span> across 12 — on a 24-core, 30 GB machine.</p>
+          <p>A retention leak had already killed one stage: <span class="n">25 GB</span> RSS with 32 GiB of swap in use, thrashing rather than computing, at 756 of ~1,680 records.</p>
+          <p><b>And a design consideration, not measured here:</b> each worker links its own BLAS, so 24 of them each spawning threads oversubscribes the machine.</p>
+
+          <div class="card strip" style="margin-top:14px">
+            <p><span class="kicker">Two operational traps, both paid for.</span></p>
+            <p style="margin-top:6px"><code>pkill -f</code> does not reach multiprocessing <em>spawn</em> workers — their argv is the bootstrap. Killing the parent left 12 orphans holding <span class="n">18.7 GiB</span> that <code>pgrep -f</code> could not see. Kill children by PID.</p>
+            <p>And the leak was fixed <em>with tests</em> — then reintroduced one layer down inside the parallel worker, and the tests stayed green, because they pinned the helper and the parent, both of which were genuinely clean. What caught it was live memory instrumentation at 20 of 59 cells.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> commit <code>0ec8ddb</code> "parallelise the sweep over cells" (the determinism claim and its verification) · commit <code>82f1b76</code> (the reintroduced leak, and the spawn-worker trap) · commit <code>6b31af3</code> (the 25 GB leak) · docs/wp9-plan.md §6.3b, §26.2 · docs/wp9-regime-map.md §4 (the unpaired-vs-paired inversion) · docs/HANDOVER-new-machine.md §4.</div>
+  </div>
+</section>
+
+<!-- 7 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Execution</span><span class="idx">07 / 25</span></div>
+    <h2>Speed, honestly: the claim is not that this is fast</h2>
+    <div class="body">
+      <p class="lead"><strong>407 configurations, 12,210 runs, 17.0 hours of simulated air time, in ≈5.9 hours of wall time.</strong> That is the number to lead with. What follows is why it must not be turned into a real-time-factor claim.</p>
+
+      <div class="cols c2">
+        <div>
+          <h3>Per run, single core, full pipeline — a negative result</h3>
+          <div class="tw">
+          <table>
+            <tr><th>Configuration</th><th class="num">Sim-s per wall-s</th></tr>
+            <tr><td class="key">n_ues = 2</td><td class="num n">1.852×</td></tr>
+            <tr><td class="key">n_ues = 8 · base point</td><td class="num n bad">0.495×</td></tr>
+            <tr><td class="key">n_ues = 32</td><td class="num n bad">0.137×</td></tr>
+          </table>
+          </div>
+          <p style="margin-top:12px"><strong>At every working fleet size this simulator is slower than the radio it models.</strong> The throughput comes from parallelism, not from the model being fast. End-to-end with 10 workers, measured over two real stages: <span class="n">2.96×</span> and <span class="n">2.78×</span> — call it <span class="n">≈2.9×</span>.</p>
+          <p>The testbed-equivalent comparison ranges from 8.6× to 37.2× depending on assumed per-cell reconfiguration time, and <em>nobody has measured that</em>. The defensible floor is the <span class="n">2.9×</span> pure-air-time number, which assumes nothing.</p>
+        </div>
+        <div>
+          <h3>The two things with no ratio at all</h3>
+          <div class="card strip" style="margin-bottom:14px">
+            <p><span class="kicker">1 · A testbed cannot replay a channel realisation.</span></p>
+            <p style="margin-top:6px">Every comparison here is within-seed — the same fade, the same blockage, the same HARQ draws, across all three arms. A testbed must raise its sample count per cell to recover the same statistical power, so the time comparison above <em>understates</em> the gap. And on this project an unpaired comparison already produced a confident answer opposite the paired one.</p>
+          </div>
+          <div class="card strip" style="margin-bottom:14px">
+            <p><span class="kicker">2 · n_ues = 32 needs 32 robots.</span></p>
+            <p style="margin-top:6px">The current testbed is two rfsim UEs. The admissible-fleet-size question — the headline procurement number — is not a matter of patience.</p>
+          </div>
+          <p><strong>Lead with reachability, not with time.</strong> A speed claim invites the obvious and correct rebuttal: <em>a testbed gives you real RF.</em> “This study is not physically runnable” has no such rebuttal, and it is true.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> docs/wp9-plan.md §26.1–§26.5 (all ratios; §26.3's figures are end-to-end wall time including scoring and record writing, so they reproduce — the driver-only column does not) · docs/HANDOVER-new-machine.md §4.</div>
+  </div>
+</section>
+
+<!-- 8 ================================================================= -->
+<section class="slide">
+<div style="border:2px solid var(--fail);background:#fdf3f2;padding:18px 22px;margin:22px 0;border-radius:6px">
+<p style="margin:0 0 8px;font-weight:700;color:var(--fail);font-size:15px">
+&#9888; WITHDRAWN 2026-09-03 &mdash; G1 and G8 on this page are KNOWN-WRONG, not merely uncertain</p>
+<p style="margin:0 0 8px">Every worst-flow number behind G1 and G8 was computed over
+<b>a population nobody chose</b>. The scoring layer ranged over <i>every</i> flow, so the
+best-effort filler (5QI&nbsp;9) and the saturating aggressor (5QI&nbsp;8) &mdash; traffic a
+QoS-aware scheduler is <i>supposed</i> to starve &mdash; entered contests these guarantees
+bind to the protected fleet. Measured across 7,560 runs, the filler wins that contest
+<b>85.4&nbsp;%</b> of the time; the telemetry bearer G1 is actually about wins it in <b>6</b>.</p>
+<p style="margin:0 0 8px">Re-measured on the protected fleet, <b>both verdicts invert, in
+opposite directions</b>: G1 goes from FAIL on every arm (a value pinned at the filler&rsquo;s
+own budget, with all three arms agreeing to 0.25&nbsp;ms) to PASS on every arm with real
+separation; G8&rsquo;s two-tier arm goes from FAIL to PASS.</p>
+<p style="margin:0"><b>G3, G5, G6 and G10 are unaffected</b> and their numbers stand.
+The defect is fixed in code; the replacement values for G1 and G8 arrive with the re-run.
+These rows are marked before their replacements exist deliberately &mdash; an unmarked wrong
+number is worse than a gap.</p>
+</div>
+
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Results</span><span class="idx">08 / 25</span></div>
+    <h2>All twelve guarantees, one row each</h2>
+    <div class="body">
+      <div class="tw">
+      <table class="dense">
+        <tr><th>G</th><th>What the client is promised</th><th>Status</th><th>Reason</th></tr>
+
+        <tr><td class="key">G1</td><td>Drive commands feel immediate</td><td><span class="chip partial">Partial</span></td>
+          <td>Ordering only — the millisecond is not certifiable without real RF. <span class="bad">Now carries a measured telemetry PDB failure</span> that arrived from G12's campaign.</td></tr>
+
+        <tr><td class="key">G2</td><td>A STOP always lands, fast</td><td><span class="chip out">Blocked</span></td>
+          <td>Blocked on a <em>named</em> mechanism: the BSR/SR desync. Truncated BSR is built, correctly wired and unit-tested — and structurally cannot fire.</td></tr>
+
+        <tr><td class="key">G3</td><td>The network never makes a healthy robot look dead</td><td><span class="chip partial">Partial</span></td>
+          <td>Conditional: reported as a function of <span class="m">T_live</span>, which is unmeasured hardware. Also carries G12's telemetry failure.</td></tr>
+
+        <tr><td class="key">G4</td><td>After a pause, the next message still arrives promptly</td><td><span class="chip pass">Answered</span></td>
+          <td>Resume is prompt. One cell, and the number is entangled with message size by construction — the scope note travels with it.</td></tr>
+
+        <tr><td class="key">G5</td><td>Operators and the AI always see fresh, complete video</td><td><span class="chip fail">Failure</span></td>
+          <td><span class="bad">Measured failure on both QoS-aware arms</span>, at the base cell, with no aggressor. Median worst-flow PDU-set completeness <span class="n">0.0000</span>.</td></tr>
+
+        <tr><td class="key">G6</td><td>Background traffic can never impair the fleet</td><td><span class="chip pass">Answered</span></td>
+          <td><span class="good">Passes</span> — both clauses, every arm, protected fleet, 40 paired seeds. But G6 <em>as written</em> cannot be scored.</td></tr>
+
+        <tr><td class="key">G7</td><td>One misbehaving robot cannot take down the others</td><td><span class="chip out">Structurally out</span></td>
+          <td>No MFBR enforcement exists anywhere in <code>sim/</code>. Containment is observable; <em>clipping</em> is not, and clipping is half the pass criterion.</td></tr>
+
+        <tr><td class="key">G8</td><td>Equal robots get equal service, continuously</td><td><span class="chip partial">Partial</span></td>
+          <td>Per-second Jain across 186 scored cells — but the PF arm is contaminated by a declaration-order tie-break. Reservation-vs-two-tier is the trustworthy pair.</td></tr>
+
+        <tr><td class="key">G9</td><td>A robot joins, or re-joins, quickly on a busy cell</td><td><span class="chip accent">Run · 4 answers</span></td>
+          <td>Four clauses, four different epistemic situations: one scored, one scored via a companion metric, one weak-form only, one not producible here at all.</td></tr>
+
+        <tr><td class="key">G10</td><td>The cell hosts a stated fleet size with all of the above intact</td><td><span class="chip pass">Answered</span></td>
+          <td><span class="good">The headline.</span> Admissible N is bounded by <span class="n">8</span> at load ≥1.0 and by <span class="n">16</span> below it, on this RAN at the deployed <span class="m">min_rb=5</span>.</td></tr>
+
+        <tr><td class="key">G11</td><td>The guarantees hold for a whole shift, and reproduce</td><td><span class="chip out">Unrun</span></td>
+          <td>Budgeted and never launched — a budget constraint, not a methodological one. A soak probe is running as of this deck.</td></tr>
+
+        <tr><td class="key">G12</td><td>Under overload, degradation follows the safety order</td><td><span class="chip accent">Run · clause 4 fails</span></td>
+          <td><span class="bad">Clause 4 fails on every arm, inside the guarantee's own ramp.</span> The ordering itself is not observable at the load G12 specifies.</td></tr>
+      </table>
+      </div>
+      <p style="font-size:15px"><span class="kicker">Tally, derived from the rows above:</span> 3 answered · 1 measured failure · 2 run with clause-level answers · 3 partial · 1 blocked on a named mechanism · 1 unrun · 1 structurally out. <b>G12's clause-4 failure is filed under G1/G3</b>, which is why two “partial” rows carry a measured failure inside them.</p>
+    </div>
+    <div class="foot"><b>Source:</b> docs/wp9-regime-map.md §2 (bridge table) and §2.1 (guarantee inventory) · docs/IA_P5G_Factory_Guarantee_Test_Plan.md §3 (the client-language statements) · docs/HANDOVER-new-machine.md §6.</div>
+  </div>
+</section>
+
+<!-- 9 ================================================================= -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Read before the results</span><span class="idx">09 / 25</span></div>
+    <h2>Three qualifiers that travel with every number in this deck</h2>
+    <div class="body">
+      <div class="cols c3">
+        <div class="strip fail">
+          <h3>1 · Any single-metric “who wins” claim is false by construction</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>N ≥ 24, load 1.0</th><th class="num">GBR contracts met</th><th class="num">Worst-flow GFBR</th></tr>
+            <tr><td class="key">PF</td><td class="num n bad">0.0</td><td class="num n good">0.636 / 0.470</td></tr>
+            <tr><td class="key">Reservation</td><td class="num n good">10.4 / 6.2</td><td class="num n bad">0.000</td></tr>
+            <tr><td class="key">Two-tier</td><td class="num n good">6.7 / 6.4</td><td class="num n bad">0.000</td></tr>
+          </table>
+          </div>
+          <p style="margin-top:10px">PF meets <em>zero</em> GBR contracts and still wins the max-min floor: it spreads capacity so every flow gets something and none reaches 95 % of its GFBR; the QoS-aware arms concentrate it so some meet contract and others get nothing.</p>
+          <p><b>Quote both numbers together, every time either is quoted.</b> And the ranking is not stable: it flips between workloads, and inside one grid it inverts as a function of fleet size. <strong>The lesson generalises; the ranking does not.</strong></p>
+        </div>
+
+        <div class="strip fail">
+          <h3>2 · A simulator defect invalidated every pre-fix published uplink figure</h3>
+          <p>The Scheduling Request was gated on an empty→non-empty backlog transition, so a UL flow whose backlog never emptied <em>could never raise another SR</em>. Combined with the crumb-collapse gate, its reported buffer clamped to zero permanently.</p>
+          <p>A per-slot trace: one flow starved from slot 14 to the end of the run, backlog growing to <span class="n">184,989</span> bytes and never granted again.</p>
+          <p>It produced a clean PF &gt; Reservation &gt; two-tier ordering that read as a scheduling property. Patched, the 8× spread collapsed to under 1 % and <em>the ordering reversed</em>. The regression check moved <span class="n">5,689</span> field values across <span class="n">15 of 20</span> records.</p>
+          <p><b>The schedulers were ported correctly.</b> This was a simulator defect that made a correct port look like a scheduler property — the most dangerous shape a bug can take here.</p>
+        </div>
+
+        <div class="strip out">
+          <h3>3 · Some guarantees this tool structurally cannot answer</h3>
+          <p><b>G7</b> needs the excess to be <em>clipped</em> at MFBR. No MFBR enforcement exists anywhere in <code>sim/</code>, so containment is observable and clipping is not. Hardware is the only test.</p>
+          <p><b>G2's</b> real failure class is a BSR/SR desync. Truncated BSR is built, wired to the trigger 38.321 actually specifies, and unit-tested — and it still cannot fire, for a measured reason.</p>
+          <p><b>G9's</b> second clause runs, and its input is not independent evidence: the attach delays are sampled between this deployment's own timer ceilings, so a p95 restates the configuration.</p>
+          <p style="margin-top:10px"><strong>This project's credibility rests on having said so.</strong> A deck that omitted these would be weaker, not stronger.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> docs/wp9-regime-map.md §0.1 and §0.1.1 · docs/wp9-plan.md §8b (the trace, the worktree diagnostic and the blast radius) and §8c (the fix, its scored prediction and the sanctioned re-baseline) · docs/oai-port-map.md row 79 · §19.5, §20 · docs/wp9-plan.md §31.1.</div>
+  </div>
+</section>
+
+<!-- 10 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Experiment · G5 · fresh, complete video</span><span class="idx">10 / 25</span></div>
+    <h2 class="q">When eight robots are all streaming at once, does every camera feed keep arriving — or does the network quietly give up on one of them?</h2>
+    <div class="body">
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What each robot sends</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Flow</th><th>Dir</th><th>Class</th><th>Rate offered</th><th>Deadline</th></tr>
+            <tr><td class="key">Camera video</td><td>uplink</td><td>5QI 2 · guaranteed</td><td class="num">3.88 Mbps<br><span style="color:var(--ink-3)">16 kB frame / 33 ms</span></td><td class="num">150 ms</td></tr>
+            <tr><td class="key">Telemetry</td><td>uplink</td><td>5QI 1 · delay</td><td class="num">24.0 kbps<br><span style="color:var(--ink-3)">300 B / 100 ms</span></td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Drive command</td><td>downlink</td><td>5QI 82 · delay</td><td class="num">16.0 kbps<br><span style="color:var(--ink-3)">100 B / 50 ms</span></td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Logs, uploads</td><td>uplink</td><td>5QI 9 · best effort</td><td class="num">8.00 Mbps<br><span style="color:var(--ink-3)">Poisson</span></td><td class="num">300 ms</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">Per robot: <b>11.90 Mbps</b> offered uplink, of which <b>3.90 Mbps is committed</b>. Across 8 robots, <b>95.2 Mbps offered uplink</b>.</p>
+          <h3 style="margin-top:6px">What the load axis moves — and what holds still</h3>
+          <p style="font-size:14.5px">The load multiplier scales <b>one flow only: the 8.00 Mbps best-effort filler</b>. Camera, telemetry and drive command hold at their profile rates on every load level, so changing “load” never changes the quantity G5 measures. At ×1.0 the filler is <b>67 % of a robot's offered uplink bytes</b>.</p>
+        </div>
+        <div class="blk">
+          <h3>What was varied</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Axis</th><th>Levels</th></tr>
+            <tr><td class="key">Scheduler arm</td><td>PF · Reservation · Two-tier</td></tr>
+            <tr><td class="key">Random seed</td><td>40 paired seeds, identical across arms</td></tr>
+            <tr><td class="key">Fleet size</td><td><b>held at 8 robots</b> (2–32 in the scope grid)</td></tr>
+            <tr><td class="key">Offered load</td><td><b>held at ×1.0</b> = 95.2 Mbps uplink</td></tr>
+            <tr><td class="key">Aggressor</td><td><b>OFF</b> — this is a base-point result</td></tr>
+          </table>
+          </div>
+          <h3 style="margin-top:6px">The grid</h3>
+          <div class="arith">
+            <div class="row"><span class="lbl">one cell =</span><span class="val">8 robots, load ×1.0, no aggressor</span></div>
+            <div class="row"><span class="lbl">runs per cell</span><span class="val">3 arms × 40 seeds = 120</span></div>
+            <div class="row"><span class="lbl">cells (G5 reads the no-aggressor half)</span><span class="val">2</span></div>
+            <div class="row tot"><span class="lbl">total runs</span><span class="val">2 × 3 × 40 = 240</span></div>
+          </div>
+          <h3 style="margin-top:6px">Run length</h3>
+          <p style="font-size:14.5px"><b>5.0 simulated seconds</b> = 20,000 slots at 0.25 ms. Chosen because the corpus's 1.0 s gives a 10 Hz telemetry flow only <b>10 messages</b> — too few for a rule-of-three bound. 5.0 s gives <b>50 messages</b>, and about <b>152 camera frames</b> per feed per seed.</p>
+        </div>
+      </div>
+      <div class="blk">
+        <h3>What was measured</h3>
+        <div class="tw">
+        <table class="dense">
+          <tr><th>Metric</th><th>In plain English</th><th>Primary</th><th>Which flows enter it</th></tr>
+          <tr><td class="key">M05 completeness</td><td>Share of camera frames arriving whole and inside 150 ms; worst feed. A partial frame counts as failed.</td><td class="verdict" style="color:var(--accent)">PRIMARY</td><td>The 8 uplink camera feeds only — all protected, so no restriction needed.</td></tr>
+          <tr><td class="key">M06 frame age</td><td>How stale the newest delivered frame is, p95, worst feed. Bar 67 ms.</td><td>secondary</td><td>Camera feeds <b>that completed at least one frame</b> — a feed that completed none is excluded by construction.</td></tr>
+          <tr><td class="key">M07 + M08</td><td>How many feeds hit 95 % of their 4.0 Mbps guarantee, and how the worst one did. Always quoted together.</td><td>secondary</td><td>The 8 guaranteed-bitrate flows, which here are exactly the 8 camera feeds.</td></tr>
+          <tr><td class="key">M02 miss rate</td><td>Byte-weighted share of traffic missing its deadline.</td><td class="verdict" style="color:var(--fail)">NOT USABLE</td><td>Every flow, byte-weighted — and the filler is 67 % of the bytes. Not a video statistic here.</td></tr>
+        </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/parametric.py · sweeps/wp9/stage6_g6_n40.csv · wp9-plan.md §1, §29 · bar from the test plan line 99.</div>
+  </div>
+</section>
+
+<!-- 11 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · G5 · fresh, complete video</span><span class="idx">11 / 25</span></div>
+    <h2>Both QoS-aware schedulers abandon one camera feed outright — at the base point, with no aggressor</h2>
+    <div class="body">
+      <div class="tw">
+      <table class="big">
+        <tr><th>Statistic</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier · the product</th></tr>
+        <tr><td class="key">Worst feed, frames complete in 150 ms — median</td><td class="num good">0.9934</td><td class="num bad">0.0000</td><td class="num bad">0.0000</td></tr>
+        <tr><td class="key">Worst feed — minimum over 40 seeds</td><td class="num good">0.9868</td><td class="num bad">0.0000</td><td class="num bad">0.0000</td></tr>
+        <tr><td class="key">Seeds meeting G5's bar of 0.99, of 40</td><td class="num good">36 of 40</td><td class="num bad">7 of 40</td><td class="num bad">5 of 40</td></tr>
+        <tr><td class="key">Seeds with a feed at <b>exactly zero</b>, of 40</td><td class="num good">0 of 40</td><td class="num bad">33 of 40</td><td class="num bad">31 of 40</td></tr>
+        <tr><td class="key">Distinct feeds behind those breaches</td><td class="num">4 feeds, 1 seed each</td><td class="num bad">2 feeds</td><td class="num bad">4 feeds, one on 30</td></tr>
+        <tr><td class="key">Frame age p95 within 67 ms — seeds, of 40</td><td class="num good">40 of 40</td><td class="num good">40 of 40</td><td class="num bad">33 of 40</td></tr>
+        <tr><td class="key">Effective frames/s on the <em>most-frozen</em> feed (source sends 30.3)</td><td class="num good">30.00</td><td class="num good">30.00</td><td class="num bad">16.60</td></tr>
+        <tr><td class="key">Aggregate delivered, median (of 95.2 Mbps offered)</td><td class="num">67.50 Mbps</td><td class="num">66.37 Mbps</td><td class="num bad">59.55 Mbps</td></tr>
+      </table>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What it means</h3>
+          <p>Both QoS-aware schedulers abandon one camera feed outright. It produces roughly <b>148 frames in 5.0 seconds</b> and delivers <b>none of them</b> inside the 150 ms deadline, while its seven siblings are fine. Proportional fair never does this — its worst feed stays above <b>98.6 %</b> complete. On G5's own pass criterion, at the base point with no aggressor, <strong>the non-QoS baseline passes and both QoS-aware arms fail.</strong></p>
+          <div class="instr">
+            <span class="lbl">Where the testing team should look</span>
+            <p>Score <b>every</b> camera feed on GT-3.1, not just the designated instrument asset — the failure is one feed of eight and it moves between robots. Run it at <b>8 robots or more</b> at offered load ×1.0. Use completeness, never frame age.</p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>The mechanism is not isolated, and this deck stops there.</b> The concentrate-versus-spread split is documented. <b>Which term of either arm's ranking abandons the feed is not identified</b> — no trace has been run. Do not attribute it.</li>
+            <li>What the data does say and no further: every robot runs the same <b>20 dB</b> mean SNR, so the abandoned feed is <b>not</b> the weakest-radio robot. Its identity is near-fixed across seeds.</li>
+            <li><b>Two of G5's four metrics are blind to this failure.</b> Frame age and freeze-count both <em>exclude a feed that completed no frames</em>, by design — so Reservation abandons a feed on 33 of 40 seeds and still records the <em>best</em> median frame age of the three arms.</li>
+            <li><b>The worst-feed floor cannot reach 1.0</b>: the camera offers ~3.89 Mbps against a 4.0 Mbps declared guarantee, so the practical ceiling is <b>≈ 0.973</b>. PF's 0.9600 median is ~99 % of what was actually offered.</li>
+            <li><b>Onset is workload-dependent.</b> Clean at 4 robots on every arm. On the realistic device mixes at 32 robots, zero-completeness feeds appear on Reservation and Two-tier but <b>never on PF</b> — 0 of 450 scored PF runs across the whole fleet grid.</li>
+            <li>One cell, one radio, one minimum grant. Ordering transfers to hardware; absolute milliseconds do not.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §29; sweeps/wp9/stage6_g6_n40.csv and stage4/stages4_rows.csv. <b>Correction on backup slide B1.</b></div>
+  </div>
+</section>
+
+<!-- 12 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Experiment · the overload ramp · G12 + G1/G3</span><span class="idx">12 / 25</span></div>
+    <h2 class="q">If you overload the cell exactly the way the test plan says to, what gives way first — and does the heartbeat survive it?</h2>
+    <div class="body">
+      <p class="lead">One campaign, <strong>two results for two different audiences</strong>. The next slide is the safety finding; the one after is a finding about the test plan itself.</p>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What the fleet sends — `mixed`, 8 robots</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Flow</th><th>Dir</th><th>Class</th><th>Rate at ×1.0</th><th>Deadline</th></tr>
+            <tr><td class="key">Telemetry ×2</td><td>UL</td><td>5QI 1 · delay</td><td class="num">22.4 kbps</td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Lidar feed ×2</td><td>UL</td><td>5QI 4 · guaranteed</td><td class="num">3.00 Mbps <span class="hi">× m</span></td><td class="num">300 ms</td></tr>
+            <tr><td class="key">Cameras ×5</td><td>UL</td><td>5QI 2 · guaranteed</td><td class="num">3.88–6.06 Mbps <span class="hi">× m</span></td><td class="num">150 ms</td></tr>
+            <tr><td class="key">Odometry ×2</td><td>UL</td><td>5QI 83 · delay</td><td class="num">80.0 kbps</td><td class="num">10 ms</td></tr>
+            <tr><td class="key">Drive control ×4</td><td>DL</td><td>5QI 82 · delay</td><td class="num">19.2 kbps</td><td class="num">10 ms</td></tr>
+            <tr><td class="key">E-STOP ×2</td><td>DL</td><td>5QI 85 · delay</td><td class="num">64 bps</td><td class="num">5 ms</td></tr>
+            <tr><td class="key">Logs, heartbeats</td><td>UL+DL</td><td>5QI 9 · best effort</td><td class="num">1.005 Mbps</td><td class="num">300 ms</td></tr>
+            <tr><td class="key"><b>Best-effort flood</b></td><td>UL</td><td>5QI 9 · saturating</td><td class="num bad">50.0 Mbps</td><td class="num">300 ms</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">Offered uplink at ×1.0 ≈ <b>78.8 Mbps</b> against a measured deliverable ceiling of <b>63.4 Mbps</b> — measured once, on PF, one seed, at the ramp bottom — the cell is <em>already</em> contended at the bottom of the ramp.</p>
+        </div>
+        <div class="blk">
+          <h3>What the load axis moves — and what holds still</h3>
+          <p style="font-size:14.5px">The multiplier scales the <b>two contracted classes only</b> — the lidar's and the cameras' offered rate <em>and</em> their guarantees together, so the contract moves with the demand and neither class is biased toward failing first.</p>
+          <p style="font-size:14.5px"><b>Everything else holds still</b>: the fleet stays at 8 robots, the 50.0 Mbps flood stays at 50.0 Mbps, and — the point of the experiment — <strong>the 22.4 kbps telemetry stream is never touched at any ramp point.</strong></p>
+          <h3 style="margin-top:6px">The ramp</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Step</th><th class="num">Committed</th><th class="num">% of 63.4 Mbps ceiling</th></tr>
+            <tr><td class="key">×1.0</td><td class="num">28.0 Mbps</td><td class="num">44 %</td></tr>
+            <tr><td class="key">×1.6</td><td class="num">44.8 Mbps</td><td class="num">71 %</td></tr>
+            <tr><td class="key">×2.3</td><td class="num">64.4 Mbps</td><td class="num">102 %</td></tr>
+            <tr><td class="key">×2.7</td><td class="num">75.6 Mbps</td><td class="num">119 %</td></tr>
+            <tr><td class="key hi">×3.3</td><td class="num hi">92.4 Mbps</td><td class="num hi">146 % — GT-7.3's own top</td></tr>
+            <tr><td class="key">×4.0 / ×6.0 / ×8.0</td><td class="num">112 / 168 / 224 Mbps</td><td class="num">177 / 265 / 353 % — beyond</td></tr>
+          </table>
+          </div>
+        </div>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>The grid</h3>
+          <div class="arith">
+            <div class="row"><span class="lbl">one cell =</span><span class="val">one fleet mix at 8 robots, swept across all 8 ramp steps</span></div>
+            <div class="row"><span class="lbl">candidate cells</span><span class="val">4 mixes × 1 fleet size = 4</span></div>
+            <div class="row"><span class="lbl">refused before running (no lidar flow)</span><span class="val">−1 → 3</span></div>
+            <div class="row"><span class="lbl">excluded whole by the ramp-bottom control</span><span class="val">−2 → <b>1 scored cell</b></span></div>
+            <div class="row"><span class="lbl">control pass · main grid · order control</span><span class="val">90 + 240 + 480</span></div>
+            <div class="row tot"><span class="lbl">total runs</span><span class="val">810</span></div>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)"><b>Two cells were excluded at cell granularity, not seed granularity</b> — dropping only the failing seeds would leave the survivors self-selected. That is a real loss of scope: the ordering rests on <b>one</b> fleet mix.</p>
+        </div>
+        <div class="blk">
+          <h3>What was measured, and on which flows</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Metric</th><th>In plain English</th><th>Which flows</th></tr>
+            <tr><td class="key">Telemetry miss rate</td><td>Share of resolved telemetry bytes that missed the 100 ms deadline</td><td><b>The 2 telemetry flows only</b> — restricted before scoring, so not the fleet-wide figure</td></tr>
+            <tr><td class="key">Best-effort throughput</td><td>Is the lowest class still getting bytes through?</td><td>All 7 flows carrying 5QI 9. <b>Never quote the miss rate without it</b></td></tr>
+            <tr><td class="key">First-violation order</td><td>Which contracted class drops below 95 % of its rate first</td><td><b>Guaranteed flows only.</b> Telemetry is a delay class and is <b>structurally invisible</b> to it</td></tr>
+            <tr><td class="key">Liveness gap</td><td>Longest silence between telemetry messages</td><td>Same 2 flows — but <b>undefined on 116 ramp points</b>, see next slide</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px"><b>Run length 5.0 simulated seconds per run.</b> A 20 s horizon was <em>measured</em> at 8.86× the cost, not the 4× assumed, and rejected. <b>This is a deviation from GT-7.3, which specifies 60 s per step</b> — it travels with every number.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/scenarios/g12.py · scripts/g12_campaign.py · wp9-plan.md §13.2, §35.6, §35.12.</div>
+  </div>
+</section>
+
+<!-- 13 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · filed as G1 / G3 · found by G12's clause 4</span><span class="idx">13 / 25</span></div>
+    <h2>The heartbeat starts missing its deadline at nominal load, while the lowest-priority class keeps 20+ Mbps</h2>
+    <div class="body">
+      <div class="tw">
+      <table class="big">
+        <tr><th>Committed load</th><th class="num">% of ceiling</th><th class="num">PF<br>miss rate / logs</th><th class="num">Reservation<br>miss rate / logs</th><th class="num">Two-tier · the product<br>miss rate / logs</th></tr>
+        <tr><td class="key">×1.0 — 28.0 Mbps</td><td class="num">44 %</td><td class="num good">0.000 / 35.3 Mbps</td><td class="num good">0.000 / 30.8 Mbps</td><td class="num bad">0.022 / 35.8 Mbps</td></tr>
+        <tr><td class="key">×1.6 — 44.8 Mbps</td><td class="num">71 %</td><td class="num good">0.000 / 20.6 Mbps</td><td class="num good">0.000 / 16.2 Mbps</td><td class="num bad">0.944 / 22.7 Mbps</td></tr>
+        <tr><td class="key">×2.3 — 64.4 Mbps</td><td class="num">102 %</td><td class="num bad">0.023 / 12.5 Mbps</td><td class="num bad">0.014 / 2.0 Mbps</td><td class="num bad">0.975 / 3.2 Mbps</td></tr>
+        <tr><td class="key">×2.7 — 75.6 Mbps</td><td class="num">119 %</td><td class="num bad">0.275 / 11.8 Mbps</td><td class="num bad">0.210 / 0.39 Mbps</td><td class="num bad">0.980 / 1.1 Mbps</td></tr>
+        <tr><td class="key hi">×3.3 — 92.4 Mbps</td><td class="num hi">146 % · GT-7.3's top</td><td class="num bad">0.980 / 11.5 Mbps</td><td class="num bad">0.561 / 0.012 Mbps</td><td class="num bad">0.980 / 0.19 Mbps</td></tr>
+        <tr><td class="key" style="color:var(--ink-3)">×4.0 to ×8.0</td><td class="num" style="color:var(--ink-3)">177–353 % · beyond</td><td class="num" style="color:var(--ink-3)">0.990 → 1.000 / 11.5 Mbps</td><td class="num" style="color:var(--ink-3)">0.812 → 1.000 / 0.004 Mbps</td><td class="num" style="color:var(--ink-3)">0.980 → 1.000 / 0.004 Mbps</td></tr>
+      </table>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What it means</h3>
+          <p>Under overload the network is supposed to sacrifice logs before it ever touches a robot's <em>I-am-alive</em> stream. <strong>It does the opposite.</strong> On the deployed two-tier scheduler, telemetry starts missing its 100 ms deadline at <b>nominal load</b> — 9 of 10 seeds — and by ×1.6 <b>94 % of resolved telemetry bytes miss it</b> — dropped on expiry or delivered late — while the best-effort class still carries <b>19.9–24.6 Mbps</b>. <b>Almost all of that is the synthetic 50 Mbps flood; the real robot log flows offer only 1.0 Mbps in total.</b> That is the test plan's own worked example of a failure, realised.</p>
+          <div class="instr">
+            <span class="lbl">Where the testing team should look</span>
+            <p>Instrument telemetry deadline misses <b>directly</b> on GT-7.3 and GT-2 — not the liveness gap, which goes blind once the flow stops completing. Run the ramp bottom (×1.0, 28.0 Mbps committed) on hardware first: <b>the two-tier arm is predicted to fail there, at nominal load.</b></p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>A full miss rate of 1.000 is reached only <em>beyond</em> the guarantee's own ramp.</b> Inside GT-7.3's range the worst readings are 0.990 (PF), 0.712 (Reservation), 0.980 (Two-tier). Do not put “1.000” and “inside the ramp” in the same sentence.</li>
+            <li><b>The strongest in-range instance is Two-tier at ×1.6</b> — miss rate 0.922–0.980 on all 10 seeds with 19.9–24.6 Mbps still moving in the best-effort class. <b>“71 % of ceiling” is the <em>committed</em> load only</b>: total offered uplink is ~150 % of ceiling and the uplink is over 90 % occupied at every ramp point, including the bottom. The contracted traffic alone would fit; the cell does not.</li>
+            <li><b>Whether the arm difference survives flow-list reordering is untested.</b> The reordering control was built for the ordering result and stored no telemetry data. In this same workload the ordering <em>was</em> shown to depend on list position <b>on PF</b> — so the concern is live, not theoretical.</li>
+            <li><b>The clean-ramp-bottom control could not have caught this.</b> It reads the guaranteed classes, and telemetry is a delay class — structurally invisible to it. “The ramp bottom is clean” means clean <em>for the ordering</em>.</li>
+            <li><b>A more operational reading of the same point:</b> at Two-tier ×1.6 the telemetry silence is directly measurable on 6 of 10 seeds and runs <b>3.0–4.3 s inside a 5.0 s run</b> — past the proposed 2.0 s liveness timeout, so the receiver would declare the robot dead.</li>
+            <li>One fleet mix, one fleet size. The other two mixes were excluded whole before the main grid ran.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §36.2; recomputed from sweeps/wp9/g12_campaign.json. Filed as G1/G3 — telemetry missing its deadline at nominal load is drive-command latency and false-failsafe territory. <b>Correction on backup slide B2.</b></div>
+  </div>
+</section>
+
+<!-- 14 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · G12 · a finding about the test plan</span><span class="idx">14 / 25</span></div>
+    <h2>At the load G12 specifies there is nothing to order — and past it, the order is not attributable to any scheduler</h2>
+    <div class="body">
+      <div class="tw">
+      <table class="big">
+        <tr><th>Statistic</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier</th></tr>
+        <tr><td class="key">Seeds producing a usable 2-class order <b>inside</b> GT-7.3's ramp</td><td class="num bad">0 of 10</td><td class="num bad">0 of 10</td><td class="num bad">3 of 10</td></tr>
+        <tr><td class="key">Lidar's worst feed at GT-7.3's own top (×3.3), contract fraction</td><td class="num good">0.9792 — met</td><td class="num good">0.9986 — met</td><td class="num good">0.9827 — met</td></tr>
+        <tr><td class="key">Camera's worst feed at the same point <span style="font-weight:400;color:var(--ink-3)">— worst-flow only; the paired contract count is not on disk, so these support a within-arm pass/fail and <b>no ranking between arms</b></span></td><td class="num bad">0.0153</td><td class="num bad">0.2092</td><td class="num bad">0.0000</td></tr>
+        <tr><td class="key">Load at which the camera class first breaches</td><td class="num">×2.3 · 102 %</td><td class="num">×2.3–×2.7 · 102–119 %</td><td class="num bad">×1.6 · 71 %</td></tr>
+        <tr><td class="key">Load at which the lidar class first breaches</td><td class="num">×4.0 · 177 %</td><td class="num bad">×6.0 · 265 %</td><td class="num">×2.7–×6.0 · 119–265 %</td></tr>
+        <tr><td class="key">Full-ramp order, canonical flow list</td><td class="num">camera → lidar</td><td class="num">camera → lidar</td><td class="num">camera → lidar</td></tr>
+        <tr style="border-top:2px solid var(--rule-strong)"><td class="key">Distinct orders across 20 reordered runs</td><td class="num bad">2</td><td class="num bad">2</td><td class="num">1, from 13 scoreable</td></tr>
+        <tr><td class="key">Reordered runs that could not even start clean</td><td class="num good">0 of 20</td><td class="num good">0 of 20</td><td class="num bad">7 of 20</td></tr>
+      </table>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What it means</h3>
+          <p>GT-7.3 says to ramp to <b>145 % of the measured ceiling</b> and watch the lidar class give way before the camera class. At that load <b>the lidar class is still delivering at least 97.9 % of its contracted rate on every arm</b> — there is nothing to order. On <b>27 of 30</b> arm-seed groups an order only appears at <b>177–265 % of ceiling</b>, and there it comes out <em>backwards</em>. The pre-registered verdict stands verbatim: <strong>not established as a scheduler property, and consistent with a declaration-order artefact.</strong> <b>The lever is untraced</b> — and all three candidate mechanisms are themselves position-dependent, so tracing to any of them would confirm the artefact rather than promote it.</p>
+          <div class="instr">
+            <span class="lbl">For whoever owns the test plan</span>
+            <p>Change GT-7.3 before it runs on hardware. Raise the ramp top from <b>145 % to at least 265 % of measured ceiling</b>, where all three arms produce an order. <b>Pin the flow declaration order in the test build</b> — otherwise the order is unrepeatable.</p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>This is not the earlier “nothing to order” result.</b> That one's cause was a workload carrying a single guaranteed class; it was fixed by building this workload, which now carries two at every ramp step. <b>Different cause, different fix, different owner.</b></li>
+            <li><b>The reordering evidence differs by arm.</b> On PF the flip is clean and total — three permutations give one order on all 5 seeds each, the fourth gives the opposite on all 5. <b>On Reservation the order splits <em>within</em> every permutation</b>, so there position <em>and</em> seed both matter. Do not carry “deterministic” as a whole-campaign property.</li>
+            <li><b>Reordering alone breaks a camera bearer at nominal load on Two-tier</b> — all 7 unscoreable runs record the same cause, a camera already under contract at the ramp bottom, before any overload.</li>
+            <li><b>The two classes do not start the ramp on equal terms — a structural competing explanation the campaign did not disclose.</b> Four of the five camera flows are provisioned with an offered rate <em>below</em> their own guarantee (3.89 against 4.00 Mbps), so they can never exceed <b>0.973</b> of contract and begin the ramp only <b>0.007</b> above the 0.95 line. Both lidar flows are provisioned offered = guarantee, ceiling <b>1.000</b>, and begin <b>0.05</b> above it. “Camera fails first” is therefore biased by the workload's own provisioning, independently of any scheduler <em>or</em> of flow-list order.</li>
+            <li><b>The 3 in-range orders are fragile:</b> all three come from a single ramp point where the lidar dips to 0.8875–0.9496, and one of them clears the contract line by <b>0.0004</b>. At the very next step all three are back inside contract.</li>
+            <li>The ordering rests on <b>one</b> fleet mix — the ramp-bottom control excluded the other two whole.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §35.5, §35.13, §36.0–§36.4; sweeps/wp9/g12_campaign.json.</div>
+  </div>
+</section>
+
+<!-- 15 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Experiment · G10 · admissible fleet size</span><span class="idx">15 / 25</span></div>
+    <h2 class="q">How many robots can you put on this cell before something breaks — and does the scheduler change that number?</h2>
+    <div class="body">
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What each robot sends</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Flow</th><th>Dir</th><th>Class</th><th>Rate offered</th><th>Deadline</th></tr>
+            <tr><td class="key">Camera</td><td>UL</td><td>5QI 2 · guaranteed 4.000 Mbps</td><td class="num">3.879 Mbps</td><td class="num">150 ms</td></tr>
+            <tr><td class="key">Telemetry</td><td>UL</td><td>5QI 1 · delay</td><td class="num">24.0 kbps</td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Drive command</td><td>DL</td><td>5QI 82 · delay</td><td class="num">16.0 kbps</td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Best-effort filler</td><td>UL</td><td>5QI 9 · non-guaranteed</td><td class="num">8.000 Mbps <span class="hi">× load</span></td><td class="num">300 ms</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">Per robot at ×1.0: <b>11.903 Mbps offered uplink</b>, of which <b>3.903 Mbps is committed</b>. <b>The camera is the only guaranteed flow</b> — one per robot — so it alone is what the contract metrics score.</p>
+          <h3 style="margin-top:6px">Fleet size and load are not independent</h3>
+          <p style="font-size:14.5px">The filler is <em>per robot</em>, so 32 robots at ×1.0 offers <b>380.9 Mbps uplink — 4.00× the 95.2 Mbps at 8 robots</b>. Read the grid as a plane, not two lines. The committed traffic alone is <b>31.2 Mbps at 8 robots (49 % of the ceiling), 62.4 Mbps at 16 (98 %), 124.9 Mbps at 32 (197 %)</b>.</p>
+        </div>
+        <div class="blk">
+          <h3>What was varied</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Axis</th><th>Levels</th></tr>
+            <tr><td class="key">Fleet size</td><td><b>2, 4, 8, 16, 24, 32 robots</b></td></tr>
+            <tr><td class="key">Offered load</td><td>×0.5, ×0.75, <b>×1.0</b>, ×1.25, ×1.5, ×2.0, ×3.0</td></tr>
+            <tr><td class="key">Bearer grouping</td><td>separate / shared buffer groups</td></tr>
+            <tr><td class="key">Uplink grant delay</td><td>1, 2, 4 slots = 0.25, 0.50, 1.00 ms</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)">Held: minimum grant <b>5 PRB</b>, max-bitrate cap off, <b>20 dB</b> uniform SNR, radio <b>55 PRB / 40 MHz / DSUUU</b>, control budget <b>48 / 32 / 16 CCE</b> at aggregation level 4.</p>
+          <h3 style="margin-top:6px">The grid</h3>
+          <div class="arith">
+            <div class="row"><span class="lbl">one cell =</span><span class="val">8 robots, load ×1.0, separate groups, 2-slot delay</span></div>
+            <div class="row"><span class="lbl">stage 1 — axis selection only, no claims</span><span class="val">59 cells × 30 = 1,770 runs</span></div>
+            <div class="row"><span class="lbl">stage 2 — the claims</span><span class="val">6 × 7 × 2 × 3 = 252 cells</span></div>
+            <div class="row"><span class="lbl">runs per cell</span><span class="val">3 arms × 10 paired seeds = 30</span></div>
+            <div class="row tot"><span class="lbl">stage 2 total</span><span class="val">252 × 30 = 7,560 runs</span></div>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)">The slide's result reads one sub-grid: separate groups <em>and</em> 2-slot delay = 42 cells, 1,260 rows, of which the load ×1.0 column is <b>180 rows</b>.</p>
+        </div>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>Run length</h3>
+          <p style="font-size:14.5px"><b>5.0 simulated seconds</b> = 20,000 slots at 0.25 ms. The corpus's 1.0 s gives a 10 Hz telemetry flow only <b>10 messages</b>; 5.0 s gives <b>50</b>. Pooled at 8 robots that is <b>4,000 messages</b>, supporting a zero-miss bound of <b>≤ 7.5 × 10⁻⁴</b>. <b>At 2 robots the pool is only 1,000 messages and the bound weakens to ≤ 3 × 10⁻³</b> — low-fleet cells carry weaker claims, by arithmetic.</p>
+        </div>
+        <div class="blk">
+          <h3>What was measured</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Metric</th><th>In plain English</th><th>Which flows enter it</th></tr>
+            <tr><td class="key">M07 contracts met</td><td>How many camera feeds got ≥ 95 % of their 4.000 Mbps guarantee</td><td><b>Guaranteed flows only</b> — one camera per robot</td></tr>
+            <tr><td class="key">M08 worst-feed floor</td><td>The single worst camera feed's share of its guarantee</td><td>Same flows. <b>Quoted with M07, always</b></td></tr>
+            <tr><td class="key">M09 fairness</td><td>Fairness inside each 1-second window</td><td>All flows. <b>Proxy status; PF's value is contaminated</b> by a declaration-order tie-break</td></tr>
+            <tr><td class="key">M02 miss rate</td><td>Share of bytes past deadline</td><td>Byte-weighted over <b>every</b> flow — the filler is 67.2 % of the bytes. <b>Not a fleet number</b></td></tr>
+            <tr><td class="key">M01 worst-flow p98</td><td>Worst flow's tail delay</td><td class="verdict" style="color:var(--fail)">KEPT OFF THE RESULT SLIDE — see next slide</td></tr>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/parametric.py · scripts/wp9_sweep.py · wp9-plan.md §1, §1.1, §5, §8d · sweeps/wp9/stage2/stage2_rows.csv.</div>
+  </div>
+</section>
+
+<!-- 16 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · G10 · admissible fleet size</span><span class="idx">16 / 25</span></div>
+    <h2>Four robots run clean on every scheduler. Eight is where the QoS-aware arms fail — and PF does not.</h2>
+    <div class="body">
+      <div class="cols c2">
+        <div class="blk">
+          <h3>The answer: seeds passing both contract tests, of 10</h3>
+          <div class="tw">
+          <table class="big">
+            <tr><th>Arm</th><th class="num">2 robots</th><th class="num">4 robots</th><th class="num">8 robots</th><th class="num">16 robots</th><th class="num">Admissible</th></tr>
+            <tr><td class="key">PF</td><td class="num good">10/10</td><td class="num good">10/10</td><td class="num good">10/10</td><td class="num bad">0/10</td><td class="num good"><b>8 robots</b></td></tr>
+            <tr><td class="key">Reservation</td><td class="num good">10/10</td><td class="num good">10/10</td><td class="num bad">3/10</td><td class="num bad">0/10</td><td class="num bad"><b>4 robots</b></td></tr>
+            <tr><td class="key">Two-tier</td><td class="num good">10/10</td><td class="num good">10/10</td><td class="num bad">1/10</td><td class="num bad">0/10</td><td class="num bad"><b>4 robots</b></td></tr>
+          </table>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)">A seed passes when <b>every</b> camera contract is met <em>and</em> the worst feed holds ≥ 95 % of its 4.000 Mbps guarantee. A second bar on the <em>same</em> camera flows agrees: video completeness passes 10/10 on every arm at 4 robots, then at 8 falls to <b>10/10 PF, 3/10 Reservation, 2/10 Two-tier</b>. It is a different threshold, <b>not independent evidence</b> — same flows, same documented mechanism. <b>The rule was registered at 5 of 5 seeds; this scores 10 of 10.</b></p>
+        </div>
+        <div class="blk">
+          <h3>Contracts met · worst-feed floor — <em>both, always</em></h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Arm</th><th class="num">8 robots</th><th class="num">16 robots</th><th class="num">24 robots</th><th class="num">32 robots</th></tr>
+            <tr><td class="key">PF</td><td class="num good">8.0/8 · 0.962</td><td class="num">13.9/16 · 0.931</td><td class="num"><span class="bad">0.0/24</span> · <span class="good">0.636</span></td><td class="num"><span class="bad">0.0/32</span> · <span class="good">0.470</span></td></tr>
+            <tr><td class="key">Reservation</td><td class="num">7.2/8 · <span class="bad">0.288</span></td><td class="num">10.9/16 · <span class="bad">0.000</span></td><td class="num">10.4/24 · <span class="bad">0.000</span></td><td class="num">6.2/32 · <span class="bad">0.000</span></td></tr>
+            <tr><td class="key">Two-tier</td><td class="num bad">5.4/8 · 0.243</td><td class="num bad">6.3/16 · 0.000</td><td class="num">6.7/24 · <span class="bad">0.000</span></td><td class="num">6.4/32 · <span class="bad">0.000</span></td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px"><strong>At 24 and 32 robots PF meets zero contracts while holding the best worst-feed floor</strong> — 0.636 and 0.470 against <b>0.000</b> on both QoS-aware arms. <b>Either number alone gives the opposite answer about who wins.</b> The floor's arithmetic ceiling is <b>0.970</b>, not 1.0, because the camera offers 3.879 Mbps against a 4.000 Mbps guarantee.</p>
+        </div>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What it means</h3>
+          <p>Four robots run clean on every scheduler. At eight, PF still meets all 8 of 8 camera contracts with a 0.962 floor while Reservation meets 7.2 with a 0.288 floor and Two-tier 5.4 with 0.243 — both fail. At sixteen, the fleet's committed traffic (62.4 Mbps) is comparable to the ~63 Mbps ceiling measured on a <em>different</em> mix, so the cell is at or near saturation and no arm passes the all-pass bar. <strong>But saturation alone does not explain what fails</strong> — the arms are still 13.9 against 6.3 contracts apart there. <b>Two-tier is the deployed product and it is last on both metrics at 8 and 16 robots.</b> Above that the ranking flips: at 24 and 32 robots PF meets <em>zero</em> contracts while holding the floor, and Two-tier ties or beats Reservation on contracts (6.7 vs 10.4 at 24 robots; 6.4 vs 6.2 at 32) with both at a 0.000 floor.</p>
+          <div class="instr">
+            <span class="lbl">Where the testing team should look</span>
+            <p>Certify at <b>4 robots</b>, not 8. Run GT-5.2 at <b>4, 8 and 16 robots</b> and score the pair together — contracts met <em>and</em> worst-feed floor. <b>Skip 2 robots</b>: the testbed's null result was structural, 4× below the 8-robot control-channel bound.</p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>Where the arms separate was predicted before anything ran, and hit.</b> Two candidate bounds: follower budget <b>55 PRB ÷ 5 PRB = 11 robots</b>; control channel <b>32 uplink CCE ÷ aggregation level 4 = 8 robots</b>. The control-channel bound binds first, and the follower budget does not take over until the minimum grant exceeds <b>6.875 PRB</b>. Measured onset, <b>on the PF-versus-Reservation pair</b>: 8 robots at load ≥ ×1.0, 16 robots below it. Adding the PF-versus-Two-tier pair pulls one cell earlier, on a floor difference of 0.4 % with both arms above the bar.</li>
+            <li><b>This locates the boundary at the deployed 5 PRB minimum grant only.</b> It was held fixed across all 252 cells; the sharper claim that it has no effect below ≈ 7 PRB is <b>untested</b>.</li>
+            <li><b>“Separation at 8 robots” is a contract-metric statement.</b> On the full five primary metrics the arms separate <b>earlier</b> — at 8 robots even at half load, and at <b>4 robots</b> at loads ×1.5 and above. Say which metrics you mean.</li>
+            <li><b>Worst-flow p98 latency is not on this slide, for two reasons.</b> Its worst flow is the best-effort filler on 10 of 12 cells, so it compares different flows between arms; and on 8 of 12 it sits within one 0.25 ms slot of that flow's own deadline — it is reading back the eviction bound, not a latency.</li>
+            <li><b>Fairness: use only the Reservation-vs-Two-tier pair.</b> Reservation's worst 1-second fairness beats Two-tier's at every fleet size — 0.893 vs 0.751 at 8 robots, 0.461 vs 0.385 at 32.</li>
+            <li><b>This mix is a uniform fleet.</b> With realistic device mixes the onset is composition-dependent — 16 robots for UGV-heavy, 32 for mixed and drone-heavy — and under a sudden lidar activation it goes <b>flat at 16 robots</b>, with the QoS-aware arms losing the most.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §1.1, §5, §8d; regime-map §0.1, §0.3, §1.1; re-derived from sweeps/wp9/stage2/stage2_rows.csv. <b>Correction on backup slide B1.</b></div>
+  </div>
+</section>
+
+<!-- 17 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Experiment · G6 · background traffic</span><span class="idx">17 / 25</span></div>
+    <h2 class="q">If someone kicks off a firmware push or a log dump from one robot mid-shift, does anything the rest of the fleet depends on actually get worse?</h2>
+    <div class="body">
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What each of the 8 robots sends</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Flow</th><th>Dir</th><th>Class</th><th>Rate</th><th>Deadline</th></tr>
+            <tr><td class="key">Heartbeat / telemetry</td><td>UL</td><td>5QI 1 · delay</td><td class="num">24.0 kbps</td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Camera feed</td><td>UL</td><td>5QI 2 · guaranteed 4.0 Mbps</td><td class="num">3.879 Mbps</td><td class="num">150 ms</td></tr>
+            <tr><td class="key">Drive command</td><td>DL</td><td>5QI 82 · delay</td><td class="num">16.0 kbps</td><td class="num">100 ms</td></tr>
+            <tr><td class="key">Best-effort filler</td><td>UL</td><td>5QI 9 · non-guaranteed</td><td class="num">8.0 Mbps <span class="hi">× load</span></td><td class="num">300 ms</td></tr>
+            <tr style="border-top:2px solid var(--rule-strong)"><td class="key"><b>The flood</b> — treatment only</td><td>UL</td><td>5QI 8 · saturating</td><td class="num bad">50 Mbps</td><td class="num">300 ms</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">At 8 robots: <b>95.22 Mbps</b> offered uplink without the flood, <b>145.22 Mbps</b> with it. Per-arm mean delivered throughput is <b>61.3–67.6 Mbps</b> at <b>93.2 %</b> uplink occupancy in every arm and both conditions — <strong>the cell is already full before the flood arrives.</strong></p>
+          <p style="font-size:14px;color:var(--ink-2)"><b>The flood sits on one robot of eight, not all eight</b>, so any shift is attributable to that one flow rather than to every robot gaining one. Note it is provisioned as 5QI 8, not the 5QI 9 G6's text names — so it does not collide with the per-robot filler in the simulator's flow key.</p>
+        </div>
+        <div class="blk">
+          <h3>What was varied</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Axis</th><th>Levels</th></tr>
+            <tr><td class="key">Flood on/off</td><td><b>2</b> — the treatment</td></tr>
+            <tr><td class="key">Scheduler arm</td><td><b>3</b> — PF, Reservation, Two-tier</td></tr>
+            <tr><td class="key">Random seed</td><td><b>40 paired</b> — same seed drives both halves of a pair</td></tr>
+            <tr><td class="key">Fleet size · load</td><td><b>held</b> at 8 robots, ×1.0</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)">The 40 seeds were extended from stage 1's 10 under a rule registered <em>before</em> the run: <b>one look, no interim analysis, no further extension.</b> Stage 1's original 10 reproduce <b>bit-for-bit</b> — 30 shared pairs, worst absolute difference 0.000e+00.</p>
+          <h3 style="margin-top:6px">The grid</h3>
+          <div class="arith">
+            <div class="row"><span class="lbl">one cell =</span><span class="val">8 robots, ×1.0, flood off — or flood on</span></div>
+            <div class="row"><span class="lbl">cells</span><span class="val">2 flood levels × 1 size × 1 load = 2</span></div>
+            <div class="row"><span class="lbl">runs per cell</span><span class="val">3 arms × 40 seeds = 120</span></div>
+            <div class="row tot"><span class="lbl">total runs</span><span class="val">2 × 120 = 240</span></div>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)">The pair was run <b>twice</b> — 480 runs in all. The first pass kept only the scored table, and the per-flow timestamps needed to decompose the population did not exist.</p>
+        </div>
+      </div>
+      <div class="blk">
+        <h3>What was measured, and on which flows — the whole finding turns on this column</h3>
+        <div class="tw">
+        <table class="dense">
+          <tr><th>Metric</th><th>In plain English</th><th>Primary</th><th>Which flows enter it</th></tr>
+          <tr><td class="key">M02 miss rate</td><td>Fraction of bytes that miss their deadline</td><td class="verdict" style="color:var(--accent)">PRIMARY</td><td><b>As shipped: every flow</b>, byte-weighted — including the flood. <b>Must be restricted to protected bearers before it says anything about the fleet.</b></td></tr>
+          <tr><td class="key">M20 protected gap</td><td>Longest silence on any protected bearer</td><td class="verdict" style="color:var(--accent)">PRIMARY</td><td>Every flow <b>except</b> 5QI 8 and 5QI 9 — added precisely so G6 stops being scored on the aggressor.</td></tr>
+          <tr><td class="key">M03 worst gap</td><td>Longest silence on <em>any</em> flow</td><td>reference</td><td>Every flow, max over all. On Two-tier with the flood, <b>the winner is the flood itself on 7 of 40 seeds.</b></td></tr>
+          <tr><td class="key">M01 worst p98</td><td>Worst flow's tail latency</td><td>reference</td><td>Every flow. Its worst flow is the filler on <b>40 of 40 seeds on every arm</b> — not a fleet statistic.</td></tr>
+          <tr><td class="key">M15 jitter</td><td>Spread between typical and worst command latency</td><td class="verdict" style="color:var(--fail)">BOUND, NEVER SCORED</td><td>Every flow. On Two-tier the worst-jitter flow is the filler on <b>40 of 40 seeds in both conditions</b> — the same defect.</td></tr>
+        </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/parametric.py · scripts/g6_seed_extension.py · wp9-plan.md §22.1a, §28 · sweeps/wp9/stage6_g6_n40.csv.</div>
+  </div>
+</section>
+
+<!-- 18 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · G6 · background traffic</span><span class="idx">18 / 25</span></div>
+    <h2>G6 cannot be scored as it is written — and on measurement, it passes</h2>
+    <div class="body">
+      <div class="blk">
+        <h3>The specification finding leads: three defects, none of them about a scheduler</h3>
+        <div class="tw">
+        <table class="big">
+          <tr><th>#</th><th>The defect</th><th>What it does to the score</th></tr>
+          <tr><td class="key">1</td><td><b>The “+20 % relative” bar is undefined when the baseline is legitimately zero.</b></td><td>On the protected fleet PF's miss rate is <b>exactly 0.0000 in both conditions on every one of 40 seeds</b> — the relative shift is 0/0: not a pass, not a fail. Two-tier's relative <em>mean</em> reads <b>+4271 %</b> off a near-zero base while its <em>median</em> reads <b>−0.21 %</b> and its protected-fleet <em>absolute</em> change is <b>−0.0270 [−0.0724, +0.0191]</b>, an interval containing zero.</td></tr>
+          <tr><td class="key">2</td><td><b>G6 is a conjunction, and only its second clause had ever been tested</b> — on 3 of the statistics it binds.</td><td>Deriving the bound set from the metric panel returns <b>11 statistics</b> today. Of those, <b>4 carry a numeric bound anywhere in the test plan</b>; <b>7 carry none</b>, the miss rate among them. Several are unmeasurable here regardless of instrument.</td></tr>
+          <tr><td class="key">3</td><td><b>“Stays within its bound” has no rule for a statistic that breaches <em>more often</em>.</b></td><td>Two-tier's frame age p95 (bound <b>67 ms</b>) breaches on <b>7 of 40 seeds without the flood and 12 of 40 with it</b>. Neither aggressor-created nor unaffected — the rate rose <b>71 %</b>, and G6's own text cannot classify that.</td></tr>
+        </table>
+        </div>
+        <p style="font-size:14px;color:var(--ink-2)">The bar is marked ▷ — a <b>proposed default to be ratified with the client</b>, not a specification. All three are input to ratification, not defects anyone has patched unilaterally.</p>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>And on measurement it passes</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Miss-rate change, flood minus no-flood</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier</th></tr>
+            <tr><td class="key"><b>Protected bearers</b> (5QI 1, 2, 82)</td><td class="num good">+0.0000</td><td class="num good">−0.0104</td><td class="num good">−0.0270</td></tr>
+            <tr><td class="key"><b>Worst protected-fleet silence</b>, relative change</td><td class="num good">PASS</td><td class="num good">PASS</td><td class="num bad">+29.35 % [+4.81, +56.18]</td></tr>
+            <tr><td class="key">Any statistic newly breaching under the flood</td><td class="num good">none</td><td class="num good">none</td><td class="num good">none</td></tr>
+            <tr style="border-top:2px solid var(--rule-strong)"><td class="key"><b>The same statistic over <em>all</em> flows</b></td><td class="num bad">+0.2446</td><td class="num bad">+0.2404</td><td class="num bad">+0.2178</td></tr>
+          </table>
+          </div>
+          <p>On the <b>miss rate</b> the fleet's protected bearers do not move when a 50 Mbps flood is added beside them — every interval contains or equals zero, on all three arms, at 40 paired seeds. <strong>The bottom row is the flood's own bytes</strong>, and the better an arm starves it, the worse it scores there. <b>On the liveness gap a real telemetry-side residual survives on Two-tier</b> — +29.35 %, an interval excluding zero and still straddling the +20 % bar. <b>Unresolved against that bar.</b></p>
+          <div class="instr">
+            <span class="lbl">Where the testing team should look</span>
+            <p>Before running GT-4.1, get the client to ratify G6's bar in <b>absolute</b> terms and to name bounds for the seven unbounded statistics. Score every statistic on <b>protected bearers only</b>. <b>Add the downlink flood</b> — only an uplink one was ever built.</p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>One cell.</b> 8 robots at ×1.0. Depth in fleet size was not bought — <em>where</em> the guarantee starts to fail as the fleet grows cannot be answered without new runs.</li>
+            <li><b>Uplink only.</b> G6's own text says “either direction”; there is no downlink aggressor anywhere in the scenario factory.</li>
+            <li><b>One robot, not all.</b> The flood sits on robot 8 of 8 by design. A flood on every robot is a different experiment.</li>
+            <li><b>The video failures visible in this cell are G5, not G6.</b> Present with <em>no flood at all</em> — and the breach counts are over <b>seeds</b>, not flows: Reservation's 33 come from <b>2 distinct feeds</b>, Two-tier's 35 from <b>4, one accounting for 30</b>. See the G5 slide.</li>
+            <li><b>The contracts-met and floor pair is not what separates the arms here.</b> The “either number alone gives the opposite answer” inversion describes the 24+ robot regime; <b>at this cell PF leads on both</b>.</li>
+            <li><b>Both provisional bars are still ▷.</b> The test plan proposes 95 ms for command latency while the scoring script uses the 100 ms budget.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §28.1–§28.4, §29.2; regime-map §0.6.1–§0.6.3; sweeps/wp9/stage6_g6_n40.csv. <b>Correction on backup slide B1.</b></div>
+  </div>
+</section>
+
+<!-- 19 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Experiment · G4 · resume after silence</span><span class="idx">19 / 25</span></div>
+    <h2 class="q">If a robot pauses at a waypoint for a second and then speaks up again, does the network still get that first message through in time?</h2>
+    <div class="body">
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What each of the 8 robots sends, at full duty</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Flow</th><th>Dir</th><th>Class</th><th>Rate</th><th>Deadline</th><th>At duty ×0.1</th></tr>
+            <tr><td class="key"><b>Telemetry</b> — the instrument</td><td>UL</td><td>5QI 1 · delay</td><td class="num">300 B / 100 ms</td><td class="num">100 ms</td><td class="num">3,000 B / 1,000 ms</td></tr>
+            <tr><td class="key">Camera</td><td>UL</td><td>5QI 2 · guaranteed</td><td class="num">16 kB / 33 ms</td><td class="num">150 ms</td><td class="num">160 kB / 330 ms</td></tr>
+            <tr><td class="key">Commands</td><td>DL</td><td>5QI 82 · delay</td><td class="num">100 B / 50 ms</td><td class="num">100 ms</td><td class="num">1,000 B / 500 ms</td></tr>
+            <tr><td class="key">Best-effort filler</td><td>UL</td><td>5QI 9</td><td class="num">8.0 Mbps</td><td class="num">300 ms</td><td class="num">unchanged</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">32 flows per run = 8 robots × 4 flows. The downlink command flow takes the <em>identical</em> size step but <b>has no uplink scheduling-request path</b> — a control that was already sitting in the workload.</p>
+          <h3 style="margin-top:6px">What the duty axis moves — and the confound it creates</h3>
+          <p style="font-size:14.5px">The duty axis stretches the telemetry period <em>and</em> grows the burst by the same factor, so <b>mean offered rate is held constant</b>. That is correct for the burstiness hypothesis, whose axis must not smuggle in a load change. <strong>It also means a 10× longer silence carries a 10× larger message, by construction</strong> — which is the finding on the next slide, not a footnote. Load holds at ×1.0 throughout.</p>
+        </div>
+        <div class="blk">
+          <h3>What was varied</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Axis</th><th>Levels</th></tr>
+            <tr><td class="key">How quiet the robot goes</td><td><b>×1.0</b> 300 B/100 ms · <b>×0.5</b> 600 B/200 ms · <b>×0.1</b> 3,000 B/1,000 ms</td></tr>
+            <tr><td class="key">Scheduler arm</td><td>PF · Reservation · Two-tier</td></tr>
+            <tr><td class="key">Random seed</td><td>10 paired seeds, same set as stage 1</td></tr>
+          </table>
+          </div>
+          <h3 style="margin-top:6px">The grid</h3>
+          <div class="arith">
+            <div class="row"><span class="lbl">one cell =</span><span class="val">robots quiet 90 % of the time, 8 robots, load ×1.0</span></div>
+            <div class="row"><span class="lbl">cells</span><span class="val">3 duty levels</span></div>
+            <div class="row"><span class="lbl">runs per cell</span><span class="val">3 arms × 10 seeds = 30</span></div>
+            <div class="row tot"><span class="lbl">total runs</span><span class="val">3 × 30 = 90</span></div>
+          </div>
+          <p style="font-size:14px;color:var(--ink-2)"><b>This grid was run fresh — it is not a re-read of stage 1.</b> Stored records carry per-message <em>completion</em> times but no <em>arrival</em> times, so post-silence latency is not recoverable from disk.</p>
+          <h3 style="margin-top:6px">Run length, and where it stops working</h3>
+          <p style="font-size:14.5px"><b>5.0 simulated seconds</b> = 20,000 slots. That gives 50 telemetry messages per flow at full duty — <b>but at duty ×0.1 the period stretches to 1,000 ms, so the same 5.0 s yields only 5 messages, 4 of them after a silence.</b> The horizon was sized for the base point and <strong>the duty axis walks out from under it</strong>: 320 scheduled post-silence messages per arm, not 4,000.</p>
+        </div>
+      </div>
+      <div class="blk">
+        <h3>What was measured</h3>
+        <div class="tw">
+        <table class="dense">
+          <tr><th>Metric</th><th>In plain English</th><th>Primary</th><th>Which flows, and which messages</th></tr>
+          <tr><td class="key">Post-silence latency</td><td>How long the first message after a pause took to arrive</td><td class="verdict" style="color:var(--accent)">PRIMARY</td><td><b>Telemetry only</b>, and <b>only messages that arrived</b> — one dropped at its 100 ms deadline is skipped, not counted late.</td></tr>
+          <tr><td class="key">Post-silence delivery share</td><td>How many of the messages that should have been sent actually arrived</td><td class="verdict" style="color:var(--accent)">PRIMARY</td><td>Same flows; denominator <b>derived from the schedule</b>, not restated.</td></tr>
+          <tr><td class="key">Worst telemetry gap</td><td>How long the receiver went without hearing from the worst-off robot</td><td>supporting</td><td>A max over <b>every</b> flow in the run, not just telemetry — checked: the winner is a telemetry flow on 29 of 30 base-cell rows and 30 of 30 at duty ×0.1.</td></tr>
+        </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> scripts/g4_postsilence.py · sim/parametric.py · wp9-plan.md §21.4, §23 · sweeps/wp9/stage6_g4.json.</div>
+  </div>
+</section>
+
+<!-- 20 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · G4 · resume after silence</span><span class="idx">20 / 25</span></div>
+    <h2>Waking up is not the problem — but one telemetry message in five never arrives at all</h2>
+    <div class="body">
+      <div class="cols c2">
+        <div class="blk">
+          <h3>Worst delivered post-silence latency, mean over robot-seeds</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Silence before</th><th class="num">Size</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier</th></tr>
+            <tr><td class="key">100 ms — steady state</td><td class="num">300 B</td><td class="num">21.62 ms</td><td class="num">20.58 ms</td><td class="num">33.82 ms</td></tr>
+            <tr><td class="key">200 ms</td><td class="num">600 B</td><td class="num">33.68 ms</td><td class="num">26.63 ms</td><td class="num">39.71 ms</td></tr>
+            <tr><td class="key">1,000 ms</td><td class="num">3,000 B</td><td class="num">77.23 ms</td><td class="num">64.87 ms</td><td class="num">74.79 ms</td></tr>
+            <tr style="border-top:2px solid var(--rule-strong)"><td class="key">Growth vs a ×10 size step</td><td class="num">×10</td><td class="num good">×3.57</td><td class="num good">×3.15</td><td class="num good">×2.21</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">Every arm grew <b>sub-proportionally</b> to the size step — <strong>no residual for a scheduling-request warm-up penalty to explain.</strong> <b>Between arms, only Reservation separates from PF</b> (−7.25 ms and −12.64 ms, intervals excluding zero); every Two-tier interval spans zero, so its higher steady-state figure is not a scored difference. Values are a flat mean over robot-seed rows; seed-balanced, Two-tier's steady state is 28.96 ms.</p>
+        </div>
+        <div class="blk">
+          <h3>The same messages, counted rather than timed</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Silence</th><th class="num">Scheduled</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier</th></tr>
+            <tr><td class="key">100 ms</td><td class="num">3,920</td><td class="num good">3,920 — 100 %</td><td class="num">3,527 — 90.0 %</td><td class="num bad">2,754 — 70.3 %</td></tr>
+            <tr><td class="key">200 ms</td><td class="num">1,920</td><td class="num good">1,920 — 100 %</td><td class="num">1,704 — 88.8 %</td><td class="num bad">1,547 — 80.6 %</td></tr>
+            <tr><td class="key">1,000 ms</td><td class="num">320</td><td class="num bad">254 — 79.4 %</td><td class="num bad">253 — 79.1 %</td><td class="num bad">258 — 80.6 %</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">Denominators derived from the schedule. At the receiver, the worst telemetry gap then reaches the proposed <b>2.0 s liveness timeout</b> on 10/10, 4/10 and 6/10 seeds — median <b>2,077 / 1,962 / 2,033 ms</b>, the arithmetic signature of one dropped message on a 1,000 ms cadence.</p>
+        </div>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What it means</h3>
+          <p>Waking up is not the problem; the <em>size</em> of what the robot wakes up with is. On every arm, post-silence latency grew far slower than the message grew, so there is no scheduling-request warm-up cost left to find. <strong>But at a 1-second pause about one telemetry message in five missed its 100 ms budget outright and was discarded</strong> — and the receiver then saw a roughly 2,000 ms silence, which is the liveness timeout itself. <b>In steady state the loss is arm-dependent: 0 % on PF, 10.0 % on Reservation, 29.7 % on Two-tier</b>, and Reservation's losses concentrate on one robot just as Two-tier's do.</p>
+          <div class="instr">
+            <span class="lbl">Where the testing team should look</span>
+            <p>For GT-2.3, <b>hold message size constant across silence buckets</b> and vary only the pause. <b>Count the messages that never arrive</b>, not just the latency of those that do. Check each robot's worst telemetry gap against the liveness timeout, not only its p98.</p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>The number is about size as much as about silence, and that is the finding.</b> A real robot that pauses one second then sends one 300-byte frame has a long silence and a <em>normal-sized</em> message. Anyone quoting “77 ms” without this is reading a number about size as a number about silence.</li>
+            <li><b>Two verdicts, kept separate.</b> The criterion was a <b>hit</b> — post-silence latency exceeds steady state on all three arms. The mechanism was a <b>miss</b> — it is fully accounted for by message size.</li>
+            <li><b>The latency figure is censored at the 100 ms deadline and cannot be compared to the client's 300 ms bound.</b> Messages later than that are discarded and skipped by the instrument. The honest statement is “of the messages that arrived, none arrived later than ~100 ms, and about one in five did not arrive.”</li>
+            <li><b>The three arms are not measured over the same population</b> — PF's number is over 3,920 messages, Two-tier's over 2,754. An arm with fewer surviving events is measuring a self-selected population.</li>
+            <li><b>The 500 ms liveness bound is not evaluable at this duty.</b> The source's own 1,000 ms cadence already exceeds it, and the metric emits a machine-generated <em>cadence, not liveness</em> caveat forbidding the comparison. Only the 2.0 s timeout figure requires a real drop.</li>
+            <li><b>Only the 1-second silence bucket was tested.</b> G4 also specifies 5 s and 60 s; a 5.0 s run cannot contain even one 5 s gap. Those buckets are <b>unrun, not passed.</b></li>
+            <li><b>The headline is a per-flow maximum, not a tail percentile</b> — at duty ×0.1 it is the worst of roughly three messages per robot.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §23; sweeps/wp9/stage6_g4.json and stage1/stage1_rows.csv. <b>Correction on backup slide B2.</b></div>
+  </div>
+</section>
+
+<!-- 21 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Experiment · G9 · join, re-join, recovery</span><span class="idx">21 / 25</span></div>
+    <h2 class="q">When a robot restarts its app, powers on mid-shift, or drives through a dead zone, how long is it off the air — and does anything else notice?</h2>
+    <div class="body">
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>What every robot sends — 8 robots, one 40 MHz cell</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Flow</th><th>Dir</th><th>Class</th><th>Rate</th><th>Deadline</th><th>On</th></tr>
+            <tr><td class="key">Telemetry</td><td>UL</td><td>5QI 1 · delay</td><td class="num">24 kbps</td><td class="num">100 ms</td><td>all 8</td></tr>
+            <tr><td class="key">Camera</td><td>UL</td><td>5QI 2 · guaranteed 4.0 Mbps</td><td class="num">3.88 Mbps</td><td class="num">150 ms</td><td>all 8</td></tr>
+            <tr><td class="key">Drive command</td><td>DL</td><td>5QI 82 · delay</td><td class="num">16 kbps</td><td class="num">100 ms</td><td>all 8</td></tr>
+            <tr><td class="key">Handshake request</td><td>UL</td><td>5QI 70 · delay</td><td class="num">1 B per restart</td><td class="num">1,000 ms</td><td>joiner</td></tr>
+            <tr><td class="key">Handshake response</td><td>DL</td><td>5QI 71 · delay</td><td class="num">1 B per restart</td><td class="num">1,000 ms</td><td>joiner</td></tr>
+            <tr><td class="key"><b>Background flood</b></td><td>UL</td><td>5QI 8 · saturating</td><td class="num bad">50 Mbps</td><td class="num">300 ms</td><td>robot 8</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px">The handshake is <b>real traffic through buffer → scheduler → HARQ</b>, not a sampled round trip — so the under-load criterion is not a tautology. Offered uplink ≈ <b>81.2 Mbps</b>; measured utilisation <b>0.876</b>.</p>
+          <h3 style="margin-top:6px">There is no load axis — load is a fixed condition</h3>
+          <p style="font-size:14.5px">Set by 7 neighbour robots at full profile plus the 50 Mbps flood. <strong>Without the flood the whole fourth clause is vacuous</strong>: at 0.222 utilisation the neighbour delta was <b>0.000000 on every arm and every seed</b> — an arithmetically correct pass from a statistic with no dynamic range.</p>
+        </div>
+        <div class="blk">
+          <h3>What was varied</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Axis</th><th>Levels</th></tr>
+            <tr><td class="key">Kind of disruption</td><td><b>app restart</b> — 10/run, every 400 ms · <b>power cycle</b> — 5/run, off 200 ms · <b>deep fade</b> — 1 emergent event/run</td></tr>
+            <tr><td class="key">Scheduler arm</td><td>PF · Reservation · Two-tier</td></tr>
+            <tr><td class="key">Random seed</td><td>10 paired seeds</td></tr>
+            <tr><td class="key">Join schedule</td><td>on / off — <b>the paired control</b></td></tr>
+            <tr><td class="key">Fade depth · duration</td><td><b>35 dB</b> extra loss (depth <em>arms</em> the timer) · <b>3.0 s = 1.5 × t310</b> (duration <em>expires</em> it). <b>Both are needed.</b></td></tr>
+          </table>
+          </div>
+          <h3 style="margin-top:6px">The grid</h3>
+          <div class="arith">
+            <div class="row"><span class="lbl">one cell =</span><span class="val">one disruption × one scheduler arm</span></div>
+            <div class="row"><span class="lbl">cells</span><span class="val">3 disruptions × 3 arms = 9</span></div>
+            <div class="row"><span class="lbl">runs per cell</span><span class="val">10 seeds × 2 conditions = 20</span></div>
+            <div class="row tot"><span class="lbl">total runs</span><span class="val">9 × 20 = 180</span></div>
+          </div>
+          <h3 style="margin-top:6px">Run length</h3>
+          <p style="font-size:14.5px">Warm and cold: <b>5.0 s</b>, set by the event schedule — the last restart fires at 4.1 s, leaving room to complete. Deep fade: <b>7.5 s</b>, set by <b>t310 = 2,000 ms = 8,000 slots</b>; the fade runs 1.0 → 4.0 s, leaving <b>3.5 s</b> of post-restore observation. <b>GT-6.3 specifies a 10 s obstruction; 3.0 s is used</b> because the detector only requires the timer to expire.</p>
+        </div>
+      </div>
+      <div class="blk">
+        <h3>What was measured</h3>
+        <div class="tw">
+        <table class="dense">
+          <tr><th>Metric</th><th>In plain English</th><th>Primary for</th><th>Which flows enter it</th></tr>
+          <tr><td class="key">M18 interruption</td><td>Time from disruption until the robot is attached <em>and</em> its handshake completed</td><td>clauses 1, 2</td><td>The joiner's join events only. Reported as the <b>median across seeds of each run's own p95</b> — not a pooled p95.</td></tr>
+          <tr><td class="key">M21 recovery</td><td>Time from radio-restore until the robot's flows sustain ≤ 1 % loss for a full 1.0 s</td><td>clause 3</td><td>The joiner's own flows.</td></tr>
+          <tr><td class="key">M19 recovery</td><td>The same question judged on head-of-line age</td><td class="verdict" style="color:var(--fail)">NEVER QUOTE</td><td>Structurally incapable of reporting red — see the result slide.</td></tr>
+          <tr><td class="key">Neighbour Δp98</td><td>How much the worst single neighbour flow's tail delay moved vs the paired control</td><td>clause 4</td><td>A <b>max over 21 protected flows</b> on robots 2–8. Joiner excluded by robot; flood excluded by class. <b>Asserted and printed per run, not assumed.</b></td></tr>
+          <tr><td class="key">Events recorded</td><td>Did the disruption actually happen, as often as scripted?</td><td class="verdict" style="color:var(--accent)">PRE-METRIC ASSERTION</td><td>The joiner's event log. This is load-bearing — see the result slide.</td></tr>
+        </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/scenarios/g9.py · scripts/g9_campaign.py · wp9-plan.md §31, §33.2–§33.3 · sweeps/wp9/g9_campaign.json.</div>
+  </div>
+</section>
+
+<!-- 22 =============================================================== -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Result · G9 · join, re-join, recovery</span><span class="idx">22 / 25</span></div>
+    <h2>Four clauses, four different answers — a single verdict would average them</h2>
+    <div class="body">
+      <div class="tw">
+      <table class="big">
+        <tr><th>Clause</th><th>Verdict</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier</th><th>Why</th></tr>
+        <tr>
+          <td class="key">1 · Warm app re-handshake<br><span style="font-weight:400;color:var(--ink-3)">bar ▷ 1 s</span></td>
+          <td class="verdict" style="color:var(--pass)">SCORED</td>
+          <td class="num good">16.6 ms</td><td class="num good">21.0 ms</td><td class="num bad">79.6 ms</td>
+          <td>All inside the bar. <b>But Two-tier recorded only 3.8 of 10 scripted restarts</b>, and the percentile is computed over <em>completed</em> events only — never-completing ones are excluded by construction. 79.6 ms is biased optimistic and the gap to PF is <b>wider than shown</b>. The specific drop path is <b>not isolated</b>.</td>
+        </tr>
+        <tr>
+          <td class="key">2 · Full attach-to-streaming<br><span style="font-weight:400;color:var(--ink-3)">bar ▷ 15 s</span></td>
+          <td class="verdict" style="color:var(--out)">NOT PRODUCIBLE</td>
+          <td class="num">145.3 ms</td><td class="num">147.8 ms</td><td class="num bad">no value</td>
+          <td>The delays are <em>sampled</em> between this deployment's own timer ceilings and one trace. <b>PF and Reservation being near-identical is the evidence</b>: the number is insensitive to the scheduler because it is configuration, not measurement. Two-tier completed <b>no cold attach on any seed</b>.</td>
+        </tr>
+        <tr>
+          <td class="key">3 · Post-fade time-to-service<br><span style="font-weight:400;color:var(--ink-3)">bar ▷ 10 s</span></td>
+          <td class="verdict" style="color:var(--partial)">PARTLY</td>
+          <td class="num good">130.1 ms</td><td class="num good">142.1 ms</td><td class="num bad">never reached</td>
+          <td>The registered metric reads <b>0.0 ms on every arm and case</b> and cannot report otherwise, so a delivery-based companion supplies the number. <b>The ▷ 10 s bar is untestable at this run length on any arm</b> — only 2.5 s of usable observation exists. Two-tier is “not within 2.5 s”, not “not within 10 s”.</td>
+        </tr>
+        <tr>
+          <td class="key">4 · Neighbours unaffected</td>
+          <td class="verdict" style="color:var(--pass)">PASSES — weak form</td>
+          <td class="num good">+0.053 ms<br><span style="font-size:11px;color:var(--ink-3)">warm</span></td><td class="num">+2.450 ms<br><span style="font-size:11px;color:var(--ink-3)">warm</span></td><td class="num good">+0.068 ms<br><span style="font-size:11px;color:var(--ink-3)">fade</span></td>
+          <td>No cell's interval excludes zero on the degrading side. <b>The strong form is not answerable</b>: the control removes the join schedule, which also removes the joiner's outages. <b>Being off <em>is</em> the outage.</b></td>
+        </tr>
+      </table>
+      </div>
+      <div class="blk">
+        <h3>What it means</h3>
+        <p style="max-width:none">On a cell already <b>87.6 % loaded</b> in uplink, PF and Reservation put a robot back on air in <b>tens of milliseconds</b> and back to sustaining all its own flows within 1 % loss about <b>130–142 ms</b> after the radio returns. Two-tier is <b>at least 5× slower</b> to re-handshake — a <em>floor</em>, not an estimate, because it is measured over 3.8 of 10 events — <b>completed no cold attach at all</b>, and never resumed delivery inside the 2.5 s the run could observe. <b>No neighbour statistic degraded with an interval excluding zero</b> — the weak form of clause 4. The strong form is not answerable with this control.</p>
+      </div>
+      <div class="cols c2u">
+        <div class="blk">
+          <h3>Did the disruption actually happen, as often as scripted?</h3>
+          <div class="tw">
+          <table class="dense">
+            <tr><th>Case</th><th class="num">Scheduled</th><th class="num">PF</th><th class="num">Reservation</th><th class="num">Two-tier</th></tr>
+            <tr><td class="key">Warm app restart</td><td class="num">10 per run</td><td class="num good">10.0</td><td class="num good">10.0</td><td class="num bad">3.8</td></tr>
+            <tr><td class="key">Cold power cycle</td><td class="num">5 per run</td><td class="num good">5.0</td><td class="num good">5.0</td><td class="num bad">1.0</td></tr>
+          </table>
+          </div>
+          <p style="font-size:14.5px"><strong>An arm with fewer events is not a smaller sample of the same thing.</strong> Its survivors are self-selected, so arms with different counts are <b>not comparable to each other</b>. This is the load-bearing qualifier on clauses 1–3. <b>The cold case is the sharper fact: 0 of 50 scheduled cold cycles completed attach on any seed</b> — a handshake that never completes strands the join state machine, and every later scripted event is silently discarded.</p>
+          <div class="instr">
+            <span class="lbl">Where the testing team should look</span>
+            <p><b>First find why Two-tier's handshake never completes at all</b> — 0 completions in 50 scheduled cold cycles. Only then decide whether GT-6.1's restart period needs changing. Take that join path to hardware first: GT-6.2 cold attach and GT-6.3 fade return, 10 consecutive cycles each. Re-test Reservation's warm neighbour delta at more seeds.</p>
+          </div>
+        </div>
+        <div class="caveats">
+          <h3>What travels with the number</h3>
+          <ul>
+            <li><b>Never quote the head-of-line recovery metric for anything in G9.</b> The buffer evicts a queue head before it can age past its deadline, so age is capped by construction. Measured on these very runs: <b>0 of 30,000 slots</b> over deadline while the recovering robot drops <b>1,396,203 bytes</b> of video.</li>
+            <li><b>Two of the recovery readings are 0.0 ms and they mean opposite things.</b> Warm on PF and Reservation: the window already met the 1 % bar <em>with real arriving bytes</em>. Cold on Two-tier: <em>there were no arriving bytes at all</em>.</li>
+            <li><b>Two-tier's cold recovery reading of 0.0 ms must be disowned, not just omitted.</b> Its cold attach simultaneously has <em>no value</em> — a powered-off robot with its source gated reads green immediately. That is the absent-event signature.</li>
+            <li><b>The clause-4 improvement is unexplained, and the obvious explanation was tested and refuted.</b> Correlation between joiner absence and neighbour improvement is <b>r = −0.028</b>. Recorded as unexplained rather than given an invented mechanism.</li>
+            <li><b>The neighbour miss-rate is floored, not flat</b> — protected neighbour flows sit at zero with ~6× headroom, so a clause-4 pass read off it alone would be a statement about the floor.</li>
+            <li><b>The one cell that nearly failed</b> is Reservation on the warm case: +2.450 ms, 7 of 10 seeds worse, interval [−0.126, +6.150] ms.</li>
+            <li><b>The published Two-tier numbers cannot be reproduced by the committed runner</b> — it now asserts that recorded events must equal scheduled events, and would abort on exactly these cells.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §31.1, §32.1, §34; sweeps/wp9/g9_campaign.json. <b>Correction on backup slide B2.</b></div>
+  </div>
+</section>
+
+<!-- 23 ================================================================ -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Coverage</span><span class="idx">23 / 25</span></div>
+    <h2>The guarantees without a result, and exactly what blocks each one</h2>
+    <div class="body">
+      <div class="tw">
+      <table class="dense">
+        <tr><th>G</th><th>Status</th><th>What blocks it, and what would unblock it</th></tr>
+
+        <tr>
+          <td class="key">G2<br><span style="font-weight:400;color:var(--ink-3)">STOP lands fast</span></td>
+          <td><span class="chip out">Blocked</span></td>
+          <td>The real failure class is the <b>BSR/SR desync</b>. Truncated BSR is built, wired to the Padding trigger 38.321 actually specifies, and unit-tested — <b>and it still cannot fire</b>.
+            <p style="margin-top:6px"><b>The blocker was measured before anything was built, and it is not what this project previously claimed.</b> Replaying every uplink grant of a real run through OAI's own transport-block sizing leaves the padding distribution <em>completely unchanged</em> — <span class="n">13,214 of 13,214</span> grants at padding 0 before and after — and <em>reduces</em> lawful truncated BSRs at light load, 5 → 4. So TB-size quantisation is <b>not</b> the blocker; that claim is retracted.</p>
+            <p>The real blocker is the <b>magnitude of the gNB's buffer error at grant time</b>: a median <span class="n">12,194–13,387 bytes</span> on grants with ≥2 LCGs backlogged, against a truncation window <span class="n">2–5 bytes</span> wide. And the two halves of the precondition are <b>anti-correlated</b>: load a UE until three LCGs are backlogged and its grants become PRB-limited — filled exactly, padding 0 at any TB size; unload it until the grant has room and all but one LCG drains, at which point the spec mandates a <em>Short</em> BSR rather than a truncated one. <b>Closing it is a BSR-accuracy item, not a TB-sizing one and not another scenario.</b> Hardware remains the only instrument.</p>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="key">G7<br><span style="font-weight:400;color:var(--ink-3)">Misbehaving robot contained</span></td>
+          <td><span class="chip out">Structurally out</span></td>
+          <td>No MFBR enforcement exists anywhere in <code>sim/</code> — the field is accepted and ignored at load time. <b>Containment is observable; clipping is not, and clipping is half the pass criterion.</b> This is not a scenario gap or a tuning gap; it is an absent mechanism. GT-4.3 on hardware is the only test.</td>
+        </tr>
+
+        <tr>
+          <td class="key">G11<br><span style="font-weight:400;color:var(--ink-3)">Holds for a shift</span></td>
+          <td><span class="chip out">Unrun</span></td>
+          <td>Budgeted and never launched. Thirty minutes of simulated time is ~43 min per run, so three arms × ten seeds is ≈21 h — which did not fit alongside stage 2 on the original laptop. It was cut to 3 seeds ≈6.5 h with no cross-seed claims permitted, <b>a budget constraint, not a methodological one</b>. On an overnight-capable machine the full ten seeds fit, and the cross-seed claims come back. <b>A soak probe is running as of this deck.</b></td>
+        </tr>
+
+        <tr>
+          <td class="key">G8<br><span style="font-weight:400;color:var(--ink-3)">Equal service, continuously</span></td>
+          <td><span class="chip partial">Partial</span></td>
+          <td>Per-second Jain is scored across 186 cells — but <b>the PF arm is contaminated</b>. Identical PF scores tie-break by flow iteration order, which is scenario-declaration order, so ties always resolve toward the same UEs. Under SR-gated eligibility this produces persistent starvation for a specific subset. <b>Reservation-versus-two-tier is the trustworthy pair</b>; a PF number here is reporting a tie-break.</td>
+        </tr>
+
+        <tr>
+          <td class="key">G1 · G3<br><span style="font-weight:400;color:var(--ink-3)">Latency · liveness</span></td>
+          <td><span class="chip partial">Partial</span></td>
+          <td>Ordering only — the millisecond is <b>not certifiable</b> without real RF, per the campaign's own environment-honesty rule. G3 is reported as a function of <span class="m">T_live</span> ∈ {1, 2, 4} s because the MEC's actual liveness timeout is an open hardware question. The liveness statistic also now carries a <b>cadence caveat</b>, derived from each flow's own median gap, for cases where a flow's period approaches the bound it is scored against. Both rows carry G12's measured telemetry failure.</td>
+        </tr>
+      </table>
+      </div>
+
+      <div class="card strip fail" style="margin-top:4px">
+        <p><span class="kicker">And one standing confound that any new session must know about: flow declaration order.</span></p>
+        <p style="margin-top:6px">Reordering the flow list, with everything else byte-identical, <b>changes which 5QI class violates first</b> — and on two-tier it can break a bearer at nominal load outright (7 of 20 permuted runs could not produce a clean ramp bottom). It is <em>deterministic</em>, not noise: one permutation gives the opposite order from three others, on all five of its seeds each. <b>The mechanism is untraced, and all three candidates are position-dependent — so tracing to any of them confirms the artefact rather than refuting it.</b></p>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> docs/wp9-plan.md §19.5, §20.0–§20.1 (the counterfactual and the anti-correlation) · sim/config_loader.py:16 · docs/wp9-plan.md §6.3, docs/HANDOVER-new-machine.md §5.1 (G11's budget) · README.md §8 (PF's tie-break) · docs/wp9-plan.md §35.5, §36.1 (declaration order) · docs/wp9-regime-map.md §2, §2.1.</div>
+  </div>
+</section>
+
+<!-- 24 ================================================================ -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Fidelity</span><span class="idx">24 / 25</span></div>
+    <h2>How this maps onto the deployed OAI stack, layer by layer</h2>
+    <div class="body">
+      <p class="lead">Three dispositions, and each layer gets exactly one. <b>Ported</b> means written against verified C with a file-and-line citation. <b>Modelled</b> means replaced by something that reproduces the behaviour, not the implementation. <b>Absent</b> means it has no counterpart, and the mapping says so rather than pointing at a nearby-but-unrelated line range.</p>
+
+      <div class="cols c2">
+        <div>
+          <div class="card strip out">
+            <p><span class="kicker">RRC / NAS / core — ABSTRACTED</span></p>
+            <p style="margin-top:6px">Nothing ported. No RRC state machine, no reconfiguration signalling, no RACH contention resolution, nothing from <code>openair3/</code>.</p>
+            <p><b>What is used instead:</b> the deployed gNB's own timer constants, read from its startup banner — <span class="m">t300 400 · t301 400 · t310 2000 · n310 10 · t311 3000 · n311 1 · t319 400</span> — driving a calibrated delay distribution (floor plus exponential excess) and an n310-armed t310 dwell detector.</p>
+            <p><b>Signed off, not assumed:</b> full RACH contention is PHY-layer fidelity the simulator's non-goals exclude, and no G9 or GT-6 pass criterion needs it. They need realistic <em>timing</em>, not realistic contention resolution.</p>
+          </div>
+
+          <div class="card strip out" style="margin-top:12px">
+            <p><span class="kicker">RLC · PDCP · SDAP — ABSENT</span></p>
+            <p style="margin-top:6px">No counterpart to <code>nr_rlc</code>, <code>nr_pdcp</code> or <code>openair2/SDAP</code>. The buffer is a byte-count FIFO with no segmentation and no ARQ — which is precisely why a flow with a pending HARQ process must be masked fully rather than proportionally: the buffer drains by byte count, not by chunk identity, so a second grant would drain whichever bytes are oldest, not the ones in flight.</p>
+            <p>QFI→LCG mapping goes through a table whose own comment flags it as invented and non-standardised.</p>
+          </div>
+        </div>
+
+        <div>
+          <div class="card strip">
+            <p><span class="kicker">MAC — PORTED, 79 mapped mechanisms with citations</span></p>
+            <p style="margin-top:6px"><b>Sources, per file, with commit provenance recorded:</b> the two-tier scheduler and the gNB uplink/downlink schedulers from branch <span class="m">twotier</span> at <span class="m">7358e99</span>; the reservation arm from <span class="m">rrc-qos-handling-v0.1.1</span>; the BSR tables from <code>NR_MAC_COMMON/nr_mac_common.c</code>; the SR trigger, prohibit timer and transmission-attempt counter from <code>NR_MAC_UE/</code> — deliberately different upstream directories from the rest, and said to be.</p>
+            <p><b>Ported bug-for-bug where code and comment disagree.</b> The reservation deficit drain <em>comments</em> “distribute tb_size proportionally across active LCGs” and then credits the full transport block to every active LCG independently. The code is what shipped and what produced the hardware numbers, so the code is what was ported. Five comment-versus-code checks were run; four were mismatches, one confirmed correct.</p>
+            <p><b>And the vendored copy is not the evidence base.</b> One deployment constant looked sourceless from the four vendored files; it was confirmed from the full checkout's config parser, the deployed <code>.conf</code> the startup log's own command line cites, and 486 of 486 empirical grant lines.</p>
+          </div>
+
+          <div class="card strip partial" style="margin-top:12px">
+            <p><span class="kicker">PHY — REPLACED BY A MODEL</span></p>
+            <p style="margin-top:6px">Nothing from <code>openair1/</code> is ported. In its place: AR(1) SNR, TR 38.901 InF path loss and LOS probability, two-state Markov blockage, a sigmoid BLER curve with per-attempt incremental-redundancy combining gain, MCS index selection, and a PRB and PDCCH budget.</p>
+            <p>No waveform, no coding, no channel estimation. This is a scheduling simulator with a channel, not a link-level simulator.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> docs/oai-port-map.md (79 rows; C line ranges are in <code>oai-branches/</code>, and a mechanism with no OAI counterpart says so explicitly in the C-source column) · oai-branches/README.md (per-file branch and commit provenance) · calibration-logs/twotier_startup_gnb.log:17 · README.md §6, §7 · CLAUDE.md, "Reproduce measured behavior, not documented intent" and "The vendored oai-branches/ subset is a convenience copy, not the evidence base".</div>
+  </div>
+</section>
+
+<!-- 25 ================================================================ -->
+<section class="slide">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Next</span><span class="idx">25 / 25</span></div>
+    <h2>What comes next, in order</h2>
+    <div class="body">
+      <div class="cols c2">
+        <div>
+          <div class="card strip">
+            <p><span class="kicker">1 · Complete the guarantee run</span></p>
+            <ul class="tight" style="margin-top:8px">
+              <li><b>G11's soak at restored depth</b> — ten seeds, ≈21 h, now affordable unattended. Restoring the seeds also restores the cross-seed claims the reduced run explicitly ruled out of bounds.</li>
+              <li><b>G12's first clause</b> — answerable from the campaign artefact without a re-run, but it was never registered as an expectation, so it needs registering before it is scored.</li>
+              <li><b>G9's two open threads</b> — the scripted restart period must exceed the slowest arm's handshake before the arms are comparable, and the neighbour improvement is still unexplained.</li>
+              <li><b>The declaration-order trace</b> — with the promotion bar applied as written, including its edge: the three candidate mechanisms are all position-dependent, so finding one <em>confirms</em> the artefact.</li>
+            </ul>
+          </div>
+
+          <div class="card strip" style="margin-top:12px">
+            <p><span class="kicker">2 · Examine where and why performance falls short</span></p>
+            <ul class="tight" style="margin-top:8px">
+              <li><b>G5's concentrate-vs-spread mechanism</b> has no isolating trace. Which term of which ranking abandons that video flow?</li>
+              <li><b>Two-tier's telemetry degradation at nominal load</b> is the most operationally serious open number, and it is untested under permutation.</li>
+              <li><b>The crumb-fraction gap to hardware</b> — 4.96 % here against hardware's 48–52 %. The k2/HARQ-pipelining candidate is now largely ruled out: building it moved the number by 0.51 points of a ~45-point gap.</li>
+              <li><b>A composition discriminator</b> holding flow count and GBR fraction fixed while varying tight-PDB density and LCG co-location — the experiment that would turn slide 4's open hypothesis into a finding.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div>
+          <div class="card strip">
+            <p><span class="kicker">3 · Triage and optimise — the code mapping is the vehicle</span></p>
+            <p style="margin-top:6px">The port map's rows are already the route from a simulator finding to the exact C lines that would have to change. That is what makes a result here actionable rather than merely interesting: a red row does not just say <em>the scheduler is wrong</em>, it names the function.</p>
+            <p>Transport-block-size quantisation is <b>fully specified and deliberately unbuilt</b>, with its home named and its premise already disproved — whoever takes it up starts at implementation, not at scoping.</p>
+          </div>
+
+          <div class="card strip" style="margin-top:12px">
+            <p><span class="kicker">4 · Virtual prototyping — features, evaluated before they are built</span></p>
+            <ul class="tight" style="margin-top:8px">
+              <li><b>Configured Grants.</b> The expected first feature ask, and structurally the removal of the <em>entire</em> G2 failure class — no SR, no BSR, no estimate to desync.</li>
+              <li><b>SPS.</b> Deliberately absent today because the deployed scheduler defers it; a simulator is the right place to find out whether it is worth building.</li>
+              <li><b>MIMO scheduling.</b> Deferred on a stated reason, not an omission: MU-MIMO invalidates Tier-1's separable capacity constraint and the reservation heuristic's min-RB semantics. A scheduler redesign, not a fidelity item.</li>
+              <li><b>New MCS adaptation logic.</b> Outer-loop link adaptation is built and inert; its home is a scheduler where MCS selection can live in the right place rather than being smuggled through the channel view.</li>
+            </ul>
+          </div>
+
+          <p style="margin-top:14px; font-size:15px"><span class="kicker">The discipline that produced all of this, in one line.</span> One fidelity change per commit; predictions registered before the run and scored for misses as well as hits; a metric panel that is pre-registered and append-only; and a regression corpus that is never re-baselined to make a diff go away — <em>a failing check is information</em>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> docs/HANDOVER-new-machine.md §5.1, §6 ("Next items, none started, each needing its own plan") · docs/wp9-plan.md §20.10 (quantisation, planned and unbuilt), §35.13 (the promotion bar) · README.md §8 (the crumb-fraction gap) · docs/p5g-sim-plan.md §6 (deferred scope, with the reason for each) · CLAUDE.md (the working rules).</div>
+  </div>
+</section>
+
+<!-- B1 =============================================================== -->
+<section class="slide backup">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Backup · how these numbers were corrected</span><span class="idx">B1 / B2</span></div>
+    <h2>Error class 1 — the aggregate was computed over a different population than the claim</h2>
+    <div class="body">
+      <p class="lead">Five instances on this project. Each is the same shape: <strong>reading an aggregate as a statement about the population it is named for, rather than the population it is computed over.</strong> Three of them cost a published conclusion before they were caught.</p>
+
+      <div class="cols c2">
+        <div class="klass">
+          <div class="inst">
+            <div class="who">G6 · cost a published conclusion</div>
+            <p>The worst-liveness-gap statistic takes a <b>max over every flow</b> and the PDB-violation rate <b>byte-weights over every flow</b>. So a 50 Mbps best-effort flood being <em>correctly starved</em> scored as fleet damage. It reported a Two-tier failure at <span class="n">+136.84 %</span> and a <span class="n">24-percentage-point</span> violation-rate rise on all three arms.</p>
+            <p><b>The better an arm contained the flood, the worse it scored — the causal direction was inverted.</b> All flows: <span class="n">+0.2313 / +0.2270 / +0.2055</span>. Aggressor excluded: <span class="n">−0.0019 / −0.0022 / +0.0010</span>.</p>
+            <p>Fixed by binding G6 to a <em>new</em> protected-fleet metric, not by editing the existing one — its all-flow domain is deliberate and other guarantees need it.</p>
+          </div>
+          <div class="inst">
+            <div class="who">G6 again · the estimator, not the population</div>
+            <p>The same statistic's per-seed deltas were summarised by a <b>mean of ratios</b>, which read <span class="n">+136.84 %</span> while the <b>median</b> read <span class="n">−0.22 %</span> and <span class="n">21 of 40 seeds improved</span>. A ratio off a near-zero base has no bounded magnitude.</p>
+            <p>Median plus interquartile range is now the reporting default for every max-type statistic on this project.</p>
+          </div>
+          <div class="inst">
+            <div class="who">G12 · inside the tool built to apply the rule</div>
+            <p>The clause-4 scorer's second version <b>pooled across arms</b> and reported “first degradation at nominal load” — true of Two-tier only. PF and Reservation stay clean until <span class="n">102 % of the measured ceiling</span>.</p>
+            <p>Caught by asking which rows entered the minimum before quoting it.</p>
+          </div>
+        </div>
+
+        <div class="klass">
+          <div class="inst">
+            <div class="who">G5 · predicted before the data arrived, cost nothing</div>
+            <p>“<span class="n">33 of 40 seeds</span> breach the video bar” sounds like thirty-three failures. It is <b>2 distinct flows</b>. Two-tier's 35 are 4 flows, one accounting for 30.</p>
+            <p><b>A breach count is over SEEDS, never over FLOWS.</b> Thirty failures and one chronically broken flow look identical in that number — and they call for completely different fixes.</p>
+            <p>This one was registered as a standing doubt <em>before</em> the data existed and confirmed on arrival. It is the cheapest instance in the list, and the only one that cost nothing.</p>
+          </div>
+          <div class="inst">
+            <div class="who">G10 · caught while building this deck</div>
+            <p>The per-flow latency statistic names a <b>worst flow</b>, and that flow is the <b>best-effort filler</b> on 10 of the 12 fleet-size × arm cells at nominal load — on PF at 24 and 32 robots it is the camera instead.</p>
+            <p>So comparing arms on it <b>compares different flows</b>. It was pulled from the result table rather than shipped with a caveat.</p>
+          </div>
+
+          <div class="card" style="margin-top:4px">
+            <p><span class="kicker">The check, stated so it is mechanical</span></p>
+            <p style="margin-top:6px">Before quoting any aggregate — a max, a mean, a rate, a count of breaches — name three things:</p>
+            <p style="margin-top:6px"><b>(a)</b> the rows it is computed over &nbsp;·&nbsp; <b>(b)</b> the rows the <em>claim</em> is about &nbsp;·&nbsp; <b>(c)</b> whether they are the same set.</p>
+            <p><strong>If they differ, the aggregate does not support the claim</strong> — no matter how large the effect or how tight the interval. Asking in advance is nearly free; three of the five instances above were caught only after publication.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> wp9-plan.md §24.2, §25.4, §27.1, §28.1–§28.1a (G6) · §29.1 (G5) · §36.6 (G12) · this deck's own build against sweeps/wp9/stage2/stage2_rows.csv (G10) · CLAUDE.md, "DECOMPOSE BEFORE ATTRIBUTING".</div>
+  </div>
+</section>
+
+<!-- B2 =============================================================== -->
+<section class="slide backup">
+  <div class="inner">
+    <div class="railtop"><span class="eyebrow">Backup · how these numbers were corrected</span><span class="idx">B2 / B2</span></div>
+    <h2>Error class 2 — the mechanism returned nothing, and the metric reported success</h2>
+    <div class="body">
+      <p class="lead">Structurally different from class 1, and worth separating because <strong>the mitigation differs</strong>. In class 1 a computed value was wrong. Here <em>every number was correct for the events that happened</em> — there simply were none. <b>No metric caveat can catch this</b>, because a caveat qualifies a computed value. The catch has to happen one level up.</p>
+
+      <div class="cols c2">
+        <div class="klass">
+          <div class="inst">
+            <div class="who">G9 · the clearest instance</div>
+            <p>The scripted deep fade was written <b>half the length of t310</b>. The dwell re-armed, radio link failure was never declared, <b>zero join events occurred</b> — and the recovery metrics reported <em>instant recovery</em>.</p>
+            <p>The diagnosis, kept verbatim because a later reader will hit it: <b>depth arms the timer, duration expires it.</b> Two identically named signal-floor fields exist on <em>different</em> objects, and the driver constructs the detector's one — so setting the other does nothing. <span class="n">t310 is 2,000 ms</span>, which at this numerology is <span class="n">8,000 slots</span>, and the fade must outlast it.</p>
+          </div>
+          <div class="inst">
+            <div class="who">G9 again · and “at all” is too weak</div>
+            <p>The campaign implemented the lesson above as a <b>non-zero check</b>, and it passed on every run — while Two-tier recorded <span class="n">3.8 of 10</span> scripted warm restarts and <span class="n">1.0 of 5</span> cold cycles.</p>
+            <p><em>“Did the mechanism fire at all”</em> is a weaker question than <em>“did it fire as often as the scenario specifies”</em>, <b>and the gap between them is exactly where a partially degenerate run hides.</b></p>
+            <p><strong>A partially degenerate run is not a smaller sample of the same thing.</strong> The events that survive are self-selected — here, the ones whose predecessor finished before the next was scheduled — so the arm is measuring a different population. Derive the expected count from the schedule and assert equality.</p>
+          </div>
+        </div>
+
+        <div class="klass">
+          <div class="inst">
+            <div class="who">G12 · the instrument goes blind where the failure is total</div>
+            <p>Clause 4 was first scored on the telemetry liveness gap alone and returned <b>UNSCOREABLE</b>. The gap is undefined on <span class="n">116 ramp points</span> — because the statistic <b>excludes any flow with fewer than two completions</b>, and a flow down to one delivered message per run has no gap to measure. <b>It goes blind while still delivering, not only when silent.</b></p>
+            <p>Rescoring on the PDB-violation rate moved the verdict from UNSCOREABLE to <b>MISS</b>, i.e. <em>against</em> the registered expectation — the honest direction for a post-hoc correction to run.</p>
+          </div>
+          <div class="inst">
+            <div class="who">G9 / the recovery metric · green by construction</div>
+            <p>The SLO-recovery metric tests head-of-line age, and the buffer <b>evicts a queue head before it can age past its deadline</b>. So age is capped by construction and <b>a never-delivering flow reads green, always</b>.</p>
+            <p>Measured: <span class="n">0 of 30,000 slots</span> exceed the deadline on a robot dropping <span class="n">1,396,203 bytes</span>. The metric has no red state for this class at all.</p>
+          </div>
+          <div class="inst">
+            <div class="who">Uplink buffer reporting · what finally caught one</div>
+            <p>Truncated buffer-status formats were wired to the wrong trigger and <b>36 unit tests passed</b> — every one of them <em>constructing the precondition it was testing</em>. A test that builds its own precondition cannot discover that the precondition never occurs.</p>
+            <p>What caught it was an at-scale run producing an <b>arithmetically impossible count</b>: <span class="n">144,000</span> — exactly <span class="n">6 robots × 3 logical-channel groups × 8,000 slots</span>. <strong>Ask of any surprising count: does it factor into the run's own dimensions?</strong> A value equal to an exact product of the grid's shape is almost never a measurement.</p>
+          </div>
+
+          <div class="card" style="margin-top:4px">
+            <p><span class="kicker">The check</span></p>
+            <p style="margin-top:6px">Run it at scale and ask whether the precondition <b>occurs at all</b> — then assert the <b>expected count</b>, derived from the schedule and never restated in prose.</p>
+            <p>Applied to a forward-looking <em>note</em> rather than to a landed mechanism, this is the cheapest place in the whole process to spend the effort: a counterfactual probe costs hours, and discovering the same thing after a mechanism ships costs a work package.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><b>Source:</b> sim/scenarios/g9.py docstring and wp9-plan.md §34.5 (the fade, the event shortfall) · §32.1 (the capped metric) · §36.6 (the blind gap) · §19.2, §20 (the buffer-format trigger and the counterfactual) · CLAUDE.md, "A test that CONSTRUCTS the precondition it is testing cannot discover that the precondition never occurs".</div>
+  </div>
+</section>
+</div>
+
+<script>
+(function () {
+  var deck = document.getElementById('deck');
+  var bar = document.querySelector('#rail > i');
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+
+  function progress() {
+    var max = deck.scrollHeight - deck.clientHeight;
+    bar.style.width = (max > 0 ? (deck.scrollTop / max) * 100 : 0) + '%';
+  }
+  deck.addEventListener('scroll', progress, { passive: true });
+  progress();
+
+  function current() {
+    var best = 0, bestD = Infinity;
+    for (var i = 0; i < slides.length; i++) {
+      var d = Math.abs(slides[i].getBoundingClientRect().top);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  function go(n) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    slides[n].scrollIntoView({ block: 'start' });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === ' ') {
+      e.preventDefault(); go(current() + 1);
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') {
+      e.preventDefault(); go(current() - 1);
+    } else if (k === 'Home') {
+      e.preventDefault(); go(0);
+    } else if (k === 'End') {
+      e.preventDefault(); go(slides.length - 1);
+    }
+  });
+})();
+</script>

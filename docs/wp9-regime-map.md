@@ -15,6 +15,16 @@ detail; this document is the roll-up.
 
 ---
 
+
+> **A NOTE ON COUNTS IN THIS DOCUMENT.** Any "N metrics", "N cells", "N
+> records" written in prose below is **as-of-writing**. This project has five
+> recorded instances of a restated count going stale, and the panel's own size
+> has been wrong three times (19 → 21 → 22). **Derive every count from the
+> thing that produces it** — `len(load_panel()["metrics"])`,
+> `len(regression_corpus._cases())`, `sum(len(v) for v in EXCURSIONS.values())`
+> — and treat a number in prose as a claim about code at a past date.
+
+
 ## 0. Four qualifiers that travel with every number below
 
 **Read these before quoting anything from this document.** Each is a
@@ -444,6 +454,39 @@ which term of the composite it thinks is carrying it.
 > by ≈0.01–0.05 in the metric's own units. Quote the verdicts freely; treat
 > a quoted *bound* from these three rows as ±0.05 rather than exact.
 
+
+> ## ⚠ KNOWN-WRONG, NOT SUSPECT — G1 AND G8 (2026-09-03)
+>
+> **Every worst-flow number for G1 and G8 in this document was computed over
+> a population nobody chose.** `Scorecard`'s worst-flow metrics ranged over
+> EVERY flow in the record, so the per-UE best-effort filler (5QI 9) and the
+> saturating aggressor (5QI 8) — flows a QoS-aware scheduler is SUPPOSED to
+> starve — entered contests the guarantees bind to the protected fleet.
+>
+> **Measured on `sweeps/wp9/stage2/stage2_rows.csv`, 7,560 rows:** the 5QI-9
+> filler wins M01's contest in **85.4 %** of runs; the 5QI-1 telemetry bearer
+> G1 is actually about wins it in **6** (0.08 %).
+>
+> **On a fresh N=8 run the VERDICT inverts, in opposite directions:**
+>
+> | | all-flow (as published here) | protected fleet |
+> |---|---|---|
+> | **G1** M01 p98 vs 100 ms | 300.00 / 300.25 / 300.00 → **FAIL every arm**, three arms agreeing to 0.25 ms because the value is pinned at 5QI 9's own 300 ms PDB | 28.00 / 22.00 / 96.75 → **PASS every arm**, 4.4× separation |
+> | **G8** M09 Jain vs 0.90 | 0.9446 / 0.9419 / 0.8783 → **TwoTier FAILS** | 0.9995 / 0.9998 / 0.9584 → **TwoTier PASSES** |
+>
+> **G3, G5, G6 and G10 are NOT affected** — G6 already restricted via M20,
+> G10's M07/M08 select `flow_class == "GBR"` which excludes both
+> non-protected 5QIs by construction, and G3's and G5's winners were already
+> protected bearers. That asymmetry is what makes this a defect rather than a
+> framing preference, and it is pinned by
+> `sim/tests/test_population_is_explicit.py`.
+>
+> **Fixed in the code (`9c23327`): the scoring layer now REFUSES to compute a
+> worst-flow statistic without an explicit population.** The replacement
+> VALUES do not exist yet — they arrive with the Phase 2 re-run. **These rows
+> are marked before their replacements exist deliberately: a wrong number
+> sitting unmarked is worse than a gap.**
+
 ## 2. G1–G12 bridge table, filled in
 
 | G | Status | Evidence / what is missing |
@@ -475,6 +518,8 @@ which term of the composite it thinks is carrying it.
 > reported beside that UE's M02 for the same window.** This is the same
 > shape as the failure §29 found on M05 — a metric reading well because the
 > traffic it measures is absent rather than served.
+
+> **⚠ G1 and G8's rows below are KNOWN-WRONG — see the banner above §2.**
 
 ## 2.1 GUARANTEE INVENTORY — one status per guarantee, with its reason
 

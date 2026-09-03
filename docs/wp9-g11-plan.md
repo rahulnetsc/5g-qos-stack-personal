@@ -930,6 +930,30 @@ running, G11 does not fit; at GT-7.1's literal two-asset reading, it is
 untested and probably does.** §7.4 is where that is settled, and it must be
 settled before the budget is trusted.
 
+
+> ## SUPERSEDED — every per-run memory figure and worker count in §7.3/§7.4
+>
+> **Retracted in full by `docs/wp9-defects-log.md` #17 (2026-09-03).** The
+> options table, its `~48 GiB` / `~24 GiB` per-run figures, and the worker
+> counts derived from them (16 → 8 → 2, across defects-log #13 and #15) all
+> trace to `sweeps/wp9/g11_probes/g11_probe_session1.py`, which builds
+> **`sweep_scenario` at N=8** and runs with **no window sink and no
+> windowing**. The campaign builds `build_g11_scenario` at **N=4, windowed,
+> with ledger eviction**. Different runs, not near-neighbours.
+>
+> **Measured on the campaign's own path, and the dominant term has since been
+> removed:** the runner was retaining every window's completions
+> (~348 bytes/completion, ~10.6 GB of a ~12.5 GB run — ~85 %). Fixed in
+> `08bcf2f`, verified row-identical. A 7.2 M-slot run is now expected at
+> **≈2 GB**, extrapolated from 240k/480k measurements and **not yet confirmed
+> at the real horizon** — which is the first thing the next real-horizon probe
+> should check, because this section exists because of an extrapolation.
+>
+> **The REASONING below is kept and the NUMBERS are not.** The LPT/efficiency
+> argument, the makespan model and the worker-scaling logic are all still
+> correct in form; every figure they are instantiated with is withdrawn.
+
+
 ### 7.3 Three options, priced by simulated LPT rather than division
 
 Makespan is **not** total-CPU ÷ speedup: G11 is 30 long jobs, so the

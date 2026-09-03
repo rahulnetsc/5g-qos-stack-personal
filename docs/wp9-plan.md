@@ -1,5 +1,48 @@
 # WP9 plan — the characterisation sweep (Phase 3)
 
+
+> ## ⚠ KNOWN-WRONG, NOT SUSPECT — G1 AND G8 (2026-09-03)
+>
+> **Every worst-flow number for G1 and G8 in this document was computed over
+> a population nobody chose.** `Scorecard`'s worst-flow metrics ranged over
+> EVERY flow in the record, so the per-UE best-effort filler (5QI 9) and the
+> saturating aggressor (5QI 8) — flows a QoS-aware scheduler is SUPPOSED to
+> starve — entered contests the guarantees bind to the protected fleet.
+>
+> **Measured on `sweeps/wp9/stage2/stage2_rows.csv`, 7,560 rows:** the 5QI-9
+> filler wins M01's contest in **85.4 %** of runs; the 5QI-1 telemetry bearer
+> G1 is actually about wins it in **6** (0.08 %).
+>
+> **On a fresh N=8 run the VERDICT inverts, in opposite directions:**
+>
+> | | all-flow (as published here) | protected fleet |
+> |---|---|---|
+> | **G1** M01 p98 vs 100 ms | 300.00 / 300.25 / 300.00 → **FAIL every arm**, three arms agreeing to 0.25 ms because the value is pinned at 5QI 9's own 300 ms PDB | 28.00 / 22.00 / 96.75 → **PASS every arm**, 4.4× separation |
+> | **G8** M09 Jain vs 0.90 | 0.9446 / 0.9419 / 0.8783 → **TwoTier FAILS** | 0.9995 / 0.9998 / 0.9584 → **TwoTier PASSES** |
+>
+> **G3, G5, G6 and G10 are NOT affected** — G6 already restricted via M20,
+> G10's M07/M08 select `flow_class == "GBR"` which excludes both
+> non-protected 5QIs by construction, and G3's and G5's winners were already
+> protected bearers. That asymmetry is what makes this a defect rather than a
+> framing preference, and it is pinned by
+> `sim/tests/test_population_is_explicit.py`.
+>
+> **Fixed in the code (`9c23327`): the scoring layer now REFUSES to compute a
+> worst-flow statistic without an explicit population.** The replacement
+> VALUES do not exist yet — they arrive with the Phase 2 re-run. **These rows
+> are marked before their replacements exist deliberately: a wrong number
+> sitting unmarked is worse than a gap.**
+
+
+> **A NOTE ON COUNTS IN THIS DOCUMENT.** Any "N metrics", "N cells", "N
+> records" written in prose below is **as-of-writing**. This project has five
+> recorded instances of a restated count going stale, and the panel's own size
+> has been wrong three times (19 → 21 → 22). **Derive every count from the
+> thing that produces it** — `len(load_panel()["metrics"])`,
+> `len(regression_corpus._cases())`, `sum(len(v) for v in EXCURSIONS.values())`
+> — and treat a number in prose as a claim about code at a past date.
+
+
 ## 0. What this work package is, and what it is not
 
 Phase 2 is complete (`a5f6baa`). Both schedulers are ported from verified OAI
@@ -4493,6 +4536,37 @@ it does not change any flow's cadence.
 > arithmetic. A caveat applied too broadly destroys findings exactly as
 > efficiently as one applied too narrowly manufactures them, and it is much
 > harder to notice, because the result simply never gets reported.
+
+> **AND THE CORRECTION ABOVE IS ITSELF WRONG — corrected again 2026-09-03,
+> this time against the data rather than the scenario file.** The box asserts
+> *"the caveat does NOT fire"* at duty 0.5. **It fires on 4 of 44 duty-0.5
+> breaches**, measured directly over the committed
+> `sweeps/wp9/part_c_rows.csv`:
+>
+> | arm | max gap | median | configured period |
+> |---|---|---|---|
+> | TwoTier | 963.25 | 596.63 | 200 ms |
+> | Reservation | 2815.00 | 602.25 | 200 ms |
+> | Reservation | 2041.25 | 551.25 | 200 ms |
+> | Reservation | 2063.75 | 525.00 | 200 ms |
+>
+> **The error is one step, and it is the reusable part: the box inferred the
+> predicate's STATE from the CONFIGURATION instead of reading the predicate's
+> INPUT.** The predicate is `median_gap_ms > T_live/4`, and `median_gap_ms`
+> is MEASURED. A flow configured at 200 ms whose network degrades it to a
+> 600 ms observed median trips it. So the exclusion is not a property of
+> `duty_cycle` at all — it is a property of each row, and it must be read per
+> row.
+>
+> **This is triage finding #22 arriving from the other direction**, and it is
+> why #22 blocks G3: the caveat silences real breaches on the metric G3 binds
+> to. **TwoTier's 503.25 ms / 5-of-10 result quoted above survives** — those
+> rows are not among the four — but the general claim that duty 0.5 is
+> caveat-free does not.
+>
+> Registered as a failure class in `prediction-journal.md`: *an
+> over-correction is its own class, and it is the hardest to see, because it
+> reads as settled.*
 >
 > Note the caveat's predicate is a strict `>`, and at duty 0.1 the DL
 > command flow's period is exactly **500.0 ms**, so rows won by 5QI 82 sit

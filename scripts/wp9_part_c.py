@@ -13,10 +13,24 @@ configured period is 1000 ms, above the 500 ms T_live/4 bound, so
 max_gap_ms measures cadence rather than a liveness failure. The caveat is
 derived from each flow's own median gap and travels in the record.
 
-NOT "<= 0.5", which this header used to say: at duty_cycle 0.5 the period
-is 200 ms, the caveat does NOT fire, and TwoTier's 503.25 ms / 5-of-10
-breach there is a REAL liveness breach against PF's 0-of-10. The wider
-wording discarded a genuine arm difference (docs/wp9-plan.md §24.6).
+NOT "<= 0.5", which this header used to say: the wider wording discarded a
+genuine arm difference (docs/wp9-plan.md §24.6).
+
+BUT THAT CORRECTION ALSO OVER-SHOT, and this is the current statement. It
+said "at duty_cycle 0.5 the period is 200 ms, the caveat does NOT fire".
+Measured over this script's own output (sweeps/wp9/part_c_rows.csv), the
+caveat fires on 4 of 44 duty-0.5 breaches -- observed medians 596/602/551/
+525 ms against that configured 200 ms period.
+
+The predicate is `median_gap_ms > T_live/4` and median_gap_ms is MEASURED,
+not configured, so a flow the network degrades from 200 ms to a 600 ms
+median trips it. THE EXCLUSION IS A PROPERTY OF EACH ROW, NOT OF THE
+duty_cycle AXIS, and must be read per row from the M03.median_gap_ms column
+this script already emits.
+
+TwoTier's 503.25 ms / 5-of-10 result is unaffected -- those rows are not
+among the four. What does not hold is the blanket claim that duty 0.5 is
+caveat-free.
 
 Usage:
     uv run python scripts/wp9_part_c.py [--smoke]
