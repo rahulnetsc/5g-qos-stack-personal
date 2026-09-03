@@ -394,6 +394,19 @@ def run(
                         # sets, only on an arrival event (CLAUDE.md's
                         # standing UL-backlog invariant). DL needs no such
                         # step -- the gNB's own queue view IS bytes_queued.
+                        # BOTH ACCOUNTS, not one. The ordinary traffic path
+                        # (:254-255) increments metrics.record_arrival AND
+                        # per_flow_arrived; this site incremented only the
+                        # latter, so the handshake's bytes were DELIVERED and
+                        # counted while never being ARRIVED and counted.
+                        # Measured before the fix on gt61_warm_rejoin: both
+                        # handshake flows read arrived=1, delivered=641,
+                        # delivery_ratio 641.00, against 1.00 or below for
+                        # every other flow in the run -- so any byte-weighted
+                        # statistic over the joiner was unsound, which is the
+                        # population G9 exists to measure.
+                        metrics.record_arrival(ue.ue_id, jcfg.handshake_ul_qfi,
+                                               jcfg.handshake_request_bytes)
                         per_flow_arrived[(ue.ue_id, jcfg.handshake_ul_qfi)] += jcfg.handshake_request_bytes
                         join_handshake_state[ue.ue_id] = "awaiting_ul"
                         join_handshake_ul_sent_ts_s[ue.ue_id] = now_s
@@ -721,6 +734,18 @@ def run(
                     hs_ue_id, hs_cfg.handshake_dl_qfi, hs_cfg.handshake_response_bytes,
                     now_s, message=response_msg,
                 )
+                # The DL response reached NEITHER account. Both are credited
+                # here, after the enqueue, so the flow's arrived bytes match
+                # what was actually offered to it.
+                #
+                # per_flow_arrived is still live at this point in the slot --
+                # it is read by the per-slot timeseries recorder below
+                # (:763). It is NOT read by bsr.on_arrivals (:539), which
+                # already ran, and that is correct rather than a lag: BSR is
+                # an uplink mechanism and this is a downlink flow.
+                metrics.record_arrival(hs_ue_id, hs_cfg.handshake_dl_qfi,
+                                       hs_cfg.handshake_response_bytes)
+                per_flow_arrived[(hs_ue_id, hs_cfg.handshake_dl_qfi)] += hs_cfg.handshake_response_bytes
                 join_handshake_state[hs_ue_id] = "awaiting_dl"
             elif hs_state == "awaiting_dl" and per_flow_delivered.get((hs_ue_id, hs_cfg.handshake_dl_qfi), 0) > 0:
                 active_event = join_active_event.get(hs_ue_id)

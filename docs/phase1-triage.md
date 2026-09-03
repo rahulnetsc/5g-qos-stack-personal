@@ -98,3 +98,95 @@ cluster is one shape: **a metric whose population is every flow while the
 guarantee is about a subset** (#39 M15, #43/61 M01/M15, #31/45/65 M09
 consumers, #48/#50 G4, #25/36/51 caveats not persisted). G6 already solved
 this once, with M20. Nothing else adopted it.
+
+---
+
+## The two open blockers — both VERIFIED, 2026-09-03
+
+**#22 — M03's cadence caveat suppresses GENUINE liveness failures.** Three
+fixtures with the SAME 2 s outage, differing only in what the flow was doing
+around it:
+
+| case | max gap | median | caveat | outcome |
+|---|---|---|---|---|
+| A healthy 100 ms source + one real 2 s outage | 2000 | 100 | no | scored ✓ |
+| B slow 1 s source + same outage | 2000 | 1000 | yes | suppressed ✓ (the intended case) |
+| **C degraded 100 → 600 ms + same outage** | **2000** | **600** | **yes** | **suppressed ✗** |
+
+The predicate is `median_gap > t_live/4`. It cannot distinguish *"this source
+is slow by configuration"* from *"the network degraded this flow until its
+median got large"* — both look identical to a statistic computed from
+delivery timestamps alone. **So it silences the breach exactly when the flow
+is worst**, on the metric G3 binds to, with the text *"do not score it
+against that bound"*.
+
+**The fix needs the flow's CONFIGURED cadence**, which `FlowRecord` does not
+carry — only `FlowConfig.traffic_params["period_ms"]` has it. Adding it to
+the record is a `RunRecord` schema change and therefore **`--check` BINDS**,
+unlike every other fix in this pass. Scoped, not done here.
+
+**#18 — the join handshake bypasses arrival accounting.** Confirmed by
+reading and then measured. `sim/driver.py:254-255` — the normal traffic path
+increments **both** `metrics.record_arrival()` and `per_flow_arrived`.
+`:397` — the UL handshake request increments `per_flow_arrived` **only**.
+`:720-723` — the DL response enqueues with **neither**. Deliveries are
+counted normally either way.
+
+Measured on `gt61_warm_rejoin(seed=1, n_neighbours=3, horizon_slots=30_000)`,
+PF — the configuration is stated because the filed claim said 129:1 and this
+is a different cell:
+
+```
+flow            qfi   arrived  delivered     ratio
+ue1_qfi70        70         1        641     641.00
+ue1_qfi71        71         1        641     641.00
+```
+
+**641:1.** Every other flow in the run sits at 1.00 or below. So
+`delivery_ratio` is meaningless for the handshake pair and **any
+byte-weighted statistic over the joiner is unsound** — which is exactly the
+population G9 exists to measure.
+
+### #18 FIXED — and #22 explicitly blocks G3 until it lands
+
+**#18.** Both handshake sites now credit `metrics.record_arrival()` beside
+`per_flow_arrived`. Measured on the same cell as the defect:
+
+```
+              before                          after
+ue1_qfi70     arrived 1  delivered 641        arrived 641  delivered 641   ratio 1.00
+ue1_qfi71     arrived 1  delivered 641        arrived 641  delivered 641   ratio 1.00
+```
+
+**Every other flow byte-for-byte identical** — 22500 / 3628856 / 15000 /
+46871326 / 42871821 unchanged — which was registered as prediction 2 in
+`prediction-journal.md` P5 and is what "movement confined to runs with join
+events" means in practice.
+
+Pinned by `sim/tests/test_handshake_arrival_accounting.py`, and the invariant
+is stated over **every** flow rather than the two handshake 5QIs, because a
+test naming only those could not catch the next enqueue site that delivers
+without recording an arrival. It also asserts the handshake actually fired,
+so the invariant cannot pass vacuously.
+
+**#22 BLOCKS G3'S NUMBER, and this is a plan statement, not a caveat.**
+
+The cadence caveat currently silences a real breach on **M03/M20 — the
+metric G3 binds to** — whenever a flow has been degraded badly enough that
+its median gap crosses `t_live/4`. Case C above is exactly that: healthy at
+100 ms, collapsed to 600 ms, a real 2 s outage, and the reading suppressed
+with *"do not score it against that bound"*.
+
+**So G3 cannot be scored honestly until #22 lands.** A G3 verdict computed
+today is silent precisely on the flows that failed worst, and reports the
+remainder as a pass. That is not a confidence interval or a qualifier — it is
+a selection effect that removes failures from the numerator.
+
+**#22 is held deliberately, and it is the one commit in this pass that
+legitimately re-baselines the corpus.** The fix needs the flow's CONFIGURED
+cadence to distinguish "slow by design" from "degraded by the network";
+`FlowRecord` does not carry it, only `FlowConfig.traffic_params`. Adding it
+is a `RunRecord` schema change, so **`--check` will bind AND move** — unlike
+every other fix in this pass, where a moved corpus would have signalled a
+second defect. That deserves its own registered prediction and its own
+commit, not to be slipped in beside a document pass.

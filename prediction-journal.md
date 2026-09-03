@@ -749,3 +749,74 @@ protected. **If a re-run moves G10, that prediction is wrong and the
 `flow_class` argument was insufficient** — which is the falsifier worth
 naming, because it is the one row I am asserting is safe without having
 re-measured it.
+
+## P5 — the join handshake bypasses arrival accounting (#18), 2026-09-03
+
+**Registered before the edit.**
+
+**The defect, measured.** `sim/driver.py:254-255` — the normal traffic path
+increments **both** `metrics.record_arrival()` and `per_flow_arrived`.
+`:397` — the UL handshake request increments `per_flow_arrived` **only**.
+`:720-723` — the DL response enqueues with **neither**. Deliveries are
+counted normally either way, so on `gt61_warm_rejoin(seed=1,
+n_neighbours=3, horizon_slots=30_000)`, PF:
+
+```
+ue1_qfi70   arrived 1   delivered 641   ratio 641.00
+ue1_qfi71   arrived 1   delivered 641   ratio 641.00
+```
+
+**`--check` BINDS, AND MUST NOT MOVE — and the distinction is the
+prediction.** The fix is in `sim/driver.py`, whose output the corpus
+serialises as `RunRecord.flows[*].bytes_arrived`, so input and change
+**intersect**: a moved record is reachable, which is what makes a clean
+result evidence rather than a structural inevitability. But the code path
+runs only when `join_configs` is non-empty, and **no corpus scenario has a
+single UE with a join config** — checked, not assumed:
+
+```
+factory_robots   UEs with join config: 0
+sensor_dense     UEs with join config: 0
+latency_bound    UEs with join config: 0
+```
+
+**Registered prediction.**
+
+1. `--check` **CLEAN**. Not because it is blind — it can see
+   `bytes_arrived` — but because the handshake never fires in the corpus.
+2. **Movement confined to runs with join events.** `bytes_arrived` rises on
+   exactly the two handshake flows (`qfi 70`, `qfi 71`); every other flow in
+   a G9 run is untouched; every non-join run is untouched everywhere.
+3. `delivery_ratio` on those two flows falls from ~641 to ≈ 1.0.
+
+**Outcome→meaning, fixed in advance.** Clean `--check` + G9 ratios at ~1.0 =
+the fix reaches the accounting and nothing else. **A MOVED `--check` means a
+non-join scenario reached the handshake path**, which would be a second
+defect, not a re-baselining occasion. Ratios still ≫ 1 = a third arrival site
+exists that neither `:397` nor `:720` covers.
+
+**This is the counterpart to P2's declaration and worth the contrast:** P2's
+`--check` could not fail (the corpus stores no scorecard output, so a
+scorecard change is invisible to it). P5's **can** fail and is predicted not
+to. Same words, opposite epistemic status, and only the second makes a clean
+result worth quoting.
+
+### P5 — SCORED, 3 of 3 HIT
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | `--check` CLEAN, and it BINDS | **HIT** — `OK -- no drift`. The corpus can see `bytes_arrived`; it stays clean because no corpus scenario has a join UE. |
+| 2 | movement confined to the two handshake flows | **HIT** — `qfi 70`/`qfi 71` arrived 1 → 641; every other flow byte-identical (22500 / 3628856 / 15000 / 46871326 / 42871821). |
+| 3 | `delivery_ratio` 641 → ≈1.0 | **HIT** — exactly 1.00 on both, both arms. |
+
+956 tests pass.
+
+**The contrast with P2 is the reusable part.** P2 declared `--check` BLIND:
+the corpus stores `RunRecord`s and no scorecard output, so a scorecard change
+is structurally invisible and a clean result is worth nothing. P5 declared it
+BINDING-BUT-QUIET: the corpus stores `bytes_arrived`, the change writes
+`bytes_arrived`, they intersect — and it stays clean only because the join
+path is never entered there. **Same two words, opposite epistemic status.**
+Only P5's clean result is quotable as evidence, and the difference is
+established by naming the input and the touched artefact, not by how the
+commit felt.
