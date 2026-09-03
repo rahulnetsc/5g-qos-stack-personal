@@ -30,6 +30,7 @@ number is quoted, and reported as a distinct estimator if the two diverge.
 
 from __future__ import annotations
 
+import statistics
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence
 
@@ -37,6 +38,7 @@ from sim.messages import (FrameLedger, MessageCompletion,
                           message_latency_percentiles_ms)
 
 __all__ = [
+    "windowed_flows_from_configs",
     "Window", "WindowedFlow", "DEFAULT_SUBSETS", "LIDAR_QFI", "ESTOP_QFI",
     "TIGHT_PDB_MS", "lidar_windows", "fixed_windows",
     "windowed_flows_from_record", "windowed_metrics",
@@ -87,6 +89,10 @@ class WindowedFlow:
     # M05w/M06w need the frames. Added here rather than re-fetched from the
     # record, so the metric functions stay pure over this flat view.
     ts_arrived_bytes: Optional[Sequence[int]] = None
+    # The source's own ACTIVE intervals, from FlowConfig.traffic_params.
+    # None = "active for the whole run", which is every flow that does not
+    # use the activation gate and therefore every pre-G11 caller.
+    active_windows: Optional[Sequence[tuple]] = None
     frame_completions: Optional[dict] = None
 
 
@@ -141,6 +147,36 @@ def windowed_flows_from_record(record: Any) -> list[WindowedFlow]:
             frame_completions=fr.frame_completions,
         )
         for fr in record.flows.values()
+    ]
+
+
+def windowed_flows_from_configs(flow_configs: Sequence[Any]) -> list[WindowedFlow]:
+    """Adapter: `FlowConfig`s -> the flat view, WITHOUT any timeseries.
+
+    The completion-family metrics (M01w/M02w/M03w/M05w/M06w/M15w) read only
+    a flow's identity and contract, never its `ts_*` arrays. Building them
+    from the SCENARIO lets a caller score those metrics inside the window
+    sink and release the completion batch, instead of retaining every
+    window's completions until a RunRecord exists.
+
+    That retention is what this exists to remove: measured at N=4 on the
+    real campaign path, holding the batches cost ~348 bytes per completion,
+    which at the 7.2 M-slot soak horizon is ~10.6 GB of a ~12.5 GB run --
+    i.e. it silently negated the ledger eviction G11 commit 2 added to bound
+    exactly this (docs/wp9-defects-log.md #15's "where the memory actually
+    goes is not yet established").
+
+    `ts_*` are left None deliberately rather than zero-filled: a metric that
+    needs them must fail loudly here, not read an empty run.
+    """
+    return [
+        WindowedFlow(
+            key=f"ue{fc.ue_id}_qfi{fc.qfi}", ue_id=fc.ue_id, qfi=fc.qfi,
+            direction=fc.direction, flow_class=fc.flow_class,
+            gfbr_bps=fc.gfbr_bps, pdb_ms=fc.pdb_ms,
+            active_windows=(fc.traffic_params or {}).get("active_windows"),
+        )
+        for fc in flow_configs
     ]
 
 
@@ -320,7 +356,38 @@ def _m07w_m08w(
     ]
 
 
-def _m03w(completions: list[MessageCompletion], keys: set, w: Window) -> dict:
+def _inactive_s(a: float, b: float, active: Optional[Sequence[tuple]]) -> float:
+    """Seconds of [a, b] during which the SOURCE was scheduled not to send.
+
+    WHY THIS AND NOT A CADENCE PREDICATE. `Scorecard._m03` guards the same
+    class of error with "is the flow's own MEDIAN gap already above the
+    bound", which correctly catches a uniformly SLOW source -- a 1000 ms
+    telemetry period against a 500 ms bound. It cannot catch a DUTY-CYCLED
+    one, and that is the only kind GT-7.1 has: the soak's teleop stream sends
+    every 50 ms while on and is silent for 8 s of every 20 s, so its median
+    gap is 50 ms and its max is 8,050 ms. The median predicate reads it as
+    healthy and the max is then scored against G3's 500 ms bound as a
+    liveness failure -- in 30 of 30 windows, on all three arms, at the same
+    value to one decimal place.
+
+    A liveness gap is "how long was the network silent while the source was
+    trying to send", so scripted silence is subtracted from the gap rather
+    than the flow being excluded: a flow that is duty-cycled AND genuinely
+    starved still reports the starved part.
+    """
+    if not active:
+        return 0.0
+    covered = 0.0
+    for start, end in active:
+        lo = a if start is None else max(a, float(start))
+        hi = b if end is None else min(b, float(end))
+        if hi > lo:
+            covered += hi - lo
+    return max(0.0, (b - a) - covered)
+
+
+def _m03w(completions: list[MessageCompletion], keys: set, w: Window,
+          flows_by_key: Optional[dict] = None) -> dict:
     """G3's liveness gap, windowed. SELECTS ON COMPLETION TIME.
 
     This is the opposite of _m01w/_m02w's deliberate choice, and the reason
@@ -340,16 +407,23 @@ def _m03w(completions: list[MessageCompletion], keys: set, w: Window) -> dict:
         k = _flow_key(c)
         if k in keys and w.contains(c.completion_ts_s):
             by_flow.setdefault(k, []).append(c.completion_ts_s)
-    worst_key, worst_gap = None, None
+    worst_key, worst_gap, worst_median = None, None, None
     thin = 0
     for k, ts in by_flow.items():
         if len(ts) < 2:
             thin += 1
             continue
         ts.sort()
-        g = max(b - a for a, b in zip(ts, ts[1:])) * 1000.0
+        act = (flows_by_key or {}).get(k)
+        act = act.active_windows if act is not None else None
+        # SCRIPTED SILENCE IS NOT A LIVENESS GAP. Subtracting it leaves the
+        # part of the interval the source was actually trying to send in.
+        gaps = [((b - a) - _inactive_s(a, b, act)) * 1000.0
+                for a, b in zip(ts, ts[1:])]
+        g = max(gaps)
         if worst_gap is None or g > worst_gap:
             worst_key, worst_gap = k, g
+            worst_median = statistics.median(gaps)
     row = {"window": w.name, "metric": "M03w", "n_flows": len(by_flow),
            "n_flows_too_thin": thin}
     if worst_gap is None:
@@ -360,6 +434,24 @@ def _m03w(completions: list[MessageCompletion], keys: set, w: Window) -> dict:
     else:
         row["value"] = worst_gap
         row["flow"] = worst_key
+        # THE REPORTING FLOW'S OWN CADENCE, carried so a consumer can tell a
+        # liveness failure from a source that simply sends slowly -- the same
+        # discriminator sim/scorecard.py:334-341 already derives for the
+        # un-windowed M03, and the one thing this row was missing.
+        #
+        # It is not optional realism. GT-7.1's soak scripts a duty-cycled
+        # teleop stream (12 s on of every 20 s), so EVERY 60 s window of it
+        # contains three 8-second silences by construction. Measured on the
+        # real scenario, all three arms report M03w = 8050.0 ms on
+        # ue1_qfi82 -- identical to one decimal across three different
+        # schedulers, which is the signature of a scripted artefact rather
+        # than a scheduling result. Scored against G3's 500 ms bound that is
+        # a FAIL in 30 of 30 windows on every arm and every seed.
+        #
+        # The BOUND is deliberately not applied here. This row stays
+        # bound-agnostic (it has no t_live_s) and the caller that owns the
+        # bound decides -- scripts/g11_score.py.
+        row["median_gap_ms"] = worst_median
     return row
 
 
@@ -508,6 +600,7 @@ def windowed_metrics(
     windows: Sequence[Window],
     subsets: Optional[dict[str, Callable[[WindowedFlow], bool]]] = None,
     contract_fraction: float = 0.95,
+    families: str = "all",
 ) -> list[dict[str, Any]]:
     """§16.4's four windowed quantities, for every (window, subset) pair.
 
@@ -525,6 +618,10 @@ def windowed_metrics(
     (`config/metric_panel.yml` defaults, M07/M08) rather than a fresh
     choice, so M07w/M08w are comparable to the panel numbers they window.
     """
+    if families not in ("all", "completion", "timeseries"):
+        raise ValueError(f"families must be all/completion/timeseries, got {families!r}")
+    want_comp = families in ("all", "completion")
+    want_ts = families in ("all", "timeseries")
     subsets = DEFAULT_SUBSETS if subsets is None else subsets
     flows_by_key = {f.key: f for f in flows}
     # PRE-BUCKET ONCE. Every metric below used to receive the WHOLE
@@ -549,15 +646,21 @@ def windowed_metrics(
         for wi, w in enumerate(windows):
             gen = by_gen.get(wi, [])
             done = by_done.get(wi, [])
-            emitted = [
-                _m01w(gen, keys, w),
-                _m02w(gen, keys, w),
-                *_m07w_m08w(flows, keys, w, time_s, contract_fraction),
-                _m03w(done, keys, w),
-                _m15w(gen, keys, w),
-                *_m05w_m06w(gen, flows_by_key, keys, w),
-                _m09w(flows, keys, w, time_s),
-            ]
+            # ORDER IS PRESERVED ACROSS BOTH FAMILIES. A caller that scores
+            # the two halves separately and concatenates gets the same rows
+            # this returns for families="all", just not in the same order --
+            # every consumer keys on row["metric"], never on position
+            # (scripts/g11_score.py:53).
+            emitted = []
+            if want_comp:
+                emitted += [_m01w(gen, keys, w), _m02w(gen, keys, w)]
+            if want_ts:
+                emitted += list(_m07w_m08w(flows, keys, w, time_s, contract_fraction))
+            if want_comp:
+                emitted += [_m03w(done, keys, w, flows_by_key), _m15w(gen, keys, w),
+                            *_m05w_m06w(gen, flows_by_key, keys, w)]
+            if want_ts:
+                emitted += [_m09w(flows, keys, w, time_s)]
             for row in emitted:
                 row["subset"] = subset_name
                 row["window_start_s"] = w.start_s

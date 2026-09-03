@@ -241,6 +241,20 @@ def main(argv):
                 "neighbour_dm02": {"ci": ci, **rs},
                 "neighbour_dp98_ms": {"ci": ci_p98, **rs_p98},
             }
+            # DURABLE AFTER EVERY ARM, not once at the end. The only write
+            # used to be the terminal one below, so a kill at hour 9 of an
+            # overnight run lost the whole campaign -- and this machine has
+            # lost three runs to environmental kills. Rewriting the partial
+            # `out` costs milliseconds against minutes of simulation.
+            #
+            # This is DURABILITY, not resume: a relaunch still recomputes
+            # everything. True resume needs a per-(case, arm) ledger and a
+            # skip, ~25 lines, and is deliberately deferred -- it buys
+            # nothing at Phase 2's 5-10 minute budget and the incremental
+            # write already removes the catastrophic case.
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(
+                json.dumps({**out, "_partial": True}, indent=2, default=str))
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, indent=2, default=str))
     print(f"\nwrote {args.out}")

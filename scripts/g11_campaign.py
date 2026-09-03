@@ -59,7 +59,8 @@ from sim.scenarios.g11 import (SLOT_S, SOAK_HORIZON_SLOTS,
                                assert_schedule_fired, build_g11_scenario,
                                expected_counts, scripted_windows)
 from regime_sweep import paired_seeds
-from wp9_window import Window, windowed_flows_from_record, windowed_metrics
+from wp9_window import (Window, windowed_flows_from_configs,
+                        windowed_flows_from_record, windowed_metrics)
 
 _TT = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
 CQI_DELAY_SLOTS = 8
@@ -92,10 +93,30 @@ def run_one(task: tuple) -> dict:
                for k in range(int((horizon_s + WINDOW_S - 1) // WINDOW_S))]
 
     rows: list[dict] = []
-    pending: dict[int, list] = {}
+    # SCORE AND RELEASE, rather than retain. The previous version stored
+    # every window's completion batch in a dict for the whole run and scored
+    # after it, which silently negated commit 2's ledger eviction: measured
+    # on this exact path (PF, N=4, ts="second"), retaining the batches costs
+    # ~348 bytes per completion, ~10.6 GB of a ~12.5 GB run at the 7.2 M-slot
+    # horizon. Scoring in the sink takes a run to ~2 GB and the affordable
+    # worker count from ~1 to ~10.
+    #
+    # The split is exact, not an approximation: M01w/M02w/M03w/M05w/M06w/M15w
+    # read only a flow's identity and contract, which the SCENARIO already
+    # has; only M07w/M08w/M09w need the run's per-second arrays. Rows are
+    # keyed by row["metric"] downstream, never by position.
+    cfg_flows = windowed_flows_from_configs(sc.flows)
 
     def sink(idx: int, comps: list) -> None:
-        pending[idx] = comps           # scored after the run, with the flows
+        if idx >= len(windows):
+            return                     # a residual window past the partition
+        for row in windowed_metrics(comps, cfg_flows, None, [windows[idx]],
+                                    subsets={"all": lambda f: True},
+                                    families="completion"):
+            row.update(arm=arm, seed=seed, window_index=idx,
+                       permutation=permutation)
+            rows.append(row)
+        comps.clear()                  # the batch is scored; drop it now
 
     summary = driver_run(
         sc, _arm(arm), cqi_delay_slots=CQI_DELAY_SLOTS,
@@ -107,10 +128,41 @@ def run_one(task: tuple) -> dict:
         flow_configs=sc.flows, summary=summary, arm={}, meta={})
     flows = windowed_flows_from_record(rec)
 
+    # THE GUARD THAT MAKES THE SPLIT SAFE. The completion family was scored
+    # against flows built from the scenario; the timeseries family is scored
+    # against flows built from the record. If those two populations ever
+    # disagree, the two halves describe different fleets and the merge is
+    # silently wrong -- so compare them rather than assume (CLAUDE.md's
+    # decompose-before-attributing rule, applied at the point of the join).
+    cfg_keys = {f.key for f in cfg_flows}
+    rec_keys = {f.key for f in flows}
+    # The asymmetry is DIRECTIONAL and only one direction is an error.
+    #
+    # scenario-only is EXPECTED and benign: `record.flows` holds only flows
+    # that produced traffic, and GT-7.1 scripts two one-shot flows late in
+    # the run -- the firmware push at T+600 s and the STOP drill at
+    # T+1200 s. On any horizon shorter than those they generate nothing and
+    # never enter the record. Harmless here because the completion family
+    # filters `if k in keys`, so a key with no completions contributes
+    # nothing; a LARGER key set changes no row. (This guard raised on its
+    # first run for exactly this case, which is why the direction is spelled
+    # out rather than assumed.)
+    #
+    # record-only is an ERROR: a flow in the record that the scenario does
+    # not declare means the two families really are scoring different
+    # fleets, and the merge below would be silently wrong.
+    if rec_keys - cfg_keys:
+        raise AssertionError(
+            f"{arm}/seed{seed}: the record carries flows the scenario does "
+            f"not declare, so the completion and timeseries metric families "
+            f"describe different populations: "
+            f"record-only={sorted(rec_keys - cfg_keys)}")
+    scenario_only = sorted(cfg_keys - rec_keys)
+
     for idx, w in enumerate(windows):
-        for row in windowed_metrics(pending.get(idx, []), flows,
-                                    rec.timeseries_time_s, [w],
-                                    subsets={"all": lambda f: True}):
+        for row in windowed_metrics([], flows, rec.timeseries_time_s, [w],
+                                    subsets={"all": lambda f: True},
+                                    families="timeseries"):
             row.update(arm=arm, seed=seed, window_index=idx,
                        permutation=permutation)
             rows.append(row)
@@ -122,6 +174,11 @@ def run_one(task: tuple) -> dict:
         "wall_s": round(time.time() - t0, 1),
         "peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
         "n_windows": len(windows), "schedule": sched, "rows": rows,
+        # Emitted, not just checked: a scripted flow that generated nothing
+        # is exactly the "did the mechanism fire at all" question, and it
+        # must be visible in the artefact rather than only in an assertion
+        # that did not fire.
+        "flows_declared_but_silent": scenario_only,
     }
 
 
@@ -272,12 +329,35 @@ def main() -> int:
 
     done_path = Path(str(a.out).replace(".json", ".runs.jsonl"))
     done: set[tuple] = set()
+    done_rows: list[dict] = []
     if done_path.exists() and not a.time_cell:
         for line in done_path.read_text().splitlines():
             if line.strip():
                 r = json.loads(line)
+                # The horizon and fleet size ARE banked (run_one's return);
+                # they were simply absent from the key, so a --smoke run at
+                # 400,000 slots displaced a 7,200,000-slot one.
+                if (r.get("horizon_slots") != horizon
+                        or r.get("n_ues") != a.n_ues):
+                    continue
                 done.add((r["arm"], r["seed"], r["permutation"]))
+                done_rows.append(r)
     todo = [t for t in tasks if (t[0], t[1], t[4]) not in done]
+    # BANKED RUNS RE-ENTER THE RESULT. Previously `results` started empty and
+    # the artefact was written as `"runs": results`, so a resume published
+    # ONLY that invocation's runs -- exit 0, n_runs < n_expected, and
+    # g11_score.py scoring whatever survived. With ARMS_LPT longest-first the
+    # subset is arm-skewed, so C1/C3/C4 would be computed per arm over a
+    # self-selected slice of a within-seed paired design.
+    #
+    # The horizon/n_ues filter above closes the second half of the same
+    # hazard: the key is (arm, seed, permutation), and `--smoke` (400,000
+    # slots) shares the production `--out` default, so a smoke record used to
+    # displace a real one. Records are now admitted only if their banked
+    # horizon and fleet size match this invocation's.
+    banked = [r for r in done_rows
+              if (r["arm"], r["seed"], r["permutation"]) not in
+                 {(t[0], t[1], t[4]) for t in todo}]
     with log.open("a") as fh:
         fh.write(f"resume: {len(done)} run(s) already complete, "
                  f"{len(todo)} to run\n")
@@ -285,7 +365,7 @@ def main() -> int:
     guard = AggregateMemoryGuard(a.budget_mb, mem)
     guard.start()
     t0 = time.time()
-    results: list[dict] = []
+    results: list[dict] = list(banked)
     failures: list[dict] = []
     # A KILLED WORKER MUST PRODUCE A RECORDED FAILURE, NOT A GAP.
     # `imap_unordered` never yields a result for a task whose worker was
@@ -300,6 +380,15 @@ def main() -> int:
     # wall-second per 4,000 slots on the slowest arm at N=4, and 4x that
     # plus an hour is generous enough that a healthy run can never trip it.
     per_task_timeout_s = max(1800.0, horizon / 4_000.0 * 4.0 + 3600.0)
+    # MEASURED AGAINST TIME SINCE THE LAST COMPLETION, not since campaign
+    # start. The previous form compared elapsed-since-t0 against
+    # `per_task_timeout_s * len(submitted)`: at the real horizon that is
+    # 10,800 s x 30 = ~90 HOURS against a ~5.7 h makespan, so the only escape
+    # from the collection loop could not fire inside the run it protects. A
+    # worker killed by the guard -- which has already happened once on a
+    # real-horizon probe -- left the parent sleeping indefinitely and the
+    # campaign JSON never written. The guard's own documented failure mode
+    # (docs/wp9-audit-2026-09-03.md Tier-1 #1) was live in its mitigation.
     with mp.get_context("spawn").Pool(a.workers) as pool:
         submitted = [(task, pool.apply_async(run_one, (task,))) for task in todo]
         with log.open("a") as fh:
@@ -307,6 +396,7 @@ def main() -> int:
                      f"{per_task_timeout_s/60:.0f} min\n")
         done_n = 0
         remaining = list(submitted)
+        last_progress_t = time.time()
         while remaining:
             progressed = False
             for entry in list(remaining):
@@ -336,15 +426,18 @@ def main() -> int:
                              f"rss={res['peak_rss_mb']}MB "
                              f"windows={res['n_windows']} "
                              f"elapsed={(time.time()-t0)/60:.1f}m\n")
+            if progressed:
+                last_progress_t = time.time()
             if remaining and not progressed:
-                if time.time() - t0 > per_task_timeout_s * len(submitted):
+                if time.time() - last_progress_t > per_task_timeout_s:
                     for task, _ in remaining:
                         arm, seed, _, _, perm = task
                         failures.append({"arm": arm, "seed": seed,
                                          "permutation": perm, "failed": True,
                                          "error": "never returned -- worker "
                                                   "killed, or hung past the "
-                                                  "per-task timeout"})
+                                                  f"{per_task_timeout_s/60:.0f} min "
+                                                  "no-progress deadline"})
                         with log.open("a") as fh:
                             fh.write(f"  ABANDONED {arm}/seed{seed}/p{perm} "
                                      f"-- no result; guard victims="
@@ -389,6 +482,13 @@ def main() -> int:
                  f"{(time.time()-t0)/60:.1f} min; guard tripped="
                  f"{guard.tripped}; victims={guard.victims}; "
                  f"failures={len(failures)}\n")
+    if len(results) != n_real_runs and not failures:
+        failures.append({"arm": None, "seed": None, "permutation": None,
+                         "failed": True,
+                         "error": f"campaign is SHORT: {len(results)} of "
+                                  f"{n_real_runs} runs present. A shortfall "
+                                  f"was previously reported at exit 0 and "
+                                  f"scored as if complete."})
     if failures:
         # Loud, and non-zero exit: a short campaign must not be scored as a
         # complete one. Per-run resume means re-invoking picks up only the

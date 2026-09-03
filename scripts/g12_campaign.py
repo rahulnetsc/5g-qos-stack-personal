@@ -437,6 +437,11 @@ def main(argv: list[str]) -> int:
                 "per_seed": per_seed}
             print(f"  {arm_name:<12} IN-RANGE {_fmt_dist(in_orders)}   |   "
                   f"FULL {_fmt_dist(full_orders)}", flush=True)
+            # Durable after every (cell, arm) -- the expensive loop. See the
+            # note in g9_campaign.py: durability, not resume.
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(
+                json.dumps({**out, "_partial": True}, indent=2, default=str))
 
     # D4's control, at the reference cell only.
     comp, n = REFERENCE_CELL
@@ -467,6 +472,11 @@ def main(argv: list[str]) -> int:
                       f"{_fmt_dist(orders) or '(none scoreable)'}{note}",
                       flush=True)
             out["permutation_control"][arm_name] = by_perm
+            # Durable after every arm -- see the note in g9_campaign.py.
+            # Durability, not resume; a relaunch still recomputes.
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(
+                json.dumps({**out, "_partial": True}, indent=2, default=str))
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, indent=2, default=str))
