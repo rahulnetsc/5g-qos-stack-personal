@@ -131,6 +131,11 @@ class Scorecard:
         # absent from the scored row is one a later question cannot be
         # re-asked of without a re-run.
         out["M21"] = self.slo_recovery_time_by_delivery(record)
+        # M22 auto-scored beside M09 for the reason M20 sits beside M03:
+        # it is the OTHER half of a conjunction the panel binds to one
+        # guarantee, and a conjunction scored on one conjunct is the
+        # failure this panel exists to prevent.
+        out["M22"] = self._m22_starvation_epochs(record)
         out["M04"] = self._m04_survival_time_failures(record, cfg["survival_miss_n"])
         out["M05"] = self._m05_pdu_set_completeness(record)
         out["M06"] = self._m06_frame_age_at_mec(record)
@@ -387,10 +392,25 @@ class Scorecard:
         value = res.value
         if isinstance(value, dict):
             value = {**value, "excluded_5qi": sorted(excluded_5qi)}
-        return MetricResult(
+        out = MetricResult(
             "M20", "protected_fleet_liveness_gap", value, res.status, "ms",
             f"M03's contest over PROTECTED bearers only, excluding 5QIs "
             f"{sorted(excluded_5qi)}; {res.note}")
+        # CARRY M03'S RUN-DERIVED CAVEATS. This delegates to _m03 and then
+        # built a fresh MetricResult from value/status/note only, silently
+        # dropping `res.caveats` -- so when the winning PROTECTED flow's own
+        # median gap already exceeded the bound, M03 said "CADENCE, NOT
+        # LIVENESS: do not score it against that bound" and M20 said nothing.
+        #
+        # That is the exact loss score() at :156-163 exists to prevent, on
+        # the one metric G6's verdict binds to. Verified by probe: one 5QI-1
+        # flow at a 1000 ms cadence, no aggressor -- identical value, and
+        # only M03 carried the caveat.
+        #
+        # Panel caveats are NOT added here; score() prepends those for every
+        # metric uniformly, and doing it in both places would duplicate them.
+        out.caveats = list(res.caveats or [])
+        return out
 
     @staticmethod
     def robust_delta_summary(deltas: list[float]) -> dict:
@@ -795,6 +815,73 @@ class Scorecard:
             "proxy", "index [0,1]",
             "computed over all flows in the record with timeseries data -- "
             "pass a same-role flow subset upstream if that's what the guarantee needs",
+        )
+
+    def _m22_starvation_epochs(
+        self, record: RunRecord, min_epoch_s: float = 1.0,
+    ) -> MetricResult:
+        """G8's SECOND conjunct, which had no instrument at all.
+
+        G8 is a conjunction -- "per-1 s Jain >= 0.9 per role across assets;
+        AND zero starvation epochs >= 1 s". M08 and M09 were the only metrics
+        bound to it and neither can express the second half. M09 in
+        particular scores `delivered / arrived` with a hardcoded 1.0 when
+        `arrived == 0`, so a flow delivering nothing reads as PERFECTLY FAIR
+        exactly when it is most starved.
+
+        DELIVERY silence, bounded to the flow's OWN active interval. A run of
+        consecutive seconds with zero delivered bytes counts only between
+        that flow's first and last arrival, so a flow that has not started
+        yet, or has finished, is never charged for the silence. Backlog is
+        deliberately not consulted: the per-second fold drops the LEVEL
+        series, and a metric that needed them could not be scored on the
+        configuration G11 runs (config/metric_panel.yml's M22 caveat).
+        """
+        if not record.timeseries_time_s:
+            return MetricResult(
+                "M22", "starvation_epochs", None, "pending", "count",
+                "requires driver.run(..., record_timeseries=True)")
+        time_s = record.timeseries_time_s
+        dt = (time_s[1] - time_s[0]) if len(time_s) > 1 else 1.0
+        need = max(1, int(round(min_epoch_s / dt))) if dt > 0 else 1
+        total, worst_flow, longest = 0, None, 0
+        scored = 0
+        for fr in record.flows.values():
+            arr, dlv = fr.ts_arrived_bytes, fr.ts_delivered_bytes
+            if not arr or not dlv:
+                continue
+            live = [i for i, a in enumerate(arr) if a > 0]
+            if not live:
+                continue          # never offered anything: not starvation
+            scored += 1
+            lo, hi = live[0], live[-1]
+            run_len = 0
+            for i in range(lo, hi + 1):
+                if dlv[i] == 0:
+                    run_len += 1
+                    continue
+                if run_len >= need:
+                    total += 1
+                    if run_len > longest:
+                        longest, worst_flow = run_len, fr.key
+                run_len = 0
+            if run_len >= need:
+                total += 1
+                if run_len > longest:
+                    longest, worst_flow = run_len, fr.key
+        if not scored:
+            return MetricResult(
+                "M22", "starvation_epochs", None, "ok", "count",
+                "no flow had any arrival in the timeseries; nothing to score")
+        return MetricResult(
+            "M22", "starvation_epochs",
+            {"epochs": total, "worst_flow": worst_flow,
+             "longest_epoch_s": longest * dt, "min_epoch_s": min_epoch_s,
+             "flows_scored": scored},
+            "ok", "count",
+            f"runs of >= {min_epoch_s}s with zero delivered bytes, per flow, "
+            f"bounded to each flow's own first..last arrival; "
+            f"{scored}/{len(record.flows)} flow(s) had any arrival",
         )
 
     def _m10_aggregate_throughput(self, record: RunRecord) -> MetricResult:

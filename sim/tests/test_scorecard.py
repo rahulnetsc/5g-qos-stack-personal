@@ -57,17 +57,52 @@ def _record(scenario_fn=smoke_scenario, record_timeseries=False, **run_kwargs):
     ), sc
 
 
-def test_panel_loads_and_has_twenty_metrics():
-    """M18/M19 (WP-Join commit 4, docs/wp-join-plan.md sec5) were the
-    panel's first additions since WP0's original 17; M20 (WP9 Step 2,
-    protected_fleet_liveness_gap) is the third and M21 (G9 commit 3,
-    slo_recovery_time_by_delivery) the fourth. The panel is append-only:
-    additions are allowed, redefinitions of an existing metric are not, and
-    M20 exists precisely so M03 did NOT have to be redefined."""
+# Every metric id ever registered in the panel. APPEND ONLY -- a new metric
+# is added to this tuple in the same commit that adds it to the panel; an id
+# is NEVER removed, because the rule this pins is that a pre-registered
+# metric cannot disappear or be redefined.
+_REGISTERED_METRIC_IDS = (
+    "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09", "M10",
+    "M11", "M12", "M13", "M14", "M15", "M16", "M17",   # WP0's original 17
+    "M18", "M19",                                      # WP-Join commit 4
+    "M20",                                             # WP9 Step 2
+    "M21",                                             # WP9 G9 commit 3
+    "M22",                                             # WP9 Phase-1 fix pass
+)
+
+
+def test_panel_is_append_only():
+    """The panel is append-only: additions are allowed, removals and
+    redefinitions are not, and M20 exists precisely so M03 did NOT have to be
+    redefined.
+
+    THIS TEST USED TO ASSERT A COUNT, and that was the defect rather than a
+    style point. It read `len(panel["metrics"]) == 21` under the name
+    `test_panel_loads_and_has_twenty_metrics` -- already stale by one in its
+    own name -- and it fired when M22 was appended, i.e. it failed on the one
+    operation the panel explicitly PERMITS while being unable to distinguish
+    it from the operation it forbids. A count cannot tell an addition from a
+    removal-plus-addition.
+
+    This is CLAUDE.md's restated-count rule, whose fourth recorded instance
+    was also in test code and whose blast radius is worse there: a literal in
+    a test fails toward PASSING once the drift goes the other way. The
+    binding form is a SUBSET check against the ids ever registered, which
+    fires on a removal and stays quiet on an addition."""
     panel = load_panel()
-    assert len(panel["metrics"]) == 21
     ids = [m["id"] for m in panel["metrics"]]
     assert len(ids) == len(set(ids)), "duplicate metric ids in the panel"
+    missing = set(_REGISTERED_METRIC_IDS) - set(ids)
+    assert not missing, (
+        f"pre-registered metric(s) removed from the panel: {sorted(missing)}. "
+        f"config/metric_panel.yml is append-only -- removing a metric, or "
+        f"redefining one, defeats the multiplicity guard it exists for.")
+    unlisted = set(ids) - set(_REGISTERED_METRIC_IDS)
+    assert not unlisted, (
+        f"metric(s) {sorted(unlisted)} are in the panel but not in this "
+        f"test's registry. Adding a metric is allowed -- add its id to "
+        f"_REGISTERED_METRIC_IDS in the SAME commit, so the removal guard "
+        f"above keeps covering it.")
 
 
 def test_caveats_travel_with_the_value_for_registered_metrics_only():

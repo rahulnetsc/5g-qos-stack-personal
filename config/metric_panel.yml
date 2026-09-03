@@ -267,6 +267,42 @@ metrics:
     requires: record_timeseries=True
     note: Requires driver.run(..., record_timeseries=True); pending otherwise.
 
+  - id: M22
+    name: starvation_epochs
+    definition: >
+      Count of (flow, epoch) pairs where a flow delivered ZERO bytes for a
+      run of >= min_epoch_s consecutive seconds, bounded to the interval
+      between that flow's own first and last arrival so pre-start and
+      post-finish silence never count. Reported with the worst flow, the
+      longest epoch, and the bound used.
+    guarantees: ['G8']
+    unit: count
+    direction: lower_better
+    status: ok
+    requires: record_timeseries=True
+    note: >
+      WP9 Phase-1 fix pass, 2026-09-03. G8's KPI is a CONJUNCTION -- "per-1 s
+      Jain >= 0.9 per role across assets; AND zero starvation epochs >= 1 s"
+      (IA_P5G_Factory_Guarantee_Test_Plan.md:102) -- and only the first half
+      had an instrument. M08 and M09 were the sole metrics bound to G8 and
+      neither can express the second: M09's per-second ratio is
+      delivered/arrived with a HARDCODED 1.0 when arrived == 0
+      (sim/scorecard.py), so a flow delivering nothing while its source is
+      idle or gated reads as PERFECTLY FAIR, which is the exact state a
+      starvation epoch is meant to catch. This is an ADDITION, not an edit:
+      M09 keeps its definition and every historical M09 reading keeps its
+      meaning, per this file's own pre-registration rule.
+    caveats:
+      - >
+        Computed from the per-second COUNT series only (ts_delivered_bytes /
+        ts_arrived_bytes), never from backlog -- deliberately, because the
+        per-second timeseries fold drops the LEVEL series
+        (backlog_bytes, hol_delay_s) and a metric that needed them could not
+        be scored on the configuration G11 runs. The consequence is that this
+        counts DELIVERY silence, which over-counts a flow that legitimately
+        had nothing to send inside its own active interval (a duty-cycled or
+        activation-gated source). Read it beside M02 for the same flow.
+
   - id: M10
     name: aggregate_throughput
     definition: Total delivered bytes (cost side of every QoS gain).
