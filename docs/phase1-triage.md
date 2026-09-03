@@ -169,7 +169,7 @@ test naming only those could not catch the next enqueue site that delivers
 without recording an arrival. It also asserts the handshake actually fired,
 so the invariant cannot pass vacuously.
 
-**#22 BLOCKS G3'S NUMBER, and this is a plan statement, not a caveat.**
+**#22 BLOCKED G3'S NUMBER — RESOLVED 2026-09-03, see below.** (Kept as written; the fix is recorded at the end of this section.)
 
 The cadence caveat currently silences a real breach on **M03/M20 — the
 metric G3 binds to** — whenever a flow has been degraded badly enough that
@@ -279,3 +279,25 @@ to settle. **None gates Phase 2**: #12 and #41 are framing claims about
 already-published G12/G2 text, and #53/#57/#62 concern stage-5 analysis and
 M21's secondary reading. Carried into the document pass, where #12 and #41
 are corrections to prose rather than code.
+
+
+### #22 FIXED — G3 unblocked
+
+`FlowRecord.configured_period_ms` now carries the source's own period, so
+M03's caveat distinguishes the two cases the measured median alone could not:
+
+| | configured | observed median | before | after |
+|---|---|---|---|---|
+| slow **by design** | 1000 ms | 1000 ms | suppressed | suppressed ✓ |
+| **degraded** by the network | 200 ms | 600 ms | suppressed ✗ | **scored**, and flagged `DEGRADED, NOT CADENCE` |
+| healthy | 100 ms | 100 ms | scored | scored, no caveat |
+| aperiodic (no period) | — | 600 ms | suppressed | **scored** — no basis to claim slow-by-design, and ambiguity resolves toward scoring because the failure mode guarded is a SILENCED breach |
+
+The re-baseline was permitted on evidence, not on convenience: **456 diff
+lines, all 456 the added key, zero numeric movement** — registered as
+`prediction-journal.md` P11 prediction 2 before the run, because that is the
+line between "the schema grew" (re-baseline) and "the numbers moved"
+(a defect).
+
+**G3 therefore joins the re-measure set**, taking Phase 2 to 8 scoreable now,
+2 with a stated limit (G9, G11), 2 out (G2, G7).

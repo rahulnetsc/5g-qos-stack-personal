@@ -880,3 +880,86 @@ path is never entered there. **Same two words, opposite epistemic status.**
 Only P10's clean result is quotable as evidence, and the difference is
 established by naming the input and the touched artefact, not by how the
 commit felt.
+
+## P11 — #22: the cadence caveat learns to tell "slow" from "degraded" (2026-09-03)
+
+**Registered before the edit. This is the one fix in the pass where
+`--check` BINDS AND IS EXPECTED TO MOVE**, and the distinction from every
+other commit here is the point: everywhere else a moved corpus would have
+signalled a *second defect*. Here a clean corpus would mean the fix did not
+reach the record.
+
+**The defect.** `Scorecard._m03`'s caveat fires on `median_gap_ms >
+T_live/4` and says *"do not score it against that bound"*. `median_gap_ms`
+is MEASURED, so the predicate cannot distinguish:
+
+| | configured period | observed median | today |
+|---|---|---|---|
+| slow **by design** | 1000 ms | ~1000 ms | suppressed ✓ |
+| **degraded by the network** | 200 ms | ~600 ms | suppressed ✗ |
+
+Measured in a published dataset (`part_c_rows.csv`): **4 of 44 duty-0.5
+breaches** are the second row — real 1–2.8 s breaches, silenced.
+
+**The fix.** `FlowRecord` gains `configured_period_ms`, populated from
+`FlowConfig.traffic_params["period_ms"]`. The caveat then fires only when the
+source is slow **by configuration**; a flow whose configured period is inside
+the bound but whose observed median is outside it gets a DIFFERENT caveat
+naming the degradation, and is **scored**.
+
+**Registered predictions.**
+
+1. **`--check` FAILS on all 20 records**, as an ADDED PER-FLOW KEY
+   (`configured_period_ms`), not as numeric drift — the same shape as WP9
+   G11 commit 2's `message_ledger_windowed`. Falsifier: a clean `--check`
+   means the field never reached `to_dict()`.
+2. **NO existing value changes.** Diffing old against new while ignoring the
+   new key must show zero differences. **This is the load-bearing one**: it
+   separates "the schema grew" from "the numbers moved", and only the first
+   is intended. A numeric delta here is a defect, not a re-baselining.
+3. Case C (configured 200 ms, observed median 600 ms, 2 s max gap) is
+   **scored**, not suppressed. Case B (configured 1000 ms) stays suppressed.
+4. **G3 becomes scoreable.** It is currently blocked because the caveat
+   removes failures from the numerator.
+
+**Then, and only after 1–3 are confirmed, `--capture`.** CLAUDE.md permits
+re-baselining only when a change is *intended* to move the corpus, and says
+to state so — this entry is that statement, written before the run rather
+than after the diff.
+
+**What would make me NOT re-capture:** prediction 2 failing. If any existing
+value moves, the fix has touched behaviour it was not supposed to touch, and
+the correct response is to find out why, not to bless the new numbers.
+
+### P11 — SCORED, 4 of 4 HIT
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | `--check` FAILS as an ADDED KEY, not numeric drift | **HIT** — 456 mismatches, every one `configured_period_ms: MISSING in baseline`. |
+| 2 | **no existing value changes** | **HIT** — of 456 diff lines, 456 mention the new key and **0** do not. |
+| 3 | degraded scored, slow-by-design still suppressed | **HIT** — 10 tests, including the boundary (exactly 500 ms does not suppress) and the aperiodic case. |
+| 4 | G3 becomes scoreable | **HIT by construction** — the caveat no longer removes failures from the numerator. |
+
+Values populate from the right place, checked rather than assumed: `5.0` for
+the 5QI-1 telemetry flows, `None` for the 5QI-9 poisson filler, which has no
+`period_ms`.
+
+**A METHOD FAILURE ON THE WAY TO THIS, RECORDED BECAUSE THE CONCLUSION WAS
+RIGHT AND THE METHOD WAS NOT.** Prediction 2 was first "confirmed" against an
+output I had truncated myself with `tail -20`: 20 lines of a 457-line diff,
+**4 % of the evidence**, reported as "no existing value moved". The answer
+happened to be correct. The check was not.
+
+**It is the could-have-failed shape wearing a passing result**, and it landed
+on the single prediction that gates whether `--capture` is permitted — in the
+one commit whose whole justification is that `--check` binds here. A
+truncated diff can only ever show the differences it kept; it cannot show
+their absence. **Reading `wc -l` on the artefact, not `tail` on the pipe, is
+the whole fix**, and it belongs with this project's existing rule that an
+empty or unchanging output file is evidence about the FILE rather than the
+process.
+
+**`--capture` is therefore permitted, and this entry is the statement
+CLAUDE.md requires**: the re-baseline is intended, it is a SCHEMA addition
+with zero numeric movement, and prediction 2 is what established the
+difference.

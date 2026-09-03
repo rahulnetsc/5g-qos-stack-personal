@@ -113,6 +113,20 @@ class FlowRecord:
     # field exists at all, not a "predates WP7" sentinel; M14's own
     # pending/ok gate reuses M03's completion_ts_by_role_s check instead.
     survival_time_ms: float = 0.0
+    # The source's CONFIGURED inter-arrival period, from
+    # FlowConfig.traffic_params["period_ms"]. None for a flow whose kind has
+    # no period (poisson, xr_video's frame model, aperiodic_event).
+    #
+    # WHY A RECORD FIELD AND NOT A SCORECARD LOOKUP: sim/scorecard.py is
+    # forbidden from importing sim/config.py, and consumes RunRecord only, so
+    # a scorer that needs to know whether a source is slow BY DESIGN can only
+    # learn it from the record. Without it, M03's cadence caveat had to infer
+    # the answer from the MEASURED median -- which cannot tell "configured
+    # slow" from "degraded by the network until the median got large", and so
+    # suppressed 4 of 44 real duty-0.5 breaches in sweeps/wp9/part_c_rows.csv
+    # (observed medians 596/602/551/525 ms against a 200 ms configured
+    # period).
+    configured_period_ms: Optional[float] = None
 
     # WP5 commit 4a (docs/wp5-plan.md): bytes abandoned after HARQ
     # max-retx exhaustion -- distinct from bytes_dropped_pdb (PDB-clock
@@ -338,6 +352,7 @@ class RunRecord:
                 pdb_ms=fc.pdb_ms,
                 priority_level=fc.priority_level,
                 survival_time_ms=fc.survival_time_ms,
+                configured_period_ms=(fc.traffic_params or {}).get("period_ms"),
                 bytes_arrived=m["bytes_arrived"],
                 bytes_delivered=m["bytes_delivered"],
                 bytes_dropped_pdb=m["bytes_dropped"],

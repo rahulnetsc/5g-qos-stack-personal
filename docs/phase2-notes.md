@@ -24,7 +24,7 @@ change specifically, the `flow_class` reasoning was insufficient.
 
 | G | limit | why |
 |---|---|---|
-| **G3** | **Do not measure before #22 lands.** | The cadence caveat silences real breaches on M03/M20, the metric G3 binds to. A verdict computed today is silent precisely on the flows that failed worst and reports the remainder as a pass — a selection effect that removes failures from the numerator, not a caveat. |
+| **G3** | ~~Do not measure before #22 lands.~~ **UNBLOCKED — #22 landed.** | The cadence caveat was silencing real breaches on M03/M20, the metric G3 binds to, so a verdict computed before the fix was silent precisely on the flows that failed worst. `M03` now distinguishes slow-BY-DESIGN (suppressed) from DEGRADED-by-the-network (scored, and flagged as such). G3 moves into the re-measure set: **8 scoreable now, 2 with a stated limit.** |
 | **G9** | Score 3 of 4 clauses; state the 4th OPEN. | **0 of 50 scheduled cold cycles completed attach.** Whether that is a scenario defect or a real scheduler finding is unestablished, and scoring it either way would assert something unmeasured. |
 | **G11** | Report WHAT WAS MEASURED, not a G11 verdict. | C2 was never wired (commit 7 built the drift detector, commit 8 never collected its inputs — defects-log #16). C3/C4/C5 cannot be scored at n=3: C3's CoV needs ≥5 per GT-7.4, and C4/C5 are cross-seed by construction. Only **C1** is a within-run check that survives at 3 seeds. |
 
@@ -35,14 +35,14 @@ change specifically, the `flow_class` reasoning was insufficient.
 | **G2** | Needs TB-size quantisation, planned and unbuilt. **And separately**, its E-STOP flow is **DL** (`sim/fleet.py:179`) while its named failure mode — the BSR/SR desync — is an **uplink** mechanism. So the flow cannot reach the failure even once the mechanism exists. Two independent blockers, and building only the first would not produce a scoreable G2. |
 | **G7** | No MFBR enforcement anywhere in `sim/`. Containment is observable; **clipping is not**, and clipping is half the pass criterion. Structurally out. |
 
-**Count, derived from the rows above: 7 re-measured, 3 with a stated limit
-(one of which is gated on #22), 2 not participating. Twelve accounted for.**
+**Count, derived from the rows above: 8 re-measured (G3 joined once #22
+landed), 2 with a stated limit, 2 not participating. Twelve accounted for.**
 
 ### Carried into Phase 4's budget
 
 **Overnight time goes to guarantees where more samples buy tighter numbers,
 not to ones blocked on missing code.** So the budget excludes G2 and G7
-entirely, and gives G3 nothing unless #22 has landed by then. G11's share is
+entirely, and gives G3 a full share now that #22 has landed. G11's share is
 sized for C1 only — spending an overnight on C3/C4/C5 at n=3 buys nothing,
 because they are unscoreable at that seed count for reasons no amount of
 wall-clock changes.

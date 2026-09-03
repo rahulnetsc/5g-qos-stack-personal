@@ -123,9 +123,23 @@ def test_robust_summary_reports_median_and_spread_not_a_bare_mean():
 def test_m03_flags_cadence_when_the_flow_is_slower_than_the_bound():
     """At duty_cycle 0.1 the telemetry source's configured period is 1000 ms
     against a 500 ms (T_live/4) bound, so every seed 'breaches' with nothing
-    failing (docs/wp9-plan.md §24.6). The caveat is derived from the flow's
-    OWN median gap, so it fires for any slow flow from any producer."""
-    rec = _record({"ue1_qfi1": _flow(1, 1, [1.00, 1.00, 1.05])})
+    failing (docs/wp9-plan.md §24.6).
+
+    UPDATED 2026-09-03 (#22). This test's SCENARIO is unchanged -- a source
+    configured at 1000 ms must still be suppressed -- but its stated
+    MECHANISM was wrong and is what the fix corrected. It read "the caveat is
+    derived from the flow's OWN median gap, so it fires for any slow flow
+    from any producer". Deriving it from the median alone cannot tell a
+    source that is slow BY DESIGN from one the network DEGRADED until its
+    median grew, and suppressed both -- silencing 4 of 44 real duty-0.5
+    breaches in sweeps/wp9/part_c_rows.csv.
+
+    So the fixture now declares the configured period the docstring always
+    described. That is the input the predicate reads; supplying it is not a
+    weakening of the test but the removal of an assumption it was making
+    silently."""
+    rec = _record({"ue1_qfi1": {**_flow(1, 1, [1.00, 1.00, 1.05]),
+                                "configured_period_ms": 1000.0}})
     res = Scorecard().score(rec, population=Population.all_flows())["M03"]
     assert res.value["median_gap_ms"] == 1000.0
     assert any("CADENCE, NOT LIVENESS" in c for c in res.caveats), res.caveats

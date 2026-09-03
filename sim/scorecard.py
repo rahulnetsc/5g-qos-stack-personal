@@ -395,6 +395,9 @@ class Scorecard:
                         # any scenario axis, so it fires for any slow flow
                         # from any producer.
                         "median_gap_ms": statistics.median(gaps_s) * 1000.0,
+                        # Carried so the caveat below can tell a source that
+                        # is slow BY DESIGN from one the network degraded.
+                        "configured_period_ms": fr.configured_period_ms,
                         "gap_count_over_t_live_over_4": sum(1 for g in gaps_s if g > t_live_quarter),
                         "gap_count_over_t_live_over_2": sum(1 for g in gaps_s if g > t_live_half),
                         "gap_count_over_t_live": sum(1 for g in gaps_s if g > t_live_s),
@@ -435,15 +438,49 @@ class Scorecard:
         # applies to any slow flow from any producer, not just to a WP9 axis.
         result = MetricResult(
             "M03", "liveness_gap_distribution", worst, "ok", "ms", note)
-        if worst["median_gap_ms"] > t_live_quarter * 1000.0:
-            result.caveats = [
-                f"CADENCE, NOT LIVENESS: the reporting flow's own median "
-                f"inter-arrival gap is {worst['median_gap_ms']:.0f} ms, already "
-                f"above the T_live/4 bound of {t_live_quarter * 1000.0:.0f} ms "
-                f"(t_live_s={t_live_s}). max_gap_ms here measures the source's "
-                f"cadence, not a liveness failure -- do not score it against "
-                f"that bound."
-            ]
+        bound_ms = t_live_quarter * 1000.0
+        if worst["median_gap_ms"] > bound_ms:
+            # THE PREDICATE NEEDED A SECOND INPUT. Firing on the observed
+            # median alone cannot distinguish two opposite situations, and
+            # suppressing the second is how real breaches were being lost:
+            #
+            #   configured 1000 ms, observed 1000 ms  -> slow BY DESIGN
+            #   configured  200 ms, observed  600 ms  -> DEGRADED BY THE NETWORK
+            #
+            # Measured over the committed sweeps/wp9/part_c_rows.csv, the
+            # second case is 4 of 44 duty-0.5 breaches, with real 1-2.8 s max
+            # gaps that the old predicate silenced with "do not score it".
+            # docs/wp9-defects-log.md #18; the correction it replaces
+            # (#8) is itself an over-correction, which is why this one is
+            # decided from the flow's own configuration rather than from the
+            # duty_cycle axis.
+            period = worst.get("configured_period_ms")
+            slow_by_design = period is not None and period > bound_ms
+            if slow_by_design:
+                result.caveats = [
+                    f"CADENCE, NOT LIVENESS: the reporting flow's CONFIGURED "
+                    f"period is {period:.0f} ms, already above the T_live/4 "
+                    f"bound of {bound_ms:.0f} ms (t_live_s={t_live_s}), and "
+                    f"its observed median gap is "
+                    f"{worst['median_gap_ms']:.0f} ms. max_gap_ms here "
+                    f"measures the source's cadence, not a liveness failure "
+                    f"-- do not score it against that bound."
+                ]
+            else:
+                # SCORED, and told why it looks like cadence but is not.
+                known = (f"configured period {period:.0f} ms"
+                         if period is not None
+                         else "no configured period (aperiodic source)")
+                result.caveats = [
+                    f"DEGRADED, NOT CADENCE: the observed median gap is "
+                    f"{worst['median_gap_ms']:.0f} ms, above the T_live/4 "
+                    f"bound of {bound_ms:.0f} ms -- but the source's own "
+                    f"{known} is NOT. The flow is being served more slowly "
+                    f"than it asks, so max_gap_ms IS a liveness measurement "
+                    f"and MUST be scored against the bound. Reported because "
+                    f"a reader who knows only the median would mistake this "
+                    f"for the cadence case."
+                ]
         return result
 
     # 5QIs that are NOT protected fleet bearers: the GT-4.1/4.2 saturating
