@@ -43,6 +43,37 @@ def _ok(v, op, bound):
     return (v <= bound) if op == "<=" else (v >= bound)
 
 
+def _cadence_blind(row: dict, bound: float) -> bool:
+    """Is this M03w reading the SOURCE'S CADENCE rather than a liveness gap?
+
+    The same predicate sim/scorecard.py:334-341 applies to the un-windowed
+    M03: if the reporting flow's own MEDIAN inter-arrival gap already exceeds
+    the bound, then max_gap_ms measures how often the application sends, not
+    whether the network kept up, and scoring it against that bound is a
+    category error rather than a failure.
+
+    SCOPE, and it is narrower than it first looks. This predicate catches a
+    uniformly SLOW source. It does NOT catch a DUTY-CYCLED one, which is the
+    case GT-7.1 actually has: the soak's teleop stream sends every 50 ms
+    while on and is silent 8 s of every 20 s, so its median gap is 50 ms and
+    its max is 8,050 ms -- the predicate reads it as healthy.
+
+    That was found by running this check rather than reasoning about it: the
+    first version of this fix mirrored Scorecard._m03's median predicate,
+    and its own verification showed median_gap = 50.0 ms and C1 still
+    FAILing. The scripted-silence case is handled where it belongs, in
+    wp9_window.py::_m03w, by subtracting the source's inactive time from the
+    gap. This stays for the slow-source case, which is real and which
+    subtraction does not cover.
+
+    Excluded, never silently passed: the conjunct becomes UNSCOREABLE (None)
+    and the count is reported, because a window that could not be judged is
+    not a window that passed.
+    """
+    med = row.get("median_gap_ms")
+    return med is not None and med > bound
+
+
 def score(path: Path) -> dict:
     data = json.loads(path.read_text())
     runs = data["runs"]
@@ -57,6 +88,7 @@ def score(path: Path) -> dict:
     for arm, by_seed in idx.items():
         wins_total = fails = unscoreable = 0
         by_conjunct: dict[str, int] = defaultdict(int)
+        cadence_blind: dict[str, int] = defaultdict(int)
         offenders: dict[str, int] = defaultdict(int)
         per_seed_pass: dict[int, bool] = {}
         for seed, by_w in by_seed.items():
@@ -67,6 +99,9 @@ def score(path: Path) -> dict:
                 for g, metric, field, op, bound in CONJUNCTS:
                     row = mets.get(metric)
                     v = row.get(field) if row else None
+                    if metric == "M03w" and row and _cadence_blind(row, bound):
+                        v = None
+                        cadence_blind[f"{g}/{metric}"] += 1
                     o = _ok(v, op, bound)
                     verdicts.append(o)
                     if o is False:
@@ -84,6 +119,10 @@ def score(path: Path) -> dict:
             "unscoreable": unscoreable,
             "pass_rate": (wins_total - fails) / wins_total if wins_total else None,
             "failures_by_conjunct": dict(by_conjunct),
+            # Reported, never folded into pass_rate: a conjunct excluded for
+            # cadence was not judged, and a reader must be able to see how
+            # much of C1 was actually evaluated.
+            "conjuncts_unscoreable_cadence": dict(cadence_blind),
             "distinct_offending_flows": len(offenders),
             "top_offenders": dict(sorted(offenders.items(),
                                          key=lambda kv: -kv[1])[:4]),
