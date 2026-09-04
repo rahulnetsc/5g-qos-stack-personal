@@ -233,11 +233,20 @@ def score_expectations(data: dict, ctl: dict) -> list[tuple[str, str, str]]:
     # decompose check failing inside the tool built to apply it.
     ramp = data["ramp"]
     in_range_top = max(data["in_range"])
-    per_arm: dict[str, dict] = {}
+    # KEYED ON (cell, arm). The first version of this pooled across arms and
+    # printed "first degradation at x1.0", true of TwoTier only (§36.6). The
+    # correction decomposed the ARM axis and left the CELL axis pooled --
+    # harmless while the grid has one scoreable cell, silently wrong the
+    # moment it has two, which is exactly what running G12's remaining cells
+    # does. Fixed here, before those cells run, along with E4/E5 and the
+    # promotion bar below: the shape was found once and applied at one of
+    # five sites in this file.
+    per_arm: dict[tuple[str, str], dict] = {}
     gap_blind = 0
-    for arms in data["cells"].values():
+    for cell, arms in data["cells"].items():
         for arm, d in arms.items():
-            a = per_arm.setdefault(arm, {"worst": 0.0, "first": [], "n": 0})
+            a = per_arm.setdefault((cell, arm),
+                                   {"worst": 0.0, "first": [], "n": 0})
             for s_ in d["per_seed"]:
                 a["n"] += 1
                 first = None
@@ -254,11 +263,11 @@ def score_expectations(data: dict, ctl: dict) -> list[tuple[str, str, str]]:
                 a["first"].append(first)
     worst_overall = max(a["worst"] for a in per_arm.values())
     bits = []
-    for arm, a in per_arm.items():
+    for (cell, arm), a in sorted(per_arm.items()):
         firsts = [f for f in a["first"] if f is not None]
         earliest = min(firsts) if firsts else None
         bits.append(
-            f"{arm}: worst M02 {a['worst']:.3f}, degrades on "
+            f"{cell}/{arm}: worst M02 {a['worst']:.3f}, degrades on "
             f"{len(firsts)}/{a['n']} seeds, earliest at x"
             f"{ramp[earliest] if earliest is not None else '-'}"
             + (" (INSIDE the guarantee's ramp)"
@@ -272,36 +281,64 @@ def score_expectations(data: dict, ctl: dict) -> list[tuple[str, str, str]]:
                    f"measure between) -- M02 is the instrument with range here"))
 
     # E4 -- is "5QI 9 exhausted" literally satisfied before a GBR breach?
-    bg_at_first_breach = []
-    for arms in data["cells"].values():
-        for d in arms.values():
+    #
+    # PER (cell, arm), not pooled. This was the worst of the four remaining
+    # pooling sites: it took a median across BOTH axes at once, and the arms
+    # reach first breach at very different loads -- TwoTier from nominal on
+    # 9/10 seeds, PF and Reservation from 102 % of ceiling (§36.2) -- so a
+    # pooled median mixes populations that breach in different regimes and is
+    # a statement about none of them. The verdict is unchanged in form (is bg
+    # still carrying bytes at the first breach) but is now answered where it
+    # is asked.
+    bg_by_group: dict[tuple[str, str], list[float]] = {}
+    n_no_breach = 0
+    for cell, arms in data["cells"].items():
+        for arm, d in arms.items():
             for s in d["per_seed"]:
                 ffi = s["full"].get("first_fail_at_index") or {}
                 if not ffi:
+                    n_no_breach += 1
                     continue
                 idx = min(ffi.values())
                 if idx < len(s["per_point"]):
-                    bg_at_first_breach.append(s["per_point"][idx]["bg_bps"])
-    if bg_at_first_breach:
-        med = statistics.median(bg_at_first_breach)
-        rows.append(("E4", "HIT" if med > 0 else "MISS",
-                     f"5QI 9 still carries a median {med/1e6:.3f} Mbps at the "
-                     f"first GBR breach (n={len(bg_at_first_breach)}); "
-                     f"'exhausted' is not a satisfied precondition"))
+                    bg_by_group.setdefault((cell, arm), []).append(
+                        s["per_point"][idx]["bg_bps"])
+    if bg_by_group:
+        per_group = {f"{c}/{a}": statistics.median(v)
+                     for (c, a), v in sorted(bg_by_group.items())}
+        n = sum(len(v) for v in bg_by_group.values())
+        # HIT only if EVERY group still carries bg at its own first breach.
+        # A pooled median could hide a group at zero behind others above it.
+        verdict = "HIT" if all(m > 0 for m in per_group.values()) else "MISS"
+        detail = "; ".join(f"{k} {m/1e6:.3f} Mbps" for k, m in per_group.items())
+        rows.append(("E4", verdict,
+                     f"5QI 9 at the first GBR breach, median per (cell, arm) "
+                     f"-- {detail}. n={n} seeds with a breach, "
+                     f"{n_no_breach} without; 'exhausted' is not a satisfied "
+                     f"precondition wherever the figure is above zero"))
     else:
-        rows.append(("E4", "UNSCOREABLE", "no group recorded a GBR breach"))
+        rows.append(("E4", "UNSCOREABLE",
+                     f"no group recorded a GBR breach ({n_no_breach} seeds "
+                     f"had none)"))
 
     # E5 -- the most-likely-wrong slot, and the promotion bar applied.
-    by_arm_orders: dict[str, set] = {}
+    # WITHIN a cell, not across cells. E5 asks whether the ARMS agree; pooling
+    # cells first would let two cells' orders merge into one arm's set and
+    # make agreement look better or worse than any cell's own answer.
+    by_cell_arm: dict[str, dict[str, set]] = {}
     for cell, arms in data["cells"].items():
         for arm, d in arms.items():
-            by_arm_orders.setdefault(arm, set()).update(
+            by_cell_arm.setdefault(cell, {}).setdefault(arm, set()).update(
                 tuple(o) for o in d["full_orders"])
-    same = len({frozenset(v) for v in by_arm_orders.values()}) == 1
-    detail = "; ".join(f"{a}: {sorted(map(list, v))}"
-                       for a, v in by_arm_orders.items())
+    per_cell_same = {c: len({frozenset(v) for v in by_arm.values()}) == 1
+                     for c, by_arm in by_cell_arm.items()}
+    same = all(per_cell_same.values()) if per_cell_same else False
+    detail = " | ".join(
+        f"{c}[{'arms agree' if per_cell_same[c] else 'ARMS DIFFER'}] "
+        + "; ".join(f"{a}: {sorted(map(list, v))}" for a, v in sorted(by_arm.items()))
+        for c, by_arm in sorted(by_cell_arm.items()))
     rows.append(("E5", "HIT" if same else "MISS",
-                 f"canonical-order full-ramp orders by arm -- {detail}"))
+                 f"canonical-order full-ramp orders, per cell -- {detail}"))
     return rows
 
 
@@ -310,13 +347,25 @@ def apply_promotion_bar(data: dict, ctl: dict) -> None:
     print("\n" + "=" * 78)
     print("THE PROMOTION BAR (§35.13), applied as written")
     print("=" * 78)
-    by_arm_canon: dict[str, set] = {}
-    for arms in data["cells"].values():
+    # PER CELL. The bar asks whether the ARMS differ; asking it of a set
+    # pooled across cells answers a different question, and this is the
+    # output that decides whether an arm difference is promoted to a
+    # scheduler finding -- the last place a mixture should be quoted as one
+    # statement.
+    by_cell: dict[str, dict[str, set]] = {}
+    for cell, arms in data["cells"].items():
         for arm, d in arms.items():
-            by_arm_canon.setdefault(arm, set()).update(
+            by_cell.setdefault(cell, {}).setdefault(arm, set()).update(
                 tuple(o) for o in d["full_orders"])
-    arms_differ_canonical = len({frozenset(v) for v in by_arm_canon.values()}) > 1
-    print(f"  arms differ under the CANONICAL order: {arms_differ_canonical}")
+    differ_by_cell = {c: len({frozenset(v) for v in by_arm.values()}) > 1
+                      for c, by_arm in by_cell.items()}
+    arms_differ_canonical = any(differ_by_cell.values())
+    for c, differ in sorted(differ_by_cell.items()):
+        print(f"  {c}: arms differ under the CANONICAL order: {differ}")
+    if len(differ_by_cell) > 1 and len(set(differ_by_cell.values())) > 1:
+        print("  ** THE CELLS DISAGREE about whether the arms differ. The bar "
+              "below fires on ANY cell,\n     so read it as 'at least one "
+              "cell shows a difference', never as a grid-wide property. **")
 
     if not ctl.get("present"):
         print("  control absent -- nothing can be promoted.")
