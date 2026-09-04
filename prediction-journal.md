@@ -1226,3 +1226,43 @@ mix whose **tightest PDB is 100 ms**, with no 5QI 83 (10 ms) or 5QI 85
 (5 ms). **Every latency-critical conclusion remains structurally
 unavailable**, regardless of the result. That is a separate gap with a named
 home (a fleet-builder run), not something this re-measurement touches.
+
+### P14 / P15 — SCORED. The control holds; one prediction REFUTED; three TwoTier verdicts REVERSE.
+
+**P15's stop condition: NOT triggered. PF is identical on all 7 metrics.**
+MFBR changed the scheduler's view, not the workload, so the cross-arm
+comparison is valid.
+
+**P14's non-no-op prediction: REFUTED, and its falsifier fired exactly as
+written.** I predicted Reservation would move via the GBR-deficit target
+spread that `FlowConfig`'s docstring says caps at 2× a burst derived from
+`mfbr_bps`. **Reservation is identical on all 7 metrics.** The registered
+falsifier was: *"Reservation identical on every metric ⇒ the documented cap
+does not bind, and FlowConfig's docstring is describing a mechanism that does
+not fire."* That is now the finding — a documented mechanism, inert.
+
+**TwoTier: THREE BOUND VERDICTS REVERSE.**
+
+| metric | bound | before | after | verdict |
+|---|---|---|---|---|
+| **G3 M20** liveness gap | ≤ 500 ms | **543.83 FAIL** | **235.67** | **FAIL → PASS** |
+| **G5 M06** frame age p95 | ≤ 67 ms | **82.90 FAIL** | **44.16** | **FAIL → PASS** |
+| **G8 M09** per-1 s Jain | ≥ 0.90 | **0.8905 FAIL** | **0.9654** | **FAIL → PASS** |
+| G8 M22 starvation epochs | 0 | 2.00 | **0.00** | eliminated |
+| G5 M05 completeness | ≥ 0.99 | 0.9561 | 0.9780 | improved, still FAIL |
+| G1 M01 p98 | ≤ 100 ms | 94.51 | 94.75 | unchanged (+0.24) |
+| G1 M15 jitter | — | 91.20 | 93.25 | **slightly worse** (+2.05) |
+
+**So every TwoTier failure verdict this project has published was measured on
+a scheduler with both of its named UL protections switched off, and three of
+them reverse once configured.** Not a caveat on those results — a different
+scheduler produced them.
+
+**Recorded honestly: two metrics did NOT improve.** G1's p98 is flat and its
+jitter is marginally worse. A rescue that moved everything in one direction
+would be more suspicious than one that does not, and M15 getting worse while
+M09 improves is consistent with service being spread rather than added.
+
+**Still unmeasured: G10's admissible fleet**, the headline. It needs a stage-2
+re-run, not this probe. P15's expectation (TwoTier's 4 rises) stands
+unscored.
