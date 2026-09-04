@@ -27,6 +27,7 @@ import itertools
 import multiprocessing as mp
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Sequence
 
 import numpy as np
@@ -300,12 +301,141 @@ def arm_cost(arm: str, n_ues: int = 1, points: int = 1) -> float:
     return ARM_COST.get(arm, 1.0) * float(n_ues) * float(points)
 
 
+# --- orphaned pool processes -----------------------------------------------
+#
+# THEY CANNOT BE FOUND BY NAME, WHICH IS THE WHOLE PROBLEM. A multiprocessing
+# SPAWN worker's argv is the bootstrap, not the script that launched it, so
+# `pgrep -f g11_campaign` returns nothing while its workers are alive. The
+# usual statement of this (CLAUDE.md) is that `pkill -f` fails to KILL them;
+# the sharper consequence is that a name-based liveness or cleanup check
+# reports CLEAN while they are running, so nothing notices them at all.
+#
+# Measured twice on this machine. During the 2026-09-03 audit two orphans
+# from a killed 2-worker attempt held 13.5 GB and starved the live run to
+# 5.9 GB free, with g11_campaign's own guard reporting the pool healthy
+# throughout. On 2026-09-04 an orphan pair (a resource tracker and one spawn
+# worker) was found alive after 28.6 HOURS, idle, from a parent long gone.
+#
+# At ~200 MB per worker a forgotten pool is enough on its own to trip the
+# aggregate memory ceiling that killed G11 at 21.8 GiB -- and it would be
+# charged to the NEW run's footprint, because that is the only run anyone is
+# looking at.
+
+_SPAWN_ARGV = "from multiprocessing.spawn import spawn_main"
+_TRACKER_ARGV = "from multiprocessing.resource_tracker import main"
+
+
+@dataclass
+class PoolProc:
+    """One multiprocessing helper process seen in /proc."""
+    pid: int
+    ppid: int
+    rss_mb: int
+    kind: str            # "spawn" | "resource_tracker"
+    parent_cmd: str      # the PARENT's argv[0]-ish, "" if it is gone
+
+
+def find_pool_processes() -> list[PoolProc]:
+    """Every spawn worker and resource tracker on this machine.
+
+    Machine-wide, not children-only, and that scope is the point: an orphan
+    is by definition no longer anyone's child, so a children-only scan is
+    guaranteed to miss exactly the processes this exists to find. Linux
+    only; returns [] where /proc is absent rather than pretending to know.
+    """
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return []
+    out: list[PoolProc] = []
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            cmd = (entry / "cmdline").read_bytes().decode("utf8", "replace")
+            if _SPAWN_ARGV in cmd:
+                kind = "spawn"
+            elif _TRACKER_ARGV in cmd:
+                kind = "resource_tracker"
+            else:
+                continue
+            status = (entry / "status").read_text()
+            ppid = 0
+            rss = 0
+            for line in status.splitlines():
+                if line.startswith("PPid:"):
+                    ppid = int(line.split()[1])
+                elif line.startswith("VmRSS:"):
+                    rss = int(line.split()[1]) // 1024
+            parent_cmd = ""
+            if ppid > 1:
+                try:
+                    parent_cmd = (proc / str(ppid) / "cmdline").read_bytes(
+                        ).decode("utf8", "replace").replace("\x00", " ").strip()
+                except OSError:
+                    parent_cmd = ""      # parent died between the two reads
+            out.append(PoolProc(int(entry.name), ppid, rss, kind, parent_cmd))
+        except (OSError, ValueError):
+            continue          # the process exited mid-scan; not an orphan
+    return out
+
+
+def find_orphaned_pool_processes() -> list[PoolProc]:
+    """Pool processes whose parent is gone.
+
+    A live worker's parent is the python process running the pool. An orphan
+    has been reparented -- to init, or to a subreaper such as `systemd
+    --user` -- so the test is that the parent is NOT a python process. That
+    is more robust than `ppid == 1`, which is only true where no subreaper is
+    configured, and it is why the parent's own argv is read rather than just
+    its pid.
+    """
+    return [p for p in find_pool_processes()
+            if p.ppid <= 1 or "python" not in p.parent_cmd.lower()]
+
+
+class OrphanedPoolError(RuntimeError):
+    """Raised before a pool is launched, never during one."""
+
+
+def check_for_orphans(allow: bool = False) -> list[PoolProc]:
+    """Refuse to launch a pool while orphaned pool processes are alive.
+
+    `allow=True` downgrades it to a printed warning, for the case the guard
+    cannot judge: the orphans may belong to another user's job, and killing
+    another job's work to protect ours is not this function's decision --
+    the same reasoning g11_campaign's aggregate guard applies to foreign
+    workers it counts but never kills.
+    """
+    orphans = find_orphaned_pool_processes()
+    if not orphans:
+        return []
+    total = sum(p.rss_mb for p in orphans)
+    lines = [f"    pid {p.pid:>7}  ppid {p.ppid:>7}  {p.rss_mb:>6} MB  {p.kind}"
+             for p in orphans]
+    msg = (
+        f"{len(orphans)} ORPHANED multiprocessing process(es) alive, holding "
+        f"{total} MB:\n" + "\n".join(lines) + "\n"
+        f"  These belong to a pool whose parent is gone. They CANNOT be found "
+        f"by script name -- a spawn worker's argv is the bootstrap -- so "
+        f"nothing that greps for a script name will report them.\n"
+        f"  Their memory would be charged to THIS run's footprint by any "
+        f"aggregate guard, which is how a stale pool trips a ceiling the new "
+        f"run never approached.\n"
+        f"  Kill by PID (pkill -f will not reach them):\n"
+        f"    kill {' '.join(str(p.pid) for p in orphans)}")
+    if allow:
+        print("WARNING: " + msg, flush=True)
+        return orphans
+    raise OrphanedPoolError(msg)
+
+
 def run_cells(
     fn: Callable[[Any], Any],
     tasks: Sequence[Any],
     workers: int,
     *,
     cost: Optional[Callable[[Any], float]] = None,
+    allow_orphans: bool = False,
 ) -> Iterator[tuple[int, Any]]:
     """Run `fn` over independent `tasks`, yielding `(index, result)` as each
     completes. `index` is the task's position in the ORIGINAL `tasks` list,
@@ -327,6 +457,10 @@ def run_cells(
         N=2 PF one -- worker CPU 7:55 against 4:35, a 1.7x imbalance. Without
         a cost the order is left alone; a wrong cost only costs balance,
         never correctness, since `index` is carried through.
+      * **IT REFUSES TO LAUNCH BESIDE AN ORPHANED POOL.** See
+        `check_for_orphans`: a stale pool's workers cannot be found by script
+        name, and their memory is charged to whichever run an aggregate guard
+        is watching. `allow_orphans=True` downgrades it to a warning.
       * **THIS GENERATOR RETAINS NOTHING.** `imap_unordered` is consumed one
         result at a time and each is handed straight to the caller. The 25 GB
         stall (wp9_sweep.m13_projection's docstring) was a parent holding
@@ -344,6 +478,9 @@ def run_cells(
             yield i, fn(task)
         return
 
+    # BEFORE the pool exists, never during. An orphan found mid-run is a
+    # diagnosis; an orphan found before launch is a prevented failure.
+    check_for_orphans(allow=allow_orphans)
     order = list(range(len(tasks)))
     if cost is not None:
         order.sort(key=lambda i: -float(cost(tasks[i])))

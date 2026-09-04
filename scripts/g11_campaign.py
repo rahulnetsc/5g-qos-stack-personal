@@ -58,7 +58,7 @@ from sim.run_record import RunRecord
 from sim.scenarios.g11 import (SLOT_S, SOAK_HORIZON_SLOTS,
                                assert_schedule_fired, build_g11_scenario,
                                expected_counts, scripted_windows)
-from regime_sweep import paired_seeds
+from regime_sweep import check_for_orphans, paired_seeds
 from wp9_window import (Window, windowed_flows_from_configs,
                         windowed_flows_from_record, windowed_metrics)
 
@@ -389,6 +389,9 @@ def main() -> int:
     # real-horizon probe -- left the parent sleeping indefinitely and the
     # campaign JSON never written. The guard's own documented failure mode
     # (docs/wp9-audit-2026-09-03.md Tier-1 #1) was live in its mitigation.
+    # Refuse to launch beside an orphaned pool: its workers cannot be
+    # found by script name and its memory is charged to this run.
+    check_for_orphans()
     with mp.get_context("spawn").Pool(a.workers) as pool:
         submitted = [(task, pool.apply_async(run_one, (task,))) for task in todo]
         with log.open("a") as fh:

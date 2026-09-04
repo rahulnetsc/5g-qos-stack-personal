@@ -23,7 +23,7 @@ from sim.parametric import sweep_scenario                    # noqa: E402
 from sim.run_record import RunRecord                         # noqa: E402
 from sim.scorecard import Population, Scorecard              # noqa: E402
 from g11_campaign import _arm                                # noqa: E402
-from regime_sweep import paired_seeds                        # noqa: E402
+from regime_sweep import check_for_orphans, paired_seeds     # noqa: E402
 
 N_UES = (2, 4, 8, 16, 24, 32)
 
@@ -66,6 +66,9 @@ def main() -> int:
     print(f"{len(tasks)} runs: 3 arms x {len(N_UES)} fleet sizes x {a.seeds} seeds, "
           f"load 1.0, horizon {a.horizon}", flush=True)
     t0 = time.time()
+    # Refuse to launch beside an orphaned pool: its workers cannot be
+    # found by script name and its memory is charged to this run.
+    check_for_orphans()
     with mp.get_context("spawn").Pool(a.workers) as pool:
         rows = pool.map(one, tasks, chunksize=1)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)

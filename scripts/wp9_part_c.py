@@ -48,7 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import json  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 
-from regime_sweep import write_csv  # noqa: E402
+from regime_sweep import check_for_orphans, write_csv  # noqa: E402
 from wp9_sweep import BASE, _run_one_cell  # noqa: E402
 
 N_SEEDS = 10
@@ -108,6 +108,9 @@ def main(argv):
     rows, n_rec = [], 0
     rec_fh = (root / f"part_c_records{suffix}.jsonl").open("w")
     try:
+        # Refuse to launch beside an orphaned pool: its workers cannot be
+        # found by script name and its memory is charged to this run.
+        check_for_orphans()
         with mp.get_context("spawn").Pool(args.workers) as pool:
             for i, (crows, _conline, payload) in enumerate(
                     pool.imap_unordered(_run_one_cell, tasks), 1):

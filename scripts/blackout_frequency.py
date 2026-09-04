@@ -31,7 +31,7 @@ from sim.driver import run as driver_run            # noqa: E402
 from sim.parametric import sweep_scenario           # noqa: E402
 from sim.run_record import RunRecord                # noqa: E402
 from g11_campaign import _arm                       # noqa: E402
-from regime_sweep import paired_seeds               # noqa: E402
+from regime_sweep import check_for_orphans, paired_seeds               # noqa: E402
 
 
 def one(task):
@@ -76,6 +76,12 @@ def main() -> int:
     tasks.sort(key=lambda t: -t[2])   # LPT: biggest fleets first
     print(f"{len(tasks)} runs: {a.arms} x N={a.n_ues} x load={a.load} "
           f"x {a.seeds} seeds, horizon {a.horizon}, mfbr_multiple={a.mfbr_multiple}", flush=True)
+
+    # Refuse to launch beside an orphaned pool: its workers cannot be
+
+    # found by script name and its memory is charged to this run.
+
+    check_for_orphans()
 
     with mp.get_context("spawn").Pool(a.workers) as pool:
         rows = pool.map(one, tasks, chunksize=1)

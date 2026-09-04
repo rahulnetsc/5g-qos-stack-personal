@@ -39,7 +39,7 @@ from sim.baselines.pf import ProportionalFair
 from scheduler.reservation import Reservation
 from scheduler import load_two_tier
 
-from regime_sweep import axis_aware, sweep, write_csv
+from regime_sweep import axis_aware, check_for_orphans, sweep, write_csv
 import wp9_gate
 
 _TT_CONFIG = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
@@ -469,6 +469,9 @@ def run_stage_1_parallel(out_dir: Path, n_seeds: int, horizon: int,
     onl_fh = (out_dir / "online_rows.jsonl").open("w")
     n_rec = n_onl = 0
     try:
+        # Refuse to launch beside an orphaned pool: its workers cannot be
+        # found by script name and its memory is charged to this run.
+        check_for_orphans()
         with mp.get_context("spawn").Pool(workers) as pool:
             for i, (crows, conline, payload) in enumerate(
                     pool.imap_unordered(_run_one_cell, tasks), 1):
@@ -571,6 +574,9 @@ def run_stage_2(out_dir: Path, n_seeds: int, horizon: int, smoke: bool,
     onl_fh = (out_dir / "online_rows.jsonl").open("w")
     n_rec = n_onl = 0
     try:
+        # Refuse to launch beside an orphaned pool: its workers cannot be
+        # found by script name and its memory is charged to this run.
+        check_for_orphans()
         with mp.get_context("spawn").Pool(workers) as pool:
             for i, (crows, conline, payload) in enumerate(
                     pool.imap_unordered(_run_one_cell, tasks), 1):
@@ -1020,6 +1026,9 @@ def _run_resumable(out_dir: Path, grid: dict, tag: str, worker, n_seeds: int,
     t0 = time.time()
     durations: list[float] = []
     try:
+        # Refuse to launch beside an orphaned pool: its workers cannot be
+        # found by script name and its memory is charged to this run.
+        check_for_orphans()
         with mp.get_context("spawn").Pool(workers) as pool:
             last = time.time()
             for i, (crows, conline, payload, tally) in enumerate(

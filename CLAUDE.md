@@ -508,6 +508,46 @@ suite.** Note also that `pkill -f <script>` does not reach
 so stopping a pool leaves orphans holding memory that `pgrep -f` cannot
 see; kill the children by PID.
 
+**AND THE CONSEQUENCE IS BROADER THAN "pkill FAILS TO KILL THEM": THEY
+CANNOT BE FOUND BY NAME AT ALL.** The same fact about argv means a
+*liveness* or *cleanup* check that greps for the script name **reports
+clean while the workers are alive** — it is not that the kill misses, it is
+that nothing looks. Worse, the search can return a *non-worker* PID (the
+shell running the check, whose own command line contains the pattern), so it
+simultaneously misses every worker and reports a match. Both halves were
+reproduced deliberately on 2026-09-04 while building the check below.
+
+**Measured three times on this machine.** Two orphans from a killed
+2-worker attempt held **13.5 GB** and starved the live run to 5.9 GB free
+while `g11_campaign`'s own aggregate guard reported the pool healthy
+throughout (2026-09-03 audit). An orphan pair — a resource tracker and one
+spawn worker — was found alive after **28.6 hours**, idle, from a parent
+long gone (2026-09-04). And a first version of the orphan *test* leaked
+**15** of them in one pytest run.
+
+**At ~200 MB per worker a forgotten pool is enough on its own to trip the
+aggregate ceiling that killed G11 at 21.8 GiB — and it is charged to the
+NEW run's footprint**, because that is the only run anyone is watching. A
+stale pool therefore looks exactly like a regression in the run just
+launched.
+
+**So the check is PRE-LAUNCH and lives in the shared layer.**
+`regime_sweep.check_for_orphans()` refuses to start a pool while any
+orphaned spawn worker or resource tracker is alive, naming the PIDs and the
+`kill` line. `run_cells` calls it, and so does every hand-rolled pool
+(`wp9_sweep`, `g11_campaign`, `wp9_part_c`, `g10_rerun`,
+`blackout_frequency`). **An orphan is detected by its PARENT'S IDENTITY, not
+by `ppid == 1`** — measured, they reparent to `systemd --user`, so a pid-1
+test finds none of them. `allow_orphans=True` downgrades it to a warning,
+for the case the guard cannot judge: the orphans may belong to another
+user's job.
+
+**One trap when writing anything that spawns a pool to test this:** do not
+`capture_output` a parent that orphans children. The children inherit the
+pipe's write end, so the read blocks until they die — the observation
+channel hangs on the thing being observed, which is the same family as the
+buffered-stdout case above.
+
 **A test that CONSTRUCTS the precondition it is testing cannot discover
 that the precondition never occurs.** The other side of the guard-test
 rule above. WP9 §19: the truncated-BSR formats were wired to the wrong
