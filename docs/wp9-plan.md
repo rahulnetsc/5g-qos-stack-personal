@@ -350,11 +350,13 @@ item:
 
 - `survival_miss_n` ∈ {2, 3, 5} — M04; discharges `[OPEN: WP9]` "start at 3,
   **report H6 as a function of N**".
-- `t_live_s` ∈ {1, 2, 4} — M03/M14. `T_live` is `[OPEN: HARDWARE]` and
+- `t_live_s` ∈ {1, 2, 4} — M03 **only**. `T_live` is `[OPEN: HARDWARE]` and
   unmeasured, so **every G3 row is reported as a function of it**, never at a
   single assumed value.
 - `gbr_contract_fraction` ∈ {0.90, 0.95, 0.99} — M07/M08.
 - `slo_green_dwell_s` ∈ {0.5, 1.0, 2.0} — M19.
+
+  > **CORRECTED 2026-09-04: this registration named M03 AND M14, and M14 does not read `t_live_s`.** Its threshold is `pdb_ms + survival_time_ms` and its own docstring says that is used *"instead of T_live-derived ones"*, so every "M14 as a function of `t_live_s`" row the sweep emitted is twelve copies of one number. M14 binds to **G11**, not G3. Found while placing its 236 % cap sensitivity (`sweeps/phase2/sca-convergence-2026-09-04/`).
 
 ### Excluded, with reasons
 

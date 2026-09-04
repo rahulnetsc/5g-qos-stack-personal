@@ -157,6 +157,35 @@ seeds:
 | **M03 max gap** | **48.75 ms** | **55.75 ms** | **87.44 %** |
 | **M14 availability** | **0.0612** | **0.0259** | **236.36 %** |
 
+**WHERE M14's 236 % LANDS: NOWHERE, AND THAT IS THE ANSWER.** It is the
+largest cap sensitivity measured and it belongs in no G-row, so it is placed
+here rather than left implied:
+
+- **M14 binds to G11 and to nothing else** (`config/metric_panel.yml`,
+  `guarantees: [G11]`).
+- **G11's own scorer does not use it.** `scripts/g11_score.py`'s five C1
+  conjuncts are M01w / M03w / M05w / M06w / M09w. M14 carries no G11 clause.
+- **It appears in no committed scored artefact.** The only non-test reader is
+  `wp9_sweep.py`'s online variation rows — where, as this pass established,
+  M14 responds to no variation parameter, so those are twelve identical
+  copies of one number.
+- **And it has never measured what it defines.** `FlowConfig.survival_time_ms`
+  is never non-zero anywhere, so M14's `pdb_ms + survival_time_ms` threshold
+  collapses to `pdb_ms` and the metric is "fraction of gaps within the flow's
+  own PDB" — not a TS 22.104 CSA figure (CLAUDE.md's dormant-mechanism
+  table).
+
+**So M14 currently carries no verdict, and must not be quoted without the
+236 % beside it.** Its within-seed movement from an arbitrary solver stopping
+point is more than twice its TwoTier-vs-PF difference: at that ratio the arm
+comparison is not merely imprecise, it is unavailable.
+
+**One place already quotes it as evidence and is wrong to.**
+`docs/wp9-regime-map.md`'s G3 rows read *"M03/M14 scored at `t_live_s` ∈
+{1,2,4}, reported as a function of it"*. M14 does not read `t_live_s` — its
+own docstring says the threshold is used *"instead of T_live-derived ones"* —
+so it is not a function of it and never was. Corrected in that document.
+
 **G1 (M01), G8 (M09) and jitter are not threatened** — their arm separations
 are 5–5,000× the cap noise. **G3 is.** Its M20 liveness gap is the same
 statistic as M03, and this is a **within-seed** variance source, so it is
