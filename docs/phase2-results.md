@@ -136,3 +136,55 @@ surfaced until someone executed the clause literally.
    are 6 vs 3. **Recommendation: report the admissible N *and* the per-seed
    pass fraction at the first failing N** — the second is already computed on
    the way to the first.
+
+4. **`two_tier.py:340` and `reservation.py:108-110` assert a fact that
+   commit `3788202` falsified, and cite a check that cannot detect it.**
+   Both docstrings state *"`mfbr_bps` is never configured on any flow in any
+   scenario in this repo"* and offer as proof
+   `grep -rn "mfbr_bps" sim/scenarios/ scripts/scheduler_study.py`. MFBR is
+   now configured — but in `sim/fleet.py` and `sim/parametric.py`, **which
+   that grep does not cover**, so re-running the cited check still returns
+   zero matches and still "confirms" the false claim. This is the
+   cannot-fail-check shape, and the cost is not cosmetic: those paragraphs
+   are the stated justification for treating the `gbr_below` / FIX-2 reserve
+   as dormant, so a reader who trusts them concludes a now-reachable path is
+   unreachable. **Fix is two edits and a widened grep; deliberately NOT made
+   in this block** — it is a claim about scheduler behaviour and belongs with
+   a measurement of whether that path now fires, not with a doc pass.
+
+## G12 — the control moved, and the explanation is not the priority fix
+
+**PF's first-violation order flipped to `[4, 2]` on 10 of 10 seeds.** PF's
+ranking never reads `priority_level`, so the priority commit cannot be the
+route, and **MFBR is eliminated by inspection**: `grep -rn mfbr_bps` outside
+tests returns hits in `scheduler/reservation.py` and `scheduler/two_tier.py`
+**only** — no traffic generator, no buffer, and nothing on PF's path reads it.
+
+**The candidate that survives is UE-side, which is why it moves every arm.**
+`sim/ue_lcp.py:95` orders a UE's logical channels by
+`sorted(ue_flows, key=lambda f: f.priority_level)` — logical channel
+prioritisation, applied under whichever gNB scheduler is running. Before
+`8f9ad34` every flow was tied at `priority_level = 100`, and a stable sort
+under a total tie returns **insertion order — i.e. declaration order**. After
+it, 5QI 2 (prio 40) is served ahead of 5QI 4 (prio 50), 5QI 4 starves, and
+5QI 4 breaches first: `[4, 2]`.
+
+**This is a HYPOTHESIS, not a measurement.** It is consistent with the shape
+of the result — uniform on PF, partial on Reservation (6/10), whose own
+grant-level ranking still intervenes — but consistency is not confirmation,
+and this session has already produced two wrong conclusions drawn from a read.
+
+**The discriminator is cheap and already exists in this campaign.** G12 runs
+a canonical declaration order *and* a permutation chosen to give the opposite
+order. If the tie-fallback account is right, **the permuted arm should now
+agree with the canonical one**, because a real priority dominates declaration
+order — whereas pre-fix the permutation is what produced the opposite result.
+Read `permutation_orders` against `in_range_orders` in
+`sweeps/phase2/g12_mfbr.json`; agreement confirms, continued opposition
+refutes.
+
+**If it confirms, G12's published finding is an artefact of the tie.** The
+claim that declaration order determines first-violation order would have been
+measuring the absence of priorities rather than a scheduler property — which
+is a larger finding than P8's outcome either way, and is why this row must
+not be closed on the prediction alone.
