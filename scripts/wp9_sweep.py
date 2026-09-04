@@ -395,14 +395,36 @@ def _online_rows_for(sc_card: Scorecard, record: RunRecord,
                     "status": m16.status, "value": m16.value})
     except (KeyError, StopIteration):
         pass
+    # ONE DEFAULT PASS PER POPULATION, then per-variation only the metrics
+    # that variation can reach. The rows below are IDENTICAL to what the full
+    # 26-pass version emitted -- a metric that does not read the varied
+    # parameter has the same value at every level of it, which is the
+    # substitution `Scorecard.VARIATION_AFFECTS` licenses and
+    # sim/tests/test_scoring_dispatch.py verifies both structurally (from
+    # score()'s AST) and empirically (both ways, diffed, every value, both
+    # populations).
+    #
+    # THE COST THIS REMOVES, measured rather than argued
+    # (sweeps/phase2/profile-2026-09-04): M09 and M22 are 81 % of a score()
+    # call and read no variation parameter, so 24 of the 26 passes computed
+    # them for nothing. 2.412 s -> 0.099 s per record, 24.4x, on a record
+    # whose driver.run is 3.6-10.1 s.
+    base = {
+        "all_flows": sc_card.score(record, population=Population.all_flows()),
+        "protected_fleet": sc_card.score(
+            record, population=Population.protected_fleet()),
+    }
     for name, values in _SCORING_VARIATIONS:
+        affects = Scorecard.VARIATION_AFFECTS[name]
         for v in values:
             # Both populations, same reason as regime_sweep: one would
             # re-make the choice silently a layer out.
-            scores = sc_card.score(record, population=Population.all_flows(),
-                                   **{name: v})
-            scores_prot = sc_card.score(
-                record, population=Population.protected_fleet(), **{name: v})
+            scores = {**base["all_flows"], **sc_card.score(
+                record, population=Population.all_flows(),
+                only=affects, **{name: v})}
+            scores_prot = {**base["protected_fleet"], **sc_card.score(
+                record, population=Population.protected_fleet(),
+                only=affects, **{name: v})}
             for mid in ("M03", "M04", "M07", "M08", "M14", "M19"):
                 for src, pop_tag in ((scores, "all_flows"),
                                      (scores_prot, "protected_fleet")):

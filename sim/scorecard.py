@@ -20,7 +20,7 @@ import math
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import yaml
 
@@ -175,7 +175,32 @@ class Scorecard:
         "M14", "M15", "M17", "M18", "M19", "M21", "M22",
     })
 
+    #: Which metrics each scoring-variation parameter can REACH. Not a claim
+    #: about which ones move on a given record -- a claim about which ones
+    #: read the parameter at all, which is a structural property of score()'s
+    #: own body and is asserted as one: sim/tests/test_scoring_dispatch.py
+    #: parses this method's AST and requires this mapping to be exactly the
+    #: set of `out["Mxx"] = ...` assignments whose value expression reads
+    #: `cfg[<key>]`. Restating it here and deriving it there is the pattern
+    #: CLAUDE.md's restated-count rule prescribes -- the constant is readable,
+    #: the test is what makes it true.
+    #:
+    #: TWO ENTRIES A READER WILL EXPECT AND NOT FIND. `t_live_s` does NOT
+    #: reach M14 and `gbr_contract_fraction` does NOT reach M08: both metrics
+    #: take no configuration at all. M14's threshold is `pdb_ms +
+    #: survival_time_ms` -- its own docstring says "instead of T_live-derived
+    #: ones" -- and M08 is a bare worst-flow minimum with no contract line in
+    #: it. So a sweep that varies those parameters and harvests M08/M14 gets
+    #: the same number every time, by construction.
+    VARIATION_AFFECTS: dict[str, frozenset] = {
+        "t_live_s": frozenset({"M03", "M20"}),
+        "survival_miss_n": frozenset({"M04"}),
+        "gbr_contract_fraction": frozenset({"M07"}),
+        "slo_green_dwell_s": frozenset({"M19"}),
+    }
+
     def score(self, record: RunRecord, *, population: Optional[Population] = None,
+              only: Optional[Iterable[str]] = None,
               **overrides) -> dict[str, MetricResult]:
         """Compute every metric in the panel for one RunRecord.
 
@@ -188,6 +213,22 @@ class Scorecard:
         ``overrides`` may set gbr_contract_fraction / survival_miss_n /
         t_live_s for this call; unset ones fall back to the panel's
         pre-registered defaults.
+
+        ``only`` restricts the pass to the named metric ids and is a
+        PERFORMANCE affordance with a correctness condition attached. It
+        exists because a sweep re-scores one record 26 times -- the panel
+        twice, then 12 scoring variations twice -- and M09 plus M22 are 81 %
+        of every one of those calls (measured: 76.8 ms and 24.8 ms of a
+        123 ms call, sweeps/phase2/profile-2026-09-04) while depending on
+        none of the four variation parameters. Twenty-four of the twenty-six
+        passes recompute them for nothing.
+
+        THE CONDITION: a caller may only omit a metric it will substitute
+        from another pass of the SAME record and population whose cfg
+        differs solely in parameters that metric does not read -- i.e. by
+        `VARIATION_AFFECTS` above. A metric not requested is ABSENT from the
+        returned dict, never present-and-None, so a caller that gets this
+        wrong raises a KeyError rather than silently reporting a default.
         """
         if population is None:
             raise TypeError(
@@ -202,15 +243,23 @@ class Scorecard:
                 "utilisation). There is deliberately no default -- defaulting "
                 "to all-flow is how this survived nine work packages."
             )
+        want = None if only is None else frozenset(only)
+
+        def _want(metric_id: str) -> bool:
+            return want is None or metric_id in want
+
         cfg = {**self.defaults, **overrides}
         # ONE restriction, applied once, used by every population-sensitive
         # metric. Doing it per-metric is what let M20 be the only one that
         # ever got it.
         scoped = population.restrict(record)
         out: dict[str, MetricResult] = {}
-        out["M01"] = self._m01_latency_percentiles(scoped)
-        out["M02"] = self._m02_pdb_violation_rate(scoped)
-        out["M03"] = self._m03_liveness_gap_distribution(scoped, cfg["t_live_s"])
+        if _want("M01"):
+            out["M01"] = self._m01_latency_percentiles(scoped)
+        if _want("M02"):
+            out["M02"] = self._m02_pdb_violation_rate(scoped)
+        if _want("M03"):
+            out["M03"] = self._m03_liveness_gap_distribution(scoped, cfg["t_live_s"])
         # M20 is auto-scored rather than left a study-layer call like
         # M13/M16. It needs no extra argument (its exclusion set has a
         # documented default) and the record_sink defect this WP just
@@ -219,35 +268,52 @@ class Scorecard:
         # without re-running. The excluded 5QIs travel INSIDE the
         # value, never as a bare number -- same convention as M03/M14
         # reporting the t_live_s they were computed against.
-        out["M20"] = self.protected_fleet_liveness_gap(record, cfg["t_live_s"])
+        if _want("M20"):
+            out["M20"] = self.protected_fleet_liveness_gap(record, cfg["t_live_s"])
         # M21 auto-scored beside M19 for the same reason M20 is beside
         # M03: the pair must be readable together, and a statistic
         # absent from the scored row is one a later question cannot be
         # re-asked of without a re-run.
-        out["M21"] = self.slo_recovery_time_by_delivery(scoped)
+        if _want("M21"):
+            out["M21"] = self.slo_recovery_time_by_delivery(scoped)
         # M22 auto-scored beside M09 for the reason M20 sits beside M03:
         # it is the OTHER half of a conjunction the panel binds to one
         # guarantee, and a conjunction scored on one conjunct is the
         # failure this panel exists to prevent.
-        out["M22"] = self._m22_starvation_epochs(scoped)
-        out["M04"] = self._m04_survival_time_failures(scoped, cfg["survival_miss_n"])
-        out["M05"] = self._m05_pdu_set_completeness(scoped)
-        out["M06"] = self._m06_frame_age_at_mec(scoped)
-        out["M07"] = self._m07_gbr_contract_count(scoped, cfg["gbr_contract_fraction"])
-        out["M08"] = self._m08_worst_flow_gfbr_fraction(scoped)
-        out["M09"] = self._m09_per_second_jain(scoped)
-        out["M10"] = self._m10_aggregate_throughput(record)
-        out["M11"] = self._m11_prb_utilization(record)
-        out["M12"] = self._m12_cce_utilization(record)
+        if _want("M22"):
+            out["M22"] = self._m22_starvation_epochs(scoped)
+        if _want("M04"):
+            out["M04"] = self._m04_survival_time_failures(scoped, cfg["survival_miss_n"])
+        if _want("M05"):
+            out["M05"] = self._m05_pdu_set_completeness(scoped)
+        if _want("M06"):
+            out["M06"] = self._m06_frame_age_at_mec(scoped)
+        if _want("M07"):
+            out["M07"] = self._m07_gbr_contract_count(scoped, cfg["gbr_contract_fraction"])
+        if _want("M08"):
+            out["M08"] = self._m08_worst_flow_gfbr_fraction(scoped)
+        if _want("M09"):
+            out["M09"] = self._m09_per_second_jain(scoped)
+        if _want("M10"):
+            out["M10"] = self._m10_aggregate_throughput(record)
+        if _want("M11"):
+            out["M11"] = self._m11_prb_utilization(record)
+        if _want("M12"):
+            out["M12"] = self._m12_cce_utilization(record)
         # M13 (first_violation_order) is a cross-run metric -- see
         # first_violation_order() below, called by the study/sweep layer.
-        out["M14"] = self._m14_communication_service_availability(scoped)
-        out["M15"] = self._m15_command_jitter(scoped)
+        if _want("M14"):
+            out["M14"] = self._m14_communication_service_availability(scoped)
+        if _want("M15"):
+            out["M15"] = self._m15_command_jitter(scoped)
         # M16 (ul_dl_shared_bearer_correlation) needs a named flow pair --
         # see correlate_flows() below, not part of the automatic per-run scan.
-        out["M17"] = self._m17_frame_freeze_and_effective_fps(scoped)
-        out["M18"] = self._m18_rejoin_interruption_time(scoped)
-        out["M19"] = self._m19_slo_recovery_time(scoped, cfg["slo_green_dwell_s"])
+        if _want("M17"):
+            out["M17"] = self._m17_frame_freeze_and_effective_fps(scoped)
+        if _want("M18"):
+            out["M18"] = self._m18_rejoin_interruption_time(scoped)
+        if _want("M19"):
+            out["M19"] = self._m19_slo_recovery_time(scoped, cfg["slo_green_dwell_s"])
         # Attach the panel's own pre-registered caveats here, uniformly,
         # rather than in each _mNN method -- a caveat is a property of the
         # metric's definition (config/metric_panel.yml), not of any one
