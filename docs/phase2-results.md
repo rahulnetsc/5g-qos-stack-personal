@@ -50,7 +50,7 @@ results table is indistinguishable from one that failed to produce a number.
 | **G9** | **NOT MEASURED — named cause** | `g9_campaign.py` refused to score and exited non-zero: *"GT-6.1_warm/TwoTier: 2 'warm' events but the scenario schedules 10."* The count guard is the result — it declined a partially-degenerate run whose survivors are self-selected. **M19/M21's `p95 = 0.0` were therefore never quoted**, and the M02 cross-read that distinguishes an eviction artefact from real instant recovery waits for a scoreable run. |
 | **G10** | **measured** | **Admissible fleet: PF 8 / Reservation 4 / TwoTier 4 — unchanged.** The seed counts moved and are the evidence: at N=8, PF **10/10**, TwoTier **6/10** (was 1/10), Reservation **3/10**. TwoTier's 6× improvement changes no verdict — see the criterion finding. |
 | **G11** | **ONE CLAUSE OF FIVE, at a horizon 18× shorter than specified** | see below |
-| **G12** | **pending** | run in flight, 720 runs |
+| **G12** | **one cell of several — `mixed_n8` complete, rest not reached** | First-violation order by 5QI, 10 seeds/arm. **PF `[4,2]` 10/10 uniform; Reservation `[4,2]` 6/10; TwoTier `[4,2]` 5/10, `[2,4]` 4/10, and one seed a degenerate one-element `[2]`.** The run timed out inside `drone_heavy_n8`; **no JSON was written**, so the evidence is the preserved stdout (`sweeps/phase2/g12_mfbr_partial.log`). **The control moved more than the treatment** — see below. |
 
 ### G11 in full — the absence is the headline
 
@@ -188,3 +188,73 @@ claim that declaration order determines first-violation order would have been
 measuring the absence of priorities rather than a scheduler property — which
 is a larger finding than P8's outcome either way, and is why this row must
 not be closed on the prediction alone.
+
+### P8 scored — NOT CONFIRMED, and the arm ordering is the reason
+
+**P8 predicted TwoTier's order would move toward `[4, 2]`** on the strength of
+the priority fix selecting Tier-1's Delay class. **TwoTier is the arm that
+moved least.**
+
+| arm | reads `priority_level` in its own ranking? | in-range `[4,2]` |
+|---|---|---|
+| PF | **no** | **10/10 — uniform** |
+| Reservation | partially | 6/10 |
+| TwoTier | **yes** | **5/10** (+1 degenerate `[2]`) |
+
+**The effect is strongest exactly where scheduler intervention is weakest**,
+which is the opposite of the mechanism P8 named and the signature of the
+UE-side `ue_lcp.py` tie-fallback described above: the LCP order is
+arm-independent, so it shows through cleanly on PF and is progressively
+overridden as the gNB scheduler's own ranking asserts itself. **This is
+evidence for that account beyond the PF observation alone** — a monotone
+across three arms, not a single control movement — but it remains a
+hypothesis until the permutation discriminator is read, because a consistent
+story is not a measured one.
+
+**P8's own outcome is a miss, and is recorded as one.** It predicted the right
+*direction* on the wrong *mechanism*, which the journal's rules count as a
+miss: a prediction that lands for a reason it did not name has not been
+tested by the result.
+
+**Two caveats on the cell itself.**
+
+1. **One seed produced a one-element in-range order (`[2]`)** — the degeneracy
+   `assert_order_non_degenerate` exists to catch, admitted here under
+   `allow_one_element`. A one-element "order" is not an ordering, and it is
+   the same shape as the truncated-population family this project keeps
+   hitting. It is 1 of 10 and does not change the counts above, but it should
+   not be averaged into them either.
+2. **Only `mixed_n8` completed.** `drone_heavy_n8` and every later cell were
+   not reached before the 2,400 s timeout, so **no cross-composition claim is
+   available** — and because the campaign serialises its JSON only at the end,
+   a timeout yields no artefact at all. The stdout was preserved manually.
+   **That is a real defect in the runner**: a 40-minute campaign that writes
+   nothing until the final line loses every completed cell to a timeout.
+   Registered, not fixed.
+
+### G12's defect category, searched across what is already measured
+
+Per the stability criterion, G12's runner defect — **a campaign that persists
+nothing until its final line** — was searched across the scripts that produced
+Phase 2's other numbers. **It is general, not specific to G12.**
+
+| script | run loop | single terminal write | what it produced |
+|---|---|---|---|
+| `blackout_frequency.py` | `Pool` :80 | `write_text` :84 | the blackout frequency table |
+| `phase2_core.py` | :107 | `write_text` :109 | **G1, G3, G5, G8** |
+| `g10_rerun.py` | :66 | `open(..., "w")` :72 | **G10** |
+
+**No result was lost to it** — those three ran to completion, so the defect is
+**latent** in them and **realized** only in G12, which is the honest way to
+state it. But the exposure is real and scales with horizon: every one of these
+is a single kill, timeout, or OOM away from discarding a completed multi-hour
+grid, and this machine's history includes all three. `g11_campaign.py` is the
+counter-example and the model to copy — it banks runs incrementally and
+re-enters them on resume.
+
+**This is why Phase 2 is COMPLETE but not STABLE.** The criterion was that a
+full pass finds nothing new; this pass found the M21 unlisted-metric
+fall-through, `g6_fleet_restricted_m03`'s silent default, the manifest's
+transfer-coupled verification, the two cannot-fail `mfbr_bps` docstrings, and
+now this. **A clean pass has not yet happened**, and the least-tested layer —
+`scripts/`, 42 files, 14 of them named in any test — has not been read at all.
