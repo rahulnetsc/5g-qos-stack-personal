@@ -73,11 +73,12 @@ def main() -> int:
              for n in [int(x) for x in a.n_ues.split(",")]
              for load in [float(x) for x in a.load.split(",")]
              for s in seeds]
+    tasks.sort(key=lambda t: -t[2])   # LPT: biggest fleets first
     print(f"{len(tasks)} runs: {a.arms} x N={a.n_ues} x load={a.load} "
           f"x {a.seeds} seeds, horizon {a.horizon}, mfbr_multiple={a.mfbr_multiple}", flush=True)
 
     with mp.get_context("spawn").Pool(a.workers) as pool:
-        rows = pool.map(one, tasks)
+        rows = pool.map(one, tasks, chunksize=1)
 
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps({"config": vars(a), "rows": rows},

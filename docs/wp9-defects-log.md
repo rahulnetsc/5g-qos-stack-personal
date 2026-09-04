@@ -269,3 +269,68 @@ claim, and it is the hardest to see because it reads as settled.* A stale
 claim is suspected by anyone who checks the date; a wrong claim is
 contradicted by the code; an over-correction arrives with a correction box
 and a citation, so nobody checks it twice.
+
+---
+
+## #19 — THE TRANSFER MANIFEST WAS NEVER CHECKED, AND ALL THREE ITEMS WERE ABSENT (2026-09-04)
+
+**Found by accident.** G6 could not be scored because
+`scripts/g6_conjunction_table.py` reads
+`sweeps/wp9/stage6_g6_n40_records.jsonl`, which was not present. Checking the
+rest of `scripts/transfer_manifest.sh`'s `ITEMS` list showed **all three
+missing**: `stage1/records.jsonl`, `stage4/records.jsonl`, and G6's.
+
+**The manifest is not partly unsatisfied — it was entirely unsatisfied**, for
+an unknown period, on a repo that has been producing results throughout.
+
+**THE ROOT CAUSE IS THAT VERIFICATION WAS COUPLED TO A TRANSFER.** The script
+had a `--verify` mode, but every mode required an ssh host
+(`[ -z "$HOST" ] && exit 2`). So the only way to ask *"is the manifest
+satisfied?"* was to ask it **of another machine**. The purely local
+question — *is what should be here, here?* — had no way to be asked, which is
+why nothing asked it.
+
+**A manifest nothing checks is a list of intentions.**
+
+**ROOT CAUSE, AS ITS OWN LINE — the local question had no way to be asked.**
+Every mode of the script required an ssh host, so the only question it could
+answer was *"does this machine's manifest match THAT machine's?"* The
+question that actually matters day to day — **"is the manifest satisfied
+HERE?"** — was not expressible, and an inexpressible question does not get
+asked.
+
+**This is the same shape as a metric with no red state.** M19 cannot report
+a never-delivering flow as failing, so nobody reads M19 and concludes
+failure; the manifest could not report itself unsatisfied on one host, so
+nobody read it and concluded absence. In both cases the gap is not that the
+check was skipped — it is that **the check had no way to produce the answer
+that mattered**, so its silence was uninformative and looked like assent.
+
+**The mechanical form:** when adding a verification, ask what OUTCOME it can
+report. If it cannot report the failure you care about, it is not a check of
+that failure, however often it runs.
+
+**Fixed:** `./scripts/transfer_manifest.sh --local` needs no host, checks
+existence **and size** (a zero-byte file passes `-e` and fails every
+consumer — the same class as an empty output file being read as evidence
+about a process), names the regenerator for each missing item, and **exits
+non-zero** so it can gate a campaign.
+
+### What is unreproducible until regenerated
+
+| artefact | what it gates | status |
+|---|---|---|
+| `stage6_g6_n40_records.jsonl` | **G6's conjunction table** — the only input `g6_conjunction_table.py` reads | **regenerated 2026-09-04** (64.5 MB) by `g6_seed_extension.py` |
+| `stage4/records.jsonl` | **C5-style bit-identity against stage 4**, and any re-scoring of the Category-2 fleet grid without re-running it | **still missing** |
+| `stage1/records.jsonl` | any re-scoring of the axis-screening gate from records rather than from `stage1_rows.csv` | **still missing** |
+
+**The rows CSVs survive** (`stage1_rows.csv`, `stage2_rows.csv`,
+`stage6_g6_n40.csv`, `part_c_rows.csv`), so results already *scored* into
+rows remain readable. What is lost is the ability to **re-score from
+records** — to ask a new question of an old run without re-running it, which
+is the entire reason `record_sink` exists.
+
+**Note the asymmetry, because it decides priority:** stage 4's records gate a
+bit-identity check that is a *verification*, so its absence weakens
+confidence rather than invalidating a number. G6's gated a *result*, and its
+absence made that result unscoreable outright.

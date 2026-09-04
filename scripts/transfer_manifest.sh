@@ -31,7 +31,46 @@ set -uo pipefail
 
 HOST="${1:-}"
 MODE="${2:-copy}"
-[ -z "$HOST" ] && { echo "usage: $0 <ssh-host> [--verify]" >&2; exit 2; }
+# --local needs NO host: it answers "is what should be here, here?" against
+# this checkout alone. Added 2026-09-04 because verification was COUPLED TO A
+# TRANSFER -- every mode required an ssh host, so there was no way to ask the
+# local question, and all three manifest items were absent for an unknown
+# period. They were found by accident: G6 could not be scored because
+# g6_conjunction_table.py reads one of them.
+#
+# A manifest nothing checks is a list of intentions.
+if [ "$HOST" = "--local" ] || [ "$HOST" = "--verify-local" ]; then
+  REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  ITEMS=(
+    "sweeps/wp9/stage1/records.jsonl"
+    "sweeps/wp9/stage4/records.jsonl"
+    "sweeps/wp9/stage6_g6_n40_records.jsonl"
+  )
+  miss=0
+  printf 'LOCAL MANIFEST CHECK -- %s\n\n' "$REPO"
+  for it in "${ITEMS[@]}"; do
+    f="$REPO/$it"
+    if [ ! -e "$f" ]; then
+      printf '  \033[31mMISSING\033[0m  %s\n' "$it"; miss=$((miss+1))
+    elif [ ! -s "$f" ]; then
+      # Size is checked, not just existence: a zero-byte file passes `-e`
+      # and fails every consumer, which is the same class as an empty output
+      # file being read as evidence about the process.
+      printf '  \033[31mEMPTY\033[0m    %s (0 bytes)\n' "$it"; miss=$((miss+1))
+    else
+      printf '  \033[32mPASS\033[0m     %-46s %s bytes\n' "$it" "$(stat -c%s "$f")"
+    fi
+  done
+  printf '\n%d of %d manifest item(s) missing or empty.\n' "$miss" "${#ITEMS[@]}"
+  if [ "$miss" -gt 0 ]; then
+    printf 'Regenerate before scoring anything that reads them:\n'
+    printf '  stage6_g6_n40_records.jsonl  <- scripts/g6_seed_extension.py (G6 cannot be scored without it)\n'
+    printf '  stage1/records.jsonl         <- scripts/wp9_sweep.py stage 1\n'
+    printf '  stage4/records.jsonl         <- scripts/wp9_sweep.py stage 4\n'
+  fi
+  exit $([ "$miss" -eq 0 ] && echo 0 || echo 1)
+fi
+[ -z "$HOST" ] && { echo "usage: $0 <ssh-host> [--verify|--push]  |  $0 --local" >&2; exit 2; }
 [ "$MODE" = "--verify" ] && MODE=verify
 [ "$MODE" = "--push" ] && MODE=push
 

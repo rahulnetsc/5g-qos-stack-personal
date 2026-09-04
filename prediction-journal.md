@@ -1266,3 +1266,212 @@ M09 improves is consistent with service being spread rather than added.
 **Still unmeasured: G10's admissible fleet**, the headline. It needs a stage-2
 re-run, not this probe. P15's expectation (TwoTier's 4 rises) stands
 unscored.
+
+## P16 — G6 with two-tier's protections switched on (2026-09-04)
+
+**Registered before running.** G6's pass was measured with **both** two-tier
+protections off, and three other TwoTier bound verdicts reversed once they
+were configured (G3 M20 543.83 → 235.67, G5 M06 82.90 → 44.16, G8 M09 0.8905
+→ 0.9654). G6's own unresolved cell is **M20 on TwoTier: +29.35 %
+[+4.81, +56.18]**, INCONCLUSIVE — interval excluding zero, straddling the
++20 % bar.
+
+**EXPECTATION: G6's M20 residual SHRINKS and the INCONCLUSIVE resolves toward
+PASS.**
+
+**Why.** M20 is the worst **protected-fleet** liveness gap — an extreme-value
+statistic over the very flows the floor rescues. The same metric, unrestricted
+by aggressor, moved 543.83 → 235.67 ms on the core probe when MFBR was
+configured. G6's +29.35 % is a *relative* shift of that statistic under the
+flood; removing the extreme value that produced it should shrink the shift.
+
+**Outcome→meaning, fixed in advance.**
+
+| outcome | meaning |
+|---|---|
+| **residual shrinks, resolves PASS** | The INCONCLUSIVE was an artefact of measuring a two-tier with its protections off. **A pass that survives with them on is a STRONGER pass** than the one on record. |
+| **residual unchanged** | M20's flood-response is independent of the floor, and G6's result stands as measured — the protections do not touch what G6 asks. |
+| **residual GROWS, or flips to FAIL** | The floor changes *which* flow wins the protected-fleet contest, and G6's conclusion was contingent on the losing one. That is a finding, not a regression. |
+
+**Falsifier for the whole comparison, same as P15's:** if **PF or
+Reservation** move on G6, MFBR reached something other than two-tier and the
+before/after is not attributable.
+
+### P15's G10 leg — SCORED: MISS, and the miss is informative
+
+**Registered: "TwoTier's admissible 4 rises, most likely to 5-8."**
+**Measured: PF 8 / Reservation 4 / TwoTier 4 — IDENTICAL to the published
+answer.**
+
+**But the counts underneath it moved, and that is the finding:**
+
+| arm | N=8 all-pass, before | after |
+|---|---|---|
+| PF | 10/10 | 10/10 |
+| Reservation | 3/10 | 3/10 |
+| **TwoTier** | **1/10** | **6/10** |
+
+**TwoTier went 1 → 6 seeds passing at N=8 — a 6× improvement that changes no
+verdict**, because the criterion requires all ten.
+
+I registered two meanings for a non-move. **The first holds: 4 is a real
+capacity limit, not a blackout artefact.** The blackout was demonstrably
+removed (the 1 → 6 jump IS that removal) and the boundary held anyway, so
+something other than total starvation bounds TwoTier at N=8. **That makes the
+published 8/4/4 stronger than it was** — it survived removing the confound
+most likely to explain it.
+
+**The second reading is also partly true and is a separate finding**: the
+all-pass criterion is brittle by construction. See the test-plan item below.
+
+---
+
+### The budget miss — an INSTANCE of the existing configuration rule, not a new one
+
+Estimated ~5 min at 6 workers; took **8.0 min**. The estimate was
+`serial-sum ÷ workers`, **which silently assumes perfect packing.** Measured
+worker CPU: 7:55 / 6:56 / 6:32 / 5:39 / 4:47 / 4:35 — a **1.7× spread**, from
+`pool.map`'s contiguous chunking over a task list ordered by cost.
+
+**This is CLAUDE.md's "a measurement carries its configuration" rule, applied
+to a derived quantity rather than a measured one.** `serial-sum ÷ workers` is
+a number that holds only in the configuration *perfectly balanced packing*,
+and it was quoted outside it. Same shape as §13's cost model and §6.3a's
+timing table; recorded as a fourth instance rather than as a new rule.
+
+**Fixed at the source, one line each:** LPT sort (descending cost) plus
+`chunksize=1`, so the expensive cells start first and workers steal work
+rather than receiving a fixed block.
+
+## P17 — my camera-provisioning lead: SCORED, REFUTED (2026-09-04)
+
+**The lead.** Phase 1 recorded that 4 of 5 camera flows are provisioned below
+their own GFBR (3.879 vs 4.000 Mbps, ceiling ~0.970). After G10's boundary
+failed to move, I proposed this as the explanation for TwoTier's three
+non-blackout failures at N=8 — a flow that cannot reach contract at zero load
+will miss it under load regardless of scheduling.
+
+**REFUTED, by arithmetic and then by measurement.** The ceiling is **0.9697**
+and the contract line is **0.95**, so the ceiling sits *above* it. Measured:
+
+| cell | M07 | M08 |
+|---|---|---|
+| N=2, load 0.1 | 2/2 | **0.9628 PASS** |
+| N=2, load 1.0 | 2/2 | **0.9802 PASS** |
+| N=4, load 1.0 | 4/4 | **0.9707 PASS** |
+
+**A camera failure under load is NOT arithmetic.** The flow meets contract
+whenever contention is low.
+
+**What the refutation leaves — and it is sharper than the lead was.** The
+margin is only **~0.02**, so the camera is *fragile*: any real loss pushes it
+under. But TwoTier's three non-blackout seeds read **0.8875 / 0.5458 /
+0.4498** — **10 to 50 points short**, far past what a 2-point margin
+explains. So provisioning makes the flow brittle and something else takes
+roughly half its uplink.
+
+**FOR THE DECK, EXPLICITLY: G10's boundary at 4 is NOT a provisioning
+artefact.** That is the obvious explanation a reader reaches for, it is
+wrong, and the deck should say so rather than leave it available.
+
+**A refuted lead that sharpens the question is worth more than an unrefuted
+one** — before this, "provisioning" would have closed the question with a
+plausible wrong answer.
+
+## P18 — WITHDRAWN, VOID PREMISE (2026-09-04)
+
+**Registered on a defect that does not exist, and withdrawn rather than
+scored.** The premise was that `g6_conjunction_table.py` hand-lists its
+metric set while claiming derivation, scoring ten metrics the panel does not
+bind to G6 and omitting M20 which it does.
+
+**All three parts are wrong, established by reading the code:**
+
+1. **The selection IS derived.** `g6_bound_statistics()` reads
+   `load_panel()` and selects every metric bound to **G1/G3/G5**.
+2. **That filter is CORRECT**, because G6's text quantifies over *other*
+   guarantees' statistics: *"every G1/G3/G5 statistic stays within its bound
+   and shifts by ≤ +20 % relative."* G6 is a statement about G1/G3/G5's
+   numbers, not about its own.
+3. **M20's absence is therefore CORRECT.** M20 is bound to `G6` itself — the
+   metric §28.1 ADDED for G6 — not one of the statistics G6 ranges over. It
+   is scored separately, by `g6_fleet_restricted_m03.py`.
+
+**The misreading:** `SCALAR.get(mid, ...)` at :127 is a bound/key LOOKUP
+keyed by the already-derived `mid`. I read it as the selection.
+
+**A prediction registered on a void premise cannot be scored either way**, so
+it is withdrawn, not marked miss. Recorded in full because a withdrawn
+registration is evidence about the process working — the premise was checked
+before the "fix" was written, which is the only reason no correct code was
+changed.
+
+**One real defect did surface from the same reading** — see P19.
+
+## P19 — M20 at n=40: which direction? (2026-09-04)
+
+**Registered before re-scoring, and the reason it matters is that the two
+existing signals DISAGREE.**
+
+| source | metric | population | seeds | direction |
+|---|---|---|---|---|
+| Phase 2 core probe | **M20** | protected fleet | 3 | **BETTER** — 543.83 → 235.67 ms |
+| G6 conjunction table | M03/M06/M02 (**ten unbound metrics**) | protected fleet | 40 | **WORSE** — M03 2→4/40, M06 12→14/40, M02 clause 2 PASS→FAIL |
+
+`config/metric_panel.yml` binds **exactly one** metric to G6: **M20**. The
+conjunction table scores ten others and omits it, so neither number above is
+G6's answer and P16 cannot be scored on either.
+
+**EXPECTATION: M20 moves BETTER, with the core probe, not worse with the
+ten.**
+
+**Why.** M20 is the worst-liveness-gap contest **restricted to protected
+bearers** — precisely the flows the UL floor rescues. The ten metrics that
+worsened are a different population and a different question: M03 is
+all-flow by design, M06 is frame age, M02 is byte-weighted violation. The
+floor removing an extreme value from the protected contest is the mechanism
+the core probe measured directly, at the same metric, on the same
+restriction.
+
+**Falsifier, and it is the informative outcome:** if **M20 also worsens at
+n=40**, then the core probe's 3-seed improvement was seed-luck, and the
+floor's effect on the protected-fleet contest is not what it appeared. That
+would also mean the two populations agree and my reading of *why* the ten
+worsened is wrong.
+
+**Control, unchanged from P16:** PF and Reservation must stay byte-identical.
+They did on the ten-metric run — M01 PF `PASS 0/40, med +4.36 % mean
++12.09 %`, M01 Reservation `PASS 0/40, med −0.46 %`, M03 both `PASS 0/40` —
+so TwoTier's movement is attributable. If they move on the M20 re-score,
+the comparison is void.
+
+**Kept either way:** *TwoTier worse on ten unbound metrics while PF and
+Reservation are byte-identical* is a real observation about the floor
+changing which flow wins a contest. It is just not G6's answer.
+
+**The two signals on record point OPPOSITE ways, and one of them is G6's
+answer** — M20 is the metric §28.1 added specifically for G6, so it, not the
+G1/G3/G5 statistics, is what G6's liveness clause turns on.
+
+| source | metric | seeds | direction |
+|---|---|---|---|
+| Phase 2 core probe | **M20** | 3 | **BETTER** — 543.83 → 235.67 ms |
+| G6 conjunction (correctly derived) | M03 / M06 / M02 | 40 | **WORSE** — M03 2→4/40, M06 12→14/40, M02 clause 2 PASS→FAIL |
+
+**EXPECTATION: M20 improves at n=40, siding with the core probe.**
+
+**Why.** M20 is the worst-liveness-gap contest **restricted to protected
+bearers** — exactly the flows the UL floor rescues, and the same metric and
+same restriction the core probe measured directly. The statistics that
+worsened are different questions on different populations: M03 is all-flow
+by design, M06 is frame age, M02 is byte-weighted violation. There is no
+contradiction to resolve unless M20 itself moves the same way they did.
+
+**Falsifier, and it is the informative branch:** if **M20 also worsens at
+n=40**, the 3-seed improvement was seed-luck, my account of why the ten
+worsened is wrong, and the floor's effect on the protected contest is not
+what the core probe suggested. n=3 → n=40 is exactly where seed-luck dies.
+
+**Control:** PF and Reservation must stay put. On the conjunction run they
+were byte-identical to the published values, which is why TwoTier's movement
+there is attributable. If they move here, the comparison is void.

@@ -49,6 +49,9 @@ SCALAR = {
     "M16": (None, None),           # study-layer: needs a named flow pair
     "M17": (None, None),
     "M19": (None, None),
+    # M21 enters `ids` via its G3 binding. The test plan states no
+    # numeric bound for it, so (None, None) is the CLAIM, not a gap.
+    "M21": (None, None),
 }
 
 # DIRECTION comes from the panel, never from a hand-written comparison.
@@ -124,7 +127,26 @@ def main() -> int:
            f"{'clause 2: shift <= +20%':<30}")
     print(hdr); print("-" * len(hdr))
     for mid in ids:
-        key, bound = SCALAR.get(mid, (None, None))
+        if mid not in SCALAR:
+            # LOUD, not silent -- the same treatment pdb_for_5qi gives an
+            # unlisted 5QI. `ids` is DERIVED from the panel's guarantees:
+            # fields, so the panel can gain a G1/G3/G5-bound metric that
+            # SCALAR has no scalar/bound for; before this, such a metric
+            # scored as "no stated bound" and was indistinguishable from one
+            # the test plan genuinely states no bound for.
+            #
+            # Found 2026-09-04: M21 (slo_recovery_time_by_delivery, added by
+            # WP9 G9 commit 3 with guarantees ['G9','G3']) entered `ids` via
+            # its G3 binding and scored as unbounded. Benign in that case --
+            # the plan really does state no bound for it -- but the two
+            # situations MUST NOT look alike.
+            raise KeyError(
+                f"{mid} is bound to G1/G3/G5 in config/metric_panel.yml but "
+                f"has no SCALAR entry here, so G6 cannot say whether it is "
+                f"within its bound. Add {mid} to SCALAR with its (key, bound) "
+                f"-- use (key, None) if the test plan states no numeric bound "
+                f"for it, which is a DIFFERENT claim from being unlisted.")
+        key, bound = SCALAR[mid]
         for arm in ARMS:
             pairs = [k for k in shared if k[0] == arm]
             b_vals, e_vals, rels = [], [], []

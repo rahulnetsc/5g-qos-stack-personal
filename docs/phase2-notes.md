@@ -320,3 +320,30 @@ where the aggressor or filler was winning the contest, and nowhere else.**
 That is the shape Phase 1 predicted from `stage2_rows.csv` (5QI 9 winning
 M01 in 85.4 % of 7,560 rows) and it is now reproduced end-to-end on fixed
 code.
+
+---
+
+## G9 — NOT MEASURED, with a named cause
+
+**`scripts/g9_campaign.py` refused to score and exited non-zero:**
+
+```
+GT-6.1_warm/TwoTier: 2 'warm' events but the scenario schedules 10.
+A partially-degenerate run is NOT a smaller sample of the same thing --
+the survivors are self-selected, so arms with different counts are not
+comparable.
+```
+
+**The guard working IS the result here.** It is the assertion added after
+§34.5 found TwoTier recording 3.8 of 10 scripted warm restarts, and it
+refused a run that would otherwise have produced a mean over self-selected
+survivors — arms with different event counts measuring different
+populations.
+
+**So M19 and M21's zeros were never quoted**, and the M02 cross-read that
+would tell an eviction artefact from a real instant recovery waits for a
+scoreable run. Reporting `p95 = 0.0` from this run would have been reporting
+a statistic over 2 events as though it were over 10.
+
+**Not a gap in Phase 2 — a refusal with a reason.** The three scoreable
+clauses cannot be scored either, because the guard fires before any of them.
