@@ -24,8 +24,10 @@ from __future__ import annotations
 
 import csv
 import itertools
+import multiprocessing as mp
+import os
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterator, Optional, Sequence
 
 import numpy as np
 
@@ -98,6 +100,7 @@ def sweep(
     schedulers: dict[str, Callable[[], Scheduler]],
     n_seeds: int = 10,
     base_seed: int = 0,
+    seeds: Optional[Sequence[int]] = None,
     driver_kwargs: Optional[dict] | Callable[..., dict] = None,
     scorecard: Optional[Scorecard] = None,
     metric_overrides: Optional[dict] = None,
@@ -114,6 +117,10 @@ def sweep(
 
     Each row: {**axis_values, "scheduler": name, "seed": seed,
                "record_id": ..., <flattened per-metric fields>}.
+
+    ``seeds``, if given, replaces ``paired_seeds(n_seeds, base_seed)``
+    verbatim -- it is how a parallel runner hands one worker a single seed
+    while keeping the pairing the caller already drew.
 
     ``driver_kwargs`` may be a plain dict (the same kwargs for every cell,
     as before) or a callable ``f(**axis_values) -> dict``, for axes that
@@ -157,7 +164,14 @@ def sweep(
     driver_kwargs = {} if driver_kwargs is None else driver_kwargs
     scorecard = scorecard or Scorecard()
     metric_overrides = metric_overrides or {}
-    seeds = paired_seeds(n_seeds, base_seed)
+    # `seeds` EXISTS SO A POOL WORKER CAN RUN ONE SEED THROUGH THIS SAME
+    # FUNCTION rather than through a second implementation of it. The
+    # alternative -- a worker that rebuilds the scenario, runs the driver and
+    # assembles the row itself -- is exactly the divergence 0ec8ddb avoided
+    # by extracting `_online_rows_for`: two code paths that must stay in step
+    # for a determinism claim to hold. The caller slices `paired_seeds()`
+    # itself, so the pairing is unchanged; nothing here re-derives it.
+    seeds = list(seeds) if seeds is not None else paired_seeds(n_seeds, base_seed)
 
     axis_names = list(axes.keys())
     rows: list[dict[str, Any]] = []
@@ -223,6 +237,129 @@ def sweep(
                         row[f"{mid}.prot"] = res.value
                 rows.append(row)
     return rows
+
+
+# --- the shared process pool ---------------------------------------------
+#
+# WHY THIS IS HERE AND NOT COPIED INTO EACH RUNNER. Parallelism landed once,
+# at `scripts/wp9_sweep.py` (0ec8ddb), with a full determinism argument and a
+# bit-identity check -- and nothing asked where else it belonged. Five later
+# campaign runners imported that module's BASE / _arms / _driver_kwargs and
+# inherited its CONFIGURATION but not its POOL, so every Phase 2 result
+# (G1/G3/G5/G8 via phase2_core.py, G4, G6 at n=40, G9, G12) was produced on
+# one of this machine's sixteen cores. G12 then timed out at 2,400 s having
+# completed a single cell. See prediction-journal.md's fix-at-the-category
+# rule, of which this is the second clean instance.
+#
+# So the pool lives beside `sweep()`, in the module every runner already
+# imports, and a new runner gets it by importing it rather than by
+# remembering to write it.
+
+_THREAD_ENV = (
+    "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS",
+)
+
+
+def pin_worker_threads() -> None:
+    """Pin every numeric backend to one thread, in the PARENT, before any
+    worker is spawned.
+
+    W processes each running a multi-threaded BLAS/HiGHS oversubscribe the
+    machine and run slower than the same W with one thread apiece. It has to
+    happen here rather than in a Pool `initializer=`: with the spawn start
+    method a worker imports numpy while unpickling the task function, which
+    is BEFORE the initializer runs, and these variables are read at import.
+    Spawned children inherit `os.environ`, so setting it in the parent is
+    what reaches them.
+
+    The parent's OWN already-imported numpy is unaffected, so in principle a
+    BLAS-threaded reduction could order its sum differently between the
+    serial reference path and a worker. Nothing in this simulator dispatches
+    to a threaded BLAS kernel (the largest array in the hot path is Tier-1's
+    10x64 LP, solved by HiGHS), and the per-script serial-vs-parallel
+    identity check is what would catch it if that ever stopped being true --
+    which is the point of running that check rather than asserting this.
+    """
+    for var in _THREAD_ENV:
+        os.environ.setdefault(var, "1")
+
+
+# Relative per-run cost, measured on the N=8 / 20,000-slot base cell
+# (sweeps/phase2/profile-2026-09-04): driver+scoring+persist per record is
+# 6.35 / 8.08 / 12.99 s for PF / Reservation / TwoTier. Used ONLY to order
+# submission longest-first, so it never has to be exact -- a wrong cost costs
+# balance, not correctness.
+ARM_COST = {"PF": 1.00, "Reservation": 1.27, "TwoTier": 2.05}
+
+
+def arm_cost(arm: str, n_ues: int = 1, points: int = 1) -> float:
+    """Submission-ordering weight for one unit of work. Cost rises with the
+    arm and with fleet size (measured super-linear in `n_ues`; the exponent
+    is not load-bearing here, only the ordering it induces)."""
+    return ARM_COST.get(arm, 1.0) * float(n_ues) * float(points)
+
+
+def run_cells(
+    fn: Callable[[Any], Any],
+    tasks: Sequence[Any],
+    workers: int,
+    *,
+    cost: Optional[Callable[[Any], float]] = None,
+) -> Iterator[tuple[int, Any]]:
+    """Run `fn` over independent `tasks`, yielding `(index, result)` as each
+    completes. `index` is the task's position in the ORIGINAL `tasks` list,
+    so a caller that needs serial-identical output ordering can place results
+    itself without depending on completion order.
+
+    `workers <= 1` runs serially in this process, yielding in task order.
+    That path is the REFERENCE every converted runner is checked against, and
+    it is kept for that reason rather than as a convenience -- 0ec8ddb's own
+    `--workers 0`.
+
+    THREE THINGS CARRIED FORWARD, each from a measured failure:
+
+      * `pin_worker_threads()` above -- oversubscription.
+      * **LONGEST FIRST, `chunksize=1`.** `cost(task)` orders submission
+        descending. `pool.map`'s default chunking hands one worker a
+        contiguous block of a cost-ordered list, which on g10_rerun.py's
+        first run gave one worker every N=32 TwoTier cell and another every
+        N=2 PF one -- worker CPU 7:55 against 4:35, a 1.7x imbalance. Without
+        a cost the order is left alone; a wrong cost only costs balance,
+        never correctness, since `index` is carried through.
+      * **THIS GENERATOR RETAINS NOTHING.** `imap_unordered` is consumed one
+        result at a time and each is handed straight to the caller. The 25 GB
+        stall (wp9_sweep.m13_projection's docstring) was a parent holding
+        live RunRecords; a worker must reduce or strip before returning, and
+        this helper deliberately gives the parent no list to append to.
+
+    An exception in a worker propagates out of the generator, which is what
+    every one of these runners wants -- g9's event-count assertion and g12's
+    census assertion are stop conditions, not warnings.
+    """
+    if not tasks:
+        return
+    if workers <= 1:
+        for i, task in enumerate(tasks):
+            yield i, fn(task)
+        return
+
+    order = list(range(len(tasks)))
+    if cost is not None:
+        order.sort(key=lambda i: -float(cost(tasks[i])))
+    pin_worker_threads()
+    payload = [(i, tasks[i]) for i in order]
+    with mp.get_context("spawn").Pool(workers) as pool:
+        for idx, result in pool.imap_unordered(
+                _run_one_indexed, [(fn, i, t) for i, t in payload], chunksize=1):
+            yield idx, result
+
+
+def _run_one_indexed(packed: tuple) -> tuple[int, Any]:
+    """Top-level so `spawn` can pickle it. Carries the ORIGINAL index through
+    the pool so completion order and output order stay independent."""
+    fn, idx, task = packed
+    return idx, fn(task)
 
 
 def write_csv(rows: list[dict[str, Any]], path: str) -> None:

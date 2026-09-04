@@ -55,7 +55,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import bootstrap_ci, sweep  # noqa: E402
+from regime_sweep import (arm_cost, bootstrap_ci,  # noqa: E402
+                          paired_seeds, run_cells, sweep)
 from sim.parametric import sweep_scenario  # noqa: E402
 from wp9_sweep import BASE, _arms, _driver_kwargs  # noqa: E402
 
@@ -66,6 +67,12 @@ GAP_BUCKETS_MS = (0.0, 1.0, 10.0, 100.0, 1000.0, float("inf"))
 DUTY_LEVELS = (1.0, 0.5, 0.1)
 N_SEEDS = 10
 HORIZON = 20_000
+# 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
+_DEFAULT_WORKERS = 16
+# Set per worker from the task -- `sweep()`'s builder takes only
+# (seed, **axis_values) and horizon is neither. Same pattern as
+# wp9_sweep._HORIZON.
+_HORIZON = [HORIZON]
 
 
 def _bucket_of(gap_ms: float) -> str:
@@ -131,25 +138,50 @@ def postsilence_rows(summary: dict, axis_values: dict, arm: str, seed: int
     return rows
 
 
-def run_cells(duty_levels=DUTY_LEVELS, n_seeds=N_SEEDS, horizon=HORIZON
-              ) -> list[dict[str, Any]]:
+def _build(seed: int, **axis_values):
+    """Module level so `spawn` can pickle the `sweep()` call using it."""
+    kwargs = {**BASE, **axis_values}
+    kwargs.pop("min_rb", None)
+    for key in ("sr_period_slots", "k2_slots"):
+        kwargs.pop(key, None)
+    return sweep_scenario(seed=seed, horizon_slots=_HORIZON[0], **kwargs)
+
+
+def _task(task: tuple) -> list[dict[str, Any]]:
+    """One (duty, seed) cell: three arms, in `sweep()`'s own order.
+
+    THE LEDGER NEVER CROSSES THE PROCESS BOUNDARY, and could not: it holds
+    live `MessageCompletion` objects and is the single largest thing in a
+    run. `postsilence_rows` already reduces it in the sink -- the same
+    reduction the serial path did -- so what comes back is the same handful
+    of per-(flow, gap-bucket) rows.
+    """
+    duty, seed, horizon = task
+    _HORIZON[0] = horizon
     collected: list[dict[str, Any]] = []
 
     def sink(record, axis_values, summary):
         collected.extend(postsilence_rows(
             summary, axis_values, record.scheduler_name, record.seed))
 
-    def build(seed: int, **axis_values):
-        kwargs = {**BASE, **axis_values}
-        kwargs.pop("min_rb", None)
-        for key in ("sr_period_slots", "k2_slots"):
-            kwargs.pop(key, None)
-        return sweep_scenario(seed=seed, horizon_slots=horizon, **kwargs)
-
-    sweep(axes={"duty_cycle": list(duty_levels)}, build_scenario=build,
-          schedulers=_arms(), n_seeds=n_seeds, driver_kwargs=_driver_kwargs,
+    sweep(axes={"duty_cycle": [duty]}, build_scenario=_build,
+          schedulers=_arms(), seeds=[seed], driver_kwargs=_driver_kwargs,
           run_sink=sink)
     return collected
+
+
+def collect_rows(duty_levels=DUTY_LEVELS, n_seeds=N_SEEDS, horizon=HORIZON,
+                 workers: int = _DEFAULT_WORKERS) -> list[dict[str, Any]]:
+    seeds = paired_seeds(n_seeds)
+    # Serial order is duty-major then seed then arm; placing each task's rows
+    # at its own index reproduces it regardless of completion order.
+    tasks = [(duty, seed, horizon)
+             for duty in duty_levels for seed in seeds]
+    per_task: list[list | None] = [None] * len(tasks)
+    for i, rows in run_cells(_task, tasks, workers,
+                             cost=lambda t: arm_cost("TwoTier", BASE["n_ues"])):
+        per_task[i] = rows
+    return [r for rows in per_task for r in rows]
 
 
 def _cell(rows, duty, arm, bucket):
@@ -252,6 +284,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--smoke", action="store_true",
                     help="tiny grid, machinery only -- NOT a result")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
+                    help="0 or 1 runs serially -- the reference path "
+                         "scripts/verify_parallel.py checks against")
     args = ap.parse_args(argv[1:])
 
     # SMOKE AND REAL MUST NOT SHARE A PATH. They did, and it cost a real
@@ -269,7 +304,7 @@ def main(argv: list[str]) -> int:
     else:
         cfg = {"duty_levels": DUTY_LEVELS, "n_seeds": N_SEEDS, "horizon": HORIZON}
         default_out = "sweeps/wp9/stage6_g4.json"
-    rows = run_cells(**cfg)
+    rows = collect_rows(**cfg, workers=args.workers)
     if not rows:
         raise AssertionError(
             "no post-silence rows produced -- the ledger was empty or the "

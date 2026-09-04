@@ -565,10 +565,18 @@ error was.
 
 ## Standing rule — FIX AT THE CATEGORY, NOT AT THE SITE OF DISCOVERY
 
-**One clean instance, recorded honestly as one.** A second was offered and
-withdrawn when its premise turned out to be false — see the note below,
-because the withdrawal is part of the rule's evidence rather than an
-embarrassment to be tidied away.
+**TWO clean instances now — the population defect, and the serial runners
+(2026-09-04).** A third was offered and withdrawn when its premise turned
+out to be false — see the note below, because the withdrawal is part of the
+rule's evidence rather than an embarrassment to be tidied away.
+
+**A COUNTING NOTE, because getting it wrong here would be self-refuting.**
+The serial-runner finding was handed to me as *"the third instance, after the
+population defect and MFBR"*. It is the **second**: this section already
+records MFBR as withdrawn and re-classified, on this page, under the heading
+below. Carrying it as the third would have restated a count that the document
+it appears in had already corrected — the exact failure the restated-count
+rule names, committed inside the rule that catches it.
 
 **The instance: the population defect.** `docs/wp9-plan.md` §24.2 diagnosed
 it — a worst-flow statistic ranging over every flow while the guarantee is
@@ -584,6 +592,52 @@ Once G6 was fixed, **G6 looked right**. The site of discovery is the one
 place the defect is guaranteed absent afterwards, so every subsequent glance
 at it confirms health. The defect survives precisely *because* it was found
 and fixed — at one site.
+
+### The second instance: parallelism, landed once and never propagated
+
+**What happened.** `0ec8ddb` ("WP9 commit 1c: parallelise the sweep over
+cells") added a process pool to `scripts/wp9_sweep.py`, with a determinism
+argument that is still correct — cells are independent, seeds and arms stay
+ordered inside a cell, `paired_seeds` is drawn up front, every run is a pure
+function of `(scenario, seed)` — and it **verified** rather than asserting
+it: a smoke grid at `--workers 0` and `--workers 4` produced a bit-identical
+`stage1_rows.csv`. Nothing about that commit was careless. Nobody asked where
+else the pattern belonged.
+
+**The consequence, measured.** Every runner written afterwards was serial:
+`phase2_core.py` (G1, G3, G5, G8), `g4_postsilence.py` (G4),
+`g6_seed_extension.py` (G6 at n=40), `g9_campaign.py` (G9),
+`g12_campaign.py` (G12). **Every Phase 2 result was produced on one of this
+machine's sixteen cores**, against a measured 12.39× at W=16
+(`docs/wp9-g11-plan.md` §1.3). G12 then **timed out at 2,400 s having
+completed a single cell**, which is why Phase 2 has one cell of G12 and no
+cross-composition claim.
+
+**Why this one is self-concealing, and it is worse than the population
+defect's version of the same property.** After 1c, `wp9_sweep.py` was fast,
+so every glance at the site of discovery confirmed health — that much is the
+familiar shape. What is new is that **the five later runners import
+`BASE`, `_arms`, `_driver_kwargs` and `_run_one_cell` FROM `wp9_sweep`**.
+They inherited that module's configuration, its arms, its driver flags — and
+not its pool. An import from the fixed module reads like inheriting the fix.
+**The propagation looked like it had already happened.**
+
+**Both questions below would have caught it, and each is one command.**
+Question 1: *where else does this pattern appear?* — `grep -l multiprocessing
+scripts/*.py` against the list of scripts that call the driver, at the moment
+of 1c, would have returned one file out of the several that already existed.
+Question 2: *do the things that should agree actually agree?* — the runner
+that produced stage 1 and the runner that produced G1/G3/G5/G8 have the same
+job and did not have the same shape.
+
+**The fix is at the category by construction this time.** The pool lives in
+`regime_sweep.run_cells`, beside `sweep()`, in the module every runner
+already imports; `scripts/parallel_audit.py` derives the runner/parallel
+classification from each file's AST and exits non-zero on a serial runner
+with no recorded reason; `scripts/verify_parallel.py` runs each converted
+runner at `--workers 1` and `--workers 4` and diffs. **The audit is the part
+that answers question 1 without anyone remembering to ask it**, which is what
+"at the category" has to mean if it is to survive the next contributor.
 
 **The project already has the working counter-example**, which is why this is
 a habit to apply rather than a technique to invent: E2's defect in the G12
@@ -604,7 +658,7 @@ across configs.
    mix having no flow tighter than 100 ms — the second being the more
    consequential and the one nobody suspected.
 
-**THE WITHDRAWN SECOND INSTANCE, and why it stays visible.** MFBR = 0 was
+**THE WITHDRAWN INSTANCE, and why it stays visible.** MFBR = 0 was
 offered as a second case of the same pattern, on the premise that the fleet
 workloads set it to 150 Mbps while the parametric mix was left at zero. **The
 premise was false.** `mfbr_bps` is assigned at exactly one non-test site
@@ -618,6 +672,12 @@ That is a **different** failure shape: not incomplete propagation of a fix,
 but a diagnosis repeatedly reached and never acted on. It belongs beside this
 rule, not inside it — and a two-instance pattern resting partly on a wrong
 premise would have been worse than a one-instance pattern that is true.
+
+**The real second instance arrived four days later and is above.** Worth
+noting against the withdrawal: the rule spent that time at n=1, and the
+temptation to keep MFBR in the count to make the pattern look established is
+exactly what would have made the serial-runner instance harder to see — a
+pattern with a wrong member in it teaches the wrong shape.
 
 ## Standing rule — a rule can be violated by the code that IMPLEMENTS it
 

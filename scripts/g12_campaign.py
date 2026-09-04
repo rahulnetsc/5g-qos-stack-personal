@@ -50,7 +50,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import paired_seeds  # noqa: E402
+from regime_sweep import arm_cost, paired_seeds, run_cells  # noqa: E402
 from scheduler import load_two_tier  # noqa: E402
 from scheduler.reservation import Reservation  # noqa: E402
 from sim.baselines.pf import ProportionalFair  # noqa: E402
@@ -67,6 +67,11 @@ _TT = str(Path(__file__).resolve().parent.parent / "scheduler"
           / "scheduler_config.yaml")
 CQI_DELAY_SLOTS = 8
 HORIZON_SLOTS = 20_000
+# 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
+# G12's ramp makes every task 8 runs long, so the pool is well fed even at
+# the reference cell -- this is the runner that timed out at 2,400 s having
+# completed ONE cell on one core.
+_DEFAULT_WORKERS = 16
 # The panel's own pre-registered value (config/metric_panel.yml
 # `defaults.gbr_contract_fraction`), read rather than re-typed.
 CONTRACT_FRACTION = Scorecard().defaults["gbr_contract_fraction"]
@@ -216,6 +221,33 @@ def run_ramp(comp: str, n_ues: int, arm_name: str, arm_factory, seed: int,
             "class_map": class_map, "census": census}
 
 
+def _task(task: tuple) -> dict[str, Any]:
+    """Pool entry point for one (cell, arm, seed) ramp.
+
+    Top-level and taking plain data because `spawn` has to pickle it -- the
+    arm FACTORY is a lambda and cannot cross, so the worker looks the arm up
+    by name. What comes back is `run_ramp`'s own return: `_project`ed records
+    (GBR flows, every array dropped) and per-point scalars, so the ~18 MB
+    live records stay in the worker.
+    """
+    comp, n, arm_name, seed, ramp, perm_seed = task
+    return run_ramp(comp, n, arm_name, _arms()[arm_name], seed, ramp,
+                    perm_seed=perm_seed)
+
+
+def _ramp_tasks(cells, arms, seeds, ramp, perm_seed=None) -> list[tuple]:
+    """Tasks in the SERIAL order -- cell, then arm, then seed -- so placing
+    each result at its own index reproduces the serial sequence whatever
+    order the pool returns them in."""
+    return [(comp, n, arm_name, seed, ramp, perm_seed)
+            for comp, n in cells for arm_name in arms for seed in seeds]
+
+
+def _ramp_cost(task: tuple) -> float:
+    comp, n, arm_name, seed, ramp, _ = task
+    return arm_cost(arm_name, n, len(ramp))
+
+
 def order_for(ramped: dict[str, Any], ramp: tuple[float, ...], label: str,
               allow_one_element: bool) -> dict[str, Any]:
     """M13 over one ramp, plus §35.7's degeneracy classification."""
@@ -239,7 +271,8 @@ def order_for(ramped: dict[str, Any], ramp: tuple[float, ...], label: str,
             "is_scoreable": verdict.is_scoreable}
 
 
-def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int]
+def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int],
+                 workers: int = _DEFAULT_WORKERS
                  ) -> tuple[list[tuple[str, int]], dict[str, Any]]:
     """E1's control, run at CELL granularity BEFORE any ordering.
 
@@ -266,19 +299,24 @@ def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int]
     print("=" * 78)
     clean, report = [], {}
     bottom = (RAMP[0],)
-    for comp, n in cells:
+    arm_names = list(arms)
+    tasks = _ramp_tasks(cells, arm_names, seeds, bottom)
+    results: list[dict | None] = [None] * len(tasks)
+    for i, r in run_cells(_task, tasks, workers, cost=_ramp_cost):
+        results[i] = r
+    per_cell = len(arm_names) * len(seeds)
+    for c, (comp, n) in enumerate(cells):
         bad = []
-        for arm_name, factory in arms.items():
-            for seed in seeds:
-                r = run_ramp(comp, n, arm_name, factory, seed, bottom)
-                worst = r["per_point"][0]["worst_by_class"]
-                dirty = sorted(qi for qi, v in worst.items()
-                               if v < CONTRACT_FRACTION)
-                if dirty:
-                    bad.append({"arm": arm_name, "seed": seed, "5qi": dirty,
-                                "worst": {k: round(v, 4)
-                                          for k, v in worst.items()}})
-        n_groups = len(arms) * len(seeds)
+        for j in range(per_cell):
+            arm_name, seed = tasks[c * per_cell + j][2], tasks[c * per_cell + j][3]
+            worst = results[c * per_cell + j]["per_point"][0]["worst_by_class"]
+            dirty = sorted(qi for qi, v in worst.items()
+                           if v < CONTRACT_FRACTION)
+            if dirty:
+                bad.append({"arm": arm_name, "seed": seed, "5qi": dirty,
+                            "worst": {k: round(v, 4)
+                                      for k, v in worst.items()}})
+        n_groups = per_cell
         report[f"{comp}_n{n}"] = {"n_groups": n_groups, "contaminated": bad}
         if bad:
             print(f"  {comp}_n{n:<3} CONTAMINATED: {len(bad)}/{n_groups} "
@@ -340,6 +378,9 @@ def main(argv: list[str]) -> int:
                     help="time ONE cell end-to-end with real post-processing "
                          "and stop -- §6.3a's rule, before the full grid")
     ap.add_argument("--out", default="sweeps/wp9/g12_campaign.json")
+    ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
+                    help="0 or 1 runs serially -- the reference path "
+                         "scripts/verify_parallel.py checks against")
     args = ap.parse_args(argv[1:])
 
     n_seeds = 2 if args.smoke else args.seeds
@@ -371,13 +412,19 @@ def main(argv: list[str]) -> int:
 
     control_report: dict[str, Any] = {}
     if not args.time_cell:
-        kept, control_report = control_pass(kept, arms, seeds)
+        kept, control_report = control_pass(kept, arms, seeds, args.workers)
         if not kept:
             print("\nNO CELL HAS A CLEAN CONTROL. E1 fails outright and no "
                   "ordering is computed -- that is the result (§35.9 E1).")
             return 1
 
     if args.time_cell:
+        # TIMED SERIALLY ON PURPOSE, whatever --workers says. The figure this
+        # mode extrapolates from is CPU cost per run; timing it on a pool
+        # would measure this machine's core count instead and produce a
+        # budget that is wrong by W. The wall-clock saving is applied at the
+        # end, from the measured efficiency, rather than being baked into the
+        # per-run number.
         t0 = time.time()
         comp, n = REFERENCE_CELL
         for arm_name, factory in arms.items():
@@ -405,14 +452,27 @@ def main(argv: list[str]) -> int:
                            "control_pass": control_report,
                            "cells": {}}
 
-    for comp, n in kept:
+    arm_names = list(arms)
+    # ONE POOL OVER THE WHOLE GRID, not one per cell. G12's tasks are 8-run
+    # ramps of very unequal cost (TwoTier at N=8 against PF at N=4), so a
+    # per-cell pool would drain to a single straggler between cells -- the
+    # tail the longest-first ordering exists to avoid.
+    grid_tasks = _ramp_tasks(kept, arm_names, seeds, ramp)
+    grid: list[dict | None] = [None] * len(grid_tasks)
+    for i, r in run_cells(_task, grid_tasks, args.workers, cost=_ramp_cost):
+        grid[i] = r
+        comp, n, arm_name, seed, _, _ = grid_tasks[i]
+        print(f"    ... {comp}_n{n}/{arm_name}/seed{seed} ran", flush=True)
+
+    per_cell = len(arm_names) * len(seeds)
+    for c, (comp, n) in enumerate(kept):
         key = f"{comp}_n{n}"
         out["cells"][key] = {}
         print(f"\n{'=' * 78}\n{key}\n{'=' * 78}", flush=True)
-        for arm_name, factory in arms.items():
+        for ai, arm_name in enumerate(arm_names):
             in_orders, full_orders, per_seed = [], [], []
-            for seed in seeds:
-                r = run_ramp(comp, n, arm_name, factory, seed, ramp)
+            for si, seed in enumerate(seeds):
+                r = grid[c * per_cell + ai * len(seeds) + si]
                 label = f"{key}/{arm_name}/seed{seed}"
                 # IN-RANGE FIRST, and a one-element order here is the
                 # FINDING (§35.12), not a defect -- see the module docstring.
@@ -450,13 +510,23 @@ def main(argv: list[str]) -> int:
               f"{'=' * 78}", flush=True)
         out["permutation_control"] = {}
         perm_seeds = paired_seeds(args.perm_seeds)
-        for arm_name, factory in arms.items():
+        # Every (arm, permutation, seed) in ONE pool, for the same reason the
+        # main grid is: the permutations are independent and unequal in cost.
+        perm_tasks = [(comp, n, arm_name, seed, ramp, pseed)
+                      for arm_name in arm_names
+                      for pseed in PERMUTATION_SEEDS
+                      for seed in perm_seeds]
+        perm_res: list[dict | None] = [None] * len(perm_tasks)
+        for i, r in run_cells(_task, perm_tasks, args.workers,
+                              cost=_ramp_cost):
+            perm_res[i] = r
+        for ai, arm_name in enumerate(arm_names):
             by_perm = {}
-            for p in PERMUTATION_SEEDS:
+            for pi, p in enumerate(PERMUTATION_SEEDS):
                 orders, unscoreable = [], []
-                for seed in perm_seeds:
-                    r = run_ramp(comp, n, arm_name, factory, seed, ramp,
-                                 perm_seed=p)
+                for si, seed in enumerate(perm_seeds):
+                    r = perm_res[(ai * len(PERMUTATION_SEEDS) + pi)
+                                 * len(perm_seeds) + si]
                     v = order_for_permutation(
                         r, ramp, f"perm{p}/{arm_name}/seed{seed}",
                         allow_one_element=not has_out_of_range)

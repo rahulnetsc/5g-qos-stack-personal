@@ -13,6 +13,8 @@ uv run pytest sim/tests/test_scorecard.py -q     # one file
 uv run python scripts/regression_corpus.py --check   # numeric drift vs snapshot
 uv run python scripts/regression_corpus.py --capture # re-baseline (see rules below)
 uv run python scripts/scheduler_study.py         # the published studies 1-3
+uv run python scripts/parallel_audit.py --check  # no runner ships serial
+uv run python scripts/verify_parallel.py         # serial == parallel, per runner
 ```
 
 Everything runs under `uv run`. There is no `pip install -e .` step and no
@@ -156,6 +158,49 @@ preconditions as raises rather than dropping them (silently wrong beats
 loudly wrong), and mirror `roundf()` (half-away-from-zero) explicitly
 instead of Python's `round()` (half-to-even) — they disagree at exact
 `.5`. `sim/power.py` is the worked example for all three.
+
+**PARALLEL BY DEFAULT — a runner that calls the driver in a loop uses
+`regime_sweep.run_cells`, and its serial path is the REFERENCE, not a
+fallback.** Parallelism landed once, at `scripts/wp9_sweep.py` (`0ec8ddb`),
+with a correct determinism argument and a bit-identity check — and every
+runner written afterwards was serial, including the five that produced every
+Phase 2 result. They imported that module's `BASE` / `_arms` /
+`_driver_kwargs`, so they **inherited its configuration and not its pool**,
+which is why nobody noticed: an import from the fixed module reads like
+inheriting the fix. `g12_campaign.py` then timed out at 2,400 s having
+completed one cell, on one of sixteen cores. Recorded as the second clean
+instance of `prediction-journal.md`'s fix-at-the-category rule.
+
+Four things travel with the pool, each from a measured failure, and
+`run_cells` carries all four so a new runner cannot lose them:
+
+- **It is a CORRECTNESS change, not a speedup.** Every comparison here is
+  within-seed, so the acceptance criterion is **byte-identical output to the
+  serial path on the same seeds, verified per script** —
+  `scripts/verify_parallel.py`, not inherited from `0ec8ddb`'s one check of
+  one runner. Exclusions from that diff are named per runner and have to earn
+  themselves: provenance must be present *and* differ, and a timing exclusion
+  must be a clock by name, so a result cannot be reclassified as "timing" to
+  make a difference disappear.
+- **`OMP_NUM_THREADS=1` and friends, set in the PARENT before the pool.** W
+  workers each running a multi-threaded BLAS oversubscribe the machine. It
+  cannot be done in a Pool `initializer=`: under `spawn` a worker imports
+  numpy while unpickling the task, which is *before* the initializer runs.
+- **The parent retains nothing live.** `run_cells` is a generator handing one
+  result at a time; a worker reduces, strips or projects before returning.
+  This is the 25 GB retention stall (`wp9_sweep.m13_projection`), which was
+  fixed in the parent and then reintroduced one layer down in the worker.
+- **Longest-first, `chunksize=1`.** `pool.map`'s default chunking hands one
+  worker a contiguous block of a cost-ordered list; on `g10_rerun.py` that
+  gave one worker every N=32 TwoTier cell and another every N=2 PF one — 1.7×
+  imbalance. `run_cells(cost=...)` orders submission and carries the task's
+  original index through, so output order stays independent of it.
+
+**`scripts/parallel_audit.py` is what makes this hold without anyone
+remembering to check.** It derives the runner/parallel split from each file's
+AST — never from a grep written into prose — and `--check` exits non-zero on
+a serial runner not named in its `ALLOW_SERIAL` list with a reason. Serial on
+purpose is fine; serial silently is the finding.
 
 **One fidelity change per commit.** Land it, run the full suite, run
 `regression_corpus.py --check`, and record which numbers moved and why.

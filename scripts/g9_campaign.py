@@ -34,7 +34,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import bootstrap_ci, paired_seeds  # noqa: E402
+from regime_sweep import (arm_cost, bootstrap_ci,  # noqa: E402
+                          paired_seeds, run_cells)
 from sim.baselines.pf import ProportionalFair  # noqa: E402
 from sim.driver import run  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
@@ -47,6 +48,8 @@ from scheduler.reservation import Reservation  # noqa: E402
 
 _TT = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
 CQI_DELAY_SLOTS = 8
+# 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
+_DEFAULT_WORKERS = 16
 # GT-6.1 expects `warm`, GT-6.2 `cold`, GT-6.3 `reestablish`. Named per
 # scenario so the assertion checks the RIGHT path, not merely "some events".
 CASES = {
@@ -161,105 +164,169 @@ def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on):
         flow_configs=sc.flows, summary=summary, arm={}, meta={})
 
 
+def _task(task: tuple) -> dict:
+    """One (case, arm, seed): the joined run, its paired no-join CONTROL, and
+    both assertions -- run HERE, in the worker, so a scenario that produced
+    no events still stops the campaign rather than being aggregated.
+
+    Returns only reduced scalars and the neighbour flow-key list. The two
+    RunRecords stay in the worker and die with it; nothing live crosses back
+    (wp9_sweep.m13_projection's 25 GB note).
+    """
+    label, arm_name, seed, n_nb = task
+    build, want_path = CASES[label]
+    factory = _arms()[arm_name]
+    sc, rec = run_one(build, want_path, arm_name, factory, seed, n_nb,
+                      joiner_on=True)
+    joiner, neighbours = joiner_ue_id(sc), neighbour_ue_ids(sc)
+    n_ev = assert_events_fired(rec, want_path, f"{label}/{arm_name}",
+                               expected=expected_event_count(sc, want_path))
+    keys = assert_neighbour_population(rec, joiner, neighbours,
+                                       f"{label}/{arm_name}")
+    # G9 is about what the FLEET receives across a join -- the neighbours
+    # clause explicitly excludes the background aggressor -- so the
+    # population is the protected fleet, stated rather than inherited.
+    scored = Scorecard().score(rec, population=Population.protected_fleet())
+    out = {"n_ev": n_ev, "keys": keys}
+    for key in ("M18", "M19", "M21"):
+        v = (scored[key].value or {}).get("by_path", {}).get(want_path)
+        out[key] = v["p95_ms"] if v and v.get("p95_ms") is not None else None
+    _, ctl = run_one(build, want_path, arm_name, factory, seed, n_nb,
+                     joiner_on=False)
+    a, b = _neighbour_stats(rec, neighbours), _neighbour_stats(ctl, neighbours)
+    # M02 on the neighbours is SATURATED AT ZERO even with bg at 0.876 UL
+    # utilisation -- their protected flows sit at p98 15.5 ms against a
+    # 100 ms PDB, ~6x headroom. A delta of a floored statistic cannot move,
+    # so the sensitive instrument is the p98 delay delta. Both are reported:
+    # M02 is the guarantee's own currency, p98 is what can actually detect a
+    # change.
+    out["nb_dm02"] = a["m02"] - b["m02"]
+    out["nb_dp98"] = a["worst_p98_ms"] - b["worst_p98_ms"]
+    return out
+
+
+def _aggregate(per_seed: list[dict]) -> dict:
+    """The per-arm summary, from results already ordered by seed. Split out
+    so it reads the same list the serial path built, in the same order --
+    the bootstrap CIs are seeded, so order is load-bearing here."""
+    m18 = [r["M18"] for r in per_seed if r["M18"] is not None]
+    m19 = [r["M19"] for r in per_seed if r["M19"] is not None]
+    m21 = [r["M21"] for r in per_seed if r["M21"] is not None]
+    nb_deltas = [r["nb_dm02"] for r in per_seed]
+    nb_p98_deltas = [r["nb_dp98"] for r in per_seed]
+    ci = bootstrap_ci(nb_deltas, seed=4242) if nb_deltas else None
+    ci_p98 = bootstrap_ci(nb_p98_deltas, seed=4243) if nb_p98_deltas else None
+    return {
+        "events_per_run": statistics.mean([r["n_ev"] for r in per_seed]),
+        "m18_p95_median": statistics.median(m18) if m18 else None,
+        "m19_p95_median": statistics.median(m19) if m19 else None,
+        "m21_p95_median": statistics.median(m21) if m21 else None,
+        "neighbour_dm02": {"ci": ci, **Scorecard.robust_delta_summary(nb_deltas)},
+        "neighbour_dp98_ms": {"ci": ci_p98,
+                              **Scorecard.robust_delta_summary(nb_p98_deltas)},
+    }
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--neighbours", type=int, default=7)
+    # Exists so the serial-vs-parallel identity check has a grid that runs to
+    # completion. The default is every arm, and on the default grid TwoTier
+    # still aborts on the event-count assertion -- that abort IS G9's
+    # published result (docs/phase2-results.md) and is checked separately, by
+    # verify_parallel's `g9_campaign_stop` case.
+    ap.add_argument("--arms", default="PF,Reservation,TwoTier")
     ap.add_argument("--out", default="sweeps/wp9/g9_campaign.json")
+    ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
+                    help="0 or 1 runs serially -- the reference path "
+                         "scripts/verify_parallel.py checks against")
     args = ap.parse_args(argv[1:])
     n_seeds = 2 if args.smoke else args.seeds
     n_nb = 3 if args.smoke else args.neighbours
     seeds = paired_seeds(n_seeds)
-    sc_card = Scorecard()
+    all_arms = _arms()
+    arms = [a for a in args.arms.split(",") if a]
+    unknown = [a for a in arms if a not in all_arms]
+    if unknown:
+        raise SystemExit(f"unknown arm(s) {unknown}; known: {list(all_arms)}")
+
+    # Task order is the serial order -- case, then arm, then seed -- so the
+    # per-arm lists the aggregation reads are seed-ordered whatever order the
+    # pool returns them in. The seeded bootstrap makes that load-bearing.
+    tasks = [(label, arm_name, seed, n_nb)
+             for label in CASES for arm_name in arms for seed in seeds]
+    results: list[dict | None] = [None] * len(tasks)
+    per_group = len(seeds)
+    done_in_group: dict[tuple[str, str], int] = {}
     out: dict = {}
 
-    for label, (build, want_path) in CASES.items():
-        print(f"\n{'=' * 78}\n{label}  ({want_path} path)\n{'=' * 78}", flush=True)
-        out[label] = {}
-        for arm_name, factory in _arms().items():
-            m18, m19, m21, nb_deltas, n_ev = [], [], [], [], []
-            nb_p98_deltas = []
-            printed_population = False
-            for seed in seeds:
-                sc, rec = run_one(build, want_path, arm_name, factory, seed,
-                                  n_nb, joiner_on=True)
-                joiner, neighbours = joiner_ue_id(sc), neighbour_ue_ids(sc)
-                n_ev.append(assert_events_fired(
-                    rec, want_path, f"{label}/{arm_name}",
-                    expected=expected_event_count(sc, want_path)))
-                keys = assert_neighbour_population(rec, joiner, neighbours,
-                                                   f"{label}/{arm_name}")
-                if not printed_population:
-                    print(f"  [{arm_name}] neighbours population ({len(keys)} flows): "
-                          f"{keys[:4]}{' ...' if len(keys) > 4 else ''}", flush=True)
-                    printed_population = True
-                # G9 is about what the FLEET receives across a join --
-                # the neighbours clause explicitly excludes the
-                # background aggressor -- so the population is the
-                # protected fleet, stated rather than inherited.
-                scored = sc_card.score(
-                    rec, population=Population.protected_fleet())
-                for store, key in ((m18, "M18"), (m19, "M19"), (m21, "M21")):
-                    v = (scored[key].value or {}).get("by_path", {}).get(want_path)
-                    if v and v.get("p95_ms") is not None:
-                        store.append(v["p95_ms"])
-                _, ctl = run_one(build, want_path, arm_name, factory, seed,
-                                 n_nb, joiner_on=False)
-                a, b = _neighbour_stats(rec, neighbours), _neighbour_stats(ctl, neighbours)
-                nb_deltas.append(a["m02"] - b["m02"])
-                # M02 on the neighbours is SATURATED AT ZERO even with bg at
-                # 0.876 UL utilisation -- their protected flows sit at p98
-                # 15.5 ms against a 100 ms PDB, ~6x headroom. A delta of a
-                # floored statistic cannot move, so the sensitive instrument
-                # is the p98 delay delta. Both are reported: M02 is the
-                # guarantee's own currency, p98 is what can actually detect
-                # a change.
-                nb_p98_deltas.append(a["worst_p98_ms"] - b["worst_p98_ms"])
-                # PER-SEED heartbeat. Without it the only progress signal is
-                # process liveness: this runner's first launch wrote a
-                # ZERO-LINE log for its entire duration, because Python
-                # block-buffers a redirected stdout and the summary prints
-                # come only at the end of an arm. Same family as the run
-                # logs lost to session-scoped scratchpads.
-                print(f"    ... {label}/{arm_name} seed {seed} done", flush=True)
-            ci = bootstrap_ci(nb_deltas, seed=4242) if nb_deltas else None
-            ci_p98 = bootstrap_ci(nb_p98_deltas, seed=4243) if nb_p98_deltas else None
-            rs_p98 = Scorecard.robust_delta_summary(nb_p98_deltas)
-            rs = Scorecard.robust_delta_summary(nb_deltas)
-            print(f"  {arm_name:<12} events/run={statistics.mean(n_ev):5.1f}  "
-                  f"M18 p95={statistics.median(m18) if m18 else None}  "
-                  f"M19 p95={statistics.median(m19) if m19 else None}  "
-                  f"M21 p95={statistics.median(m21) if m21 else None}", flush=True)
-            print(f"  {'':<12} neighbours ΔM02  mean {ci['point']:+.6f} "
-                  f"[{ci['lo']:+.6f},{ci['hi']:+.6f}]  median {rs['median']:+.6f} "
-                  f"worse {rs['frac_worse']:.0%}  n_seeds={rs['n']} paired")
-            print(f"  {'':<12} neighbours Δp98  mean {ci_p98['point']:+.3f} ms "
-                  f"[{ci_p98['lo']:+.3f},{ci_p98['hi']:+.3f}]  "
-                  f"median {rs_p98['median']:+.3f}  worse {rs_p98['frac_worse']:.0%}",
-                  flush=True)
-            out[label][arm_name] = {
-                "events_per_run": statistics.mean(n_ev),
-                "m18_p95_median": statistics.median(m18) if m18 else None,
-                "m19_p95_median": statistics.median(m19) if m19 else None,
-                "m21_p95_median": statistics.median(m21) if m21 else None,
-                "neighbour_dm02": {"ci": ci, **rs},
-                "neighbour_dp98_ms": {"ci": ci_p98, **rs_p98},
-            }
-            # DURABLE AFTER EVERY ARM, not once at the end. The only write
-            # used to be the terminal one below, so a kill at hour 9 of an
-            # overnight run lost the whole campaign -- and this machine has
-            # lost three runs to environmental kills. Rewriting the partial
-            # `out` costs milliseconds against minutes of simulation.
-            #
-            # This is DURABILITY, not resume: a relaunch still recomputes
-            # everything. True resume needs a per-(case, arm) ledger and a
-            # skip, ~25 lines, and is deliberately deferred -- it buys
-            # nothing at Phase 2's 5-10 minute budget and the incremental
-            # write already removes the catastrophic case.
-            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-            Path(args.out).write_text(
-                json.dumps({**out, "_partial": True}, indent=2, default=str))
+    def _flush(partial: bool) -> None:
+        """Rebuild the whole document in CANONICAL order and write it. The
+        partial writes exist because this machine has lost three runs to
+        environmental kills (see the note this replaces); rebuilding rather
+        than appending means the surviving file is in the same order as a
+        completed one, so a partial and a final are diffable."""
+        doc = {label: {arm: out[(label, arm)]
+                       for arm in arms if (label, arm) in out}
+               for label in CASES}
+        doc = {k: v for k, v in doc.items() if v}
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(
+            {**doc, "_partial": True} if partial else doc,
+            indent=2, default=str))
+
+    for i, res in run_cells(_task, tasks, args.workers,
+                            cost=lambda t: arm_cost(t[1])):
+        results[i] = res
+        label, arm_name, seed, _ = tasks[i]
+        # PER-RESULT HEARTBEAT. Without it the only progress signal is
+        # process liveness: this runner's first launch wrote a ZERO-LINE log
+        # for its entire duration, because Python block-buffers a redirected
+        # stdout and the summary prints come only at the end of an arm. Same
+        # family as the run logs lost to session-scoped scratchpads. In
+        # completion order, which is a log, not a result.
+        print(f"    ... {label}/{arm_name} seed {seed} done", flush=True)
+        key = (label, arm_name)
+        done_in_group[key] = done_in_group.get(key, 0) + 1
+        if done_in_group[key] != per_group:
+            continue
+        idx0 = tasks.index((label, arm_name, seeds[0], n_nb))
+        group = [results[idx0 + k] for k in range(per_group)]
+        # ASSERTION 2's population is PRINTED, not assumed (§31.6).
+        print(f"\n{'=' * 78}\n{label}/{arm_name}\n{'=' * 78}", flush=True)
+        keys = group[0]["keys"]
+        print(f"  [{arm_name}] neighbours population ({len(keys)} flows): "
+              f"{keys[:4]}{' ...' if len(keys) > 4 else ''}", flush=True)
+        summary = _aggregate(group)
+        ci, ci_p98 = summary["neighbour_dm02"], summary["neighbour_dp98_ms"]
+        print(f"  {arm_name:<12} events/run={summary['events_per_run']:5.1f}  "
+              f"M18 p95={summary['m18_p95_median']}  "
+              f"M19 p95={summary['m19_p95_median']}  "
+              f"M21 p95={summary['m21_p95_median']}", flush=True)
+        print(f"  {'':<12} neighbours ΔM02  mean {ci['ci']['point']:+.6f} "
+              f"[{ci['ci']['lo']:+.6f},{ci['ci']['hi']:+.6f}]  "
+              f"median {ci['median']:+.6f} worse {ci['frac_worse']:.0%}  "
+              f"n_seeds={ci['n']} paired")
+        print(f"  {'':<12} neighbours Δp98  mean {ci_p98['ci']['point']:+.3f} ms "
+              f"[{ci_p98['ci']['lo']:+.3f},{ci_p98['ci']['hi']:+.3f}]  "
+              f"median {ci_p98['median']:+.3f} "
+              f"worse {ci_p98['frac_worse']:.0%}", flush=True)
+        out[key] = summary
+        # DURABLE AFTER EVERY (case, arm), not once at the end. The only
+        # write used to be the terminal one below, so a kill at hour 9 of an
+        # overnight run lost the whole campaign.
+        #
+        # This is DURABILITY, not resume: a relaunch still recomputes
+        # everything. True resume needs a per-(case, arm) ledger and a skip,
+        # ~25 lines, and is deliberately deferred -- it buys nothing at Phase
+        # 2's 5-10 minute budget and the incremental write already removes
+        # the catastrophic case.
+        _flush(partial=True)
+
+    out = {label: {arm: out[(label, arm)] for arm in arms}
+           for label in CASES}
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, indent=2, default=str))
     print(f"\nwrote {args.out}")

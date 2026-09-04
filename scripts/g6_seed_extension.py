@@ -42,40 +42,84 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyse_stage6 import (ARMS, G6_BAR, G6_METRICS, _stable_seed,  # noqa: E402
                             g6_verdict, impairment_interval, load_rows,
                             paired_deltas)
-from regime_sweep import bootstrap_ci, sweep, write_csv  # noqa: E402
+from regime_sweep import (arm_cost, bootstrap_ci, paired_seeds,  # noqa: E402
+                          run_cells, sweep, write_csv)
 from sim.scorecard import Scorecard  # noqa: E402
 from sim.parametric import sweep_scenario  # noqa: E402
-from wp9_sweep import (BASE, PersistingRecordSink, _arms,  # noqa: E402
-                        _driver_kwargs)
+from wp9_sweep import (BASE, _arms, _driver_kwargs,  # noqa: E402
+                        _strip_timeseries)
 
 N_SEEDS = 40
 HORIZON = 20_000
 CONTROL_N = 10          # the seeds stage 1 already ran
 CONTROL_TOL = 1e-9      # bit-for-bit: same scenario, same flags, same seed
+# 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
+_DEFAULT_WORKERS = 16
+
+# Set per worker from the task, the same way `wp9_sweep._HORIZON` is: the
+# scenario builder `sweep()` calls takes only (seed, **axis_values), and
+# horizon is neither.
+_HORIZON = [HORIZON]
 
 
-def run_cells(n_seeds=N_SEEDS, horizon=HORIZON,
-              records_path: Path | None = None) -> list[dict[str, Any]]:
+def _build(seed: int, **axis_values):
+    """Module level so `spawn` can pickle the `sweep()` call that uses it."""
+    kwargs = {**BASE, **axis_values}
+    kwargs.pop("min_rb", None)
+    for key in ("sr_period_slots", "k2_slots"):
+        kwargs.pop(key, None)
+    return sweep_scenario(seed=seed, horizon_slots=_HORIZON[0], **kwargs)
+
+
+def _task(task: tuple) -> tuple[list[dict[str, Any]], list[dict]]:
+    """One (bg, seed) cell: three arms, in `sweep()`'s own order.
+
+    Runs through `sweep()` rather than reimplementing the run/score/row
+    assembly, so the parallel and serial paths are the SAME code -- see the
+    `seeds=` note in `regime_sweep.sweep`. Records are stripped here and the
+    dicts returned; the parent is the single writer, and nothing live
+    crosses back (wp9_sweep.m13_projection's 25 GB note).
+    """
+    bg, seed, horizon, keep_records = task
+    _HORIZON[0] = horizon
+    records: list[dict] = []
+    sink = None
+    if keep_records:
+        def sink(record, axis_values):      # noqa: F811
+            records.append(_strip_timeseries(record.to_dict()))
+    rows = sweep(axes={"bg": [bg]}, build_scenario=_build,
+                 schedulers=_arms(), seeds=[seed],
+                 driver_kwargs=_driver_kwargs, record_sink=sink)
+    return rows, records
+
+
+def collect_rows(n_seeds=N_SEEDS, horizon=HORIZON,
+                 records_path: Path | None = None,
+                 workers: int = _DEFAULT_WORKERS) -> list[dict[str, Any]]:
     """`records_path` is not optional in spirit. The first version of this
     function passed no `record_sink`, so its n_seeds=40 run kept only the
     scored CSV and the per-flow completion timestamps were gone -- see
     `wp9_sweep.PersistingRecordSink`. Every caller should persist."""
-    def build(seed: int, **axis_values):
-        kwargs = {**BASE, **axis_values}
-        kwargs.pop("min_rb", None)
-        for key in ("sr_period_slots", "k2_slots"):
-            kwargs.pop(key, None)
-        return sweep_scenario(seed=seed, horizon_slots=horizon, **kwargs)
-
-    if records_path is None:
-        return sweep(axes={"bg": [False, True]}, build_scenario=build,
-                     schedulers=_arms(), n_seeds=n_seeds,
-                     driver_kwargs=_driver_kwargs)
-    with PersistingRecordSink(records_path) as sink:
-        rows = sweep(axes={"bg": [False, True]}, build_scenario=build,
-                     schedulers=_arms(), n_seeds=n_seeds,
-                     driver_kwargs=_driver_kwargs, record_sink=sink)
-        print(f"  persisted {sink.n} records to {records_path}")
+    seeds = paired_seeds(n_seeds)
+    # Serial order is bg-major then seed then arm, and `sweep()` supplies the
+    # arm order within a task -- so placing each task's rows at its own index
+    # reproduces the serial list exactly, whatever order they complete in.
+    tasks = [(bg, seed, horizon, records_path is not None)
+             for bg in (False, True) for seed in seeds]
+    per_task: list[tuple | None] = [None] * len(tasks)
+    for i, res in run_cells(_task, tasks, workers,
+                            cost=lambda t: arm_cost("TwoTier", BASE["n_ues"])):
+        per_task[i] = res
+    rows = [r for res in per_task for r in res[0]]
+    if records_path is not None:
+        records_path.parent.mkdir(parents=True, exist_ok=True)
+        n = 0
+        with records_path.open("w") as fh:
+            for res in per_task:
+                for rec in res[1]:
+                    fh.write(json.dumps(rec) + "\n")
+                    n += 1
+        print(f"  persisted {n} records to {records_path}")
     return rows
 
 
@@ -167,13 +211,20 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--root", default="sweeps/wp9")
+    ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
+                    help="0 or 1 runs serially -- the reference path "
+                         "scripts/verify_parallel.py checks against")
     args = ap.parse_args(argv[1:])
     root = Path(args.root)
+    root.mkdir(parents=True, exist_ok=True)
     if args.smoke:
-        rows = run_cells(n_seeds=2, horizon=2000)
+        rows = collect_rows(n_seeds=2, horizon=2000, workers=args.workers,
+                            records_path=root / "stage6_g6_SMOKE_records.jsonl")
+        write_csv(rows, str(root / "stage6_g6_SMOKE.csv"))
         print(f"smoke: {len(rows)} rows -- machinery only, NOT a result")
         return 0
-    rows = run_cells(records_path=root / "stage6_g6_n40_records.jsonl")
+    rows = collect_rows(records_path=root / "stage6_g6_n40_records.jsonl",
+                        workers=args.workers)
     ok = control_vs_stage1(rows, root / "stage1" / "stage1_rows.csv")
     write_csv(rows, str(root / "stage6_g6_n40.csv"))
     summary = report(rows) if ok else {"control": "FAILED -- not read"}

@@ -26,6 +26,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -33,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import sim.driver as driver_mod  # noqa: E402
+from regime_sweep import run_cells  # noqa: E402
 from sim.bsr import BsrModel  # noqa: E402
 from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig  # noqa: E402
 from scheduler import load_two_tier  # noqa: E402
@@ -41,6 +43,8 @@ from scheduler.flow import FlowConfig  # noqa: E402
 _TT_CONFIG = str(Path(__file__).resolve().parent.parent
                  / "scheduler" / "scheduler_config.yaml")
 
+# 16 physical cores; see docs/wp9-g11-plan.md §1.3.
+_DEFAULT_WORKERS = 16
 MODES = ("off", "oai", "spec")
 
 
@@ -180,11 +184,29 @@ def run_mode(mode: str, seed: int = 7) -> dict:
     }
 
 
-def main() -> int:
+def _task(task: tuple) -> dict:
+    """Pool entry point. `run_mode` resets `_ObservingBsr.stats` itself and
+    returns a self-contained dict, so the class-level accumulator it uses is
+    per-run and does not leak across workers -- checked before converting,
+    because a shared class attribute is exactly the state that survives a
+    serial loop and does not survive a pool."""
+    return run_mode(*task)
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
+                    help="0 or 1 runs serially")
+    a = ap.parse_args((argv or sys.argv)[1:])
     seeds = (7, 11, 23)
     print("WP9 §18.5 — pre-registered expectations, scored")
     print("=" * 78)
-    rows = {m: [run_mode(m, s) for s in seeds] for m in MODES}
+    tasks = [(m, sd) for m in MODES for sd in seeds]
+    flat: list[dict | None] = [None] * len(tasks)
+    for i, r in run_cells(_task, tasks, a.workers):
+        flat[i] = r
+    rows = {m: [flat[i] for i, t in enumerate(tasks) if t[0] == m]
+            for m in MODES}
 
     def avg(m, k):
         return sum(r[k] for r in rows[m]) / len(rows[m])

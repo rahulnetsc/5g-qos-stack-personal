@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from regime_sweep import arm_cost, run_cells               # noqa: E402
 from sim.driver import run as driver_run                   # noqa: E402
 from sim.parametric import sweep_scenario                  # noqa: E402
 from sim.run_record import RunRecord                       # noqa: E402
@@ -35,6 +36,11 @@ from sim.scorecard import Population, Scorecard             # noqa: E402
 from g11_campaign import _arm                              # noqa: E402
 
 SLOT_S = 0.00025
+# 16 physical cores on this machine; measured efficiency 77 % at W=16 against
+# 45 % at W=32 (docs/wp9-g11-plan.md §1.3). Peak RSS is 214-226 MB per record
+# at the N=8 / 20,000-slot base cell, so 16 workers is ~3.6 GB -- memory does
+# not bind here, only at N=32 or at soak horizons.
+_DEFAULT_WORKERS = 16
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float) -> dict:
@@ -91,6 +97,12 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float) -> dict
     }
 
 
+def _task(task: tuple) -> dict:
+    """Pool entry point. Top-level and taking one plain tuple, because
+    `spawn` has to pickle it (`regime_sweep.run_cells`)."""
+    return one(*task)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", default="PF,Reservation,TwoTier")
@@ -99,12 +111,24 @@ def main() -> int:
     ap.add_argument("--horizon", type=int, default=40_000)   # 10 s at mu=2
     ap.add_argument("--load-mult", type=float, default=1.0)
     ap.add_argument("--out", default="sweeps/phase2/core_fast.json")
+    ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
+                    help="0 or 1 runs serially -- the reference path the "
+                         "parallel one is checked byte-for-byte against")
     a = ap.parse_args()
 
     from regime_sweep import paired_seeds
     seeds = paired_seeds(a.seeds)
-    rows = [one(arm, s, a.n_ues, a.horizon, a.load_mult)
-            for s in seeds for arm in a.arms.split(",")]
+    arms = a.arms.split(",")
+    # Task order is the serial order (seed-major, then arm) so that placing
+    # each result at its own index reproduces the serial `rows` list exactly.
+    # Submission order is longest-first inside run_cells; the two are
+    # independent because the index travels with the result.
+    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult)
+             for s in seeds for arm in arms]
+    rows: list[dict] = [None] * len(tasks)          # type: ignore[list-item]
+    for i, row in run_cells(_task, tasks, a.workers,
+                            cost=lambda t: arm_cost(t[0], t[2])):
+        rows[i] = row
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps({"config": vars(a), "rows": rows},
                                       indent=1, default=str))
