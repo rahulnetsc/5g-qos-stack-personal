@@ -1,0 +1,111 @@
+# Every published figure, with the artefact it came from and the statistic it
+# is, so `scripts/verify_claims.py` can re-derive it.
+#
+# THE CONVENTION: a figure in a document is quotable only if it appears here.
+# The rule this enforces is defects-log #22 -- a row that is never read back
+# against its source can contradict it indefinitely, and one did.
+#
+# `statistic` must be the one the prose means. The checker reports which
+# OTHER statistics would also have matched, and fails unless the declared one
+# does: G8's row mixed a single seed with a 3-seed mean and each figure
+# matched something, so "matches some estimator" is not a check.
+
+claims:
+
+  # --- THE FAILING CASE, KEPT ON PURPOSE ------------------------------------
+  # The pre-correction G8 row, as published in docs/phase2-results.md before
+  # 2026-09-04. It is retained as a claim so this checker demonstrably FAILS
+  # on the defect it was built for -- a guard whose failing case is not in its
+  # own suite is a guard nobody has seen fail.
+  - id: G8.M22.PRE_CORRECTION
+    doc: docs/phase2-results.md (superseded row)
+    text: "M22 starvation epochs: 0 on all arms at the core cell"
+    artefact: sweeps/phase2/core_mfbr.json
+    n: 3
+    horizon: 40000
+    field: G8_M22_epochs_prot
+    statistic: max          # "0 on all arms" is a claim about the worst row
+    value: 0
+    expect: fail            # documentation only; the checker does not read it
+
+  # --- verification-2026-09-04, the current figures --------------------------
+  - id: G8.M22.n10.reservation
+    doc: docs/verification-2026-09-04.md
+    text: "Reservation: M22 epochs on 7/10 seeds"
+    artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    n: 10
+    horizon: 40000
+    where: {arm: Reservation}
+    field: G8_M22_epochs_prot
+    statistic: count_nonzero
+    value: 7
+
+  - id: G8.M09.n10.twotier
+    doc: docs/verification-2026-09-04.md
+    text: "TwoTier: M09 below 0.90 on 3/10 seeds"
+    artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    n: 10
+    horizon: 40000
+    where: {arm: TwoTier}
+    field: G8_M09_worst_prot
+    statistic: count_lt
+    statistic_arg: 0.90
+    value: 3
+
+  - id: G1.M01.n10.twotier.median
+    doc: docs/verification-2026-09-04.md
+    text: "TwoTier M01 p98 protected, median 90.12 ms"
+    artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    n: 10
+    horizon: 40000
+    where: {arm: TwoTier}
+    field: G1_M01_p98_prot
+    statistic: median
+    value: 90.125
+    tolerance: 0.01
+
+  - id: G1.M01.n10.breaches
+    doc: docs/verification-2026-09-04.md
+    text: "0/10 breach the 100 ms bound on every arm"
+    artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    n: 10
+    horizon: 40000
+    field: G1_M01_p98_prot
+    statistic: count_gt
+    statistic_arg: 100.0
+    value: 0
+
+  - id: G3.M20.n10.breaches
+    doc: docs/verification-2026-09-04.md
+    text: "0/10 over the 500 ms bound on every arm"
+    artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    n: 10
+    horizon: 40000
+    field: G3_M20_prot_ms
+    statistic: count_gt
+    statistic_arg: 500.0
+    value: 0
+
+  - id: G5.M05.n10.reservation
+    doc: docs/verification-2026-09-04.md
+    text: "Reservation fails the 0.99 completeness bar on 7/10 seeds"
+    artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    n: 10
+    horizon: 40000
+    where: {arm: Reservation}
+    field: G5_M05_prot
+    statistic: count_lt
+    statistic_arg: 0.99
+    value: 7
+
+  - id: G10.admissible.PF
+    doc: docs/verification-2026-09-04.md
+    text: "PF passes 10/10 seeds at N=8"
+    artefact: sweeps/verification-2026-09-04/g10_rows.csv
+    n: 10
+    horizon: 20000
+    where: {scheduler: PF, n_ues: 8}
+    field: M08.fraction
+    statistic: count_lt
+    statistic_arg: 0.95
+    value: 0

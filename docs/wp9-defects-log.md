@@ -697,6 +697,29 @@ mean 0.9654, the checker reports **which** matches rather than accepting the
 first that does — a checker that accepts any estimator would have passed this
 row unchanged.
 
-**Not built here.** It is a new instrument, it belongs with a decision about
-the citation convention, and building it inside a verification pass would
-make the pass's own numbers its first and only test case.
+**BUILT 2026-09-05** — `scripts/verify_claims.py` + `config/published_claims.yml`,
+after the verification pass closed, so the pass's own numbers are not its
+only test case.
+
+**Its failing case is kept as a claim, and it demonstrates why the estimator
+constraint is the whole design.** The pre-correction G8 row is entry
+`G8.M22.PRE_CORRECTION`, and the checker reports:
+
+```
+FAIL   G8.M22.PRE_CORRECTION   max=2 quoted=0  (9 values, core_mfbr.json)
+       but these DO match the quoted value: median, min
+       -- the figure is a different statistic from the one declared
+```
+
+**The protected-fleet M22 values across the three seeds are `[0, 0, 2]`.** The
+claim *"0 on all arms"* is a claim about the **max**, which is 2 — but the
+**median and the min are both 0**. A checker that accepted "some estimator
+matches" would have **passed the exact row it was built to catch**. That is
+why it reports which estimators match and fails unless the declared one does,
+and why `sim/tests/test_verify_claims.py` pins that behaviour rather than
+only pinning the pass/fail.
+
+The checker also refuses an empty selection, a missing artefact and an
+unknown statistic, and its statistic vocabulary is a small named table rather
+than an expression evaluator — a checker that can compute anything can match
+anything, and stops being a check.

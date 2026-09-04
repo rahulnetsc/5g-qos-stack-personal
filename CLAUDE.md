@@ -15,6 +15,7 @@ uv run python scripts/regression_corpus.py --capture # re-baseline (see rules be
 uv run python scripts/scheduler_study.py         # the published studies 1-3
 uv run python scripts/parallel_audit.py --check  # no runner ships serial
 uv run python scripts/verify_parallel.py         # serial == parallel, per runner
+uv run python scripts/verify_claims.py --check   # published figures vs their artefacts
 ```
 
 Everything runs under `uv run`. There is no `pip install -e .` step and no
