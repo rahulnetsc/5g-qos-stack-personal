@@ -1,0 +1,36 @@
+WP9 stage-1 gate -- verdicts (rule as committed, pre-stage-1)
+
+QUALIFIES  n_ues              score=     inf
+            best: M07.met at n_ues=24 (PF vs TwoTier) mean_d=-5 sd=0 es=inf CI=[-5, -5] n=10
+QUALIFIES  load_mult          score=     inf
+            best: M07.met at load_mult=1.5 (PF vs TwoTier) mean_d=-5 sd=0 es=inf CI=[-5, -5] n=10
+QUALIFIES  shared_lcg         score=     inf
+            best: M07.met at shared_lcg=True (PF vs TwoTier) mean_d=3 sd=0 es=inf CI=[3, 3] n=10
+QUALIFIES  k2_slots           score=     inf
+            best: M07.met at k2_slots=1 (PF vs TwoTier) mean_d=3 sd=0 es=inf CI=[3, 3] n=10
+QUALIFIES  min_rb             score= 152.579
+            best: M08.fraction at min_rb=1 (PF vs Reservation) mean_d=0.9618 sd=0.006304 es=152.579 CI=[0.9581, 0.9652] n=10
+QUALIFIES  sr_period_slots    score= 152.579
+            best: M08.fraction at sr_period_slots=1 (PF vs Reservation) mean_d=0.9618 sd=0.006304 es=152.579 CI=[0.9581, 0.9652] n=10
+  --       inf_scenario       score=   5.494
+QUALIFIES  snr_spread_db      score=   4.689
+            best: M02 at snr_spread_db=12.0 (PF vs TwoTier) mean_d=0.01726 sd=0.00368 es=4.689 CI=[0.01509, 0.01934] n=10
+QUALIFIES  pdb_ms             score=   2.927
+            best: M09.worst at pdb_ms=1000.0 (PF vs TwoTier) mean_d=0.1979 sd=0.06761 es=2.927 CI=[0.1503, 0.2313] n=10
+QUALIFIES  duty_cycle         score=   2.663
+            best: M09.worst at duty_cycle=0.1 (PF vs Reservation) mean_d=0.08673 sd=0.03257 es=2.663 CI=[0.06807, 0.1055] n=10
+QUALIFIES  bg                 score=   2.648
+            best: M09.worst at bg=True (PF vs TwoTier) mean_d=0.1876 sd=0.07084 es=2.648 CI=[0.1377, 0.2231] n=10
+QUALIFIES  mfbr_multiple      score=   1.778
+            best: M02 at mfbr_multiple=2.0 (PF vs Reservation) mean_d=-0.01346 sd=0.007573 es=1.778 CI=[-0.01763, -0.008885] n=10
+
+promoted to stage 2: ['n_ues', 'load_mult', 'shared_lcg']
+dropped: min_rb             score= 152.579  not promoted: only one excursion axis fits the stage-2 budget
+dropped: mfbr_multiple      score=   1.778  not promoted: only one excursion axis fits the stage-2 budget
+dropped: duty_cycle         score=   2.663  not promoted: only one excursion axis fits the stage-2 budget
+dropped: snr_spread_db      score=   4.689  not promoted: only one excursion axis fits the stage-2 budget
+dropped: pdb_ms             score=   2.927  not promoted: only one excursion axis fits the stage-2 budget
+dropped: sr_period_slots    score= 152.579  not promoted: only one excursion axis fits the stage-2 budget
+dropped: k2_slots           score=     inf  not promoted: only one excursion axis fits the stage-2 budget
+dropped: inf_scenario       score=   5.494  did not pass the gate
+dropped: bg                 score=   2.648  not promoted: only one excursion axis fits the stage-2 budget

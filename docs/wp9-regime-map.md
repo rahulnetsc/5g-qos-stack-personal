@@ -106,6 +106,32 @@ ran that combination.
 
 ### 0.3 The boundary is located at the deployed `min_rb` only
 
+> **`min_rb`'s exclusion is CONFIRMED as a cap decision, 2026-09-04 — and it
+> was missing from the record that documents it.** `wp9_gate.select_for_stage_2`
+> built its `dropped` list from a slice of the *unsorted* excursion list
+> indexed by the *count* of promoted axes, so it discarded the first element
+> whether or not that was the promoted one. **Both committed verdicts list 8
+> dropped axes where the accounting requires 9, and the missing axis in both
+> is `min_rb`** — under a docstring reading "Nothing is silently omitted."
+>
+> Regenerated from the committed `stage1_rows.csv` with the fix
+> (`scripts/regen_gate_verdict.py`): **every score and the promoted set
+> reproduce exactly**, so the decision was never in doubt — only its record.
+> `min_rb` qualified at **152.579** and was dropped *"not promoted: only one
+> excursion axis fits the stage-2 budget"*, which is what this section says.
+> **The claim stands; the evidence for it now exists.**
+>
+> **One thing the regeneration exposed that this section should carry.** The
+> gate ranks by `|mean delta| / sd`, so it is maximised by **saturation**
+> rather than by effect size: `min_rb=1` and `sr_period_slots=1` score an
+> identical 152.579 because both pin Reservation's worst-flow GFBR fraction
+> at exactly **0.0000 on all 10 seeds** (PF sits at 0.9618 in every cell of
+> every axis). The `inf` scores above them are sd exactly zero on `M07.met`.
+> So *"it separated the arms strongly"* is literally what the score measures
+> and is accurate — but it is **not** a statement that the axis has a large
+> effect on the boundary, which §0.3 already records as untested. This is the
+> mechanism behind §0.4's observation that 11 of 12 axes cleared the bar.
+
 `min_rb` was held at its base 5 throughout stage 2. So §1.1's *sharper*
 claim — that `min_rb` has no effect on the boundary below ≈ 7, because the
 PDCCH bound (32/4 = 8) binds before the follower-budget bound (55/`min_rb`)

@@ -252,12 +252,35 @@ def select_for_stage_2(verdicts: list[AxisVerdict]) -> dict[str, Any]:
         [v for v in excursions if v.qualifies], key=lambda v: -v.score
     )
     promoted = [v.axis for v in core] + [v.axis for v in qualifying[:1]]
+    # EVERY excursion that is not promoted, with no slice. The slice that
+    # used to stand here -- `excursions[len(qualifying[:1]):]` -- was taken on
+    # the UNSORTED list by the COUNT of promoted axes, so it discarded
+    # `excursions[0]` whether or not that element was the promoted one. The
+    # `not in promoted` filter below is what does the actual exclusion, and
+    # it is sufficient on its own.
+    #
+    # IT HAPPENED, in both committed verdicts. `gate_verdict.txt` and
+    # `gate_verdict_corrected.txt` each list 8 dropped axes where the
+    # accounting requires 9, and the missing one in both is `min_rb` --
+    # score 152.579, among the highest non-`inf` in the grid, and the axis
+    # `docs/wp9-regime-map.md` §0.3 records as dropped by the stage-2 cap.
+    # The decision was real; the committed record of it was not complete.
     dropped = [
         {"axis": v.axis, "qualifies": v.qualifies, "score": v.score,
          "reason": ("not promoted: only one excursion axis fits the stage-2 "
                     "budget" if v.qualifies else "did not pass the gate")}
-        for v in excursions[len(qualifying[:1]):] if v.axis not in promoted
+        for v in excursions if v.axis not in promoted
     ]
+    # THE ACCOUNTING, ASSERTED RATHER THAN DESCRIBED. The docstring's claim
+    # that nothing is silently omitted is now a check that fails loudly if it
+    # stops being true -- which is the only form of that claim worth making.
+    accounted = set(promoted[:MAX_AXES_INTO_STAGE_2]) | {d["axis"] for d in dropped}
+    missing = [v.axis for v in verdicts if v.axis not in accounted]
+    if missing:
+        raise AssertionError(
+            f"axes neither promoted nor dropped: {missing}. Every axis must "
+            f"appear in exactly one of the two lists, or the verdict is not "
+            f"a record of the decision it claims to be.")
     return {
         "promoted": promoted[:MAX_AXES_INTO_STAGE_2],
         "qualifying_excursions": [
