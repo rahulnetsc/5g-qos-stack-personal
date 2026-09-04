@@ -42,7 +42,7 @@ results table is indistinguishable from one that failed to produce a number.
 | **G1** | **measured** | M01 p98 **protected fleet**: PF 24.83 / Reservation 24.42 / TwoTier **94.51 ms** against a 100 ms bound — all pass, 3.8× arm separation. **The all-flow reading is saturated and must not be quoted**: ~300 ms on every arm, won by the 5QI-9 filler, pinned at that filler's own PDB, three arms agreeing to 0.25 ms. |
 | **G2** | **NOT MEASURED — out of scope** | Two independent blockers. TB-size quantisation is planned and unbuilt. **And separately** the E-STOP flow is **DL** (`sim/fleet.py:179`) while G2's named failure mode — the BSR/SR desync — is an **uplink** mechanism, so the flow cannot reach the failure even once the mechanism exists. Building only the first would not produce a scoreable G2. |
 | **G3** | **measured** | M20 protected-fleet liveness gap, n=40: PF **+0.44 % PASS**, Reservation **+1.84 % PASS**, TwoTier **+21.34 %** [−2.81, +50.02] **INCONCLUSIVE**. Unblocked by the M03 slow-vs-degraded fix (`2a4b382`), which previously silenced real breaches. |
-| **G4** | **pending** | run in flight |
+| **G4** | **measured** | Post-silence p98 on the T1 telemetry instrument, 10 paired seeds per cell, all nine cells at **n=10** — no seeds silently dropped. **duty 0.1:** PF 106.56 / Reservation 117.50 / TwoTier 112.42 ms; Reservation−PF **+10.94** [+5.93, +16.20] and TwoTier−PF **+5.86** [+4.50, +7.25], both intervals excluding zero. **duty 0.5 and 1.0:** every arm difference's interval **contains zero** (TwoTier−PF −6.48 [−22.14, +7.91] and −6.20 [−25.19, +10.72]) — no arm separation. So the only separation G4 shows is at duty 0.1, where PF is fastest to resume. |
 | **G5** | **measured** | M05 completeness: PF FAIL 3/40, Reservation FAIL 30/40, TwoTier FAIL 34/40 under 0.99. M06 frame age: PF and Reservation PASS 0/40, **TwoTier FAIL 14/40** over 67 ms. |
 | **G6** | **measured** | Clause 1 within-bound and clause 2 shift ≤ +20 %, n=40 paired, protected fleet. **PF and Reservation byte-identical to the published values** — the control holds, so TwoTier's movement is attributable. TwoTier **worse**: M03 2→4/40, M06 12→14/40, M02 clause 2 PASS→**FAIL**. **And G6 remains unscoreable as written** — see specification findings. |
 | **G7** | **NOT MEASURED — structurally out** | No MFBR *enforcement* anywhere in `sim/`. Containment is observable; **clipping is not**, and clipping is half the pass criterion. |
@@ -71,6 +71,20 @@ scored as a liveness breach. The scripted-silence subtraction removed that.
 ---
 
 ## Open threads
+
+### G4's separation exists only at duty 0.1 — and that is the cell M03's cadence caveat governs
+
+At duty 0.1 the telemetry source's configured period is **1,000 ms**, above
+G3's 500 ms bound, which is exactly the condition `Scorecard._m03`'s
+CADENCE-NOT-LIVENESS caveat fires on. G4's own statistic is post-silence
+latency rather than a liveness gap, so the caveat does not apply to it —
+but the two describe the same cell, and a reader moving between them should
+know that **the one cell where G4 separates the arms is the one where G3's
+liveness reading is not scoreable against its bound.**
+
+Recorded as an adjacency, not a defect. Nothing here is wrong; the point is
+that a G4 claim at duty 0.1 and a G3 claim at duty 0.1 rest on different
+footings.
 
 ### The camera UL loss at N=8 — the only unexplained thing bounding G10
 
