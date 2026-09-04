@@ -121,7 +121,62 @@ conditions exactly.** The hardware team is being told about their own
 product's join path — which every deployment exercises on every attach and
 recovery — not about a limitation of this model.
 
-### Tier-1's LP is degenerate and its SCA loop does not converge — a fidelity finding, not a performance one
+### Tier-1's SCA loop has NO FIXED POINT, and where it stops decides the allocation
+
+**This supersedes the framing below it.** The convergence half was recorded
+first as an adjacency to the degeneracy finding; investigated, it is the
+larger of the two and it bears on G3.
+
+**It is not converging slowly — it is not converging.** All 50 Tier-1 solves
+of one run, at the shipped cap and at a cap 133× larger: **9 converge (median
+56 iterations), 41 hit the cap, identically at both caps**, and the best
+`rel_change` those 41 ever reach is **~0.15** against a 1e-6 tolerance.
+**Not one of the 41 has its `rel_change` minimum at the end**, so the series
+is not decaying. One capped solve's last five values are
+`0.085069, 0.07840, 0.085069, 0.07840, 0.085069` — **a period-2 limit
+cycle.** The SCA iteration damps toward a vertex the degenerate LP selects by
+solver path; when that selection alternates, the damped average has nothing
+to settle on.
+
+**So the cap is not truncating a convergence. It is picking a point on a
+cycle** — and the point it picks is a real choice: moving the cap from 150 to
+**151** changes delivered bytes on 7 of 32 flows and moves **11 of 20 panel
+metrics**, including M01 p98 **+13.96 %**, M06 p95 **+10.37 %** and M14
+**−12.50 %**.
+
+**THE SCALE THAT DECIDES WHETHER THAT MATTERS IS THE ARM DIFFERENCE.**
+TwoTier@150 vs TwoTier@151, against TwoTier vs PF, medians over 5 paired
+seeds:
+
+| metric | cap-induced | TwoTier − PF | **cap / arm** |
+|---|---|---|---|
+| M09 worst Jain | 5.0e-05 | 0.25 | 0.02 % |
+| M01 p98 | 5.34 ms | 59.44 ms | 8.98 % |
+| M15 jitter | 7.63 ms | 65.44 ms | 11.66 % |
+| M06 p95 frame age | 12.48 ms | 63.90 ms | 19.53 % |
+| **M03 max gap** | **48.75 ms** | **55.75 ms** | **87.44 %** |
+| **M14 availability** | **0.0612** | **0.0259** | **236.36 %** |
+
+**G1 (M01), G8 (M09) and jitter are not threatened** — their arm separations
+are 5–5,000× the cap noise. **G3 is.** Its M20 liveness gap is the same
+statistic as M03, and this is a **within-seed** variance source, so it is
+**invisible to every bootstrap interval in this project**, all of which
+resample seeds. G3's TwoTier reading (**+21.34 % [−2.81, +50.02]
+INCONCLUSIVE**) therefore rests on an instrument whose within-seed movement
+is ~87 % of the difference being measured. **The INCONCLUSIVE verdict
+stands; what changes is that adding seeds will not resolve it.**
+
+**Is the deployed C exposed? Unknown, and stated as a hypothesis.** The
+degeneracy is a property of the model, and the cap, damping and tolerance are
+all ground truth, so the mechanism is present in the C — but GLPK's vertex
+selection is not HiGHS's and this is not testable from here. **It is cheap to
+answer on the hardware side**: log `rel_change` per SCA iteration and count
+how many solves reach `IA_P5G_TIER1_SCA_TOL` before the cap. Owned by whoever
+owns the deployed scheduler.
+
+Evidence and reproduction: `sweeps/phase2/sca-convergence-2026-09-04/`.
+
+### Tier-1's LP is degenerate — the mechanism underneath the above
 
 Found while profiling, and it changes what a TwoTier number rests on. Over
 one real run's **2,437** Tier-1 LPs, solving each twice — through

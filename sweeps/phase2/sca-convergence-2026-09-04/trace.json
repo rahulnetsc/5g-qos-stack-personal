@@ -1,0 +1,194 @@
+{
+  "trace": {
+    "shipped_cap_150_summary": {
+      "solves": 50,
+      "converged": 9,
+      "hit_cap": 41,
+      "iters_converged_median": 56.0,
+      "capped_with_min_at_end": 0,
+      "capped_min_rel_change_median": 0.14806400900950148,
+      "capped_distinct_vertex_sums_median": 2.0
+    },
+    "shipped_cap_150": [
+      {
+        "iterations": 150,
+        "rel_change_first5": [
+          675613.34,
+          1.41851647,
+          0.59185775,
+          0.32786784,
+          0.2211967
+        ],
+        "rel_change_last5": [
+          0.085069,
+          0.07839963,
+          0.085069,
+          0.07839963,
+          0.085069
+        ],
+        "min_rel_change": 0.072032928,
+        "min_at_iteration": 13,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 2
+      },
+      {
+        "iterations": 150,
+        "rel_change_first5": [
+          714717.057704,
+          2.46348862,
+          0.64338489,
+          0.35117367,
+          0.20792215
+        ],
+        "rel_change_last5": [
+          0.07622435,
+          0.06601113,
+          0.18210188,
+          0.07864097,
+          0.1508289
+        ],
+        "min_rel_change": 0.0659665146,
+        "min_at_iteration": 43,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 1
+      },
+      {
+        "iterations": 150,
+        "rel_change_first5": [
+          743867.0456,
+          1.11470104,
+          0.46387879,
+          0.288417,
+          0.17908301
+        ],
+        "rel_change_last5": [
+          0.0036768,
+          0.00295229,
+          0.00236883,
+          0.00189956,
+          0.08101085
+        ],
+        "min_rel_change": 0.0016420094,
+        "min_at_iteration": 29,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 2
+      },
+      {
+        "iterations": 150,
+        "rel_change_first5": [
+          806867.45628697,
+          4.02913698,
+          0.78685306,
+          0.64190325,
+          0.3122949
+        ],
+        "rel_change_last5": [
+          0.24337363,
+          0.11568311,
+          0.10465308,
+          0.25036948,
+          0.1148319
+        ],
+        "min_rel_change": 0.1044423353,
+        "min_at_iteration": 16,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 2
+      }
+    ],
+    "big_cap_summary": {
+      "solves": 50,
+      "converged": 9,
+      "hit_cap": 41,
+      "iters_converged_median": 56.0,
+      "capped_with_min_at_end": 0,
+      "capped_min_rel_change_median": 0.14980761863936914,
+      "capped_distinct_vertex_sums_median": 2.0
+    },
+    "big_cap": [
+      {
+        "iterations": 20000,
+        "rel_change_first5": [
+          675613.34,
+          1.41851647,
+          0.59185775,
+          0.32786784,
+          0.2211967
+        ],
+        "rel_change_last5": [
+          0.085069,
+          0.07839963,
+          0.085069,
+          0.07839963,
+          0.085069
+        ],
+        "min_rel_change": 0.072032928,
+        "min_at_iteration": 13,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 2
+      },
+      {
+        "iterations": 20000,
+        "rel_change_first5": [
+          714717.057704,
+          2.46348862,
+          0.64338489,
+          0.35117367,
+          0.20792215
+        ],
+        "rel_change_last5": [
+          0.07172734,
+          0.1680533,
+          0.08169696,
+          0.07117212,
+          0.16942543
+        ],
+        "min_rel_change": 0.0659665146,
+        "min_at_iteration": 43,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 1
+      },
+      {
+        "iterations": 20000,
+        "rel_change_first5": [
+          810610.9944632,
+          1.19858638,
+          0.47645392,
+          0.27857511,
+          0.19665375
+        ],
+        "rel_change_last5": [
+          0.01863108,
+          0.01518783,
+          0.08891779,
+          0.02766159,
+          0.02275882
+        ],
+        "min_rel_change": 0.014004405,
+        "min_at_iteration": 22,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 2
+      },
+      {
+        "iterations": 20000,
+        "rel_change_first5": [
+          775365.33799556,
+          3.71059247,
+          0.7610045,
+          0.62009377,
+          0.303603
+        ],
+        "rel_change_last5": [
+          0.10879542,
+          0.09766145,
+          0.24352087,
+          0.10879542,
+          0.09766145
+        ],
+        "min_rel_change": 0.0926439998,
+        "min_at_iteration": 11,
+        "min_is_at_the_end": false,
+        "distinct_vertex_sums": 2
+      }
+    ]
+  }
+}
