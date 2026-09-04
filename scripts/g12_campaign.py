@@ -50,7 +50,8 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import arm_cost, paired_seeds, run_cells  # noqa: E402
+from regime_sweep import (RunLedger, arm_cost,  # noqa: E402
+                          paired_seeds, run_cells)
 from scheduler import load_two_tier  # noqa: E402
 from scheduler.reservation import Reservation  # noqa: E402
 from sim.baselines.pf import ProportionalFair  # noqa: E402
@@ -233,6 +234,41 @@ def _task(task: tuple) -> dict[str, Any]:
     comp, n, arm_name, seed, ramp, perm_seed = task
     return run_ramp(comp, n, arm_name, _arms()[arm_name], seed, ramp,
                     perm_seed=perm_seed)
+
+
+def _encode(ramped: dict[str, Any]) -> dict[str, Any]:
+    """`run_ramp`'s return, as plain JSON, for the resume ledger.
+
+    The RunRecords are already `_project`ed -- GBR flows only, every array
+    dropped -- so `to_dict()` is a few KB, not the ~18 MB a live record is.
+    `census` is keyed by 5QI int and JSON has no int keys, so the decode side
+    puts them back rather than leaving a dict whose keys changed type across
+    a resume."""
+    return {"records": [r.to_dict() for r in ramped["records"]],
+            "per_point": ramped["per_point"],
+            "class_map": ramped["class_map"],
+            "census": {str(k): v for k, v in (ramped["census"] or {}).items()}}
+
+
+def _decode(blob: dict[str, Any]) -> dict[str, Any]:
+    """EVERY 5QI-KEYED DICT, not just the top-level one.
+
+    JSON has no integer keys, so a dict keyed by 5QI comes back keyed by
+    string. The first version of this restored `census` and missed
+    `per_point[*]["worst_by_class"]` one level down -- and the resumed run
+    then scored `never_failed` over string keys and produced an order of
+    length 1 where the fresh run gave 2. Caught by the kill-and-resume
+    identity check, which is the only thing that could have: both runs exit
+    0 and both artefacts look complete.
+    """
+    per_point = [{**pt,
+                  "worst_by_class": {int(k): v for k, v
+                                     in (pt.get("worst_by_class") or {}).items()}}
+                 for pt in blob["per_point"]]
+    return {"records": [RunRecord.from_dict(d) for d in blob["records"]],
+            "per_point": per_point,
+            "class_map": blob["class_map"],
+            "census": {int(k): v for k, v in (blob["census"] or {}).items()}}
 
 
 def _ramp_tasks(cells, arms, seeds, ramp, perm_seed=None) -> list[tuple]:
@@ -458,10 +494,42 @@ def main(argv: list[str]) -> int:
     # per-cell pool would drain to a single straggler between cells -- the
     # tail the longest-first ordering exists to avoid.
     grid_tasks = _ramp_tasks(kept, arm_names, seeds, ramp)
+
+    # BANKED AS EACH RAMP COMPLETES. G12 is the campaign that lost a
+    # completed cell to a timeout because it persisted nothing until its
+    # final line, and parallelising the grid into ONE pool made that worse
+    # before this: results now arrive out of order, so the per-(cell, arm)
+    # partial writes below cannot happen until the whole grid is done. The
+    # ledger closes the window the pool opened -- one line per completed
+    # ramp, fsynced, re-entered on resume.
+    ledger = RunLedger(Path(args.out).with_suffix(".runs.jsonl"),
+                       {"ramp": list(ramp), "seeds": n_seeds,
+                        "horizon": HORIZON_SLOTS, "cells": [list(c) for c in kept],
+                        "arms": arm_names},
+                       ("cell", "arm", "seed", "perm"))
+    banked = {(r["cell"], r["arm"], r["seed"], r["perm"]): _decode(r["ramped"])
+              for r in ledger.banked()}
+
+    def _gk(t):
+        comp, n, arm_name, seed, _, perm = t
+        return (f"{comp}_n{n}", arm_name, seed, perm)
+
     grid: list[dict | None] = [None] * len(grid_tasks)
-    for i, r in run_cells(_task, grid_tasks, args.workers, cost=_ramp_cost):
+    for i, t in enumerate(grid_tasks):
+        if _gk(t) in banked:
+            grid[i] = banked[_gk(t)]
+    todo = [(i, t) for i, t in enumerate(grid_tasks) if _gk(t) not in banked]
+    if banked:
+        print(f"  {ledger.summary()}; {len(todo)} ramps still to run",
+              flush=True)
+    idx_map = [i for i, _ in todo]
+    for j, r in run_cells(_task, [t for _, t in todo], args.workers,
+                          cost=_ramp_cost):
+        i = idx_map[j]
         grid[i] = r
-        comp, n, arm_name, seed, _, _ = grid_tasks[i]
+        comp, n, arm_name, seed, _, perm = grid_tasks[i]
+        ledger.bank({"cell": f"{comp}_n{n}", "arm": arm_name, "seed": seed,
+                     "perm": perm, "ramped": _encode(r)})
         print(f"    ... {comp}_n{n}/{arm_name}/seed{seed} ran", flush=True)
 
     per_cell = len(arm_names) * len(seeds)
@@ -516,10 +584,22 @@ def main(argv: list[str]) -> int:
                       for arm_name in arm_names
                       for pseed in PERMUTATION_SEEDS
                       for seed in perm_seeds]
+        perm_banked = {(r["cell"], r["arm"], r["seed"], r["perm"]):
+                       _decode(r["ramped"]) for r in ledger.banked()}
         perm_res: list[dict | None] = [None] * len(perm_tasks)
-        for i, r in run_cells(_task, perm_tasks, args.workers,
+        for i, t in enumerate(perm_tasks):
+            if _gk(t) in perm_banked:
+                perm_res[i] = perm_banked[_gk(t)]
+        p_todo = [(i, t) for i, t in enumerate(perm_tasks)
+                  if _gk(t) not in perm_banked]
+        p_idx = [i for i, _ in p_todo]
+        for j, r in run_cells(_task, [t for _, t in p_todo], args.workers,
                               cost=_ramp_cost):
+            i = p_idx[j]
             perm_res[i] = r
+            comp_, n_, arm_, seed_, _, perm_ = perm_tasks[i]
+            ledger.bank({"cell": f"{comp_}_n{n_}", "arm": arm_,
+                         "seed": seed_, "perm": perm_, "ramped": _encode(r)})
         for ai, arm_name in enumerate(arm_names):
             by_perm = {}
             for pi, p in enumerate(PERMUTATION_SEEDS):

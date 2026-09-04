@@ -14,7 +14,7 @@ other TwoTier bound verdicts. This asks whether it moves the headline.
 Emits stage2_rows-compatible columns so g10_admissible.py scores it unchanged.
 """
 from __future__ import annotations
-import argparse, csv, multiprocessing as mp, sys, time
+import argparse, csv, sys, time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -23,7 +23,7 @@ from sim.parametric import sweep_scenario                    # noqa: E402
 from sim.run_record import RunRecord                         # noqa: E402
 from sim.scorecard import Population, Scorecard              # noqa: E402
 from g11_campaign import _arm                                # noqa: E402
-from regime_sweep import check_for_orphans, paired_seeds     # noqa: E402
+from regime_sweep import RunLedger, arm_cost, paired_seeds, run_cells  # noqa: E402
 
 N_UES = (2, 4, 8, 16, 24, 32)
 
@@ -54,23 +54,35 @@ def main() -> int:
     seeds = paired_seeds(a.seeds)
     tasks = [(arm, s, n, a.horizon)
              for arm in ("PF", "Reservation", "TwoTier") for n in N_UES for s in seeds]
-    # LONGEST-PROCESSING-TIME FIRST, and chunksize=1 below. Measured cost
-    # rises with n_ues and with arm (TwoTier ~2.5x PF at equal N), and
-    # pool.map's DEFAULT chunking hands each worker a CONTIGUOUS block of a
-    # cost-ordered list -- so one worker got the N=32 TwoTier cells and
-    # another the N=2 PF ones. Measured spread on the first run: worker CPU
-    # 7:55 down to 4:35, a 1.7x imbalance that made an 8.0 min run out of a
-    # ~5 min serial-sum/workers estimate.
-    _COST = {"PF": 1.0, "Reservation": 1.4, "TwoTier": 2.5}
-    tasks.sort(key=lambda t: -(_COST[t[0]] * t[2]))
+    # run_cells carries what this script had to learn on its own: the
+    # longest-first submission with chunksize=1 (pool.map's default chunking
+    # handed one worker every N=32 TwoTier cell and another every N=2 PF one,
+    # worker CPU 7:55 against 4:35), plus thread pinning and the pre-launch
+    # orphan check. The cost weight moves to regime_sweep.arm_cost.
     print(f"{len(tasks)} runs: 3 arms x {len(N_UES)} fleet sizes x {a.seeds} seeds, "
           f"load 1.0, horizon {a.horizon}", flush=True)
     t0 = time.time()
-    # Refuse to launch beside an orphaned pool: its workers cannot be
-    # found by script name and its memory is charged to this run.
-    check_for_orphans()
-    with mp.get_context("spawn").Pool(a.workers) as pool:
-        rows = pool.map(one, tasks, chunksize=1)
+    # BANKED PER RUN. This produced G10's re-measured admissible fleet and
+    # wrote its CSV only at the end -- one kill from losing the grid.
+    ledger = RunLedger(Path(a.out).with_suffix(".runs.jsonl"),
+                       {"horizon": a.horizon, "seeds": a.seeds,
+                        "n_ues": list(N_UES)},
+                       ("scheduler", "seed", "n_ues"))
+    banked = {(r["scheduler"], r["seed"], r["n_ues"]): r
+              for r in ledger.banked()}
+    todo = [(i, t) for i, t in enumerate(tasks)
+            if (t[0], t[1], t[2]) not in banked]
+    if banked:
+        print(f"  {ledger.summary()}; {len(todo)} still to run", flush=True)
+    rows: list = [None] * len(tasks)
+    for i, t in enumerate(tasks):
+        if (t[0], t[1], t[2]) in banked:
+            rows[i] = banked[(t[0], t[1], t[2])]
+    idx_map = [i for i, _ in todo]
+    for j, row in run_cells(one, [t for _, t in todo], a.workers,
+                            cost=lambda t: arm_cost(t[0], t[2])):
+        rows[idx_map[j]] = row
+        ledger.bank(row)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     with open(a.out, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))

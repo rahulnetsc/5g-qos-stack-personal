@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import arm_cost, run_cells               # noqa: E402
+from regime_sweep import RunLedger, arm_cost, run_cells    # noqa: E402
 from sim.driver import run as driver_run                   # noqa: E402
 from sim.parametric import sweep_scenario                  # noqa: E402
 from sim.run_record import RunRecord                       # noqa: E402
@@ -125,10 +125,30 @@ def main() -> int:
     # independent because the index travels with the result.
     tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult)
              for s in seeds for arm in arms]
+
+    # BANKED AS EACH RUN COMPLETES, not written once at the end. This runner
+    # produced G1/G3/G5/G8 and had the write-at-the-end shape G12 lost a cell
+    # to (docs/phase2-results.md). A resume re-enters the banked rows rather
+    # than publishing only this invocation's.
+    ledger = RunLedger(Path(a.out).with_suffix(".runs.jsonl"),
+                       {"n_ues": a.n_ues, "horizon": a.horizon,
+                        "load_mult": a.load_mult, "arms": arms},
+                       ("arm", "seed"))
+    done = ledger.done_keys()
+    by_key = {(r["arm"], r["seed"]): r for r in ledger.banked()}
+    todo = [(i, t) for i, t in enumerate(tasks) if (t[0], t[1]) not in done]
+    if by_key:
+        print(f"  {ledger.summary()}; {len(todo)} still to run", flush=True)
+
     rows: list[dict] = [None] * len(tasks)          # type: ignore[list-item]
-    for i, row in run_cells(_task, tasks, a.workers,
+    for i, t in enumerate(tasks):
+        if (t[0], t[1]) in by_key:
+            rows[i] = by_key[(t[0], t[1])]
+    idx_map = [i for i, _ in todo]
+    for j, row in run_cells(_task, [t for _, t in todo], a.workers,
                             cost=lambda t: arm_cost(t[0], t[2])):
-        rows[i] = row
+        rows[idx_map[j]] = row
+        ledger.bank(row)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps({"config": vars(a), "rows": rows},
                                       indent=1, default=str))

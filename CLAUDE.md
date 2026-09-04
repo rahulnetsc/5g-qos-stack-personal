@@ -198,6 +198,47 @@ loudly wrong), and mirror `roundf()` (half-away-from-zero) explicitly
 instead of Python's `round()` (half-to-even) — they disagree at exact
 `.5`. `sim/power.py` is the worked example for all three.
 
+**BANK EACH UNIT OF WORK AS IT COMPLETES — a campaign that writes its
+artefact only at the end loses everything to one kill.** G12 demonstrated
+it: a 40-minute run timed out inside its second cell, wrote nothing, and
+Phase 2 has one cell of G12 because of it. The defect was then found LATENT
+in `phase2_core.py` (G1/G3/G5/G8), `g10_rerun.py` (G10) and
+`blackout_frequency.py` — each one kill, timeout or OOM from discarding a
+completed multi-hour grid, and this machine's history includes all three.
+
+`regime_sweep.RunLedger` is `g11_campaign.py`'s pattern extracted rather
+than copied a fifth time: one fsynced JSONL line per completed unit, a
+`done_keys()` a caller subtracts from its task list, and `banked()` rows
+re-entered into the published result. Three things it exists to get right,
+all learned by getting them wrong:
+
+- **The ledger key carries the run-defining CONFIG**, or a `--smoke`
+  invocation sharing the production `--out` displaces real records. G11 hit
+  exactly this at 400,000 slots against 7,200,000.
+- **Banked runs must RE-ENTER the result.** G11's first version published
+  only the resumed invocation's own runs — exit 0, a short artefact, over a
+  self-selected subset of a within-seed paired design.
+- **`bank()` refuses a payload that is not JSON; it does NOT pass
+  `default=`.** The first version did, so a payload holding `RunRecord`s was
+  written as their `repr()` — valid JSON, silently wrong — and the resumed
+  run handed strings to a scorer. A serialization fallback converts an
+  unserializable payload into a corrupt one, which is defects-log #1's
+  boundary-coercion failure with a friendlier face.
+
+**AND THE ACCEPTANCE TEST IS KILL-AND-RESUME IDENTITY, not "it wrote a
+file".** Kill a run mid-grid, resume it, and require the artefact to equal an
+uninterrupted one's. Nothing weaker finds the real failures: both bugs above
+produced runs that exited 0 with artefacts that looked complete. That check
+also caught a second int-key coercion — JSON has no integer keys, so a dict
+keyed by 5QI comes back keyed by string, and restoring only the top-level
+one left `per_point[*]["worst_by_class"]` as strings, which changed a scored
+order's length from 2 to 1.
+
+**Phase 4 launches from a detached shell** (`setsid` or `tmux`), outside
+Claude Code: tracked background tasks are SIGTERM'd on session compaction,
+and a multi-hour campaign must not die with a session. Claude monitors
+read-only, by PID.
+
 **PARALLEL BY DEFAULT — a runner that calls the driver in a loop uses
 `regime_sweep.run_cells`, and its serial path is the REFERENCE, not a
 fallback.** Parallelism landed once, at `scripts/wp9_sweep.py` (`0ec8ddb`),

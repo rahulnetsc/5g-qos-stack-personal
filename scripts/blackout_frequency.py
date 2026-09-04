@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import multiprocessing as mp
 import sys
 from pathlib import Path
 
@@ -31,7 +30,8 @@ from sim.driver import run as driver_run            # noqa: E402
 from sim.parametric import sweep_scenario           # noqa: E402
 from sim.run_record import RunRecord                # noqa: E402
 from g11_campaign import _arm                       # noqa: E402
-from regime_sweep import check_for_orphans, paired_seeds               # noqa: E402
+from regime_sweep import (RunLedger, arm_cost,  # noqa: E402
+                          paired_seeds, run_cells)
 
 
 def one(task):
@@ -73,18 +73,35 @@ def main() -> int:
              for n in [int(x) for x in a.n_ues.split(",")]
              for load in [float(x) for x in a.load.split(",")]
              for s in seeds]
-    tasks.sort(key=lambda t: -t[2])   # LPT: biggest fleets first
     print(f"{len(tasks)} runs: {a.arms} x N={a.n_ues} x load={a.load} "
           f"x {a.seeds} seeds, horizon {a.horizon}, mfbr_multiple={a.mfbr_multiple}", flush=True)
 
-    # Refuse to launch beside an orphaned pool: its workers cannot be
+    # BANKED PER RUN, and submitted longest-first by run_cells, which also
+    # pins worker threads and refuses to launch beside an orphaned pool.
+    # This wrote its JSON only at the end -- one kill from losing the grid.
+    ledger = RunLedger(Path(a.out).with_suffix(".runs.jsonl"),
+                       {"horizon": a.horizon, "mfbr_multiple": a.mfbr_multiple,
+                        "arms": a.arms, "n_ues": a.n_ues, "load": a.load,
+                        "seeds": a.seeds},
+                       ("arm", "seed", "n_ues", "load_mult"))
+    banked = {(r["arm"], r["seed"], r["n_ues"], r["load_mult"]): r
+              for r in ledger.banked()}
 
-    # found by script name and its memory is charged to this run.
+    def _k(t):
+        return (t[0], t[1], t[2], t[4])
 
-    check_for_orphans()
-
-    with mp.get_context("spawn").Pool(a.workers) as pool:
-        rows = pool.map(one, tasks, chunksize=1)
+    todo = [(i, t) for i, t in enumerate(tasks) if _k(t) not in banked]
+    if banked:
+        print(f"  {ledger.summary()}; {len(todo)} still to run", flush=True)
+    rows: list = [None] * len(tasks)
+    for i, t in enumerate(tasks):
+        if _k(t) in banked:
+            rows[i] = banked[_k(t)]
+    idx_map = [i for i, _ in todo]
+    for j, row in run_cells(one, [t for _, t in todo], a.workers,
+                            cost=lambda t: arm_cost(t[0], t[2])):
+        rows[idx_map[j]] = row
+        ledger.bank(row)
 
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps({"config": vars(a), "rows": rows},

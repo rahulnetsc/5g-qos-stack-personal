@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import csv
 import itertools
+import json
 import multiprocessing as mp
 import os
 from dataclasses import dataclass
@@ -497,6 +498,120 @@ def _run_one_indexed(packed: tuple) -> tuple[int, Any]:
     the pool so completion order and output order stay independent."""
     fn, idx, task = packed
     return idx, fn(task)
+
+
+# --- incremental banking ----------------------------------------------------
+#
+# A CAMPAIGN THAT WRITES ITS ARTEFACT ONLY AT THE END LOSES EVERYTHING TO ONE
+# KILL, and G12 demonstrated it: a 40-minute run timed out inside its second
+# cell, wrote nothing, and Phase 2 has one cell of G12 because of it. The
+# defect was then searched across the scripts that produced Phase 2's other
+# numbers (`docs/phase2-results.md`) and found LATENT in three more --
+# `phase2_core.py` (G1/G3/G5/G8), `g10_rerun.py` (G10) and
+# `blackout_frequency.py`. Latent, not harmless: each is one kill, timeout or
+# OOM away from discarding a completed multi-hour grid, and this machine's
+# history includes all three.
+#
+# `scripts/g11_campaign.py` is the counter-example and this is its pattern,
+# extracted rather than copied a fourth time. Two details in it were learned
+# the hard way and are the reason a hand-rolled ledger is not good enough:
+#
+#   1. THE LEDGER KEY MUST CARRY THE RUN-DEFINING CONFIG, or a `--smoke`
+#      invocation sharing the production `--out` displaces real records. G11
+#      hit exactly this: a 400,000-slot smoke run banked rows that a
+#      7,200,000-slot campaign then treated as done.
+#   2. BANKED RUNS MUST RE-ENTER THE RESULT. G11's first version started its
+#      results list empty and published `"runs": results`, so a resumed
+#      invocation wrote out ONLY its own runs -- exiting 0, with a short
+#      artefact, over a self-selected subset of a within-seed paired design.
+
+
+class RunLedger:
+    """One JSONL line per completed unit of work, written as it completes.
+
+    `config` is the invocation's run-defining configuration. Banked rows
+    carrying a different one are IGNORED rather than reused, which is
+    detail (1) above. `key_fields` names the row fields that identify a unit
+    of work; `done_keys()` is what a caller subtracts from its task list.
+
+    Deliberately not a context manager and deliberately append-mode: the
+    point is that a row is on disk before the next one starts, so a process
+    killed between two units keeps everything before the kill.
+    """
+
+    def __init__(self, path: Path | str, config: dict[str, Any],
+                 key_fields: Sequence[str]) -> None:
+        self.path = Path(path)
+        self.config = dict(config)
+        self.key_fields = tuple(key_fields)
+        self._banked: list[dict[str, Any]] = []
+        self._done: set[tuple] = set()
+        self._load()
+
+    def _key(self, row: dict[str, Any]) -> tuple:
+        return tuple(row.get(f) for f in self.key_fields)
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        for line in self.path.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                # A row half-written by a kill. Everything before it stands;
+                # this one is simply not banked.
+                continue
+            if row.get("_config") != self.config:
+                continue          # detail (1): a different invocation
+            self._banked.append(row)
+            self._done.add(self._key(row))
+
+    def done_keys(self) -> set[tuple]:
+        return set(self._done)
+
+    def banked(self) -> list[dict[str, Any]]:
+        """Rows from previous invocations, to be re-entered into the result
+        alongside this invocation's -- detail (2) above."""
+        return [{k: v for k, v in r.items() if k != "_config"}
+                for r in self._banked]
+
+    def bank(self, row: dict[str, Any]) -> None:
+        """NO `default=` ON PURPOSE, and this is the important line.
+
+        The first version passed `default=str`, and a caller that banked a
+        payload containing `RunRecord` objects got their `repr()` written to
+        disk -- valid JSON, silently wrong, and the resumed run then handed
+        strings to a scorer. Caught by a kill-and-resume identity check, not
+        by anything the ledger itself could see.
+
+        A serialization fallback converts an unserializable payload into a
+        corrupt one, which is the boundary-coercion failure this project
+        keeps hitting (defects-log #1). Raising here makes the caller say
+        what it means -- `to_dict()` on the way in, `from_dict()` on the way
+        out -- which is the only version of this that survives a resume.
+        """
+        try:
+            line = json.dumps({**row, "_config": self.config})
+        except TypeError as exc:
+            raise TypeError(
+                f"RunLedger.bank got a payload that is not JSON: {exc}. Bank "
+                f"plain data -- call .to_dict() on records before banking and "
+                f".from_dict() after loading. A `default=` fallback here would "
+                f"write a repr() and the resume would read it back as a "
+                f"string.") from exc
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a") as fh:
+            fh.write(line + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())      # a kill must not lose a flushed row
+        self._banked.append({**row, "_config": self.config})
+        self._done.add(self._key(row))
+
+    def summary(self) -> str:
+        return (f"{self.path.name}: {len(self._banked)} run(s) banked for "
+                f"this configuration")
 
 
 def write_csv(rows: list[dict[str, Any]], path: str) -> None:
