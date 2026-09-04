@@ -6,8 +6,9 @@ handshake accounting, the 5QI priority table, the per-axis scoring dispatch,
 `g12_score`'s four decompose sites and G6's estimator change.
 
 **The "Phase 2" label is retired.** It meant *fast numbers to check the
-plumbing*, and that is what those numbers were — one of them literally
-`--seeds 1`. This pass is the re-measurement.
+plumbing*, and that is what those numbers were: the core-cell row set is
+**n=3**, drawn from *two different runs*, and one of its claims is
+contradicted by the file it came from. This pass is the re-measurement.
 
 ---
 
@@ -16,10 +17,11 @@ plumbing*, and that is what those numbers were — one of them literally
 The criterion was: **a full pass that finds nothing new.** Every pass so far
 has found defects, and the question was whether the rate has fallen.
 
-**It has not. This pass found four new things**, listed below and none of
-them cosmetic. One reverses a published conclusion, one shows a published
-verdict rests on n=1, one is a check that can never pass again, and one is a
-regression this session itself introduced.
+**It has not. This pass found five new things**, listed below and none of
+them cosmetic. One reverses a published conclusion, one is a published claim
+contradicted by the artefact it came from, one is a check that can never pass
+again, one is a regression this session itself introduced, and one is the
+category search the second of those obliged.
 
 **What DID hold is the code.** Re-run at the published configuration, the
 published verdicts reproduce; three guarantees reproduce byte-identically.
@@ -40,22 +42,49 @@ part of the result.
 | **G5** | **measured — reproduces** | M05 completeness, protected, n=10: PF **0/10** fail, Reservation **7/10**, TwoTier **4/10**, Reservation's median **0.0000**. The published failure ("median worst-flow PDU-set completeness 0.0000 on both QoS-aware arms") holds. |
 | **G6** | **NOT PUBLISHABLE — a second specification defect** | **NEW.** The clause names no estimator over runs, and the three defensible readings give **PASS, INCONCLUSIVE and FAIL on the same cell**. See below. |
 | **G7** | **NOT MEASURED — structurally out, unchanged** | No MFBR *enforcement* anywhere in `sim/`; containment is observable, clipping is not, and clipping is half the criterion. |
-| **G8** | **FAILS at n=10 — the published pass was n=1** | **NEW.** See below. |
+| **G8** | **FAILS at n=10 — and the published row is contradicted by its own source** | **NEW.** `core_mfbr.json` (n=3) records Reservation starving `ue8_qfi9` for **10.0 s** on 1 of 3 seeds, under a row reading *"0 on all arms"*. At n=10 both conjuncts fail on both QoS-aware arms. See below. |
 | **G9** | **NOT MEASURED — named cause, deferred** | `g9_campaign.py`'s count guard refuses to score a partially-degenerate run. Unchanged; deferred for this delivery. |
 | **G10** | **measured — BYTE-IDENTICAL** | Admissible fleet **PF 8 / Reservation 4 / TwoTier 4**, per-seed at N=8 **PF 10/10, Reservation 3/10, TwoTier 6/10**. Every number reproduces. |
 | **G11** | **one clause of five — deferred** | Unchanged; deferred for this delivery. |
-| **G12** | **TWO cells, and the promotion bar now FIRES** | **NEW — a reversal.** See below. |
+| **G12** | **TWO cells; the bar is applied and NEITHER CLAUSE FIRES** | **NEW:** a second cell (`drone_heavy_n8`) Phase 2 never reached, and a **fifth pooling defect in `g12_score`** — in the clause that decides promotion. The registered conclusion stands: the ordering is **not** established as a scheduler property. Its E3 failure is filed under **G1/G3**. See below. |
 
 ---
 
 ## The four new findings
 
-### 1. G8's published pass rests on n=1, and at n=10 both conjuncts fail
+### 1. G8's published row is CONTRADICTED BY ITS OWN SOURCE FILE
 
-`sweeps/phase2/core_fast.json` is **`seeds=1`**. The published G8 row — *"M09
-per-1s Jain protected: PF 0.9995 / Reservation 0.9998 / TwoTier 0.9654 — all
-pass ≥ 0.90. M22 starvation epochs: 0 on all arms"* — is one seed, reported
-as a cell result.
+> **CORRECTION to this document's first version and to commit `17d6211`.**
+> Both said *"G8's published pass rests on n=1"* on the strength of
+> `core_fast.json` being `seeds=1`. **That file is not the source of the
+> published row.** Traced by arithmetic: G8's figures reconcile to
+> `core_mfbr.json` (**n=3**), and G1's TwoTier 94.51 ms reconciles to
+> `core_fixed.json` (**n=3**, pre-MFBR) — *two different runs presented as
+> one row set*. The seed-count framing was right in direction and wrong in
+> instance, and the real defect is worse than low n.
+
+**The published claim is false against the artefact it came from.** G8's row
+reads *"M22 starvation epochs … **0 on all arms** at the core cell"*.
+`core_mfbr.json`, n=3:
+
+| seed | arm | M22 all-flow | M22 protected | longest |
+|---|---|---|---|---|
+| 1826701614 | all three | 0 | 0 | 0.0 s |
+| 1367864806 | all three | 0 | 0 | 0.0 s |
+| **1097657231** | **Reservation** | **3** | **2** | **10.0 s** |
+
+**One seed of three shows Reservation starving `ue8_qfi9` for ten seconds**,
+against a 1 s bar — in the file the row was written from. It was not read.
+
+**And the M09 figures mix estimators within one row.** *"PF 0.9995 /
+Reservation 0.9998 / TwoTier 0.9654"*: TwoTier's 0.9654 is the 3-seed mean,
+but Reservation's mean is **0.9719** — 0.9998 is seed 1 alone. A single-seed
+value and a mean sit side by side with no marking.
+
+**So there are three defects in one row**: a claim contradicted by its
+source, two estimators presented as one, and two source files presented as
+one run. **None is a code defect** — which the isolation below establishes,
+and which is why the row is corrected rather than the simulator.
 
 **The code is not the cause, and that was isolated rather than assumed.** Run
 at the published configuration exactly (n=1, h=40,000) on current code, the
@@ -71,6 +100,36 @@ everywhere. Only the seed count was then changed:
 **G8 is a conjunction and both halves fail on both QoS-aware arms.** The
 starvation victim is consistently a 5QI-9 flow (`ue7/ue8_qfi9`) with epochs up
 to 5.00 s against a 1 s bar.
+
+### 1a. THE CATEGORY SEARCH — which other verdicts rest on n ≤ 3
+
+G8 is the instance that proves the question is worth asking, so it was asked
+of every committed artefact, derived rather than recalled:
+
+| artefact | seeds | what it backs |
+|---|---|---|
+| `phase2/core_fast.json` | **1** | nothing published (superseded by the two below) |
+| `phase2/core_fixed.json` | **3** | **G1's TwoTier 94.51 ms** |
+| `phase2/core_mfbr.json` | **3** | **G8's row, G3's and G5's core figures** |
+| `phase2/g11_c1_mfbr.json` | **3** | **G11's C1 "1.000 pass rate, 3/3 seeds"** |
+| `phase2/blackout_*.json` | 20 | the blackout table |
+| `phase2/g10_rows_mfbr.csv` | 10 | G10 |
+| `wp9/stage6_g4.json` | 10 | G4 |
+| `wp9/stage6_g6_n40.csv` | 40 | G6 |
+| `wp9/stage{1,2,4,5}_rows.csv`, `part_c_rows.csv` | 10–40 | the sweep |
+
+**Four artefacts at n ≤ 3, and they back G1, G3, G5, G8 and G11's C1** — the
+entire core-cell row set plus the one G11 clause that was scored.
+
+**G11's C1 is the one to look at next, and it is the same shape as G8's.**
+Its "1.000 pass rate, 0 failing windows, all arms" is n=3, and the seed count
+IS disclosed on its row — but disclosure is not the issue: G8's was a pass at
+low n that reversed at n=10, and C1 is a pass at low n that has not been
+re-measured. **Not started here** (G11's remaining clauses are deferred), and
+recorded so the next person meets it as a known exposure rather than a
+result.
+
+**Everything else is n ≥ 10.** The exposure is bounded and named.
 
 ### 2. G6 names no estimator — and the three readings disagree
 
@@ -94,8 +153,32 @@ fleet — the population G6 binds to — does **not** stabilise it. And the
 per-run reading depends on the run count, which §7 lists as unconfirmed:
 Reservation **passes at n=3 and fails at n=5**.
 
-**No single G6 verdict is published.** Choosing an estimator in code would be
-the tool deciding what the specification declined to.
+**REGISTERED DISPOSITION — NO G6 VERDICT IS PUBLISHED, AND THAT IS THE
+FINDING.** Not "we could not decide", and not a caveat on a number: **a
+guarantee whose verdict depends on a choice the guarantee declines to make
+cannot be scored by anyone.** It is not that this project lacks the data or
+the estimator — it is that the specification admits three readings and the
+data separates them. A different team, on different code, with a different
+simulator, would face the same three answers.
+
+**This is the fourth specification finding and the strongest of them**,
+because the other three are about a guarantee being hard to score and this
+one is about it being *undecidable as written*:
+
+| # | finding | shape |
+|---|---|---|
+| 1 | G6's +20 % bar is undefined at a zero baseline | the bar has no value in a reachable case |
+| 2 | GT-7.3's ramp does not reach its own failure condition | the test runs outside the regime its evidence needs |
+| 3 | G10's all-pass criterion cannot distinguish 1/10 from 6/10 | a binary criterion over a non-binary quantity |
+| **4** | **G6 names no estimator, and the three readings disagree** | **the verdict is a property of an unmade choice** |
+
+**Findings 1 and 4 are both G6, in one sentence of specification.**
+
+**What would make G6 publishable:** its owner ratifying **an estimator and a
+run count** — both, since the per-run reading's verdict moves with n. Until
+then the tool reports all three readings side by side and marks the
+disagreement, and this project publishes no G6 verdict. Choosing in code
+would be the tool deciding what the specification declined to.
 
 ### 3. G6's control can never pass again — a cannot-PASS check
 
@@ -141,19 +224,72 @@ parallelisation and per-run banking the campaign completes: **`mixed_n8` and
 `mixed_n8` reproduces the published orders exactly (PF `[4,2]`×10;
 Reservation `[4,2]`×6, `[2,4]`×4; TwoTier `[4,2]`×5, `[2,4]`×4, `[2]`×1).
 
-**THE REVERSAL.** Phase 2 concluded *"NEITHER CLAUSE FIRES … the Region-2
-ordering is NOT ESTABLISHED as a scheduler property and is CONSISTENT WITH A
-DECLARATION-ORDER ARTEFACT."* That conclusion was a consequence of the
-campaign not completing — the permutation control never ran. It now has:
+### THE PROMOTION BAR: NEITHER CLAUSE FIRES — and a correction
 
-- arms differ under the canonical order in **both** cells;
-- **the difference survives permutation in the same direction**;
-- ⇒ **clause 1 FIRES.** The arm difference is a **candidate scheduler
-  finding** that needs the mechanism trace to confirm.
+> **CORRECTION.** An earlier report of this pass said *"the promotion bar now
+> fires"* and called it a reversal. **It does not fire.** That claim came from
+> `g12_score.apply_promotion_bar`'s output, and the scorer's clause 1 was
+> weaker than the criterion §35.13 registered. **Reporting a scorer's output
+> without checking the scorer implements the registered bar is the failure
+> this project keeps recording, committed here on the bar itself.**
 
-Clause 2 is untouched and its edge still holds: all three candidate
-mechanisms are position-dependent, so tracing to any of them **confirms the
-artefact rather than promoting it**.
+**The fifth pooling defect in `g12_score.py`, and the one that decides
+promotion.** Clause 1 as registered is *"the arms' order distributions differ
+**in the same direction** under **every** permutation tested, canonical
+included."* The implementation collapsed every permutation into one **set**
+per arm and asked only whether the arms' sets differ — PF `{[4,2]}` against
+Reservation `{[4,2],[2,4]}` differ, so it returned True. **A pooled set
+cannot see a direction, and direction is the whole criterion.** Fixed; a tie
+is now explicitly not a lean, because two arms cannot differ in a direction
+if one has none.
+
+**Applied as written, per condition:**
+
+| condition | PF | Reservation | TwoTier |
+|---|---|---|---|
+| canonical / `drone_heavy_n8` | `[4,2]` | `[4,2]` | `[4,2]` |
+| canonical / `mixed_n8` | `[4,2]` | `[4,2]` | **TIE** |
+| perm 101 | `[4,2]` | `[4,2]` | `[2,4]` |
+| perm 102 | `[4,2]` | **`[2,4]`** | `[2,4]` |
+| perm 103 | `[4,2]` | **`[2,4]`** | `[2,4]` |
+| perm 104 | `[4,2]` | **`[2,4]`** | `[2,4]` |
+
+| pair | differs in | same direction throughout |
+|---|---|---|
+| PF – Reservation | 3/6 conditions | **False** |
+| PF – TwoTier | 4/6 conditions | **False** |
+| Reservation – TwoTier | 1/6 conditions | **False** |
+
+**⇒ CLAUSE 1 DOES NOT FIRE.**
+
+**And the trace answers clause 2 in the direction the bar anticipated.**
+Asked first, because it is the cheapest discriminator and the data was
+already in the campaign: *does the order depend on list position at all?*
+
+- **PF does not.** `[4,2]` under the canonical order and under **all four
+  permutations**, 5/5 each.
+- **Reservation does.** `[4,2]` under canonical and perm 101; **`[2,4]` under
+  102, 103 and 104** — unanimous 5/5 under 104, the opposite of canonical.
+- **TwoTier does.** Tied 5/5 under canonical, leaning `[2,4]` under every
+  permutation.
+
+**The effect moves with list position on exactly the two arms that show it.**
+Per the bar's own edge — *"tracing the effect to any of the three candidates
+CONFIRMS the artefact; it does not refute it"* — **this confirms the
+artefact.** It does not promote the finding, and the bar said so in advance,
+before these numbers existed.
+
+**⇒ NEITHER CLAUSE FIRES. The registered conclusion applies verbatim:** the
+Region-2 ordering is **not established as a scheduler property and is
+consistent with a declaration-order artefact.**
+
+**One thing genuinely changed, and it is not a promotion.** §35.5's pre-fix
+data had **PF** as the position-sensitive arm (*"PF's permutation 104 gives
+the opposite first-violation order from 101/102/103"*). After the
+`priority_level` fix, **PF is the stable one** and the sensitivity has moved
+to Reservation. The artefact did not go away; it changed which arm carries
+it. Recorded as an observation — characterising a distribution over
+permutations is out of bounds on four of them (§35.13's own limit).
 
 **And E3 is worse on the new cell:** TwoTier's telemetry M02 reaches 1.000
 from **×1.0 — nominal load** — on `drone_heavy_n8`, against ×1.6 on
@@ -165,6 +301,41 @@ Mbps on `drone_heavy_n8` against **0.345 Mbps** on `mixed_n8/Reservation` — a
 number. The four sites were fixed one commit before the run that needed them.
 
 ---
+
+## G12's E3 — filed under G1/G3, and worse on the new cell
+
+**G12's clause 4 fails inside the guarantee's own ramp, and the new
+composition makes it worse.** Filed here as a **G1/G3** finding because that
+is what it is about — telemetry latency and liveness — not about degradation
+ordering.
+
+| cell | arm | earliest telemetry M02 = 1.000 | 5QI 9 at that point |
+|---|---|---|---|
+| `mixed_n8` | PF | ×2.3 | — |
+| `mixed_n8` | Reservation | ×2.3 | — |
+| `mixed_n8` | **TwoTier** | **×1.6** | — |
+| `drone_heavy_n8` | PF | ×2.3 | — |
+| `drone_heavy_n8` | Reservation | ×2.3 | — |
+| **`drone_heavy_n8`** | **TwoTier** | **×1.0 — NOMINAL LOAD** | **17.4 Mbps** |
+
+**On `drone_heavy_n8`, TwoTier's telemetry reaches M02 = 1.000 — every
+resolved byte PDB-violated — at ×1.0, with no overload applied at all**,
+while the best-effort 5QI-9 class still carries **17.4 Mbps**. That is
+GT-7.3's own worked FAIL example, at nominal load, on the deployed arm.
+
+Every one of the six groups degrades on **10/10 seeds**, and every earliest
+point is **inside** the guarantee's ramp.
+
+**And the gap statistic is blind on 240 ramp points** — a flow that has
+stopped completing has no gap between completions to measure — so M02 is the
+instrument with range here and M03/M20 must not be read alone on a starved
+flow. That is the same blindness G3's row already carries; this pass doubles
+the count of ramp points it affects.
+
+**Two qualifications travel with it**, unchanged: the arm difference in the
+*ordering* is not established (the bar does not fire, above), and this is a
+**telemetry** reading while E1's clean-control check covers M13's GBR
+classes — 5QI 1 is `Delay`, so the control does not cover it.
 
 ## What this pass did not cover
 

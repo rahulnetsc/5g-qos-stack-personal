@@ -75,6 +75,9 @@ def report_permutation_control(data: dict) -> dict[str, Any]:
         orders_all = [o for v in by_perm.values() for o in v["orders"]]
         distinct = {tuple(o) for o in orders_all}
         out["by_arm"][arm] = {
+            # Per permutation, not only pooled: clause 1 of the promotion bar
+            # needs a direction per condition, which a pooled set destroys.
+            "by_permutation": {p: list(v["orders"]) for p, v in by_perm.items()},
             "n_perm": n_perm, "n_perm_fully_unscoreable": n_bad,
             "n_runs": n_runs, "n_unscoreable_runs": n_bad_runs,
             "distinct_orders": [list(d) for d in distinct],
@@ -370,13 +373,58 @@ def apply_promotion_bar(data: dict, ctl: dict) -> None:
     if not ctl.get("present"):
         print("  control absent -- nothing can be promoted.")
         return
+    # CLAUSE 1, AS REGISTERED -- "the arms' order distributions differ IN THE
+    # SAME DIRECTION under EVERY permutation tested, canonical included."
+    #
+    # THE FIFTH POOLING DEFECT IN THIS FILE, and the one that decides
+    # promotion. The previous implementation collapsed every permutation into
+    # ONE SET per arm and asked only whether the arms' sets differ. That is a
+    # far weaker test: PF {[4,2]} against Reservation {[4,2],[2,4]} "differ",
+    # so it returned True and reported the bar as firing -- while the arms'
+    # actual leans REVERSE across permutations, which is precisely what a
+    # position artefact looks like and precisely what the bar was written to
+    # exclude. A pooled set cannot see a direction, and direction is the
+    # whole criterion.
     survives = None
     if arms_differ_canonical:
-        perm_arm_orders = {a: {tuple(o) for o in v["orders"]}
-                           for a, v in ctl["by_arm"].items()}
-        usable = {a: v for a, v in perm_arm_orders.items() if v}
-        survives = (len(usable) == len(perm_arm_orders)
-                    and len({frozenset(v) for v in usable.values()}) > 1)
+        def _lean(orders):
+            """The strict majority order, or None. A TIE IS NOT A LEAN --
+            two arms cannot 'differ in a direction' if one has none."""
+            c = Counter(tuple(o) for o in orders if o)
+            if not c:
+                return None
+            top, n = c.most_common(1)[0]
+            return top if n * 2 > sum(c.values()) else None
+
+        conds: dict[str, dict[str, Any]] = {}
+        for cell, arms_d in data["cells"].items():
+            for arm, d2 in arms_d.items():
+                conds.setdefault(f"canonical/{cell}", {})[arm] = d2["full_orders"]
+        for arm, by_perm in ctl["by_arm"].items():
+            for p, orders in by_perm.get("by_permutation", {}).items():
+                conds.setdefault(f"perm{p}", {})[arm] = orders
+        arm_names = sorted({a for v in conds.values() for a in v})
+        leans = {c: {a: _lean(v.get(a, [])) for a in arm_names}
+                 for c, v in conds.items()}
+        print("  per-condition lean (TIE = no majority, so no direction):")
+        for c in sorted(conds):
+            print(f"    {c:<22}" + "  ".join(
+                f"{a}:{list(leans[c][a]) if leans[c][a] else 'TIE'}"
+                for a in arm_names))
+        results = {}
+        for i, a in enumerate(arm_names):
+            for b in arm_names[i + 1:]:
+                dirs = []
+                for c in conds:
+                    la, lb = leans[c][a], leans[c][b]
+                    dirs.append(None if (la is None or lb is None or la == lb)
+                                else (la, lb))
+                seen = [x for x in dirs if x is not None]
+                results[(a, b)] = (bool(seen) and len(set(seen)) == 1
+                                   and len(seen) == len(dirs))
+                print(f"    {a}-vs-{b}: differs in {len(seen)}/{len(dirs)} "
+                      f"conditions; same direction throughout: {results[(a,b)]}")
+        survives = any(results.values())
         print(f"  the difference survives permutation in the same direction: "
               f"{survives}")
 
