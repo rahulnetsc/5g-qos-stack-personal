@@ -283,5 +283,20 @@ re-enters them on resume.
 full pass finds nothing new; this pass found the M21 unlisted-metric
 fall-through, `g6_fleet_restricted_m03`'s silent default, the manifest's
 transfer-coupled verification, the two cannot-fail `mfbr_bps` docstrings, and
-now this. **A clean pass has not yet happened**, and the least-tested layer —
-`scripts/`, 42 files, 14 of them named in any test — has not been read at all.
+now this. **A clean pass has not yet happened.**
+
+**The `scripts/` layer has now been read — `docs/wp9-defects-log.md` #20.**
+Two corrections to this paragraph's own description of it, both derived
+rather than restated: there are **44** files, not 42, and **10** are imported
+by a test, not 14. The "14 named" counted *mentions*, five of which are
+docstring references, so the tested fraction was overstated by half.
+
+The read changed no published number and found, among others: **nine scripts
+that cannot run at all** (`TwoTier.__init__` stopped accepting
+`tier1_period_slots` at the Phase 2 rewrite; they import cleanly and raise on
+their first scheduler), **`wp9_gate.py` silently omitting one axis from its
+committed verdict** — `min_rb`, score 152.579, absent from both
+`gate_verdict.txt` and `gate_verdict_corrected.txt` under a docstring
+promising nothing is omitted — and **`g12_score.py`'s decompose fix applied
+at one of five aggregation sites in its own file**, whose triggering
+condition is G12's own next step of running a second cell.
