@@ -1,0 +1,35 @@
+g11 campaign: 30 runs (3 arms x 10 seeds), N=4, horizon=400000 (1.7 min), 16 workers
+expected per run: {'teleop_on_windows': 5, 'waypoint_pauses': 0, 'firmware_windows': 0, 'stop_bursts': 0}
+resume: 0 run(s) already complete, 30 to run
+submitted 30 task(s); per-task timeout 67 min
+  1/30 Reservation/seed1826701614/p0 wall=60.2s rss=519.3MB windows=2 elapsed=1.1m
+  2/30 Reservation/seed1367864806/p0 wall=60.8s rss=521.3MB windows=2 elapsed=1.1m
+  3/30 Reservation/seed1097657231/p0 wall=60.4s rss=519.9MB windows=2 elapsed=1.1m
+  4/30 Reservation/seed579362555/p0 wall=60.6s rss=524.7MB windows=2 elapsed=1.1m
+  5/30 Reservation/seed661058651/p0 wall=60.8s rss=523.2MB windows=2 elapsed=1.1m
+  6/30 Reservation/seed87989972/p0 wall=65.1s rss=520.6MB windows=2 elapsed=1.2m
+  7/30 PF/seed1826701614/p0 wall=46.2s rss=527.2MB windows=2 elapsed=1.8m
+  8/30 TwoTier/seed661058651/p0 wall=113.4s rss=523.1MB windows=2 elapsed=1.9m
+  9/30 TwoTier/seed87989972/p0 wall=114.0s rss=523.6MB windows=2 elapsed=1.9m
+  10/30 TwoTier/seed1746484539/p0 wall=111.3s rss=522.8MB windows=2 elapsed=1.9m
+  11/30 PF/seed1367864806/p0 wall=50.1s rss=523.8MB windows=2 elapsed=2.0m
+  12/30 TwoTier/seed1826701614/p0 wall=121.2s rss=522.9MB windows=2 elapsed=2.1m
+  13/30 TwoTier/seed1367864806/p0 wall=120.8s rss=519.7MB windows=2 elapsed=2.1m
+  14/30 TwoTier/seed1097657231/p0 wall=121.6s rss=520.0MB windows=2 elapsed=2.1m
+  15/30 TwoTier/seed579362555/p0 wall=121.6s rss=521.2MB windows=2 elapsed=2.1m
+  16/30 TwoTier/seed161576974/p0 wall=121.3s rss=521.0MB windows=2 elapsed=2.1m
+  17/30 TwoTier/seed35492826/p0 wall=121.6s rss=523.0MB windows=2 elapsed=2.1m
+  18/30 TwoTier/seed376383645/p0 wall=121.9s rss=522.1MB windows=2 elapsed=2.1m
+  19/30 Reservation/seed161576974/p0 wall=60.0s rss=523.0MB windows=2 elapsed=2.1m
+  20/30 Reservation/seed35492826/p0 wall=60.6s rss=525.3MB windows=2 elapsed=2.1m
+  21/30 Reservation/seed376383645/p0 wall=60.4s rss=525.3MB windows=2 elapsed=2.1m
+  22/30 Reservation/seed1746484539/p0 wall=60.0s rss=528.6MB windows=2 elapsed=2.1m
+  23/30 PF/seed1097657231/p0 wall=46.0s rss=527.2MB windows=2 elapsed=2.6m
+  24/30 PF/seed579362555/p0 wall=46.4s rss=528.9MB windows=2 elapsed=2.7m
+  25/30 PF/seed661058651/p0 wall=46.1s rss=525.3MB windows=2 elapsed=2.7m
+  26/30 PF/seed87989972/p0 wall=46.2s rss=531.5MB windows=2 elapsed=2.8m
+  27/30 PF/seed161576974/p0 wall=46.4s rss=523.8MB windows=2 elapsed=2.8m
+  28/30 PF/seed35492826/p0 wall=45.5s rss=525.4MB windows=2 elapsed=2.8m
+  29/30 PF/seed376383645/p0 wall=46.2s rss=529.5MB windows=2 elapsed=2.8m
+  30/30 PF/seed1746484539/p0 wall=45.5s rss=528.6MB windows=2 elapsed=2.8m
+DONE 30/30 runs in 2.8 min; guard tripped=False; victims=[]; failures=0

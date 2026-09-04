@@ -33,6 +33,36 @@ part of the result.
 
 ## The list
 
+**PROVENANCE FOR EVERY ROW — artefact, n and horizon**, because a figure
+without them is the defect finding 1 is about. All under
+`sweeps/verification-2026-09-04/` unless named otherwise.
+
+| G | artefact | n | horizon |
+|---|---|---|---|
+| G1 | `core_40k_n1.json` (reproduction) + `core_40k_n10.json` + `core.json` | 1, 10, 10 | 40k, 40k, 20k |
+| G3 | `core.json` | 10 | **20k** |
+| G4 | `g4.json` | 10 | 20k |
+| G5 | `core.json` | 10 | **20k** |
+| G6 | `stage6_g6_n40_records.jsonl` | 40 | 20k |
+| G8 | `core_40k_n1.json` + `core_40k_n10.json` | 1, 10 | 40k |
+| G10 | `g10_rows.csv` | 10 | 20k |
+| G11 | `g11_c1_n10.json` (**re-measured**) | **10** | 400k |
+| G12 | `g12.json` | 10 | 20k |
+
+**TWO INCONSISTENCIES THIS TABLE MAKES VISIBLE, and neither was intended.**
+
+1. **G3 and G5 are read at h=20,000 while G1 and G8 are read at h=40,000.**
+   The horizon matters: TwoTier's M20 median is **238.62 ms at 20k and
+   266.25 ms at 40k**, and G1's TwoTier p98 breaches 2/10 at 20k and 0/10 at
+   40k. Neither verdict changes, but the rows are not on one configuration
+   and say so here rather than implying they are.
+2. **G11's row WAS the only one still on an n≤3 artefact.** Re-measured at
+   n=10 on 2026-09-05 — the exposure is closed and the result is below.
+
+**Every row now quotes an n≥10 figure**, and where a row also cites a low-n
+number (G1's and G8's n=1 reproductions) that number is labelled as a
+reproduction of the published cell, never as the result.
+
 | G | status | result, and whether it moved |
 |---|---|---|
 | **G1** | **measured** | M01 p98 protected, n=1/h=40k (the published cell) on current code: PF **28.00** / Reservation **22.00** / TwoTier **90.75** ms against 100 ms — **all pass, as published** (published: 24.83 / 24.42 / 94.51). At n=10, h=40k: **0/10 fail on every arm**. **NEW — horizon sensitivity:** at h=20,000, TwoTier's median rises to 98.12 and **2/10 seeds breach**. The bound holds at the published horizon and is knife-edge at the sweep's standard one. |
@@ -45,7 +75,7 @@ part of the result.
 | **G8** | **FAILS at n=10 — and the published row is contradicted by its own source** | **NEW.** `core_mfbr.json` (n=3) records Reservation starving `ue8_qfi9` for **10.0 s** on 1 of 3 seeds, under a row reading *"0 on all arms"*. At n=10 both conjuncts fail on both QoS-aware arms. See below. |
 | **G9** | **NOT MEASURED — named cause, deferred** | `g9_campaign.py`'s count guard refuses to score a partially-degenerate run. Unchanged; deferred for this delivery. |
 | **G10** | **measured — BYTE-IDENTICAL** | Admissible fleet **PF 8 / Reservation 4 / TwoTier 4**, per-seed at N=8 **PF 10/10, Reservation 3/10, TwoTier 6/10**. Every number reproduces. |
-| **G11** | **one clause of five — deferred** | Unchanged; deferred for this delivery. |
+| **G11** | **C1 re-measured at n=10 — the pass SURVIVES; four clauses still unscored** | **The n≤3 exposure is closed.** C1 = **1.000 on all three arms**, 0 failing windows, 0 unscoreable, **10/10 seeds pass on every arm**, over **20 windows** against 6 at n=3. **This does NOT clear G11:** the horizon is still **400,000 slots — 1.7 min — against GT-7.1's specified ≥30 min**, so it is a pass at 1/18th of the specified duration. C2–C5 remain unscored and are deferred for this delivery. |
 | **G12** | **TWO cells; the bar is applied and NEITHER CLAUSE FIRES** | **NEW:** a second cell (`drone_heavy_n8`) Phase 2 never reached, and a **fifth pooling defect in `g12_score`** — in the clause that decides promotion. The registered conclusion stands: the ordering is **not** established as a scheduler property. Its E3 failure is filed under **G1/G3**. See below. |
 
 ---
@@ -121,13 +151,22 @@ of every committed artefact, derived rather than recalled:
 **Four artefacts at n ≤ 3, and they back G1, G3, G5, G8 and G11's C1** — the
 entire core-cell row set plus the one G11 clause that was scored.
 
-**G11's C1 is the one to look at next, and it is the same shape as G8's.**
-Its "1.000 pass rate, 0 failing windows, all arms" is n=3, and the seed count
-IS disclosed on its row — but disclosure is not the issue: G8's was a pass at
-low n that reversed at n=10, and C1 is a pass at low n that has not been
-re-measured. **Not started here** (G11's remaining clauses are deferred), and
-recorded so the next person meets it as a known exposure rather than a
-result.
+**G11's C1 was the other candidate, and it was re-measured rather than
+assumed.** Registered in advance that it would *not* survive — G8's shape
+exactly, and the asymmetry runs one way, since more seeds means more windows
+and more chances for any of five conjuncts to breach.
+
+**It survived.** 1.000 on all three arms at n=10, over 20 windows against 6.
+**The prediction was a MISS and that is the useful outcome**
+(`PREDICTIONS.md`): it establishes that the n≤3 exposure is **not general**,
+and that G8's reversal was specific to a starvation counter rather than a
+property of low-n passes.
+
+**So the category search found one real instance and cleared the other by
+measurement.** Clearing a candidate is the cheaper half of a category search
+and the half that usually goes unreported; it is reported here because
+without it "four artefacts at n≤3" reads as four open exposures when it is
+one.
 
 **Everything else is n ≥ 10.** The exposure is bounded and named.
 

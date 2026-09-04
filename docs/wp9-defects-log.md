@@ -619,3 +619,84 @@ is what makes the check able to fail.
   `g6_conjunction_table.py` now takes `--records`, checks existence, and
   names the regenerator, instead of reading a gitignored 251 MB path from a
   module constant.
+
+
+---
+
+## #22 — A PUBLISHED ROW CONTRADICTED BY ITS OWN SOURCE FILE (2026-09-04)
+
+**Its own class, and not one already in this log.** Every earlier entry is a
+wrong *inference* from data, a *stale count*, an *empty selection*, or a
+*check that could not fire*. This is none of those: **the data was correct,
+on disk, and the row summarising it was never read back against it.**
+
+### The instance
+
+`docs/phase2-results.md`'s G8 row read *"M22 starvation epochs … **0 on all
+arms** at the core cell."* Its source, `sweeps/phase2/core_mfbr.json` (n=3):
+
+| seed | arm | M22 all-flow | M22 protected | longest |
+|---|---|---|---|---|
+| 1826701614 | all three | 0 | 0 | 0.0 s |
+| 1367864806 | all three | 0 | 0 | 0.0 s |
+| **1097657231** | **Reservation** | **3** | **2** | **10.0 s** |
+
+**One seed of three shows a flow starved for ten seconds against a one-second
+bar**, in the file the row was written from.
+
+**Three defects in one row, and they compound:**
+
+1. **A claim contradicted by its source** — "0 on all arms" against 3 epochs.
+2. **Two source files presented as one run.** Traced by arithmetic: G8's
+   figures reconcile to `core_mfbr.json`, and G1's TwoTier 94.51 ms
+   reconciles to `core_fixed.json` — *a different run*, pre-MFBR. The two
+   rows sit in one table implying one campaign.
+3. **Mixed estimators inside one metric.** *"PF 0.9995 / Reservation 0.9998 /
+   TwoTier 0.9654"*: TwoTier's is the 3-seed mean, Reservation's mean is
+   **0.9719** — 0.9998 is seed 1 alone. A single-seed value and a mean, side
+   by side, unmarked.
+
+**None of it is a code defect.** Re-run at the published configuration on
+current code, the published numbers reproduce. The simulator was right and
+the row was wrong.
+
+### Why the existing checks could not catch it
+
+`--check` compares `RunRecord`s, not documents. The panel's rules govern how
+a metric is *computed*, not how it is *quoted*. `regime_map_rollup.py` checks
+one derived sentence against its own table. **Nothing in this project reads a
+published figure back against the artefact it claims to summarise** — the
+gap is between the JSON and the prose, and every guard sits on one side of
+it.
+
+### THE CHECK THAT WOULD CATCH IT — PROPOSED, NOT BUILT
+
+Two parts, and the first is most of the value:
+
+**1. Every quoted figure names its artefact and its n.** A row becomes
+`M22 epochs 0/9 (core_mfbr.json, n=3, h=40k)` rather than "0 on all arms".
+This is a documentation convention, costs a phrase, and would have made the
+mixed sources visible on sight — G1 and G8 citing different files in adjacent
+rows is obvious once the files are named. The provenance table now at the top
+of `docs/verification-2026-09-04.md` is this part, applied by hand, and it
+immediately exposed a second inconsistency nobody intended: G3 and G5 are
+read at h=20,000 while G1 and G8 are read at h=40,000.
+
+**2. A script re-derives the row from the artefact it names.** Parse the
+citations out of the markdown, load each artefact, recompute the quoted
+statistic, and diff. Roughly: a `figure` inline convention the parser can
+find, a small registry mapping metric ids to how they are summarised
+(median / mean / count-of-seeds), and a `--check` mode that exits non-zero on
+a mismatch. **It is the same shape as `regime_map_rollup.py`**, which already
+does this for one sentence, generalised to figures — so the pattern is
+established and the cost is bounded.
+
+**What it must NOT do**, on this log's own evidence: silently pick an
+estimator. If a row says "0.9654" and the artefact's median is 0.9166 and its
+mean 0.9654, the checker reports **which** matches rather than accepting the
+first that does — a checker that accepts any estimator would have passed this
+row unchanged.
+
+**Not built here.** It is a new instrument, it belongs with a decision about
+the citation convention, and building it inside a verification pass would
+make the pass's own numbers its first and only test case.

@@ -734,6 +734,58 @@ not a review of the code. **The scorer had already been read and approved by
 its author.** Reading analysis code does not catch this; decomposing its
 output does.
 
+### THE SHARPEST INSTANCE: reported a tool's answer on the one criterion written down so a tool could not decide it (2026-09-04)
+
+**G12's promotion bar is the place this project had been most careful.**
+§35.13 fixed the bar *before the data arrived*, wrote both clauses out, and
+added an edge in advance — *"all three candidate mechanisms are
+position-dependent; tracing the effect to any of them CONFIRMS the artefact,
+it does not refute it"* — precisely so that a striking result could not be
+talked into a finding later.
+
+**And the bar was reported as FIRING, from `g12_score`'s output, without
+anyone checking that `g12_score` implements the bar.** It does not. Clause 1
+is *"the arms' order distributions differ **in the same direction** under
+**every** permutation tested, canonical included."* The code collapsed every
+permutation into one **set** per arm and asked only whether the arms' sets
+differ:
+
+```
+PF {[4,2]}  vs  Reservation {[4,2],[2,4]}   ->  "differ"  ->  survives = True
+```
+
+**A pooled set cannot represent a direction, and direction is the entire
+criterion.** Applied as written, no arm pair differs in the same direction
+across all six conditions — PF–Reservation 3/6, PF–TwoTier 4/6,
+Reservation–TwoTier 1/6 — and the arms' leans *reverse* between canonical and
+perm 104, which is what a position artefact looks like and exactly what the
+bar was written to exclude.
+
+**Why this is a class beyond "a rule violated by the code implementing it".**
+§36.6 was a scorer breaking a rule its docstring cited. This is worse in one
+specific way: **the criterion existed in prose, correct and complete, and the
+tool's disagreement with it was never checked — on the one output whose whole
+purpose was to stop a human deciding.** The bar was written down so that a
+tool would decide it; the tool was then trusted to have been written to the
+bar. Nobody re-derived one from the other.
+
+**The failure is not in the scorer. It is in the reporting step**: a verdict
+was published from a program's output with no step between them. Reading the
+scorer would not have caught it either — it reads plausibly; only *applying
+the registered wording to the same data by hand* separates them, which is
+what eventually did.
+
+**Mechanically, and it is one step:** when a tool emits a verdict against a
+registered criterion, **re-derive the verdict from the criterion's own words
+on the same data, once, by hand.** If the two agree, the tool implements the
+bar. If they disagree, the tool is the thing that is wrong — and it will be
+wrong in the direction that makes a result look stronger, because that is the
+direction a weaker test fails in.
+
+**Cost, and it is the cheapest column this table has had:** caught before
+publication, by one hand-application of the bar's own sentence. **The
+retraction was of a report already given, not of a committed result.**
+
 ---
 
 ## P6 — `priority_level` derives from the 5QI table (2026-09-03)
