@@ -41,9 +41,22 @@ MODE="${2:-copy}"
 # A manifest nothing checks is a list of intentions.
 if [ "$HOST" = "--local" ] || [ "$HOST" = "--verify-local" ]; then
   REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  # DECIDED 2026-09-04, and the three files are NOT the same case.
+  #
+  # stage4/records.jsonl was REMOVED from this list: nothing reads it.
+  # C5's bit-identity check (analyse_stage5.py::c5_stage4_identity) reads
+  # sweeps/wp9/stage4/stages4_rows.csv -- which IS present, 669 KB -- so the
+  # belief that its absence blocked C5 was wrong. An expectation nothing acts
+  # on is worse than no expectation: it was "discovered missing" twice and
+  # cost attention both times for a capability that was never impaired.
+  #
+  # The other two are REGENERABLE BUT NOT COMMITTABLE: ~1 MB/record measured,
+  # so stage 1 is ~1.8 GB and the n=40 set ~250 MB, against GitHub's hard
+  # 100 MB per-blob limit. Pushing cannot protect them, so the manifest's job
+  # is to say LOUDLY that they are absent and name the regenerator -- which
+  # is what --local now does -- not to imply they should have been copied.
   ITEMS=(
     "sweeps/wp9/stage1/records.jsonl"
-    "sweeps/wp9/stage4/records.jsonl"
     "sweeps/wp9/stage6_g6_n40_records.jsonl"
   )
   miss=0
@@ -66,7 +79,6 @@ if [ "$HOST" = "--local" ] || [ "$HOST" = "--verify-local" ]; then
     printf 'Regenerate before scoring anything that reads them:\n'
     printf '  stage6_g6_n40_records.jsonl  <- scripts/g6_seed_extension.py (G6 cannot be scored without it)\n'
     printf '  stage1/records.jsonl         <- scripts/wp9_sweep.py stage 1\n'
-    printf '  stage4/records.jsonl         <- scripts/wp9_sweep.py stage 4\n'
   fi
   exit $([ "$miss" -eq 0 ] && echo 0 || echo 1)
 fi

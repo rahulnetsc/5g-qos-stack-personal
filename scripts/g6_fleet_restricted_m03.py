@@ -78,7 +78,21 @@ VARIANTS = {
 
 import argparse
 _ap = argparse.ArgumentParser()
-_ap.add_argument("--records", default="sweeps/wp9/stage1/records.jsonl")
+# NO SILENT DEFAULT TO A FILE THAT IS NOT IN THE REPO. stage1/records.jsonl
+# is ~1.8 GB (1,770 runs x ~1 MB) and CANNOT be committed -- GitHub rejects
+# any blob over 100 MB -- so it exists only on whichever machine last ran
+# stage 1. Defaulting to it meant this script died on FileNotFoundError with
+# no route forward, which is how it blocked an M20 re-score on 2026-09-04.
+#
+# Required, with the two real sources named in the error. The n=40 records
+# are usually the BETTER input anyway: same population, and post-fix.
+_ap.add_argument(
+    "--records", required=True,
+    help=("path to a records.jsonl. Two real sources: "
+          "sweeps/wp9/stage6_g6_n40_records.jsonl (n=40, regenerate with "
+          "scripts/g6_seed_extension.py), or sweeps/wp9/stage1/records.jsonl "
+          "(~1.8 GB, regenerate with scripts/wp9_sweep.py stage 1). Neither "
+          "is committable; both are regenerable."))
 _args = _ap.parse_args()
 base, exc = load(REPO / _args.records)
 print(f"records: {_args.records}")
