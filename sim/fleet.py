@@ -261,6 +261,13 @@ def _allocate(n_ues: int, comp: dict[str, float]) -> list[str]:
     return seq
 
 
+# MFBR as a multiple of GFBR. See the mfbr_bps note in build_fleet -- an
+# authored scenario value, matched to sim/parametric.py's mfbr_multiple
+# default so the two builders agree (the literal config diff that would
+# have caught this in the first place).
+_MFBR_MULTIPLE = 2.0
+
+
 def build_fleet(
     n_ues: int,
     composition: str,
@@ -313,6 +320,26 @@ def build_fleet(
                 ue_id=ue_id, qfi=f.qfi, direction=f.direction,
                 flow_class=f.flow_class, gfbr_bps=gfbr,
                 pdb_ms=DERIVE_PDB_FROM_5QI,       # STANDARDISED, not authored
+                # MFBR, 2026-09-04. This builder set it NOWHERE, so every
+                # fleet flow took FlowConfig's 0.0 default -- and 0.0 makes
+                # BOTH of two-tier's protections unreachable, because FIX-2's
+                # GBR PRB reserve and the UL service-interval floor are gated
+                # on has_pending_gbr, which requires gbr_ul_max > 0
+                # (gNB_scheduler_ulsch.c:66). Measured at 0.0: the gate is
+                # true ZERO times in 424,959 calls, and two-tier's
+                # total-UL-blackout rate is 35 %; configured, 5 %.
+                #
+                # AUTHORED VALUE, not ported: no MFBR ground truth exists in
+                # this repo. 2x GFBR is the operator convention of bursting
+                # to twice the guarantee. Magnitude is irrelevant to arming
+                # (P13: identical at 8 and 150 Mbps) but DOES feed
+                # Reservation's GBR-deficit target-spread cap, so this is not
+                # a two-tier-only knob.
+                #
+                # Non-GBR flows keep 0.0: MFBR is a GBR QoS-profile field and
+                # inventing one for a best-effort flow would be a different
+                # claim than the one this fixes.
+                mfbr_bps=(_MFBR_MULTIPLE * gfbr) if gfbr > 0 else 0.0,
                 traffic_kind=f.kind, traffic_params=params,
             ))
     return flows, seq

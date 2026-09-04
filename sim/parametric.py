@@ -147,7 +147,7 @@ def sweep_scenario(
     snr_spread_db: float = 0.0,
     pdb_ms: Optional[float] = None,
     shared_lcg: bool = False,
-    mfbr_multiple: float = 0.0,
+    mfbr_multiple: float = 2.0,
     bg: bool = False,
     inf_scenario: Optional[str] = None,
     horizon_slots: int = 20_000,
@@ -179,7 +179,22 @@ def sweep_scenario(
                      [OPEN: HARDWARE/DECISION]) -- WP9 routes around that
                      open item rather than appearing to settle it, and any
                      H5 result is conditional on this override.
-      mfbr_multiple  0.0 = off (the repo-wide status quo). Otherwise every
+      mfbr_multiple  2.0 by default since 2026-09-04. WAS 0.0, and that
+                     zero made BOTH of two-tier's protections unreachable in
+                     every sweep this project ever ran: FIX-2's GBR PRB
+                     reserve and the UL service-interval floor are gated on
+                     has_pending_gbr, which requires gbr_ul_max > 0
+                     (gNB_scheduler_ulsch.c:66). Measured: at 0.0 the gate is
+                     true ZERO times in 424,959 calls; configuring it takes
+                     two-tier's total-UL-blackout rate from 35 % to 5 %.
+                     The VALUE is a scenario choice, not a ported one -- no
+                     MFBR ground truth exists in this repo -- and 2x GFBR is
+                     the operator convention of bursting to twice the
+                     guarantee. Magnitude does not matter to arming
+                     (prediction-journal.md P13: identical 5 % at 8 Mbps and
+                     150 Mbps), but it DOES feed Reservation's GBR-deficit
+                     target-spread cap, so this is not a two-tier-only knob.
+                     Otherwise every
                      GBR flow gets mfbr_bps = multiple * gfbr_bps, which
                      activates gbr_bytes_slot / gbr_below in BOTH arms at
                      once -- neither arm's captured baseline covers it.

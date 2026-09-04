@@ -1,0 +1,72 @@
+{
+ "expected_trials_per_run": 80.0,
+ "rows": [
+  {
+   "arm": "PF",
+   "seed": 1,
+   "n_ues": 8,
+   "load_mult": 3.0,
+   "horizon_slots": 200000,
+   "sim_s": 50.0,
+   "wall_s": 36.6,
+   "stop_bytes_arrived": 3480,
+   "stop_bytes_delivered": 3480,
+   "trials": 87,
+   "delivered_trials": 87,
+   "never_delivered": 0,
+   "misses_over_bound": 0,
+   "pass_fraction": 1.0,
+   "p50_ms": 0.2500000000011937,
+   "max_ms": 3.7499999999965894,
+   "bound_ms": 100.0
+  },
+  {
+   "arm": "Reservation",
+   "seed": 1,
+   "n_ues": 8,
+   "load_mult": 3.0,
+   "horizon_slots": 200000,
+   "sim_s": 50.0,
+   "wall_s": 52.8,
+   "stop_bytes_arrived": 3480,
+   "stop_bytes_delivered": 3480,
+   "trials": 87,
+   "delivered_trials": 87,
+   "never_delivered": 0,
+   "misses_over_bound": 0,
+   "pass_fraction": 1.0,
+   "p50_ms": 0.25000000000030553,
+   "max_ms": 2.2500000000000853,
+   "bound_ms": 100.0
+  },
+  {
+   "arm": "TwoTier",
+   "seed": 1,
+   "n_ues": 8,
+   "load_mult": 3.0,
+   "horizon_slots": 200000,
+   "sim_s": 50.0,
+   "wall_s": 109.5,
+   "stop_bytes_arrived": 3480,
+   "stop_bytes_delivered": 3480,
+   "trials": 87,
+   "delivered_trials": 87,
+   "never_delivered": 0,
+   "misses_over_bound": 0,
+   "pass_fraction": 1.0,
+   "p50_ms": 0.499999999995282,
+   "max_ms": 3.500000000002501,
+   "bound_ms": 100.0
+  }
+ ],
+ "config": {
+  "arms": "PF,Reservation,TwoTier",
+  "seed": 1,
+  "n_ues": 8,
+  "horizon": 200000,
+  "rate_hz": 0.2,
+  "burst_bytes": 40,
+  "load_mult": 3.0,
+  "out": "sweeps/phase2/g2_fast_load3.json"
+ }
+}

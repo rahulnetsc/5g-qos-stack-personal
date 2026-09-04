@@ -563,6 +563,62 @@ the CONFIGURATION and the predicate's input is a MEASUREMENT, the correction
 is a hypothesis, not a fix — and it will be believed harder than the original
 error was.
 
+## Standing rule — FIX AT THE CATEGORY, NOT AT THE SITE OF DISCOVERY
+
+**One clean instance, recorded honestly as one.** A second was offered and
+withdrawn when its premise turned out to be false — see the note below,
+because the withdrawal is part of the rule's evidence rather than an
+embarrassment to be tidied away.
+
+**The instance: the population defect.** `docs/wp9-plan.md` §24.2 diagnosed
+it — a worst-flow statistic ranging over every flow while the guarantee is
+about a subset — and fixed it **for G6**, by binding that guarantee to a new
+M20 rather than editing M03. That fix was correct, careful, and
+well-reasoned. Nobody asked whether any other guarantee had the same shape.
+Nine work packages later it was inverting **G1 and G8 in opposite
+directions**, and the correction cost a re-measurement of the entire
+evidence base.
+
+**Why this class is self-concealing, which is the part worth internalising.**
+Once G6 was fixed, **G6 looked right**. The site of discovery is the one
+place the defect is guaranteed absent afterwards, so every subsequent glance
+at it confirms health. The defect survives precisely *because* it was found
+and fixed — at one site.
+
+**The project already has the working counter-example**, which is why this is
+a habit to apply rather than a technique to invent: E2's defect in the G12
+scorer was found by **searching the same file for the shape of a defect
+already found in it**, instead of treating the first as a one-off. That is
+the move. It was applied within a file and not across guarantees, and not
+across configs.
+
+**THE ACTIONABLE FORM — two questions before closing any fix:**
+
+1. **Where else does this metric, parameter or pattern appear?** Not "is this
+   fix correct" but "is this fix COMPLETE". One grep, at the moment of the
+   fix, while the shape is still in your head. `M20` should have prompted
+   *which other metrics rank over every flow?* — the answer was most of them.
+2. **Do the configs that should agree actually agree?** A literal diff, not a
+   reading. `sim/parametric.py` against `sim/fleet.py` takes one command and
+   would have surfaced both `mfbr_bps = 0.0` everywhere AND the parametric
+   mix having no flow tighter than 100 ms — the second being the more
+   consequential and the one nobody suspected.
+
+**THE WITHDRAWN SECOND INSTANCE, and why it stays visible.** MFBR = 0 was
+offered as a second case of the same pattern, on the premise that the fleet
+workloads set it to 150 Mbps while the parametric mix was left at zero. **The
+premise was false.** `mfbr_bps` is assigned at exactly one non-test site
+(`sim/parametric.py:258`, default `0.0`); `sim/fleet.py` never assigns it;
+all four compositions have zero flows with it set. So MFBR is not a fix
+applied narrowly — it is a parameter **diagnosed as inert three separate
+times** (two-tier commit 4a's `gbr_below`, `max_burst` at its floor, the UL
+floor's arming gate), understood each time, and configured nowhere.
+
+That is a **different** failure shape: not incomplete propagation of a fix,
+but a diagnosis repeatedly reached and never acted on. It belongs beside this
+rule, not inside it — and a two-instance pattern resting partly on a wrong
+premise would have been worse than a one-instance pattern that is true.
+
 ## Standing rule — a rule can be violated by the code that IMPLEMENTS it
 
 Fourth of the form rules, and it is about a failure the other three cannot
@@ -963,3 +1019,210 @@ process.
 CLAUDE.md requires**: the re-baseline is intended, it is a SCHEMA addition
 with zero numeric movement, and prediction 2 is what established the
 difference.
+
+## P12 — does configuring MFBR fix two-tier's 35 % blackout rate? (2026-09-03)
+
+**Registered before running. My expectation differs from the instruction's,
+and that is the point of writing it down.**
+
+**The setup.** Two-tier has two protections against a UE being zeroed, and
+BOTH are gated on `mfbr_bps > 0` via `has_pending_gbr`
+(`gNB_scheduler_ulsch.c:48-66`, faithfully ported): FIX-2's GBR PRB reserve
+and the UL service-interval floor. The parametric mix sets
+`mfbr_multiple = 0.0`, so `mfbr_bps = 0.0` on all 32 flows and both are
+inert. The fleet workloads set 150 Mbps; the sweep never did.
+
+**MY EXPECTATION: TwoTier does NOT drop to 0/20. I expect a partial drop at
+most, and would not be surprised by no movement.**
+
+**Why, and it is a distinction about what the floor was built for.** The C's
+`has_pending_gbr` is computed by skipping any LCG whose
+`estimated_ul_buffer_per_lcg <= 0`. CLAUDE.md's own invariant says that array
+is **frozen between BSRs and never drained on a grant**, while the scalar IS
+decremented — they desync deliberately. That asymmetry is what makes the
+array a durable arming signal *in the fault the C describes*: for a
+**DESYNCED** UE, `B` reads 0 while the array still holds the last BSR's
+value, so `has_pending_gbr` stays true and the floor arms.
+
+**Our UE8's array is 0 because it never had a BSR at all** — measured, 0 in
+all 40,000 slots. It is **NEVER-SERVED, not DESYNCED**. The C's own comment
+names the fault as *"BSR desync / SR loss on real RF"* — a UE that had
+service and lost it. A never-served UE presents the same symptom through a
+different history, and the arming signal cannot distinguish them because it
+reads the same zero.
+
+**So configuring MFBR should switch on FIX-2's reserve (which needs only the
+GBR configuration, not a live estimate) while leaving the floor still unable
+to arm.** Hence: partial drop, from the reserve, not the floor.
+
+**Outcome→meaning, fixed in advance.**
+
+| outcome | meaning |
+|---|---|
+| **0/20** | I am wrong; the array is non-zero often enough for the floor to arm, and the 35 % was purely a misconfigured scenario. No code question ever existed. |
+| **partial drop, reserve fires, floor does not** | My reading holds. The reserve stops the band being taken; the floor never arms because the UE is never-served. |
+| **no movement** | Both remain inert for a reason MFBR does not reach, and the never-served case is outside what either protection covers. |
+
+**Instrumented separately, because they switch on together and protect
+different points:** FIX-2's reserve becoming non-zero, and floor arming via
+`has_pending_gbr`. If both fire, report which was sufficient.
+
+**And whichever way it goes, this is NOT a licence to make the reserve
+unconditional.** FIX-2 is deliberately targeted — its own comment: *"when no
+downstream GBR UE is waiting, reserve_rb is 0 and the cap is inert"*. An
+unconditional `n_candidates * min_rb` reserve holds back 35 of 55 PRBs
+permanently at 8 UEs and would stop the sim's two-tier being the deployed
+two-tier.
+
+### P12 — SCORED: HIT, and the mechanism split settles which protection works
+
+**Registered: "TwoTier does NOT drop to 0/20; partial drop at most."**
+**Measured: 7/20 → 1/20 (35 % → 5 %).** A large drop, not elimination.
+
+| arm | mfbr=0 | mfbr=2.0 |
+|---|---|---|
+| PF | 0 % | 0 % |
+| **Reservation** | 65 % | **65 % — unchanged** |
+| **TwoTier** | 35 % | **5 %** |
+
+**WHICH MECHANISM DID THE WORK — they switch on together, so they were
+counted apart:**
+
+| run | `has_pending_gbr` TRUE | FLOOR_FIRED | dead flows |
+|---|---|---|---|
+| rescued seed, mfbr=0 | **0** of 424,959 calls | 0 | 9 |
+| rescued seed, mfbr=2.0 | 304,913 | **3** | **0** |
+| still-dead seed, mfbr=2.0 | 110,218 | **0** | 9 |
+
+**THE FLOOR IS SUFFICIENT; THE RESERVE ALONE IS NOT.** The still-dead seed
+has the gate TRUE in 110,218 calls — so FIX-2's reserve is fully active —
+and still loses 9 flows, because **the floor never fired for the dead UE**.
+The rescued seed differs only in that the floor fired **3 times**. Three
+fires clear nine dead flows, which is what a deadlock break looks like: one
+grant carries a BSR, the estimate resyncs, normal service resumes.
+
+**And row 1 is the config diagnosis in one number:** at `mfbr=0` the gate is
+true **zero times in 424,959 calls**. Both protections were not merely
+weakened, they were never reachable.
+
+**MY REASONING WAS RIGHT FOR THE RIGHT REASON, which is worth separating
+from the hit.** I predicted a partial drop because the floor's arming reads
+`estimated_ul_buffer_per_lcg`, which is 0 for a **never-served** UE as
+opposed to the **desynced** UE the C's comment describes (*"BSR desync / SR
+loss on real RF"*). The still-dead seed is exactly that residue: the gate is
+true for the cell, the reserve is active, and the floor cannot arm for the
+one UE that needs it, because arming reads the signal the fault destroys.
+
+**What I got wrong along the way, recorded because the pattern is the
+lesson.** Three times I inferred a mechanism from a small sample and was
+wrong — "ranked last" (right, but from three unrepresentative rows), "the
+tiers are inert" (wrong: 109 distinct `pdb_ms` values), "the cold-start
+hypothesis is refuted" (too strong: the deadlock is the documented one, its
+symptom is not). Every one was caught by the next measurement, never by more
+reasoning. The rank trace eventually confirmed rank 7 in 6,940 of 9,216
+appearances — so the first guess was correct and its evidence was not, and
+those are different failures.
+
+## P13 — is MFBR's MAGNITUDE binding, or only its non-zero-ness? (2026-09-04)
+
+**Registered before running.** `mfbr_multiple` ∈ {2.0, 37.5} on the frequency
+probe, 3 arms × N=8 × 20 seeds. At a 4 Mbps camera GFBR that is **8 Mbps vs
+150 Mbps — a 19× range.**
+
+**EXPECTATION: 5 % holds on TwoTier across both. Magnitude is irrelevant.**
+
+**Why.** The C's arming test is `if (c->gbr_ul_max > 0)`
+(`gNB_scheduler_ulsch.c:66`) — a **boolean**, not a comparison against
+offered rate or PRB capacity. The port reproduces it as `if f.mfbr_bps > 0`.
+Nothing downstream of the gate reads the magnitude on the arming path.
+
+**Falsifier, and it is specific:** if TwoTier's rate differs between 2.0 and
+37.5, then MFBR is binding somewhere OTHER than the gate — most likely in
+`gbr_bytes_slot`'s sizing or the deficit target — and that is a separate
+finding needing its own trace, not a tuning result.
+
+**Second falsifier, cheaper to overlook:** if Reservation or PF move at all,
+MFBR is reaching an arm that has no MFBR-gated mechanism, which would mean
+the parameter changes the WORKLOAD and not just the scheduler's view of it.
+Both arms must stay flat at 65 % / 0 % for this to be a clean scheduler
+result.
+
+## P14 — configuring MFBR in both builders (2026-09-04)
+
+**Registered before the edit.**
+
+**The change.** `sim/parametric.py`'s `mfbr_multiple` default 0.0 → 2.0, and
+`sim/fleet.py` gains `mfbr_bps` on its GBR flows. Justified by P13: any
+non-zero value arms both of two-tier's protections **identically** (5 % at
+8 Mbps and at 150 Mbps, a 19× range), so this is *configuring a real
+per-bearer QoS parameter*, not tuning a value.
+
+**THE VALUE IS A SCENARIO CHOICE, NOT A PORTED ONE, and is labelled as such.**
+No ground truth for MFBR exists anywhere in this repo — not in
+`calibration-logs/`, not in the vendored C, not in any `.conf`. The only
+MFBR-shaped value on disk is `scenario_config_6.yml`'s 2 Mbps, annotated
+*"not enforced in sim"*. **2× GFBR** is chosen as the common operator
+convention (burst to twice the guarantee) and recorded as an authored value,
+the way `t_live_s = 2 s` already is.
+
+**`--check` is BLIND, and the intersection test says so before running.**
+`regression_corpus.py::_cases()` builds all 20 cases from
+`scripts/scheduler_study.py`'s three scenarios, which call neither
+`sweep_scenario` nor `build_fleet`. Input read and artefact touched do not
+intersect. **A clean `--check` here is zero evidence** and must not be cited.
+Predicted: CLEAN. A MOVED `--check` would mean a corpus scenario reaches one
+of these builders, which would be a finding in itself.
+
+**What BINDS instead:** the builders' own MFBR histograms, and the frequency
+probe re-run.
+
+**AND A PREDICTION THAT IS NOT A NO-OP, registered because it is the easy
+thing to miss.** MFBR is not only two-tier's arming gate. `FlowConfig`'s own
+docstring records that **Reservation's GBR-deficit target-spread caps at 2×
+a per-slot burst derived from `mfbr_bps`**, falling back to a GFBR-derived
+floor when it is 0. So setting MFBR changes **Reservation's** behaviour too,
+through a different path.
+
+P13 measured Reservation flat at 65 % across both values — but that is the
+BLACKOUT metric only. **I expect Reservation's throughput/latency metrics to
+move**, and if they do not, the deficit cap is inert for a reason worth
+finding. Falsifier: Reservation identical on every metric ⇒ the documented
+cap does not bind, and `FlowConfig`'s docstring is describing a mechanism
+that does not fire.
+
+## P15 — Phase 2's re-run with MFBR configured: what moves (2026-09-04)
+
+**Registered before running, so the comparison is SCORED and not read.**
+
+**The framing that makes this more than a caveat: every two-tier number this
+project has ever produced was measured with FIX-2's GBR PRB reserve and the
+UL service-interval floor switched off.** That is not a qualified two-tier.
+It is a **different scheduler** — one missing both of its named UL
+protections. So the question is not "which arms are affected" but "which
+results were about two-tier at all".
+
+| result | expectation | why |
+|---|---|---|
+| **G10 admissible fleet** (PF 8 / Res 4 / **TT 4**) | **TwoTier's 4 MOVES UP.** Most likely to 5–8. | THE HEADLINE. The boundary was located on a two-tier missing both mechanisms. The all-pass criterion (`M07.met == M07.total` AND `M08.fraction ≥ 0.95` on every seed) fails if any GBR flow is starved — and the blackout starves whole UEs. Removing 6-in-7 blackouts should let more seeds pass at N=8. |
+| **G6 conjunction** (M20 TwoTier +29.35 % INCONCLUSIVE) | **moves, direction unknown** | Its M20 residual is a worst-protected-flow liveness gap; a rescued UE removes the extreme value that produced it. Could resolve the INCONCLUSIVE either way. |
+| **G11 C1** | **pass rate rises on TwoTier** | C1's conjuncts include M05 ≥ 0.99 and M09 ≥ 0.90; a blacked-out UE fails both. |
+| **G12 clause 4** (telemetry M02 = 1.000) | **may not move** | The ramp's fault is telemetry PDB violation under load, not total starvation. Different mechanism. If it DOES move, the two were entangled. |
+| **Reservation, all metrics** | **moves via the deficit cap**, not via blackouts | P14's non-no-op prediction: MFBR feeds Reservation's GBR-deficit target spread. Blackout rate stays 65 % (P13 measured that); throughput/latency should shift. |
+| **PF** | **unchanged everywhere** | No MFBR-gated mechanism, no deficit cap. **This is the control: if PF moves, MFBR changed the WORKLOAD and the whole comparison is invalid.** |
+
+**The strongest falsifier, stated first because it is the one that would
+invalidate the pass: if PF moves on any metric, stop.** MFBR would then be
+altering offered traffic rather than the scheduler's view of it, and no
+before/after comparison across arms would mean anything.
+
+**Second falsifier: if G10's TwoTier admissible count does NOT move**, then
+either the blackout was not what bounded it — and the 4 is a real capacity
+limit — or the all-pass criterion is dominated by something else entirely.
+Both are findings; neither is a null result.
+
+**Scope limit that survives however clean the run is**, recorded here so a
+clean Phase 2 cannot be read as covering it: the re-run uses a parametric
+mix whose **tightest PDB is 100 ms**, with no 5QI 83 (10 ms) or 5QI 85
+(5 ms). **Every latency-critical conclusion remains structurally
+unavailable**, regardless of the result. That is a separate gap with a named
+home (a fleet-builder run), not something this re-measurement touches.

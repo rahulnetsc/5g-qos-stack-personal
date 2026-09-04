@@ -38,6 +38,37 @@ change specifically, the `flow_class` reasoning was insufficient.
 **Count, derived from the rows above: 8 re-measured (G3 joined once #22
 landed), 2 with a stated limit, 2 not participating. Twelve accounted for.**
 
+### A LIMIT THAT SURVIVES A CLEAN RUN — no latency-critical flow is present
+
+**Stated alongside the non-participating guarantees, because a clean Phase 2
+would otherwise read as covering ground it does not touch.**
+
+The re-run uses `sweep_scenario`'s parametric mix. Its classes and budgets:
+
+| | classes | tightest PDB |
+|---|---|---|
+| parametric mix (what Phase 2 runs) | 5QI 1 (100 ms), 2 (150 ms), 9 (300 ms), 82 (100 ms) | **100 ms** |
+| fleet builder (what it does not run) | the same **plus 5QI 83 (10 ms) and 5QI 85 (5 ms)** | **5 ms** |
+
+**The mix contains no flow any reasonable reading would call
+latency-critical.** So every latency-critical conclusion is **structurally
+unavailable from this pass regardless of how clean it is** — including
+`docs/wp9-plan.md` §15.5's open hypothesis about tight-PDB density, which
+cannot be tested on a workload with no tight-PDB flows.
+
+It bites hardest on **G1**, whose 100 ms bound is evaluated against a mix
+whose tightest configured budget *equals that bound*, and on **G3**, whose
+liveness numbers come from flows whose slowest cadence is 300 ms.
+
+**What Phase 2 CAN still say** is everything about 5QI 1 / 2 / 9 / 82
+behaviour — arm separation, load dependence, G10's per-arm admissible counts.
+Those classes are really present and really measured.
+
+**Deliberately not fixed here.** Retrofitting the classes would change every
+sweep number simultaneously, on top of the MFBR change, and destroy the
+attribution this re-run exists for. It is a real gap with a named home: a
+fleet-builder run of its own, decided after Phase 2 lands.
+
 ### Carried into Phase 4's budget
 
 **Overnight time goes to guarantees where more samples buy tighter numbers,
