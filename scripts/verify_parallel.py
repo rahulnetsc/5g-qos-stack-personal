@@ -90,7 +90,26 @@ CASES: dict[str, dict[str, Any]] = {
         "timing_keys": [], "provenance_keys": [],
     },
     "g12_campaign": {
-        "argv": ["scripts/g12_campaign.py", "--smoke"],
+        # --perm-seeds 2, NOT the default 5, and the trade is stated rather
+        # than absorbed. A check nobody can afford to run before a commit is
+        # one that quietly stops being run. At full width this case is 204
+        # runs; it WAS run at full width once, on 2026-09-04, and passed --
+        # 3 arms x 4 permutations x 5 seeds. At 2 seeds it is 24 permutation
+        # tasks instead of 60, which still exercises the three-level index
+        # arithmetic (arm, permutation, seed) that is the only thing the pool
+        # can get wrong here.
+        #
+        # MEASURED at --perm-seeds 2: 671 s end to end (serial reference half
+        # plus parallel half), against roughly 28 min at full width. The
+        # remaining cost is not the permutations -- it is that every run here
+        # is a full 20,000-slot N=8 run under ramped load, which has nothing
+        # to do with what the check tests. Cutting HORIZON_SLOTS for the
+        # identity case is the next lever if 11 min is still too slow to run
+        # before a commit; it is not taken here because the horizon is a
+        # scenario property this runner reads from sim/scenarios/g12.py, and
+        # overriding it from the check would make the check exercise a
+        # configuration the campaign never runs.
+        "argv": ["scripts/g12_campaign.py", "--smoke", "--perm-seeds", "2"],
         "out_flag": "--out", "out_name": "g12.json", "fmt": "json",
         "timing_keys": [], "provenance_keys": [],
     },
