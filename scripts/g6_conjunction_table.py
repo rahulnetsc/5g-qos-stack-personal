@@ -20,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -33,7 +34,11 @@ from sim.scorecard import Population, Scorecard, load_panel  # noqa: E402
 
 ARMS = ("PF", "Reservation", "TwoTier")
 BAR = 0.20
-RECORDS = "sweeps/wp9/stage6_g6_n40_records.jsonl"
+# NO SILENT DEFAULT TO AN UNCOMMITTABLE FILE -- the same defect fixed in
+# g6_fleet_restricted_m03.py (defects-log #19) and missed here, in the only
+# other script that reads this class of input (#20.7). It is gitignored and
+# absent from any clone.
+_DEFAULT_RECORDS = "sweeps/wp9/stage6_g6_n40_records.jsonl"
 
 # The scalar each metric contributes, and its bound where the test plan
 # states one. A bound of None means the plan states no numeric bound for
@@ -87,12 +92,25 @@ def _scalar(res, key):
     return None if not isinstance(v, dict) else v.get(key)
 
 
-def main() -> int:
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--records", default=_DEFAULT_RECORDS,
+        help=("path to the n=40 records JSONL. Gitignored and absent from a "
+              "clone; regenerate with scripts/g6_seed_extension.py."))
+    args = ap.parse_args(argv[1:])
+    records = Path(args.records)
+    if not records.exists():
+        raise SystemExit(
+            f"{records} is absent. It is ~251 MB, gitignored, and does not "
+            f"survive a clone. Regenerate it with "
+            f"`uv run python scripts/g6_seed_extension.py`, or pass --records "
+            f"with another n=40 records file.")
     ids = g6_bound_statistics()
     print(f"G6 binds {len(ids)} statistics, derived from the panel: {ids}\n")
 
     base, exc = {}, {}
-    with open(RECORDS) as fh:
+    with records.open() as fh:
         for line in fh:
             p = json.loads(line)
             rec = RunRecord.from_dict(p["record"])
@@ -176,10 +194,25 @@ def main() -> int:
                 c2 = "undefined (zero base)"
             else:
                 ci = bootstrap_ci(rels, seed=4242)
+                # THE VERDICT IS THE MEDIAN'S. Both estimators are printed --
+                # the reporting rule -- but a PASS/FAIL from the MEAN's CI is
+                # that rule honoured in the display and broken in the verdict,
+                # on the exact statistic where this project recorded the two
+                # disagreeing: +136.84 % mean against -0.22 % median on one G6
+                # cell (wp9-plan §25.4, §27.1).
+                ci_med = bootstrap_ci(rels, seed=4242, statistic="median")
                 summ = Scorecard.robust_delta_summary(rels)
-                verdict = ("PASS" if ci["hi"] <= BAR
-                           else "FAIL" if ci["lo"] > BAR else "INCONCLUSIVE")
+                def _v(c):
+                    return ("PASS" if c["hi"] <= BAR
+                            else "FAIL" if c["lo"] > BAR else "INCONCLUSIVE")
+
+                verdict, mean_verdict = _v(ci_med), _v(ci)
+                # Both, with a marker when they disagree -- switching the
+                # estimator silently would substitute one answer for another.
+                if verdict != mean_verdict:
+                    verdict = f"{verdict}!={mean_verdict}"
                 c2 = (f"{verdict:<13} med {summ['median']*100:+7.2f}% "
+                      f"[{ci_med['lo']*100:+6.1f},{ci_med['hi']*100:+6.1f}] "
                       f"mean {ci['point']*100:+7.2f}%")
             print(f"{mid:<6}{arm:<13}{c1:<34}{c2:<30}")
         print()
@@ -187,4 +220,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv))

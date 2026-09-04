@@ -628,19 +628,46 @@ def write_csv(rows: list[dict[str, Any]], path: str) -> None:
 
 def bootstrap_ci(
     values: list[float], n_boot: int = 2000, alpha: float = 0.05, seed: int = 0,
+    statistic: str = "mean",
 ) -> dict[str, float]:
-    """Percentile bootstrap: point estimate (sample mean) + a (1-alpha) CI."""
+    """Percentile bootstrap: point estimate + a (1-alpha) CI.
+
+    ``statistic="median"`` bootstraps the median instead of the mean. The
+    DEFAULT IS UNCHANGED and the mean path is bit-for-bit what it was --
+    every existing caller and every published interval keeps its value; the
+    resample draws happen in the same order from the same seeded stream.
+
+    WHY THE OPTION EXISTS. On a ratio statistic this project has recorded the
+    two estimators disagreeing about whether a guarantee holds: the same G6
+    cell read **+136.84 % on the mean and -0.22 % on the median**, with 21/40
+    seeds improving (`docs/wp9-plan.md` §25.4, §27.1). The reporting rule
+    that followed -- median and quartiles beside the mean, never the mean
+    alone -- was being honoured in the DISPLAY and broken in the VERDICT by
+    scorers computing PASS/FAIL from the mean's CI. A median verdict needs a
+    median interval, and there was no way to ask for one.
+    """
     arr = np.asarray(values, dtype=float)
     if arr.size == 0:
         return {"point": float("nan"), "lo": float("nan"), "hi": float("nan"), "n": 0}
+    if statistic not in ("mean", "median"):
+        raise ValueError(f"statistic must be 'mean' or 'median', not {statistic!r}")
+    est = np.mean if statistic == "mean" else np.median
     rng = np.random.default_rng(seed)
-    boot_means = np.empty(n_boot)
+    boot = np.empty(n_boot)
     n = arr.size
     for i in range(n_boot):
         sample = arr[rng.integers(0, n, size=n)]
-        boot_means[i] = sample.mean()
-    lo, hi = np.percentile(boot_means, [100 * alpha / 2, 100 * (1 - alpha / 2)])
-    return {"point": float(arr.mean()), "lo": float(lo), "hi": float(hi), "n": int(n)}
+        boot[i] = est(sample)
+    lo, hi = np.percentile(boot, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    out = {"point": float(est(arr)), "lo": float(lo), "hi": float(hi),
+           "n": int(n)}
+    # The `statistic` key appears ONLY on the non-default path. These dicts
+    # are serialised straight into committed artefacts (g9_campaign.json,
+    # g12_campaign.json), so adding a field on the default path would change
+    # every one of them -- a shape change dressed as a new option.
+    if statistic != "mean":
+        out["statistic"] = statistic
+    return out
 
 
 def aggregate(

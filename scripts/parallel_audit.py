@@ -36,6 +36,13 @@ import sys
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
+REPO = SCRIPTS.parent
+# The repo root, so `import sim` / `import scheduler` resolve when the
+# dead-call check imports them. Without it every script reports a
+# ModuleNotFoundError -- a check that fires on everything is as useless
+# as one that fires on nothing, and louder about it.
+sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(SCRIPTS))
 
 # A module is a RUNNER if it imports one of these run entry points and
 # mentions it anywhere -- referenced, not necessarily called directly, since
@@ -70,15 +77,9 @@ ALLOW_SERIAL = {
     "plot_timeseries.py": "one run, to draw it",
     "tbs_counterfactual.py": "replays one existing run's grants offline",
     "g12_ramp_probe.py": "a stop-condition probe, one arm one seed",
-    "compare_schedulers.py": "PHASE 1 STUDY, superseded -- kept for the "
-                             "record, not re-run",
-    "cqi_study.py": "PHASE 1 STUDY, superseded",
-    "demand_study.py": "PHASE 1 STUDY, superseded",
-    "maxmin_study.py": "PHASE 1 STUDY, superseded",
-    "ul_shadow_study.py": "PHASE 1 STUDY, superseded",
+    "cqi_study.py": "PHASE 1 STUDY, superseded -- kept because it still runs",
+    "maxmin_study.py": "PHASE 1 STUDY, superseded -- kept because it still runs",
     "f2_duty_cycle_trace.py": "single-run trace, by construction",
-    "diagnose_finding2.py": "single-run diagnostic trace",
-    "diagnose_finding3.py": "single-run diagnostic trace",
     "phase2_g2.py": "G2 is NOT MEASURED (docs/phase2-results.md); this "
                     "probes one configuration",
     "scheduler_study.py": "the published studies 1-3, whose numbers are "
@@ -144,11 +145,67 @@ def classify(path: Path) -> dict:
             "parallel": sorted(set(parallel_via))}
 
 
+def dead_calls(path: Path) -> list[str]:
+    """Calls whose keyword arguments the callee no longer accepts.
+
+    THE CLASS THIS CATCHES. `TwoTier.__init__` stopped taking
+    `tier1_period_slots` at the Phase 2 rewrite, and SEVEN scripts kept
+    passing it -- every one of them IMPORTING CLEANLY, because a constructor
+    is not called at import time. Nothing static noticed and nothing dynamic
+    ran them, so they sat dead for a phase. Import-checking is not enough;
+    the signature has to be compared against the call.
+
+    Also flags a `from <project module> import NAME` whose NAME is gone --
+    `knapsack_diagnostic.py` failed that way on `estimate_demand_bps`.
+    """
+    import importlib
+    import inspect
+    tree = ast.parse(path.read_text())
+    names = _imports(tree)
+    problems: list[str] = []
+    resolved: dict[str, Any] = {}
+    for local, (mod, orig) in names.items():
+        if not mod.split(".")[0] in ("scheduler", "sim"):
+            continue
+        try:
+            m = importlib.import_module(mod)
+        except Exception as exc:                     # noqa: BLE001
+            problems.append(f"import {mod}: {type(exc).__name__}: {exc}")
+            continue
+        if mod == orig:
+            # `import sim.driver as driver_mod` binds the MODULE, not an
+            # attribute of it. Importing it cleanly is the whole check.
+            continue
+        if not hasattr(m, orig):
+            problems.append(f"{mod}.{orig} no longer exists")
+            continue
+        resolved[local] = getattr(m, orig)
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        fn = resolved.get(node.func.id)
+        if fn is None or not (inspect.isclass(fn) or inspect.isfunction(fn)):
+            continue
+        try:
+            sig = inspect.signature(fn)
+        except (TypeError, ValueError):
+            continue
+        if any(p.kind is inspect.Parameter.VAR_KEYWORD
+               for p in sig.parameters.values()):
+            continue
+        for kw in node.keywords:
+            if kw.arg and kw.arg not in sig.parameters:
+                problems.append(
+                    f"{node.func.id}(..., {kw.arg}=...) at line {node.lineno}: "
+                    f"no such parameter")
+    return problems
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
                     help="exit non-zero if any runner is serial and not "
-                         "listed in ALLOW_SERIAL")
+                         "listed in ALLOW_SERIAL, or any script is dead")
     a = ap.parse_args(argv[1:])
 
     rows = [classify(p) for p in sorted(SCRIPTS.glob("*.py"))]
@@ -173,6 +230,20 @@ def main(argv: list[str]) -> int:
     print(f"\nANALYSIS / REPORTING ONLY ({len(analysis)}):")
     print("  " + "  ".join(r["name"] for r in analysis))
 
+    print("\nDEAD CALLS (a signature the callee no longer has, or a vanished "
+          "import):")
+    dead: dict[str, list[str]] = {}
+    for path in sorted(SCRIPTS.glob("*.py")):
+        if path.name == "parallel_audit.py":
+            continue
+        probs = dead_calls(path)
+        if probs:
+            dead[path.name] = probs
+            for msg in probs:
+                print(f"  {path.name:<28} {msg}")
+    if not dead:
+        print("  none -- every script's calls match the signatures it calls")
+
     inert = sorted(set(ALLOW_SERIAL) - {r["name"] for r in serial})
     if inert:
         print(f"\nALLOW_SERIAL entries that are not serial runners "
@@ -185,7 +256,7 @@ def main(argv: list[str]) -> int:
         print("  Either use regime_sweep.run_cells, or add the file to "
               "ALLOW_SERIAL with the reason it is serial on purpose.")
     if a.check:
-        return 1 if unexplained else 0
+        return 1 if (unexplained or dead) else 0
     return 0
 
 

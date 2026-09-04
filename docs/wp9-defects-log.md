@@ -520,3 +520,102 @@ simulator that no longer exists.
 `coerce` in `analyse_stage2/3/6`, five sites in `analyse_stage5`), so
 defect #1's string/bool fix propagated correctly. That is the one place in
 this read where a fix reached every site it needed to.
+
+---
+
+## #21 — THE NINE DEAD SCRIPTS: TWO FIXED, SEVEN DELETED (2026-09-04)
+
+#20.1 established that nine scripts could not run. Decided per script, because
+"fix" and "delete" are not interchangeable here: **seven of them cannot be
+repaired without changing what they measure.**
+
+`TwoTier.__init__` stopped accepting `tier1_period_slots` at the Phase 2
+rewrite, and `2000` was the STALE value in the first place — it encoded
+`ia_p5g_scheduler.h`'s doc-commented 1.0 s against the deployed 0.1 s macro
+(CLAUDE.md). So "fixing" one of these means pointing it at a **different
+scheduler** from the one whose finding it documents. The repaired script
+would produce a new measurement wearing an old name, which is worse than no
+script: the finding it records lives in the docs, and a runnable file beside
+it invites someone to re-run it and believe the output.
+
+### FIXED (2)
+
+| script | what was wrong | why fix rather than delete |
+|---|---|---|
+| `plot_timeseries.py` | `TwoTier(tier1_period_slots=2000)` | a plotting utility, not a finding. It has no result to invalidate, and construction is its only stale part — now `load_two_tier(_TT_CONFIG, min_rb=5)`. |
+| `g6_fleet_restricted_m03.py` | ran its whole analysis at **import time** — `parse_args()` and the body at module scope (#20.8), so importing it parsed `sys.argv` | it is G6's decisive falsifier and still the right instrument. Wrapped in `main()`. |
+
+### DELETED (7)
+
+`compare_schedulers.py`, `demand_study.py`, `diagnose_finding2.py`,
+`diagnose_finding3.py`, `knapsack_diagnostic.py`, `transient_check.py`,
+`ul_shadow_study.py`.
+
+Each is a Phase 1-era diagnostic whose finding is recorded in `docs/`, and
+each would need a rewrite rather than a repair:
+
+- **`transient_check.py`** also **reimplemented the slot loop** and still
+  applied `bytes_capacity * (1 - bler)` as its delivery model — the
+  fractional HARQ discount CLAUDE.md forbids reintroducing (#20.2). Its
+  question ("is 4,000 slots steady state?") is re-askable with
+  `wp9_window.py` on `driver.run` output; the answer it gave was measured on
+  a simulator six work packages behind.
+- **`ul_shadow_study.py`** studied `_shadow_lcp_split`, which CLAUDE.md names
+  as a known modeling error not to extend and which Phase 2 deleted.
+- **`demand_study.py`** asked how Tier-1 gets demand without ground truth;
+  Phase 2 answered it by porting `_compute_demand_bps` from the C.
+- **`diagnose_finding2.py`** passed `enable_sps=False`, a mechanism deleted
+  with the SPS path.
+
+**`knapsack_diagnostic.py` is the one deletion with an external cost, and it
+is deliberate.** README §8 carries an `[OPEN: PHASE2]` item: `paper/main.tex`'s
+knapsack section rests on `solve_tier1` being lexicographic, ground truth has
+no such structure, and whether the fixed `IA_P5G_TIER1_GBR_PENALTY` still
+produces knapsack-shaped allocations under the single-phase form is **open
+and empirically answerable**. That script was the instrument for the OLD
+formulation. **Repairing its imports would let it answer the old question
+against a scheduler that no longer exists and report it as an answer to the
+new one** — so the code goes and the question stays. README's entry is
+updated from "no longer runs" (which implies revival) to "removed; the
+instrument for the new formulation has to be built".
+
+### THE STRUCTURAL FIX, so the class cannot recur silently
+
+**Every one of these imported cleanly** — a constructor is not called at
+import time — so nothing static noticed and nothing dynamic ran them. They
+sat dead for a whole phase.
+
+`scripts/parallel_audit.py --check` now also reports **DEAD CALLS**: for
+every call to a name imported from `sim`/`scheduler`, it compares the
+keyword arguments against the callee's live signature, and flags a
+`from <module> import NAME` whose NAME has vanished. Verified to bind by
+restoring one deleted script and re-running:
+
+```
+_deadcheck_probe.py   TwoTier(..., tier1_period_slots=...) at line 34: no such parameter
+_deadcheck_probe.py   TwoTier(..., enable_sps=...) at line 138: no such parameter
+```
+
+Import-checking alone would have passed all nine. The signature comparison
+is what makes the check able to fail.
+
+### AND TWO DEFECTS FROM #20 FIXED WHILE HERE
+
+- **#20.6, the mean-of-ratios verdict**, in both `g6_fleet_restricted_m03.py`
+  and `g6_conjunction_table.py`. `regime_sweep.bootstrap_ci` gained
+  `statistic="median"` — **default unchanged and the mean path bit-identical**,
+  with the new `statistic` key emitted ONLY on the non-default path, because
+  these dicts are serialised straight into committed artefacts and adding a
+  field on the default path would change every one of them.
+
+  **THE ESTIMATOR CHANGE MOVES A VERDICT, so it is shown rather than
+  substituted.** On the n=40 G6 records, TwoTier's all-flow row reads
+  **MEDIAN −0.85 % PASS** where the mean gives **+30.24 % [−0.21, +68.79]
+  INCONCLUSIVE**. Both are printed and the row is marked `!= mean:INCONCLUSIVE`
+  when they disagree. Silently swapping one answer for another would have
+  been the same move as quoting the mean alone, in the other direction — the
+  disagreement between the estimators is the finding.
+- **#20.7, the sibling that did not get #19's fix.**
+  `g6_conjunction_table.py` now takes `--records`, checks existence, and
+  names the regenerator, instead of reading a gitignored 251 MB path from a
+  module constant.

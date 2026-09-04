@@ -30,7 +30,10 @@ from sim.scenarios import (
 from sim.baselines.gradient import GradientScheduler
 from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
-from scheduler import TwoTier
+from scheduler import load_two_tier
+
+_TT_CONFIG = str(Path(__file__).resolve().parent.parent
+                 / "scheduler" / "scheduler_config.yaml")
 
 
 SCENARIOS = {
@@ -46,7 +49,11 @@ SCHEDULERS = {
     "rr": lambda: RoundRobin(),
     "pf": lambda: ProportionalFair(ewma_window_slots=200),
     "gradient": lambda: GradientScheduler(),
-    "twotier": lambda: TwoTier(tier1_period_slots=2000),
+    # `TwoTier(tier1_period_slots=...)` has not existed since the Phase 2
+    # rewrite, and 2000 was the STALE value anyway -- it encoded
+    # ia_p5g_scheduler.h's doc-commented 1.0 s against the deployed
+    # 0.1 s macro (CLAUDE.md). `load_two_tier` reads the real config.
+    "twotier": lambda: load_two_tier(_TT_CONFIG, min_rb=5),
 }
 
 

@@ -1587,9 +1587,14 @@ these five, add a new tag rather than forcing it into an existing one.
   utility term enough to produce knapsack-shaped (vertex, all-or-nothing)
   allocations under the new single-phase form is open and empirically
   answerable, not yet answered — `scripts/knapsack_diagnostic.py` was
-  the instrument that answered the old version of this question and no
-  longer runs post-commit-2 (`ImportError` on the private `tier1.py`
-  helpers it imported, all deleted in the rewrite). The first finding in
+  the instrument that answered the old version of this question and was
+  **DELETED 2026-09-04** (`docs/wp9-defects-log.md` #21). It had not run
+  since commit 2 (`ImportError` on `estimate_demand_bps` and the private
+  `tier1.py` helpers, all deleted in the rewrite), and repairing its
+  imports would have let it answer the OLD question against a scheduler
+  that no longer exists and report it as an answer to the new one. **The
+  instrument for the single-phase form has to be built; it cannot be
+  recovered.** The first finding in
   this whole port that reaches outside the simulator into a paper draft
   — not recoverable only by grepping commit history, hence its own entry
   here rather than a commit-message mention alone.
