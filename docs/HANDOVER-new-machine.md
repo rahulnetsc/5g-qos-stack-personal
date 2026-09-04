@@ -1,3 +1,37 @@
+> # ⛔ STOP — READ BEFORE QUOTING ANY NUMBER IN THIS DOCUMENT
+>
+> **This handover read through `74789ed`. There have been 43 commits since,
+> and SIX of them change what every prior number MEANS.** A figure from
+> before them is not stale — it was produced by different code.
+>
+> | commit | what it changed | what it invalidates |
+> |---|---|---|
+> | `8f9ad34` | `priority_level` now derives from the 5QI table | every WP9/G9/G11/G12 figure — all flows previously tied at 100, so Tier-1's Delay class was never selected and TwoTier's urgency weight sat clamped at its floor |
+> | `9c23327` | worst-flow statistics REFUSE to compute without an explicit population | **G1 and G8's published rows are known-wrong** — the filler won M01's contest in 85.4 % of 7,560 runs |
+> | `3788202` | MFBR configured in both builders | **every arm comparison ever published** — two-tier's FIX-2 reserve and UL floor were unreachable in every workload |
+> | `2a4b382` | M03 distinguishes slow-by-design from network-degraded | G3, which could not be scored honestly before — the caveat silenced real breaches |
+> | `b1981a5` | join handshake credits its arrivals | any byte-weighted statistic over a G9 joiner (`delivery_ratio` read 641:1) |
+> | `ebfee69` | 5QI tables verified against the deployed gNB | three priorities were absent and fell back to 100 |
+>
+> **THE SINGLE MOST DAMAGING THING A NEW READER CAN DO IS QUOTE A PRE-FIX
+> FIGURE.** They are plausible, they are precise, they are in the deck, and
+> nothing about their appearance says they are superseded.
+>
+> **Where the current numbers live: `docs/phase2-results.md`.** Every
+> guarantee, with a verdict or a named cause. Use it instead of this
+> document's results sections.
+>
+> **The client deck still carries pre-fix figures.** G1 and G8 are marked
+> withdrawn in it; the rest of its numbers predate these commits and have not
+> been re-measured into it.
+>
+> **Also changed structurally:** `Scorecard.score()` now requires a
+> `population=` argument and raises without one — any script calling it must
+> say which flows it means. `sweeps/wp9/stage1/records.jsonl` is absent and
+> not committable (~1.8 GB); run `./scripts/transfer_manifest.sh --local` to
+> see what is missing before scoring anything.
+
+
 # Handover — moving this project to another machine
 
 Written 2026-09-01; **revised 2026-09-01 after G9 and G12 closed** (this
@@ -12,6 +46,7 @@ uv 0.12.5, Python 3.12.3). §4 says which of them must be re-measured
 before they are trusted anywhere else — the answer is "all the timings".
 
 ---
+
 
 ## 1. What travels in a `git clone`, and what does not
 

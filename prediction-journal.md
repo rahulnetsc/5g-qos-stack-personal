@@ -1343,6 +1343,28 @@ timing table; recorded as a fourth instance rather than as a new rule.
 `chunksize=1`, so the expensive cells start first and workers steal work
 rather than receiving a fixed block.
 
+**A SECOND INSTANCE, AND ITS SHAPE IS DIFFERENT AND WORSE (2026-09-04).**
+G10 was budgeted before launching — per-run times measured at the real
+horizon, extrapolated, reported, checked against the 30-minute rule, and it
+fit. **G12 was launched without any of that**, and reported **720 runs** on
+startup: roughly 1.5–2 hours, far outside the same rule.
+
+**The difference is not that the estimate was wrong. It is that the rule was
+not applied.** G10 had a check run against it; G12 had the same check
+available and skipped.
+
+**That is the manifest's shape, not the packing entry's.** The packing miss
+was a number quoted outside the configuration it held in — a wrong estimate.
+This is *a check that exists and was not run*, which is the same failure as
+`transfer_manifest.sh` having a `--verify` mode nobody invoked, and the same
+as `--check` being cited without asking whether it could fail.
+
+**Recorded beside the packing entry because they look alike and are not:**
+one is a defective measurement, the other is an omitted one. The mitigation
+differs — the first needs a better model, the second needs the existing check
+actually run.
+
+
 ## P17 — my camera-provisioning lead: SCORED, REFUTED (2026-09-04)
 
 **The lead.** Phase 1 recorded that 4 of 5 camera flows are provisioned below
