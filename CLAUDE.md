@@ -125,6 +125,45 @@ wrong value, not the confirmed-real one. Phase 2's rewrite defaults to
 not a special case of the OAI-comment rule, it's the same rule applied to
 a default this codebase itself chose.
 
+**TIER-1'S LP HAS MULTIPLE OPTIMA AND ITS SCA LOOP DOES NOT CONVERGE —
+so `scheduler/tier1.py`'s output depends on the SOLVER PATH, not only on
+the model.** Measured 2026-09-04 over one real run's 2,437 Tier-1 LPs
+(`sweeps/phase2/lp-degeneracy-2026-09-04/`): solving each one twice, via
+`scipy.optimize.linprog(method="highs")` and via a directly-built HiGHS
+model with scipy's own options, returns a **different `x` on 1,781 of them
+(73 %)** — median max abs difference **3.3e6** — while the **relative
+objective gap never exceeds 9.5e-11** and **both points are feasible in all
+2,437**. That is degeneracy: same optimal face, different vertex, chosen by
+how the solver got there. `presolve` on/choose/off does not change it.
+
+**Two consequences, and the second is the one that will surprise someone.**
+
+1. **A pure-speedup swap of the LP call cannot be bit-identical**, so the
+   41×-per-call direct-HiGHS optimisation the profile identified is
+   **unavailable at this project's own bar** and was reverted rather than
+   landed — both the warm (reuse model, change `c`) and cold (rebuild per
+   call) variants move `regression_corpus.py --check`, e.g. TwoTier
+   `ue9_qfi9` `throughput_bps` 5,521,232 → 5,340,428. Unblocking it means
+   giving the LP its own vertex-selection rule (lexicographic tie-break, or
+   a tiny secondary objective), which is a **behaviour change to the
+   scheduler**, would move the corpus deliberately, and needs its own
+   decision against ground truth.
+2. **The regression corpus is pinning a solver path as tightly as it is
+   pinning the scheduler.** A scipy upgrade is a scheduler change here.
+   Treat a `--check` diff after a dependency bump as this first, before
+   looking for a fidelity regression.
+
+**And the loop runs to its cap: 41 of 50 Tier-1 solves hit
+`_SCA_MAXITERS = 150` without reaching `_SCA_TOL = 1e-6`** (median 150
+iterations, mean 133.1, 6,656 LP solves in one 20,000-slot run). So on 82 %
+of solves the targets are not a converged fixed point — they are where the
+damped sequence stood at iteration 150, across 150 degenerate LPs. **The cap
+is faithful to ground truth** (`IA_P5G_TIER1_SCA_MAXITERS`), so this is not
+a porting error; what is **unknown** is whether the deployed C converges
+where this does not, since GLPK's vertex selection is not HiGHS's. Do not
+"fix" the convergence by raising the cap — that would depart from ground
+truth to chase a property nobody has established the real system has.
+
 **Do not add SPS / Configured Grant to the schedulers.** `main`'s
 `scheduler/two_tier.py` had it (`_SPSReservation`, `_allocate_sps`); the real
 hardware scheduler defers SPS to a Phase 2 that was never built. The Python

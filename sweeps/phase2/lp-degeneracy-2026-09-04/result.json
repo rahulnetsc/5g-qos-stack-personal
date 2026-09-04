@@ -1,0 +1,34 @@
+{
+  "presolve": "on",
+  "solves": 2437,
+  "status_disagreements": 0,
+  "relative_objective_gap": {
+    "max": 9.511839406139432e-11,
+    "median": 1.4116442448499325e-11,
+    "above_1e-9": 0
+  },
+  "max_abs_x_difference": {
+    "max": 8660788.001000773,
+    "median": 3290041.401306645,
+    "nonzero": 1781
+  },
+  "both_solutions_feasible": {
+    "highs": 2437,
+    "scipy": 2437,
+    "of": 2437
+  }
+}
+{
+  "tier1_solves": 50,
+  "sca_maxiters": 150,
+  "sca_tol": 1e-06,
+  "iterations": {
+    "min": 56,
+    "median": 150.0,
+    "max": 150,
+    "mean": 133.12
+  },
+  "converged_before_cap": 9,
+  "hit_the_cap": 41,
+  "total_lp_solves": 6656
+}

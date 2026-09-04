@@ -121,6 +121,33 @@ conditions exactly.** The hardware team is being told about their own
 product's join path — which every deployment exercises on every attach and
 recovery — not about a limitation of this model.
 
+### Tier-1's LP is degenerate and its SCA loop does not converge — a fidelity finding, not a performance one
+
+Found while profiling, and it changes what a TwoTier number rests on. Over
+one real run's **2,437** Tier-1 LPs, solving each twice — through
+`scipy.optimize.linprog` and through a directly-built HiGHS model with
+scipy's own options — returns a **different `x` on 1,781 (73 %)**, median max
+abs difference **3.3e6**, while the **relative objective gap never exceeds
+9.5e-11** and **both points are feasible in every one**. Same optimal face,
+different vertex, selected by the solver's path.
+
+**And 41 of 50 Tier-1 solves hit `_SCA_MAXITERS = 150` without reaching
+`_SCA_TOL`.** So on 82 % of solves the targets are not a converged fixed
+point — they are where the damped sequence stood at iteration 150, over 150
+degenerate LPs.
+
+**What this does and does not say.** It does **not** invalidate any Phase 2
+number: within a pinned scipy the path is deterministic and the corpus
+reproduces. It says those numbers are **contingent on a solver path that
+nothing in the repo declares** — a scipy upgrade is a scheduler change here
+— and that TwoTier's Tier-1 targets are not uniquely determined by Tier-1's
+own model. The 150-iteration cap is faithful to ground truth
+(`IA_P5G_TIER1_SCA_MAXITERS`); **whether the deployed C, on GLPK, converges
+where this does not is untested**, and GLPK's vertex selection is not
+HiGHS's.
+
+Evidence and reproduction: `sweeps/phase2/lp-degeneracy-2026-09-04/`.
+
 ### Specification findings — these belong to the test plan's owner
 
 Properties of the guarantees' **definitions**, not of any scheduler. None
