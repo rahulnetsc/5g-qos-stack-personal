@@ -86,7 +86,15 @@ def _task(task: tuple) -> tuple[list[dict[str, Any]], list[dict]]:
     sink = None
     if keep_records:
         def sink(record, axis_values):      # noqa: F811
-            records.append(_strip_timeseries(record.to_dict()))
+            # THE ENVELOPE IS PART OF THE FORMAT. `PersistingRecordSink`
+            # writes {"axis_values": ..., "record": ...} and every reader of
+            # these files -- g6_fleet_restricted_m03.py, g6_conjunction_table.py
+            # -- unwraps it. Writing the bare record here changed the schema
+            # silently: the parallelisation commit's serial-vs-parallel check
+            # compares NEW code against NEW code, so it binds on the axis it
+            # was designed for and not on the one that actually moved.
+            records.append({"axis_values": dict(axis_values),
+                            "record": _strip_timeseries(record.to_dict())})
     rows = sweep(axes={"bg": [bg]}, build_scenario=_build,
                  schedulers=_arms(), seeds=[seed],
                  driver_kwargs=_driver_kwargs, record_sink=sink)

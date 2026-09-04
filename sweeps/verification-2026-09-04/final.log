@@ -1,0 +1,37 @@
+=== G6 n=40, control able to fire ===
+  persisted 240 records to sweeps/verification-2026-09-04/stage6_g6_n40_records.jsonl
+==============================================================================
+CONTROL, read before any effect size: do stage 1's own 10 seeds reproduce?
+==============================================================================
+  30 shared (arm, seed) pairs, 3 metrics
+  worst absolute difference: 1.076e+03   at ('TwoTier', 1826701614) / M03.max_gap_ms: 1835.0 vs 759.2500000000002
+  -> FAIL  -- the extension is NOT read; the runner and stage 1 disagree about the scenario.
+
+wrote sweeps/verification-2026-09-04/stage6_g6_n40.csv and .json
+
+=== G12 -- full campaign, all cells ===
+    ... drone_heavy_n8/TwoTier/seed661058651  in-range [4, 2]  full [4, 2]
+    ... drone_heavy_n8/TwoTier/seed87989972  in-range [2, 4]  full [2, 4]
+    ... drone_heavy_n8/TwoTier/seed161576974  in-range [4, 2]  full [4, 2]
+    ... drone_heavy_n8/TwoTier/seed35492826  in-range [4, 2]  full [4, 2]
+    ... drone_heavy_n8/TwoTier/seed376383645  in-range [4, 2]  full [4, 2]
+    ... drone_heavy_n8/TwoTier/seed1746484539  in-range [2, 4]  full [2, 4]
+  TwoTier      IN-RANGE [4, 2]x7  [2, 4]x3   |   FULL [4, 2]x7  [2, 4]x3
+
+==============================================================================
+D4 permutation control -- mixed N=8
+==============================================================================
+  PF           perm 101: [4, 2]x5
+  PF           perm 102: [4, 2]x5
+  PF           perm 103: [4, 2]x5
+  PF           perm 104: [4, 2]x5
+  Reservation  perm 101: [4, 2]x4  [2, 4]x1
+  Reservation  perm 102: [2, 4]x4  [4, 2]x1
+  Reservation  perm 103: [2, 4]x3  [4, 2]x2
+  Reservation  perm 104: [2, 4]x5
+  TwoTier      perm 101: [2, 4]x3  [4, 2]x2
+  TwoTier      perm 102: [2, 4]x3  [4, 2]x2
+  TwoTier      perm 103: [2, 4]x4  [4, 2]x1
+  TwoTier      perm 104: [2, 4]x3  [4, 2]x2
+
+wrote sweeps/verification-2026-09-04/g12.json

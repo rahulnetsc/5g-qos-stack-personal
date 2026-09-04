@@ -1,4 +1,20 @@
-# Phase 2 — complete results
+# Phase 2 — complete results  ·  **SUPERSEDED**
+
+> **⛔ SUPERSEDED 2026-09-04 by `docs/verification-2026-09-04.md`.** Every
+> guarantee has been re-measured on current code. **The "Phase 2" label is
+> retired** — it meant *fast numbers to check the plumbing*, and that is what
+> these were: the G1/G3/G5/G8 row below comes from a **`--seeds 1`** run
+> (`sweeps/phase2/core_fast.json`).
+>
+> **Two verdicts below are known-wrong at a defensible seed count.** G8's
+> "both conjuncts pass, 0 starvation epochs on all arms" is n=1; at n=10 both
+> conjuncts fail on both QoS-aware arms. And G12's "neither promotion clause
+> fires" was a consequence of the campaign not completing — with the
+> permutation control run, **clause 1 fires**.
+>
+> **What is still current here:** the specification findings (including 1a,
+> registered in this document), the scope limits at the top, and the two
+> Tier-1 solver sections. Use the verification document for every number.
 
 **2026-09-04.** Every guarantee, with a verdict or a named cause. This is the
 artefact Phase 3 diffs against, so it is written to be readable without the
@@ -240,6 +256,58 @@ surfaced until someone executed the clause literally.
 1. **G6 is unscoreable as written.** Its *"shifts by ≤ +20 % relative"* bar is
    undefined when the baseline is legitimately zero, and one of G6's own
    bound statistics is exactly that.
+
+1a. **G6 NAMES NO ESTIMATOR, AND THE THREE DEFENSIBLE READINGS GIVE THREE
+   DIFFERENT VERDICTS ON THE SAME CELL.** A second, independent defect in the
+   same guarantee — the bar is undefined at a zero baseline (above), *and*
+   undefined over runs.
+
+   The clause is *"every G1/G3/G5 statistic stays within its bound and shifts
+   by ≤ ▷ +20 % relative"*. It fixes a number and a direction and says
+   nothing about how the shift is aggregated across the campaign's runs.
+   **That omission is a gap, not an implied convention: the plan names a
+   run-rule wherever it means one** — G10 is *"all-pass in **5/5** runs"*, and
+   §7 of the open items sets *"defaults are 5 runs (P0) / 3 runs (P1+), 5/5
+   for admissible-N"*. G6 is silent.
+
+   Measured on the n=40 records, **protected fleet** (the population G6
+   binds to), M03's max gap:
+
+   | arm | median | mean | per-run (all seeds within bar) |
+   |---|---|---|---|
+   | PF | −0.30 % **PASS** | +0.44 % **PASS** | 36/40 **FAIL** |
+   | Reservation | +0.10 % **PASS** | +1.84 % **PASS** | 38/40 **FAIL** |
+   | **TwoTier** | **−1.39 % PASS** | **+21.34 % INCONCLUSIVE** | **29/40 FAIL** |
+
+   **PASS, INCONCLUSIVE and FAIL, on one cell, from one dataset.** The
+   verdict is a property of a choice the guarantee does not make.
+
+   **AND THE ALL-FLOW ROW DISAGREES IN EXACTLY THE SAME WAY** — TwoTier reads
+   median −0.85 % PASS against mean +30.24 % INCONCLUSIVE — so restricting to
+   the protected fleet does not stabilise it. Worth stating because the
+   protected reading is the one G6 binds to, and it is not the safer one.
+
+   **A THIRD UNSPECIFIED CHOICE COMPOUNDS IT: the run count itself.** A
+   per-run conjunction gets strictly harder as runs are added, and §7 lists
+   the count as unconfirmed. Reservation **passes at n=3 and fails at n=5**:
+
+   | arm | n=3 | n=5 | n=10 | n=20 | n=40 |
+   |---|---|---|---|---|---|
+   | PF | FAIL 2/3 | FAIL 4/5 | FAIL 8/10 | FAIL 17/20 | FAIL 36/40 |
+   | **Reservation** | **PASS 3/3** | **FAIL 4/5** | FAIL 8/10 | FAIL 18/20 | FAIL 38/40 |
+   | TwoTier | FAIL 2/3 | FAIL 4/5 | FAIL 7/10 | FAIL 14/20 | FAIL 29/40 |
+
+   **REGISTERED DISPOSITION: no single G6 verdict is published.** No
+   estimator is derivable from the guarantee, so choosing one in code would
+   be the tool deciding what the specification declined to. All three
+   readings are reported side by side, with the disagreement marked
+   (`scripts/g6_fleet_restricted_m03.py`,
+   `scripts/g6_conjunction_table.py`). **G6 becomes publishable when its
+   owner ratifies an estimator AND a run count** — not before, and not by
+   this project picking the one whose answer reads best.
+
+   **This belongs to the test plan's owner, and it is the second defect in
+   G6's single sentence.**
 2. **GT-7.3's ramp does not reach its own failure condition.**
 3. **G10's all-pass criterion cannot distinguish 1/10 from 6/10.** An
    all-pass requirement is binary in a quantity that is not, so a **6×

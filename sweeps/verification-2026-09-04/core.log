@@ -1,0 +1,70 @@
+=== G1/G3/G5/G8 -- phase2_core, N=8, load 1.0, 10 seeds, 20k slots ===
+  Reservation     0.0000    0.0000     21.62
+  TwoTier         0.9934    0.9934     47.78
+  PF              0.9934    0.9934     26.20
+  Reservation     0.0000    0.0000     21.37
+  TwoTier         1.0000    1.0000     51.63
+
+G8  BOTH conjuncts -- M09 per-1s Jain (>=0.9) AND M22 starvation epochs (==0)
+  arm           Jain all Jain prot  epochs all  epochs prot  longest s   worst flow
+  PF              0.9512    0.9999           0            0       0.00         None
+  Reservation     0.9490    0.9999           0            0       0.00         None
+  TwoTier         0.9030    0.9992           0            0       0.00         None
+  PF              0.9452    0.9999           0            0       0.00         None
+  Reservation     0.9433    0.9998           0            0       0.00         None
+  TwoTier         0.8991    0.9912           0            0       0.00         None
+  PF              0.9471    0.9999           0            0       0.00         None
+  Reservation     0.8817    0.9161           3            2       5.00     ue8_qfi9
+  TwoTier         0.8599    0.9058           0            0       0.00         None
+  PF              0.9579    0.9999           0            0       0.00         None
+  Reservation     0.8909    0.9166           3            2       5.00     ue8_qfi9
+  TwoTier         0.7187    0.7500           9            6       2.71     ue8_qfi9
+  PF              0.9551    0.9999           0            0       0.00         None
+  Reservation     0.8084    0.8333           6            4       5.00     ue7_qfi9
+  TwoTier         0.9159    0.9990           0            0       0.00         None
+  PF              0.9432    0.9998           0            0       0.00         None
+  Reservation     0.8802    0.9165           3            2       5.00     ue8_qfi9
+  TwoTier         0.8933    0.9992           0            0       0.00         None
+  PF              0.9374    1.0000           0            0       0.00         None
+  Reservation     0.8747    0.9166           3            2       5.00     ue8_qfi9
+  TwoTier         0.7183    0.7499           9            6       2.96     ue7_qfi9
+  PF              0.9420    0.9999           0            0       0.00         None
+  Reservation     0.9377    0.9998           0            0       0.00         None
+  TwoTier         0.7186    0.7499           9            6       5.00     ue6_qfi9
+  PF              0.9466    0.9999           0            0       0.00         None
+  Reservation     0.8772    0.9165           3            2       5.00     ue8_qfi9
+  TwoTier         0.9033    0.9955           0            0       0.00         None
+  PF              0.9585    0.9999           0            0       0.00         None
+  Reservation     0.8892    0.9166           3            2       5.00     ue8_qfi9
+  TwoTier         0.9201    0.9998           0            0       0.00         None
+
+wall: 250s total
+=== G10 -- g10_rerun, 6 fleet sizes x 3 arms x 10 seeds ===
+180 runs: 3 arms x 6 fleet sizes x 10 seeds, load 1.0, horizon 20000
+wrote sweeps/verification-2026-09-04/g10_rows.csv (180 rows) in 3.9 min
+=== G10 admissible, scored from that ===
+arm                N=2       N=4       N=8      N=16      N=24      N=32   admissible
+-------------------------------------------------------------------------------------
+PF               10/10     10/10     10/10      0/10      0/10      0/10   8
+Reservation      10/10     10/10      3/10      0/10      0/10      0/10   4
+TwoTier          10/10     10/10      1/10      0/10      0/10      0/10   4
+
+admissible N (largest fleet passing on EVERY seed):
+  PF           8
+  Reservation  4
+  TwoTier      4
+
+mean M07 contracts met  /  mean M08 worst-flow floor (§0.1: quote BOTH, always)
+arm                        N=2               N=4               N=8              N=16              N=24              N=32
+------------------------------------------------------------------------------------------------------------------------
+PF                 2.0 / 0.967       4.0 / 0.965       8.0 / 0.962      13.9 / 0.931       0.0 / 0.636       0.0 / 0.470
+Reservation        2.0 / 0.967       4.0 / 0.965       7.2 / 0.288      10.9 / 0.000      10.4 / 0.000       6.2 / 0.000
+TwoTier            2.0 / 0.967       4.0 / 0.965       5.4 / 0.243       6.3 / 0.000       6.7 / 0.000       6.4 / 0.000
+
+rank per metric (1 = best); ties shown as '=' 
+  N=2   PF: M07 1= M08 1  | Reservation: M07 1= M08 2  | TwoTier: M07 1= M08 3 
+  N=4   PF: M07 1= M08 2  | Reservation: M07 1= M08 3  | TwoTier: M07 1= M08 1 
+  N=8   PF: M07 1  M08 1  | Reservation: M07 2  M08 2  | TwoTier: M07 3  M08 3 
+  N=16  PF: M07 1  M08 1  | Reservation: M07 2  M08 2= | TwoTier: M07 3  M08 2=
+  N=24  PF: M07 3  M08 1  | Reservation: M07 1  M08 2= | TwoTier: M07 2  M08 2=
+  N=32  PF: M07 3  M08 1  | Reservation: M07 2  M08 2= | TwoTier: M07 1  M08 2=

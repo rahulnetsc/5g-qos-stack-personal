@@ -149,6 +149,15 @@ def main(argv: list[str]) -> int:
                         else "FAIL" if c["lo"] > 0.20 else "INCONCLUSIVE")
 
             verdict, mean_verdict = _v(ci_med), _v(ci)
+            # THE PER-RUN READING, which is the one G6's own document
+            # supports. Its clause names no estimator over runs -- but the
+            # plan DOES name one where it means one (G10: "all-pass in 5/5
+            # runs"; §7 of the open items: "defaults are 5 runs (P0) / 3 runs
+            # (P1+), 5/5 for admissible-N"). So "every statistic shifts by
+            # <= +20 %" read in the document's own idiom is a per-run
+            # conjunction, and it is decidable without choosing an estimator.
+            within = sum(1 for r in rels if r <= 0.20)
+            per_run = "PASS" if within == len(rels) else "FAIL"
             # BOTH VERDICTS, and a marker when they disagree. Switching the
             # estimator SILENTLY would substitute one answer for another --
             # on this data it moves TwoTier's all-flow row from INCONCLUSIVE
@@ -163,7 +172,7 @@ def main(argv: list[str]) -> int:
                   f"mean {ci['point'] * 100:+8.2f}% "
                   f"[{ci['lo'] * 100:+8.2f},{ci['hi'] * 100:+8.2f}]  "
                   f"worse {sum(1 for r in rels if r > 0)}/{len(rels)}"
-                  f"  winner-flow changed identity on {flips}/{len(rels)}"
+                  f"  per-run {within}/{len(rels)} within bar -> {per_run}"
                   f"{flag}{warn}")
         print()
     return 0

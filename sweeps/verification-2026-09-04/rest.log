@@ -1,0 +1,40 @@
+=== G4 -- post-silence, 3 duty levels x 10 seeds x 3 arms ===
+  TwoTier      duty 0.5   p98    60.66 ms vs    60.70 at duty 1.0  ->  x  1.00   size baseline x2.0   excess x 0.50
+
+------------------------------------------------------------------------------
+ACROSS ARMS at one duty level -- CONFOUND-FREE (identical sizes)
+------------------------------------------------------------------------------
+
+  duty_cycle = 0.1
+    PF           p98   106.56 ms  [  106.22,   106.94]  n=10
+    Reservation  p98   117.50 ms  [  112.56,   122.43]  n=10
+    TwoTier      p98   112.42 ms  [  110.76,   113.98]  n=10
+      Reservation - PF:   +10.94 ms [   +5.93,   +16.20] *
+      TwoTier - PF:    +5.86 ms [   +4.50,    +7.25] *
+
+  duty_cycle = 0.5
+    PF           p98    64.15 ms  [   63.91,    64.40]  n=10
+    Reservation  p98    62.64 ms  [   60.89,    64.29]  n=10
+    TwoTier      p98    57.67 ms  [   42.10,    72.09]  n=10
+      Reservation - PF:    -1.51 ms [   -3.09,    +0.06]  
+      TwoTier - PF:    -6.48 ms [  -22.14,    +7.91]  
+
+  duty_cycle = 1.0
+    PF           p98    61.89 ms  [   61.68,    62.06]  n=10
+    Reservation  p98    61.27 ms  [   59.39,    62.70]  n=10
+    TwoTier      p98    55.69 ms  [   37.13,    72.87]  n=10
+      Reservation - PF:    -0.62 ms [   -2.65,    +0.97]  
+      TwoTier - PF:    -6.20 ms [  -25.19,   +10.72]  
+
+  (* = paired bootstrap CI excludes zero)
+
+wrote sweeps/verification-2026-09-04/g4.json  (3867 flow-bucket rows)
+
+=== G6 -- n=40 seed extension, then the conjunction table ===
+  persisted 240 records to sweeps/verification-2026-09-04/stage6_g6_n40_records.jsonl
+==============================================================================
+CONTROL, read before any effect size: do stage 1's own 10 seeds reproduce?
+==============================================================================
+  stage-1 CSV absent (sweeps/verification-2026-09-04/stage1/stage1_rows.csv) -- control CANNOT be run, and this is reported as unverified, not as a pass.
+
+wrote sweeps/verification-2026-09-04/stage6_g6_n40.csv and .json

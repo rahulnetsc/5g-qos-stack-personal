@@ -1,0 +1,8 @@
+=== n=1, h=40000 -- the published cell, on current code ===
+  TwoTier         0.9030    0.9992           0            0       0.00         None
+
+wall: 48s total
+=== n=10, h=40000 -- the same cell at a defensible seed count ===
+  TwoTier         0.9088    0.9921           0            0       0.00         None
+
+wall: 529s total
