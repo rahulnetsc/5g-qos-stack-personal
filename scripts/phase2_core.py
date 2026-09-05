@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from code_state import stamp                              # noqa: E402
 from regime_sweep import RunLedger, arm_cost, run_cells    # noqa: E402
 from sim.driver import run as driver_run                   # noqa: E402
 from sim.parametric import sweep_scenario                  # noqa: E402
@@ -150,7 +151,8 @@ def main() -> int:
         rows[idx_map[j]] = row
         ledger.bank(row)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(a.out).write_text(json.dumps({"config": vars(a), "rows": rows},
+    Path(a.out).write_text(json.dumps({"config": vars(a),
+                                       "code_state": stamp(), "rows": rows},
                                       indent=1, default=str))
 
     def fmt(v, p=2):

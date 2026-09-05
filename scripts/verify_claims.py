@@ -40,6 +40,10 @@ from typing import Any, Callable, Optional
 
 import yaml
 
+from code_state import artefact_state, core_hash
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_CLAIMS = REPO / "config" / "published_claims.yml"
 
@@ -77,11 +81,14 @@ class ClaimError(Exception):
     pass
 
 
-def _load_artefact(path: Path) -> list[dict[str, Any]]:
+def _load_artefact(path: Path, _state: Optional[list] = None) -> list[dict[str, Any]]:
+    """Rows, and (via `_state`) the artefact's code-state stamp if it has one."""
     if not path.exists():
         raise ClaimError(f"artefact absent: {path}")
     if path.suffix == ".json":
         blob = json.loads(path.read_text())
+        if _state is not None:
+            _state.append(artefact_state(blob))
         rows = blob.get("rows")
         if rows is None:
             raise ClaimError(
@@ -143,7 +150,8 @@ def check_claim(claim: dict) -> dict:
     """Recompute one claim. Returns a verdict dict; never raises for a
     mismatch -- only for a claim that cannot be evaluated at all."""
     path = REPO / claim["artefact"]
-    rows = _load_artefact(path)
+    _st: list = []
+    rows = _load_artefact(path, _st)
     values = _values(rows, claim["field"], claim.get("where"))
 
     declared = claim["statistic"]
@@ -182,8 +190,31 @@ def check_claim(claim: dict) -> dict:
         if n_rows != expected:
             meta.append(f"n: claim says {claim['n']} seeds "
                         f"({expected} values expected), artefact yields {n_rows}")
-    return {"id": claim["id"], "ok": ok and not meta, "got": got, "want": want,
+    # --- THE STALENESS CHECK (docs/verify-claims-staleness-proposal.md) ---
+    # A figure matching its artefact says nothing about whether the artefact
+    # still matches the CODE. `code_state` says which question this claim is
+    # making: `current` (must have been produced by HEAD) or
+    # `historical: <reason>` (deliberately pinned, e.g. a kept failing case).
+    cs = claim.get("code_state", "current")
+    stale = None
+    if isinstance(cs, str) and cs.startswith("historical"):
+        pass                                    # pinned on purpose
+    else:
+        got_state = _st[0] if _st else None
+        want_state = core_hash()
+        if got_state is None:
+            stale = ("UNSTAMPED -- this artefact predates code-state stamping, "
+                     "so it cannot be shown to match current code. Unknown is "
+                     "NOT treated as matching.")
+        elif got_state != want_state:
+            stale = (f"STALE -- produced by code {got_state}, HEAD is "
+                     f"{want_state}. Re-run the campaign, or mark the claim "
+                     f"`code_state: historical: <reason>`.")
+
+    return {"id": claim["id"], "ok": ok and not meta and stale is None,
+            "got": got, "want": want,
             "declared": declared, "also_match": also, "meta": meta,
+            "stale": stale,
             "n_values": len(values), "artefact": claim["artefact"]}
 
 
@@ -230,6 +261,8 @@ def main(argv: list[str]) -> int:
                   f"the guard demonstrating its own failure mode")
         for m in r["meta"]:
             print(f"         {'':<28} {m}")
+        if r.get("stale"):
+            print(f"         {'':<28} code_state: {r['stale']}")
         if not r["ok"] and r["also_match"]:
             # THE POINT OF THE CONSTRAINT. Naming the estimator that DOES
             # match is what turns "the number is wrong" into "the number is a

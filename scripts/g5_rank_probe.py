@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from attach_path_experiment import _stagger, STAGGER_SLOTS  # noqa: E402
+from code_state import stamp                              # noqa: E402
 from regime_sweep import arm_cost, paired_seeds, run_cells   # noqa: E402
 from scheduler.rank_trace import LossPointTally              # noqa: E402
 from sim.driver import run as driver_run                     # noqa: E402
@@ -159,7 +160,8 @@ def main() -> int:
 
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"rows": rows}, indent=1, default=str))
+    out.write_text(json.dumps({"code_state": stamp(), "rows": rows},
+                              indent=1, default=str))
     print(f"\nwrote {out} ({len(rows)} rows)")
     return 0
 

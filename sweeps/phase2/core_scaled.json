@@ -8,6 +8,10 @@
   "out": "sweeps/phase2/core_scaled.json",
   "workers": 8
  },
+ "code_state": {
+  "sim_core_ast_sha256_16": "046065ed426b8d40",
+  "n_core_files": 45
+ },
  "rows": [
   {
    "arm": "PF",

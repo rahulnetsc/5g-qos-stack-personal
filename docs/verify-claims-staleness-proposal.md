@@ -1,4 +1,9 @@
-# Closing `verify_claims`' blind spot — proposal, not built
+# Closing `verify_claims`' blind spot — **BUILT 2026-09-05**
+
+> **LANDED.** `scripts/code_state.py` + the staleness check in
+> `scripts/verify_claims.py`, with `sim/tests/test_code_state.py`. The
+> proposal below is kept as written; §7 records what the noisy landing found
+> and how the nine claims were triaged.
 
 **2026-09-05.** `verify_claims --check` passed all 9 claims immediately
 after `0ea02b0`, while `G1.M01.n10.twotier.median = 90.125` had become stale:
@@ -72,3 +77,52 @@ artefact's state does not match HEAD unless the claim is marked historical.**
 claims**, all citing `core_40k_n10.json`, produced before `_OBJ_SCALE`. Today
 that took a hand-built provenance column and a person remembering to add it.
 **A green check should have been impossible.**
+
+
+---
+
+## 7. What the noisy landing found, and the claim-by-claim triage
+
+**Landed noisy on purpose.** On first run **8 of 9 claims FAILED** as
+`UNSTAMPED` — the blind spot becoming visible. A quiet landing would have
+meant the check could not see what it was built for.
+
+**The hash behaved as designed, and was tested in both directions before any
+triage** — a docstring edit to `scheduler/tier1.py` left it unchanged, and
+flipping `_OBJ_SCALE = 1.0e4 → 1.0e5` moved it. **It is not noisy, so there
+was nothing to report under the stop-and-report rule.**
+
+### The triage — one decision per claim, not a rule that guesses
+
+| claim | disposition | why |
+|---|---|---|
+| `G8.M22.PRE_CORRECTION` | **historical** | the kept pre-correction demonstration failure. Re-running it would destroy the demonstration, which *is* the claim |
+| `G8.M22.n10.reservation` | **re-run** | repointed to the stamped `core_scaled.json`; value unchanged (7) |
+| `G8.M09.n10.twotier` | **re-run** | repointed; value unchanged (3) |
+| **`G1.M01.n10.twotier.median`** | **re-run, AND THE VALUE MOVED** | **90.125 → 87.7845.** This is the figure the whole check was built for — it re-derived cleanly from its old artefact for a full day after the code that produced it changed |
+| `G1.M01.n10.breaches` | **re-run** | repointed; value unchanged (0) |
+| `G3.M20.n10.breaches` | **re-run** | repointed; value unchanged (0) |
+| `G5.M05.n10.reservation` | **re-run** | repointed; value unchanged (7) |
+| `G10.admissible.PF` | **re-run** | repointed to `g5_consol_scaled.json`. **The `n` check then caught a second thing**: the artefact was 3 seeds against a published n=10 claim, so it was re-run at n=10 rather than the claim being lowered to fit — lowering it would have weakened a published figure to match an artefact, which is the wrong direction and the shape of this project's own n≤3 exposure |
+| **`G11.C1.soak.runs`** | **REMOVED** | `min(n_windows) == 30` restates **arithmetic** — 7.2M slots × 0.25 ms ÷ 60 s *is* 30, on any arm under any scheduler — and the checker had already flagged it as not estimator-discriminating. A figure nobody needs does not justify regenerating an artefact. C1's real figure (0 failing windows of 900) gets a claim the next time the 72-minute soak runs for a reason of its own |
+
+**Result: 8 claims, all passing for the right reason** — seven stamped
+against HEAD, one explicitly historical.
+
+### One thing the landing changed that was not predicted
+
+`sim/tests/test_verify_claims.py`'s own fixture cites the pre-correction
+artefact and **started failing on staleness rather than on the estimator
+behaviour it tests.** Fixed by marking the fixture `historical` — and a
+**converse test was added** asserting the same fixture *without* that marking
+fails as `UNSTAMPED`, so the exemption is a deliberate use rather than a
+default that quietly disables the check.
+
+### The limitation to state
+
+**Only JSON artefacts can carry a stamp.** A `.csv` or `.jsonl` artefact has
+nowhere to put one, so a `current` claim citing either fails permanently.
+`test_code_state.py` asserts this explicitly rather than leaving it to be
+discovered: a non-JSON artefact under a `current` claim is a test failure
+naming the claim. Both such claims were repointed or removed in the triage;
+a future one needs a sidecar, and that is not built.

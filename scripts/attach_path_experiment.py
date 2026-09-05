@@ -37,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from code_state import stamp                              # noqa: E402
 from regime_sweep import arm_cost, paired_seeds, run_cells   # noqa: E402
 from sim.driver import run as driver_run                     # noqa: E402
 from sim.parametric import sweep_scenario                    # noqa: E402
@@ -159,7 +160,8 @@ def main() -> int:
 
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"rows": rows}, indent=1, default=str))
+    out.write_text(json.dumps({"code_state": stamp(), "rows": rows},
+                              indent=1, default=str))
     print(f"\nwrote {out}")
     return 0
 

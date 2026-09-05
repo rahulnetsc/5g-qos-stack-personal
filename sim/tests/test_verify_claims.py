@@ -25,9 +25,15 @@ import verify_claims as vc  # noqa: E402
 
 
 def _claim(**over):
+    # `code_state: historical` because this fixture cites the KEPT
+    # pre-correction artefact, which predates code-state stamping and is
+    # pinned on purpose. Without it every test here would fail on staleness
+    # rather than on the estimator behaviour it is actually testing --
+    # which is the staleness check working, not a reason to weaken it.
     base = {
         "id": "test", "artefact": "sweeps/phase2/core_mfbr.json",
         "field": "G8_M22_epochs_prot", "statistic": "max", "value": 0,
+        "code_state": "historical: the kept pre-correction fixture",
     }
     base.update(over)
     return base
@@ -112,3 +118,15 @@ def test_the_shipped_claims_file_is_consistent_apart_from_the_kept_failure():
                 f"{claim['id']}: {r['declared']}={r['got']} but the document "
                 f"quotes {r['want']}"
                 + (f"; {r['also_match']} would have matched" if r["also_match"] else ""))
+
+
+def test_a_CURRENT_claim_on_this_same_fixture_FAILS_on_staleness():
+    """The other half of the fixture change above: without
+    `code_state: historical`, this artefact is unstamped and a current claim
+    must fail -- so the historical marking is a real exemption being used
+    deliberately, not a default that quietly disables the check."""
+    c = _claim(statistic="median")
+    c.pop("code_state")
+    r = vc.check_claim(c)
+    assert r["ok"] is False
+    assert "UNSTAMPED" in (r.get("stale") or "")
