@@ -80,15 +80,46 @@ re-baseline risk is not a trade this project should take when
 `regime_sweep.run_cells` already delivers 8–16× from parallelism at zero
 fidelity risk.
 
-**And the top candidate has a cheaper fix that is not a port.**
-`sim/scorecard.py`'s 18.57 % is concentrated in **two lines** —
-`_bucket_by_second` at `scorecard.py:150-151` accounts for **11.1 % of the
-whole record**. That is a Python-level data-structure problem, it is outside
-the slot loop, it draws no randomness, and `Scorecard.score(only=...)`
-already exists to skip work. **Fixing it in Python plausibly recovers most
-of the top candidate's 1.228× at a fraction of a port's cost and none of its
-risk** — which strengthens rather than weakens "port zero files".
+## CORRECTION — the per-file table above is from a STALE PROFILE, and the error is mine
 
+**The shares above come from the 2026-09-04 profile, and `sim/scorecard.py`'s
+18.57 % no longer describes current code.** Measured on the 2026-09-05
+post-scaling profile, `scorecard.py`'s two phases (`online_variations` +
+`panel_score`) are **4.37 % of a record**, not 18.6 %. **The M09 hoist —
+which moved `_bucket_by_second` out of a nested loop — had already fixed
+it**, and its own docstring says so; I read a per-file number from a profile
+taken before that landed.
+
+**I then tried the "cheaper fix" this section originally recommended, and
+both attempts confirm the correction rather than the recommendation:**
+
+| attempt | result |
+|---|---|
+| rewrite `_bucket_by_second` to allocate only on a real miss | **1.09×** on the function — the "`setdefault` allocates a throwaway list" hypothesis was **wrong** |
+| memoise across scoring variations (the same 64 arrays are re-bucketed ~26× per record) | **1.23× on the phase**, but only **0.049 s of a 10.7 s record — 0.5 %** |
+
+**Both were reverted.** A bounded cache with retention semantics, in a
+project with a 25 GB retention leak twice in its record, is not worth 0.5 %.
+
+**The consequence for the recommendation is that it gets STRONGER.** With
+`scorecard.py` at ~4.4 % rather than 18.6 %:
+
+| ported | corrected share | corrected speedup |
+|---|---|---|
+| top 1 — now `sim/harq.py` | ~9.2 % | **~1.10×** |
+| top 2 — `+ scheduler/two_tier.py` | ~15.6 % | **~1.18×** |
+| top 3 — `+ sim/buffer.py` | ~20.3 % | **~1.25×** |
+
+**The largest single candidate is ~9 %, against a 25 % stopping threshold.
+Port zero files, with more margin than the original table showed.**
+
+**The transferable lesson is this project's own rule, which I broke:** a
+measurement carries its configuration, and a profile is a configuration. The
+2026-09-04 numbers were taken on pre-scaling, pre-hoist code; quoting a
+per-file share from them as current is the same category error as quoting a
+timing table across horizons. **The phase-level numbers I had already
+re-measured on 2026-09-05 contradicted the per-file table I built from the
+older profile, and I did not check one against the other.**
 ---
 
 # 2. THE CONFIGURATION APPROACH — the gate fails; stop

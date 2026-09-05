@@ -1,5 +1,22 @@
 # WP9 regime map — the bridge artefact for the hardware campaign
 
+> **⚠ CORRECTED 2026-09-05 — THE PDCCH BOUND DOES NOT BIND, so any agreement
+> between it and a measured boundary on this page is COINCIDENTAL.** Measured
+> CCE utilisation is **9.4 % / 7.6 % / 7.3 % at N=8 / 16 / 32** while UL PRB
+> sits at **93 %** throughout. The `32 CCE ÷ AL 4 = 8` arithmetic is correct
+> and the constraint is simply never reached — PRB is what binds, at every
+> fleet size.
+>
+> **What the admissible-fleet boundary IS set by, and the evidence is
+> decisive:** the **cold-start lock-out**
+> (`docs/g5-mechanism-2026-09-05.md`). Under the attach path,
+> `n_never_granted` goes to **0 at every fleet size on every arm and seed**,
+> including N=16 where Reservation was 4/1/3 and TwoTier 1/1/2. **A change
+> that touches only BSR state cannot move a PDCCH or PRB limit** — so the
+> boundary was never a hard resource bound. It is also why PF admits more:
+> PF starves nobody at any N, having no ranking tier that reads the per-LCG
+> array.
+
 **Audience:** the team executing `IA_P5G_Factory_Guarantee_Test_Plan.md`.
 This is the characterisation output that plan's §0 and §10 reference. It
 says where the boundaries are, which guarantees are scheduler-limited
@@ -763,7 +780,7 @@ against, with position controlled.
 
 | H | Verdict | Basis |
 |---|---|---|
-| **H1** (reservation collapses above a UE count) | **Confirmed, bound identified** | Boundary at N=8 / N=16, matching the PDCCH bound. §0.3 limits it to `min_rb=5`. |
+| **H1** (reservation collapses above a UE count) | **Confirmed; the BOUND'S CAUSE IS CORRECTED 2026-09-05** | Boundary at N=8 / N=16 — **previously attributed to the PDCCH bound, which does not bind** (CCE utilisation 7.3–9.4 % against UL PRB 93 %). The agreement with `32/4 = 8` was coincidental. **The boundary is set by the cold-start lock-out**: under the attach path `n_never_granted` is 0 at every fleet size on every arm and seed, and a change touching only BSR state cannot move a resource limit. §0.3 limits it to `min_rb=5`. |
 | **H2** (two-tier wins as traffic becomes bursty) | **CONFIRMED at one cell, and the "contradiction" was a DIFFERENT MECHANISM** | **Two corrections here, and they are separate.** (1) *"Not tested as an axis" was an UNDERSTATEMENT of coverage*: the `duty_cycle` excursion rows were run in stage 1 and are on disk — 30 rows per level (3 arms × 10 seeds), paired within seed against the base cell. Computed (`docs/wp9-plan.md` §22.3, zero new runs), at `duty_cycle=0.1` **PF loses nearly twice as many GBR contracts as TwoTier (M07 −7.0 vs −4.0) and is the only arm whose worst-flow GFBR fraction falls, while TwoTier's rises (+0.384, interval excluding zero)**. H2 holds in its registered direction, on both metrics. (2) *Stage 5's transient does NOT contradict it.* A direct-cause trace (`scripts/f2_duty_cycle_trace.py`, §22.4) shows the two regimes are driven by **different terms of the same formula, in opposite directions**: duty-cycling makes TwoTier's UL composite `base_q`-dominated (the virtual queue integrating across idle periods — median 0 → 4,678, share 0.385 → **0.851**), while a lidar activation makes it `urg`-dominated (median `base_q` 8.0 → **0.000**, share 0.423 → 0.337), because a one-off step to a permanently higher load contains no idle period to integrate across. The two coexist without tension. **Depth beyond the base point: bought but not yet run** (§21.5). |
 | **H3** (two-tier wins as channel spreads) | **CONFIRMED at one cell, in its registered direction** | *"Not tested" was an UNDERSTATEMENT of coverage* — the `snr_spread_db` excursion rows were run in stage 1 and are on disk, 30 rows per level, paired within seed. Computed (`docs/wp9-plan.md` §22.2, zero new runs): **TwoTier improves on BOTH panel metrics as the channel spreads** — M08.fraction +0.676 [+0.425, +0.886] at 6 dB and +0.698 [+0.453, +0.939] at 12 dB, M07.met +1.60 [+0.80, +2.30] at 12 dB — while PF and Reservation do not move. Note this is a case where §0.1's both-numbers rule does not bite: there is no metric split, TwoTier wins both. **One cell only** (N=8, load ×1.0); depth bought but not yet run. |
 | **H4** (Tier-1 mismatched to factory deadlines) | **Re-tagged — not an environmental question** | Driven by `pdb_ms`, which is **Cat 1** (5QI-derived, `ad6ba54`). Testable only as a **deployment variant**, not as an axis in this map. It did qualify (2.927) and was dropped by the cap, but that framing implied a gap the map could close; it cannot. |
