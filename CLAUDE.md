@@ -366,6 +366,26 @@ populate it and then ranks below every UE that has one -- measured at
 9,216 of 9,216 candidate slots with every per-LCG estimate at 0 while
 `bytes_reported` was positive on all 9,216. Eligibility and ranking read
 different fields; fixing the deadlock for one did not fix it for the other.
+**CONFIRMED IN THE DEPLOYED C, so this is a product finding, not a port
+defect** (`docs/g5-mechanism-2026-09-05.md`, defects-log #25).
+`update_ul_qos_priority` (`gNB_scheduler_ulsch.c:41-70`) seeds
+`best_pending_pdb_ms = 9999` / `has_pending_gbr = false` and `continue`s
+past every zero per-LCG entry, exactly as ported; the array's only two
+writers in the C are the BSR MAC-CE handlers, which require a grant.
+**AND THE C'S OWN RESCUE FOR THIS FAULT CANNOT ARM IN IT**: Tier 1.5's
+floor gate reads `has_pending_gbr` (`ia_p5g_scheduler.c:2325`), set only
+inside that same zero-gated loop — measured at 0 firings in 32,000
+evaluations per starved UE. **Do not "fix" either in this port**: it
+reproduces the C exactly, and diverging in the direction of being better
+defeats what the port is for.
+**AND DECLARATION ORDER IS ATTACH ORDER, not an artefact.**
+`add_UE_to_list` appends at the first free slot and `remove_UE_from_list`
+`memmove`s to compact, so `connected_ue_list` is in arrival order and
+`UE_iterator` builds the pre-`qsort` array from it. The last-position UE
+is the most recent joiner. One difference to keep straight: C's `qsort`
+is not required to be stable while Python's `list.sort` is, so the
+deterministic victim is this port's; the fault state and the dead rescue
+are the product's.
 **Since WP5: "real data receipt" means *confirmed* receipt, not grant
 time — they stopped being the same event once UL HARQ retry existed.**
 `on_ul_grant(..., delivered_bytes=...)` still decrements unconditionally

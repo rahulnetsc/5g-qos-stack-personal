@@ -871,3 +871,76 @@ Nothing checked the array, because nothing had yet asked which fields the
 *ranking* reads. The cheap check is the one this campaign happened to run:
 for any field a scheduler reads, ask what writes it and whether that writer
 can be reached from a starved state.
+
+---
+
+## #25 — A DESIGNED REMEDY GATED ON THE CONDITION WHOSE ABSENCE DEFINES THE FAULT (2026-09-05)
+
+**In the deployed C, not only in this port.** The follow-up to #24, and the
+reason #24 is a product finding rather than a porting question.
+
+### The instance
+
+`ia_p5g_scheduler.c`'s Tier-1.5 UL service-interval floor exists specifically
+to rescue a UE whose `estimated_ul_buffer_per_lcg[]` reads 0. Its own comment
+(:2119-2135) states the fault and the cure:
+
+> *"A floor-fired UE is in the fault state where BOTH composite inputs are
+> gated on `estimated_ul_buffer_per_lcg[] > 0`, which reads 0 by definition
+> of the fault… under Tier 2 it would sort dead last… It only needs to land
+> ONCE: the resulting BSR… repopulates `estimated_ul_buffer_per_lcg[]`."*
+
+Its arming gate (:2325) is:
+
+```c
+if (_fl && sched_ctrl->has_pending_gbr && !_intr) {
+```
+
+`has_pending_gbr` is written **only** by `update_ul_qos_priority`
+(`gNB_scheduler_ulsch.c:41-70`), inside a loop that `continue`s past every
+LCG whose per-LCG estimate is ≤ 0. **So the rescue for "the array reads 0" is
+gated on a flag that is false exactly when the array reads 0.**
+
+Measured in the faithful port: the floor is evaluated **32,000 times per UE
+per run** and fires **0 times** for the three UEs that receive **0 UL grants
+in 40,000 slots**. The one firing observed across two seeds landed on a UE
+that already had 19,805 grants.
+
+### Why it is its own entry rather than part of #24
+
+#24 is a **gate** that produces a fault state. This is a **remedy** that
+cannot reach it. They have different fixes and, more importantly, different
+evidential status: #24 could plausibly have been a port artefact until the C
+was read; this one is visible in the C's own source with the C's own comment
+explaining what it was supposed to do.
+
+### The shape worth carrying: A FIX THAT REMOVES *SOME* OF THE CIRCULAR INPUTS
+
+The C's v2 comment is the transferable part — it shows the trap being
+half-escaped:
+
+> *"v2 … Deficit read for TELEMETRY ONLY … it is NOT an arming input. v1
+> armed on (B>0 || deficit>0 || vq>0), all estimate-derived: B==0 defines
+> the fault and vq_ul stops updating once the per-LCG estimate reads 0, so
+> arming rested entirely on the deficit staying non-zero…"*
+
+**v2 correctly identified that arming must not depend on estimate-derived
+state, removed three such inputs, and left a fourth standing in the `if`.**
+The author was reasoning about the *body* of the arming logic and did not
+re-examine the *guard* around it.
+
+**Mechanically:** when a mechanism exists to escape a degenerate state,
+enumerate **every** predicate on the path to it — the guard as well as the
+body — and check each against the degenerate state. A partial escape is
+indistinguishable from a working one in any test where the state is
+constructed rather than reached, which is `sim/tests/`'s own recorded failure
+mode (§19's fixture-built precondition).
+
+### Parked, deliberately
+
+Fixing this is a **behaviour change to a ported scheduler against ground
+truth** — the port currently reproduces the C exactly, including the dead
+gate. Changing it would make this simulator diverge from the deployed system
+in the direction of being better, which is the opposite of what this port is
+for. The finding is the deliverable; any change belongs in a conversation
+with whoever owns `ia_p5g_scheduler.c`.
