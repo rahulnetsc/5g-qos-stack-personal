@@ -1656,3 +1656,74 @@ a hit if anything moved at all.
 **Same family as predicting a SHAPE rather than a MECHANISM.** Both are
 predictions loose enough to survive any outcome, and both feel like
 knowledge at the time they are written.
+
+---
+
+# NEW CLASS: A STATISTIC THAT IS UNDEFINED ON THE DATA AND RETURNS A CONFIDENT VALUE ANYWAY
+
+**Added 2026-09-05, from G11's C5.**
+
+**This is not a check that cannot fail, and it is not an empty selection.**
+Those two are already recorded and both are about *selection*:
+
+| class | the data | the value |
+|---|---|---|
+| a check that cannot fail | fine | no value could have contradicted the claim |
+| an empty selection | **nothing was selected** | an aggregate over zero rows, often exactly `0.000` |
+| **this class** | **real, and plentiful** | **finite, precise-looking, and meaningless** |
+
+**The instance.** C5 tests the per-seed p98 vector for bimodality by
+splitting it in two and reporting `gap / pooled_within_cluster_SD`. The p98
+of a latency measured in slots is **quantised to the 0.25 ms slot**, and the
+vectors held **3–6 distinct levels across 10 seeds**. When values repeat
+exactly, within-cluster variance is **exactly zero** — so the denominator
+goes to zero and the separation ratio reads as enormous for *any* split.
+**The first scorer reported BIMODAL on all three arms, including the control
+arm, with separations of 2.7–4.9 σ.** Every input was real. Every number was
+computed correctly. The statistic simply has no meaning on data with that
+few levels.
+
+**Why it is dangerous in a way the other two are not.** An empty selection
+often announces itself with an implausible number (`0.000`, or a count equal
+to a product of the grid's dimensions). A check that cannot fail announces
+itself the moment someone asks what would make it fail. **This class
+announces nothing**: `separation = 3.90 σ` looks exactly like a real
+finding, and it was on the arm where a mechanism had been *predicted*, which
+is precisely when a plausible number gets believed.
+
+---
+
+## THE GUARD IS ON DEFINEDNESS, AND IT LOOKS IDENTICAL TO A TUNED THRESHOLD IN A DIFF
+
+Both add a conditional that suppresses a result. **Both make a firing check
+stop firing.** The distinction is not visible in the change; it is visible
+only in *what the condition is about*:
+
+| | tests | example |
+|---|---|---|
+| **definedness guard** | a **precondition of the statistic** — does the denominator mean anything? | *pooled SD must exceed the measurement quantum* |
+| **tuned threshold** | the **result** — is the number big enough to report? | *separation must exceed 3.5 σ rather than 2.0* |
+
+**The mechanical test, and it is one question:** *could the condition have
+been written before seeing any data?* A definedness guard could — "a
+separation-in-SDs statistic requires an SD larger than the measurement
+quantum" is a fact about the statistic and the instrument, knowable from the
+slot duration alone. A tuned threshold could not — it exists because a
+particular number came out and was unwelcome.
+
+**Record the answer to that question in the guard's own comment**, because a
+later reader has only the diff. C5's guard says so explicitly, including that
+the first version had no guard and what it reported.
+
+**Why this matters for this project specifically:** "a check tuned until it
+stops firing" is a shape recorded here four times, and the correct response
+to a suspicious result is usually *not* to add a condition. **This is the
+exception, and an exception that looks like the rule needs its distinguishing
+test written down** — otherwise the next person either applies the rule and
+keeps an undefined statistic, or ignores the rule and tunes.
+
+**Related but distinct:** the *dynamic-range* rule (an expectation nothing
+could contradict) and *form rule 4* (a prediction satisfied by too many
+outcomes) are both about the **claim**. This one is about the **instrument**.
+A well-formed prediction scored with an undefined statistic is still worth
+nothing.
