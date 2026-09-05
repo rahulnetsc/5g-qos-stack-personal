@@ -100,3 +100,46 @@ folded into C3.
 **G11 from one clause of five to four**, and **G7 from not-measured to
 measured — nine guarantees with a verdict rather than eight.** With C4's
 caveat stated, and C5 the one that might actually surprise.
+
+
+---
+
+## SCORED 2026-09-05
+
+### G7 — all three clause predictions HIT, including clause 2's direction
+
+| clause | predicted | measured |
+|---|---|---|
+| 1 A within SLO | PASS | **PASS**, 0/10 on every arm |
+| 2 B delivered ≤ MFBR | **FAIL on both QoS arms** | **FAIL 0/10 at every tolerance incl. 25 %**, 2.0–2.1× MFBR |
+| 3 B's own telemetry | PASS | **PASS**, 0/10 on every arm |
+
+**And one correction to my own registered mechanism.** I wrote that delivery
+above MFBR should appear *"exactly when spare capacity exists"*. **Too
+weak** — the excess persists and *grows* (2.02× → 2.14×) across a 2.5× load
+range at ~93 % UL utilisation, so the BE overflow is winning capacity **in
+competition**, not merely mopping up idle resources. The second read's limit
+is stated with it: utilisation could not be driven above ~0.933 with the load
+knob, so *"at saturation"* was never actually reached.
+
+**Unpredicted and the more striking half:** PF, with no MFBR concept at all,
+contains the aggressor **better** (1.05×) than either arm implementing the
+clamp.
+
+### G11 — C3 hit-with-a-direction-miss, C4 hit, C5 falsifier FIRED
+
+| clause | predicted | measured |
+|---|---|---|
+| C3 | PASS all three; **TwoTier largest CoV** | **PASS all three** — but **Reservation's CoV is 3.6× TwoTier's**. Verdict hit, direction **MISS** |
+| C4 | PASS, satisfied by construction | **exactly that**, and the caveat now travels with the number |
+| C5 | no bimodality on PF or Reservation | **the registered falsifier FIRED** — the first scorer reported bimodal on all three including PF |
+
+**C3's direction miss has a named cause:** I extrapolated TwoTier's spread on
+the *core cell at n=8* to a soak running *n_ues=4*, where its lock-out is not
+armed. A measurement carries its configuration.
+
+**C5's outcome is stronger than a miss:** the scorer itself was unsound on
+quantised data, and the fix is a validity guard (pooled SD must exceed the
+measurement quantum), not a threshold tuned until the result went away. **C5
+is NOT SCOREABLE at n=10 on this artefact** — reported as that rather than as
+"no bimodality found".
