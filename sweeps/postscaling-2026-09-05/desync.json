@@ -1,0 +1,1013 @@
+{
+ "code_state": {
+  "sim_core_ast_sha256_16": "d108c73cc72fb9dd",
+  "n_core_files": 45
+ },
+ "rows": [
+  {
+   "arm": "PF",
+   "seed": 1826701614,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 3800,
+    "short|omits0": 2794
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 1848,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 1858,
+     "first_grant": 1,
+     "last_grant": 19993,
+     "slots_after_last_grant": 7,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 1850,
+     "first_grant": 1,
+     "last_grant": 19996,
+     "slots_after_last_grant": 4,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 1842,
+     "first_grant": 1,
+     "last_grant": 19994,
+     "slots_after_last_grant": 6,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 1844,
+     "first_grant": 1,
+     "last_grant": 19992,
+     "slots_after_last_grant": 8,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 1830,
+     "first_grant": 2,
+     "last_grant": 19989,
+     "slots_after_last_grant": 11,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 1847,
+     "first_grant": 2,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 1839,
+     "first_grant": 2,
+     "last_grant": 19997,
+     "slots_after_last_grant": 3,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "PF",
+   "seed": 1367864806,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 3739,
+    "short|omits0": 2863
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 1848,
+     "first_grant": 1,
+     "last_grant": 19991,
+     "slots_after_last_grant": 9,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 1841,
+     "first_grant": 1,
+     "last_grant": 19983,
+     "slots_after_last_grant": 17,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 1849,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 1857,
+     "first_grant": 1,
+     "last_grant": 19994,
+     "slots_after_last_grant": 6,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 1844,
+     "first_grant": 1,
+     "last_grant": 19984,
+     "slots_after_last_grant": 16,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 1844,
+     "first_grant": 2,
+     "last_grant": 19992,
+     "slots_after_last_grant": 8,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 1836,
+     "first_grant": 2,
+     "last_grant": 19988,
+     "slots_after_last_grant": 12,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 1850,
+     "first_grant": 2,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "PF",
+   "seed": 1097657231,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 3816,
+    "short|omits0": 2800
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 1844,
+     "first_grant": 1,
+     "last_grant": 19993,
+     "slots_after_last_grant": 7,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 1835,
+     "first_grant": 1,
+     "last_grant": 19997,
+     "slots_after_last_grant": 3,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 1843,
+     "first_grant": 1,
+     "last_grant": 19992,
+     "slots_after_last_grant": 8,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 1839,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 1850,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 1845,
+     "first_grant": 2,
+     "last_grant": 19989,
+     "slots_after_last_grant": 11,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 1838,
+     "first_grant": 2,
+     "last_grant": 19988,
+     "slots_after_last_grant": 12,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 1850,
+     "first_grant": 2,
+     "last_grant": 19994,
+     "slots_after_last_grant": 6,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 3,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "Reservation",
+   "seed": 1826701614,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 2794,
+    "short|omits0": 4016
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 5844,
+     "first_grant": 1,
+     "last_grant": 19996,
+     "slots_after_last_grant": 4,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 5923,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 5923,
+     "first_grant": 1,
+     "last_grant": 19973,
+     "slots_after_last_grant": 27,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 6164,
+     "first_grant": 1,
+     "last_grant": 19972,
+     "slots_after_last_grant": 28,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 6015,
+     "first_grant": 1,
+     "last_grant": 19974,
+     "slots_after_last_grant": 26,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 5952,
+     "first_grant": 28,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 29,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 5905,
+     "first_grant": 113,
+     "last_grant": 19976,
+     "slots_after_last_grant": 24,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 114,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 6101,
+     "first_grant": 113,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 114,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "Reservation",
+   "seed": 1367864806,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 2726,
+    "short|omits0": 4014
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 5869,
+     "first_grant": 1,
+     "last_grant": 19973,
+     "slots_after_last_grant": 27,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 5994,
+     "first_grant": 1,
+     "last_grant": 19972,
+     "slots_after_last_grant": 28,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 6008,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 5904,
+     "first_grant": 1,
+     "last_grant": 19997,
+     "slots_after_last_grant": 3,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 6100,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 6047,
+     "first_grant": 34,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 35,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 5908,
+     "first_grant": 129,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 130,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 5964,
+     "first_grant": 129,
+     "last_grant": 19989,
+     "slots_after_last_grant": 11,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 130,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "Reservation",
+   "seed": 1097657231,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 2235,
+    "short|omits0": 3813
+   },
+   "n_served_ues": 7,
+   "n_never_granted": 1,
+   "per_ue": {
+    "1": {
+     "n_grants": 5604,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 5637,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 5597,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 5599,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 5630,
+     "first_grant": 1,
+     "last_grant": 19997,
+     "slots_after_last_grant": 3,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 5723,
+     "first_grant": 38,
+     "last_grant": 19997,
+     "slots_after_last_grant": 3,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 39,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 5757,
+     "first_grant": 38,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 39,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "TwoTier",
+   "seed": 1826701614,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 5102,
+    "short|omits0": 2821
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 11118,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 11060,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 11066,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 8987,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 9703,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 10717,
+     "first_grant": 39,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 40,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 11237,
+     "first_grant": 39,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 40,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 9231,
+     "first_grant": 39,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 40,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "TwoTier",
+   "seed": 1367864806,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 5017,
+    "short|omits0": 2904
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 10899,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 10418,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 11151,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 11006,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 9040,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 8583,
+     "first_grant": 38,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 39,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 11055,
+     "first_grant": 39,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 40,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 9492,
+     "first_grant": 39,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 40,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  },
+  {
+   "arm": "TwoTier",
+   "seed": 1097657231,
+   "n_ues": 8,
+   "horizon": 20000,
+   "load_mult": 1.0,
+   "duty_cycle": 1.0,
+   "shared_lcg": false,
+   "bsr_formats": {
+    "long|omits0": 4662,
+    "short|omits0": 2962
+   },
+   "n_served_ues": 8,
+   "n_never_granted": 0,
+   "per_ue": {
+    "1": {
+     "n_grants": 10199,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "2": {
+     "n_grants": 9923,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "3": {
+     "n_grants": 10129,
+     "first_grant": 1,
+     "last_grant": 19998,
+     "slots_after_last_grant": 2,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "4": {
+     "n_grants": 10297,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "5": {
+     "n_grants": 9982,
+     "first_grant": 1,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 1,
+     "desync_episodes": 0,
+     "slots_faulted": 2,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "6": {
+     "n_grants": 7656,
+     "first_grant": 2679,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 2,
+     "desync_episodes": 0,
+     "slots_faulted": 1070,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "7": {
+     "n_grants": 8361,
+     "first_grant": 2679,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 2,
+     "desync_episodes": 0,
+     "slots_faulted": 1070,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    },
+    "8": {
+     "n_grants": 8312,
+     "first_grant": 2679,
+     "last_grant": 19999,
+     "slots_after_last_grant": 1,
+     "cold_start_episodes": 2,
+     "desync_episodes": 0,
+     "slots_faulted": 1070,
+     "longest_desync": 0,
+     "median_desync": 0,
+     "latched": false
+    }
+   }
+  }
+ ]
+}

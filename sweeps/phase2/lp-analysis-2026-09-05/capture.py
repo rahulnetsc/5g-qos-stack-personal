@@ -27,11 +27,11 @@ def spy(c, A_ub=None, b_ub=None, bounds=None, method="highs", **kw):
     return res
 T1.linprog = spy
 
-sc = sweep_scenario(seed=1097657231, n_ues=8, horizon_slots=20_000, load_mult=1.0)
+sc = sweep_scenario(seed=1097657231, n_ues=16, horizon_slots=20_000, load_mult=1.0)
 run(sc, TwoTier(min_rb=5), cqi_delay_slots=8, record_timeseries=True)
 T1.linprog = _orig
 
-out = Path(__file__).parent / "lps.pkl"
+out = Path(__file__).parent / "lps_n16.pkl"
 with out.open("wb") as fh:
     pickle.dump(CAP, fh)
 print(f"captured {len(CAP)} LPs -> {out}")
