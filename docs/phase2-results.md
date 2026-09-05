@@ -73,6 +73,12 @@ results table is indistinguishable from one that failed to produce a number.
 > **best** there (11.00 ms). **G8's verdict also differs by workload** —
 > Reservation fails M09 on 1/10 seeds here and 10/10 there.
 
+
+> **COUNT, as of 2026-09-06: eleven guarantees carry a verdict, one of those
+> is partial (G11 — 2 clauses of 5), and G6's is "fails clause 1" rather than
+> a clean result. G2 alone has none.** Use that wording rather than
+> "11 of 12".
+
 | G | status | result or cause |
 |---|---|---|
 | **G1** | **measured** | M01 p98 **protected fleet**: PF 24.83 / Reservation 24.42 / TwoTier **94.51 ms** against a 100 ms bound — all pass, 3.8× arm separation. **The all-flow reading is saturated and must not be quoted**: ~300 ms on every arm, won by the 5QI-9 filler, pinned at that filler's own PDB, three arms agreeing to 0.25 ms. |

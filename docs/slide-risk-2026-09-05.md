@@ -9,11 +9,11 @@ it goes if an audience finds it before we say it.
 ## Tier 1 — would be a retraction on stage
 
 **1. "Twelve guarantees" is not twelve.** **G2, G7 and G9 are NOT MEASURED**
-and G6 is **not scoreable**, so at most **eight of twelve** carry a verdict.
+and G6 is **not scoreable**, so **eleven carry a verdict, one of those is partial (G11: 2 clauses of 5), and G6's is "fails clause 1" rather than a clean result** — G2 alone has none.
 G7 is *structurally* out — there is no MFBR enforcement anywhere in `sim/`,
 and clipping is half its pass criterion. Any slide that says "we evaluated
 twelve guarantees" invites the one question we cannot answer.
-**Say eight, and name the four and why.**
+**Say "eleven with a verdict, one partial", and name G2 and why.**
 
 **2. G11 "passes" is one clause of five.** C1 passed at the specified
 horizon — 1.000 on all three arms, 900 windows, 0 failing. **C2–C5 are
