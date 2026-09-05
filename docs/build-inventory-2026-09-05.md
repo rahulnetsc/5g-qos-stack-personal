@@ -1,198 +1,213 @@
-# Finish-the-simulator: the whole remaining surface, in one place
+# Finish-the-simulator: the remaining surface, organised BY DEFECT CLASS
 
-**2026-09-05. An inventory, not a plan — nothing here is started, and no
-order is proposed.** Each item says what must be built, roughly what it
-costs, whether it is a **scenario / mechanism / metric**, and — the column
-that decides sequencing — **whether building it yields a scoreable verdict
-or only removes one blocker of several.**
+**2026-09-05. An inventory, not a plan — nothing is started and no order is
+proposed.**
 
-**A separate flag column marks anything that would be a DIVERGENCE FROM THE
-DEPLOYED C rather than a missing piece of the port.** Those need a different
-justification: the port's defence is fidelity, and a divergence has to be
-argued on its own terms, not slipped in as "completing" something.
+**Organised by class first, guarantee second, deliberately.** This project's
+most expensive recurring failure is **fixing at the site of discovery rather
+than at the category** — the population fixed for G6 only, MFBR fixed
+nowhere, the decompose fix applied to one of five sites *in its own file*,
+the write-at-the-end fix landed in one runner and absent in four. **A
+per-guarantee inventory reproduces exactly that shape**, so this one refuses
+to be read that way: every item carries a **"where else does this appear"**
+line, and it is answered explicitly even when the answer is *nowhere*.
 
----
-
-## Summary
-
-| item | kind | cost | scoreable alone? | divergence? |
-|---|---|---|---|---|
-| **G2** — E-STOP timing | scenario **+** mechanism | **L** | **NO — 2 blockers, and one is now known not to help** | no |
-| **G7** — MFBR containment + clipping | **mechanism** | **M** | **NO — half the criterion missing** | **YES** |
-| **G9** — join/re-join/RLF recovery | **scenario** | **S** | **YES** | no |
-| **G11 C2** — internals stable, no drift | **mechanism + metric** | **M** | **NO — no skip-reason counter exists at all** | **YES** |
-| **G11 C3** — CoV(p98) ≤ 15 % | **metric** | **XS** | **YES** | no |
-| **G11 C4** — identical verdicts across repeats | **metric** | **XS** | **YES (needs C1, which is done)** | no |
-| **G11 C5** — bimodality inspection | **metric** | **S** | **YES** | no |
-| **BSR-desync route** (parked) | **scenario** | **S** | **YES — answers a named open question** | no |
-| **`verify_claims` staleness** (parked) | **tooling** | **S** | n/a — closes a blind spot | no |
-
-**Cost key:** XS ≈ an afternoon; S ≈ 1 session; M ≈ 2–3 sessions; L ≈ a work
-package. These are *build* costs; campaign wall-clock is separate and noted
-per item.
+**There was already a known instance waiting** — G9's scenarios carry the
+same absolute-time defect found and fixed in G11, left unfixed because G9
+was deferred. It leads the list, as class A.
 
 ---
 
-## G2 — Emergency-stop under worst case (GT-1.2)
+## CLASS A — Schedules pinned to absolute time, silently no-op at a shorter horizon
 
-**Two independent blockers, and the second one is the reason this is not a
-quick win.**
+**Defect-log #23.** A schedule sized for one horizon, run at another. Events
+past the end are consumed-and-discarded, the run exits 0, and the artefact
+looks complete.
 
-1. **The E-STOP flow is DL** (`sim/fleet.py:179`) while G2's named failure
-   mode — the BSR/SR desync — is an **uplink** mechanism. The flow cannot
-   reach the failure. *Fix: a UL STOP flow. Scenario work, S.*
-2. **TB-size quantisation is planned and unbuilt** — **and WP9 §20.1 measured
-   that building it would not close G2.** Replaying every UL grant of a real
-   run through OAI's own `nr_find_nb_rb`/`nr_compute_tbs` left the padding
-   distribution **completely unchanged**: 13,214 of 13,214 grants at padding
-   0 before and after. The operative scale is the gNB's **BSR error at grant
-   time** (median 12,194–13,387 bytes) against a truncation window **2–5
-   bytes** wide.
+**Where this appears — the category question was already asked, and the
+answer was written down and then acted on in one place only:**
 
-**So: adding the UL STOP flow removes one blocker and changes nothing** —
-the canonical example of an item that must not be built alone. **And the
-second blocker has no known fix**: §20.1 also established the *shape* any
-attempt must defeat, an anti-correlation (load a UE until its grants are
-PRB-limited and padding is exactly 0; unload it and 38.321 §5.4.5 mandates a
-Short BSR rather than a truncated one).
+| site | scheduled events | clipped? |
+|---|---|---|
+| `sim/scenarios/g11.py` | firmware T+600 s, STOP T+1200 s | **FIXED** (refuses construction below `minimum_horizon_slots()`) |
+| **`g9.py::gt61_warm_rejoin`** | 10 cycles from slot 2000, period 1600 | **NO** |
+| **`g9.py::gt62_cold_attach`** | 5 cycles from slot 2000, period 3000 | **NO** |
+| **`g9.py::gt63_rlf_recovery`** | fade from slot 4000, 12000 slots | **NO** |
+| **`g9_campaign.expected_event_count`** | returns *all* events, unclipped | **NO** — the count guard would compare against a number the horizon cannot reach |
+| `g12.py` | none — one load per run | n/a |
 
-**Verdict: L, and not currently scoreable at any cost.** What it needs first
-is a *mechanism hypothesis that survives §20.1*, which is research, not
-build.
+**Measured:** `gt61_warm_rejoin` at h=8,000 places **6 of its 10 events
+beyond the horizon**; at h=4,000, **8 of 10**. `gt63_rlf_recovery` at h=4,000
+has its **entire fade** outside the run. **Latent, not active** — at G9's
+designed horizon (20,000) everything fits, so no published G9 result is
+affected.
 
----
+**Item A1 — fix the class, not G9.** *Scenario. Cost XS-S.* The fix is the
+one already written for G11 (`minimum_horizon_slots()` derived from the
+schedule + refuse construction below it), applied to all four G9 sites **and
+to `expected_event_count`**. **Scoreable alone: no — it is a correctness fix,
+not a measurement.** **Divergence: no.** **Where else: the five sites above,
+and `g12.py` confirmed n/a.**
 
-## G7 — MFBR containment and clipping (GT-5.x)
-
-**There is no MFBR *enforcement* anywhere in `sim/`.** Containment (does a
-flow stay under its MFBR?) is observable today. **Clipping (does the
-scheduler actively hold it there?) is not, and clipping is half the pass
-criterion.**
-
-**⚠ DIVERGENCE FLAG.** Before building an enforcement path, establish
-whether the deployed C clips at all. `mfbr_bps` reaches `has_pending_gbr`
-and the Tier-1.5 floor arming, but no clipping site has been identified in
-`ia_p5g_scheduler.c`. **If the C does not clip, building clipping is a
-divergence from the deployed system, not a completion of the port** — and
-G7 would then be unmeasurable *by construction* rather than unbuilt, which
-is a finding, not a gap. **That question is cheap (a grep and a read) and
-should precede any build.**
-
-**Verdict: M to build, but do the C-side question first — it may convert
-this from "unbuilt" to "structurally out", which is a better answer.**
+> **Listing "fix G9's scenario" without naming the class is the failure this
+> section exists to prevent.** A1 is not G9 work that happens to be shared;
+> it is class work of which G9 is four sites.
 
 ---
 
-## G9 — Join, loss and recovery (GT-6.1/6.2/6.3)
+## CLASS B — Built, tested, green, and never reached or never observable
 
-**The nearest thing to a free verdict on this list.** The machinery exists
-and works: `sim/join.py`, `sim/rlf.py`, M18/M19/M21, and `g9_campaign.py`
-**already refuses to score a degenerate run** — it exited non-zero with
-*"2 'warm' events but the scenario schedules 10"*, which is the guard doing
-its job.
+**The 2026-09-03 audit found twelve instances.** Two of the remaining
+guarantees are blocked by new members of this class, which is why they are
+grouped rather than listed under their guarantees.
 
-**What has to be built is scenario, not mechanism**, and the diagnosis is
-already written down: **depth arms `t310`, duration expires it.** The fade
-must outlast `t310` = 2,000 ms = **8,000 slots at numerology 2**, and
-`sim/driver.py` constructs `RlfDetectorConfig()` itself — so setting
-`JoinConfig.rlf_snr_floor_db` does nothing for detection. GT-6.3's scripted
-fade was **half the length of `t310`**, so zero join events occurred and
-M18/M19 reported instant recovery for a UE that never left.
+**Item B1 — G7's MFBR clipping.** *Mechanism. Cost M.* There is **no MFBR
+enforcement anywhere in `sim/`**: containment is observable, **clipping is
+not**, and clipping is half the pass criterion.
+**Scoreable alone: NO** — building containment measurement without clipping
+still leaves half the criterion unmeasurable.
+**⚠ DIVERGENCE: YES, POSSIBLY THE WHOLE ITEM.** No clipping site has been
+identified in `ia_p5g_scheduler.c`. `mfbr_bps` reaches `has_pending_gbr` and
+the Tier-1.5 floor arming — nothing else. **If the deployed C does not clip,
+building clipping is a divergence, and G7 is structurally out rather than
+unbuilt — a better answer than an unbuilt mechanism.** The C-side question
+is a grep and a read, and must come first.
+**Where else:** `sim/power.py` (PHR, dormant and correctly labelled) and
+`sim/olla.py` are the same *shape* — built, not wired — but both **declare**
+it in their docstrings, which is what B-class hygiene looks like. The
+unlabelled members are `sim/blockage.py` (**confirmed: no scenario, sweep or
+YAML sets `UEConfig.blockage`**), `sync_group`/`phase_offset_ms`, `slice_id`,
+and `FlowConfig.survival_time_ms` — **confirmed still never set outside
+tests, so M14 has still never measured what it defines.**
 
-**Also required by this project's own rule:** assert the expected event
-count *and* that nothing failed to complete — M18 already computes
-`n_never_completed`, and §34.5a records an arm that logged its full count
-while completing **0 of 50** cold attaches.
-
-**Verdict: S, and SCOREABLE ALONE.** Highest verdict-per-unit-cost on the
-list.
-
----
-
-## G11 C2–C5 (GT-7.1 / GT-7.4)
-
-C1 is done. The other four split sharply.
-
-### C3, C4, C5 — metrics only, and all scoreable
-- **C3** — CoV(p98) ≤ 15 % per instrument flow across fresh seeds.
-  *Trivial arithmetic over the existing soak artefact; needs n ≥ 5 and we
-  have n = 10.* **XS, scoreable alone.**
-- **C4** — identical PASS/FAIL verdicts across repeats. *C1's verdict vector
-  compared across seeds; C1 exists.* **XS, scoreable alone.**
-- **C5** — bimodality inspected before signing. *Requires the per-seed p98
-  **vector**, not the CoV — and §2.1 records that **C3's named instrument is
-  structurally blind to C5**, so C5 cannot be folded into C3.* **S,
-  scoreable alone.**
-
-**All three read the soak artefact that now exists post-scaling. This is the
-cheapest block on the page and it converts G11 from "one clause of five" to
-"four of five".**
-
-### C2 — internals stable, no monotonic drift
-**The expensive one, and it is a mechanism gap.** C2 needs floor-fire rate,
-`%min_rb` crumb rate and **skip-reason counters** to show no monotonic
-drift. **No skip-reason counter exists in `sim/` or `scheduler/` at all**
-(§3.2), and there is no trend statistic anywhere.
-
-**⚠ DIVERGENCE FLAG — partial.** The C emits these through
-`[P5G-UL-SUMMARY]`. Porting the counters is *completing the port*. But the
-**trend statistic** over them is a scoring construct with no C counterpart,
-so it belongs in `sim/scorecard.py` as a metric, not in `scheduler/` as
-behaviour — and it must not change any scheduling decision.
-
-**Verdict: M, NOT scoreable alone** — the counters and the trend statistic
-are both required, and neither is useful without the other.
+**Item B2 — G11 C2's skip-reason counters.** *Mechanism + metric. Cost M.*
+C2 needs floor-fire rate, `%min_rb` crumb rate and **skip-reason counters**
+to show no monotonic drift. **Confirmed: no skip-reason counter exists in
+`sim/` or `scheduler/` at all** — the only occurrences are in
+`test_g11_drift.py`, which asserts `"skip_reasons": None  # does not exist`
+and that the reason string says *"hardware log field"*. **The test already
+documents the absence**, which is this class handled correctly.
+**Scoreable alone: NO** — the counters and the trend statistic are jointly
+required and neither is useful without the other.
+**⚠ DIVERGENCE: PARTIAL.** Porting the counters completes the port (the C
+emits them via `[P5G-UL-SUMMARY]`). **The trend statistic has no C
+counterpart**, so it belongs in `sim/scorecard.py` as a metric, never in
+`scheduler/`, and must not change a scheduling decision.
+**Where else:** the five driver counters that reach `summary` and are
+**dropped by `RunRecord.from_summary`** are the same *unobservable* half of
+this class, and `harq_masked_flow_double_grant_count` is the sharpest case —
+README §8 calls it a standing Phase-2 guard while it reaches no record, no
+corpus and no test, so **that check cannot currently fail.**
 
 ---
 
-## The two parked items
+## CLASS C — Checks that cannot fail, or cannot fail at the level the failure happens
 
-### The BSR-desync route into the never-granted fault
-`docs/attach-path-result-2026-09-05.md` answers *"does a successful attach
-clear the lock-out"* — yes, at every fleet size. It does **not** answer
+**Item C1 — `verify_claims` staleness.** *Tooling. Cost S.* Proposal written
+(`docs/verify-claims-staleness-proposal.md`), not built. It re-derives a
+figure from an **artefact on disk**; `0ea02b0` changed **code** and rewrote
+no artefact, so all 9 claims passed while `G1.M01.n10.twotier.median =
+90.125` had become stale against post-scaling code's 87.78.
+**Scoreable alone: n/a — it closes a blind spot.** It would have caught
+**five of nine claims**. **Divergence: no.**
+**Where else — this is the class with the most live members:**
+`harq_masked_flow_double_grant_count` (B2, cannot fail); the M09-hoist
+`--check` that read `RunRecord`s while the change was in `scorecard.py`
+(wrong *layer*); the 22 GiB per-process watchdog against a machine-level
+exhaustion (wrong *aggregation*); and **the same generator-vs-output shape as
+`stage6_partA.json` — fixing a producer does not fix what it already
+wrote.** C1's fix (stamp the producing path's AST hash into the artefact) is
+the only one of these that generalises to the others.
+
+---
+
+## CLASS D — A route or mechanism that is simply not modelled
+
+**Item D1 — the BSR-desync route into the never-granted fault.** *Scenario.
+Cost S.* `docs/attach-path-result-2026-09-05.md` answered *"does a successful
+attach clear the lock-out"* — yes, at every fleet size. It did **not** answer
 *"can a Short/Truncated BSR empty an already-served UE's per-LCG array and
 put it back into the fault"*, **which is the route hardware would actually
 take** and which gets no second seed.
+**Scoreable alone: YES** — and it decides whether the frequency finding
+transfers. The instrument exists (`n_never_granted`, and the consolidation
+`n_never_granted > 0 ⟺ M08 floored`, **0 counterexamples in 144 runs**).
+**Divergence: no** — the desync is already faithful (`sim/bsr.py`'s memset
+mirrors the C's); only the *load pattern that triggers it* is missing.
+**Where else:** this is the last unexplored branch of the cold-start finding.
+Nowhere else.
 
-**Scenario work, S** — it needs a load pattern that drives a served UE into
-a Short BSR while it still holds backlog on other LCGs. The instrument
-already exists (`n_never_granted`, and the consolidation
-`n_never_granted > 0 ⟺ M08 floored` with 0 counterexamples in 144 runs).
+**Item D2 — G2's UL STOP flow.** *Scenario. Cost S.* The E-STOP flow is
+**DL** (`sim/fleet.py:179`) while G2's named failure mode — the BSR/SR
+desync — is **uplink**, so the flow cannot reach the failure.
+**Scoreable alone: NO, AND THIS IS THE CANONICAL EXAMPLE.** It removes one
+blocker of two. **The second blocker has no known fix**: WP9 §20.1 measured
+that TB-size quantisation would **not** close G2 — replaying every UL grant
+through OAI's own `nr_find_nb_rb`/`nr_compute_tbs` left padding
+**completely unchanged, 13,214 of 13,214 grants at padding 0 before and
+after** — because the operative scale is the gNB's BSR error at grant time
+(median 12,194–13,387 bytes) against a 2–5 byte truncation window.
+**Divergence: no.**
+**Where else:** the DL/UL direction mismatch between a scenario's flow and
+its named failure mechanism appears **once more**: G5's subject flow is UL
+while both arms' DL ranking keys are out of scope on the parametric mix —
+already documented, not a defect there, but the same class of "the flow
+cannot reach the mechanism".
 
-**Scoreable alone: YES**, and it decides whether the frequency finding
-transfers to hardware — currently the largest open question attached to a
-published result.
-
-### `verify_claims` staleness
-Proposal written (`docs/verify-claims-staleness-proposal.md`), not built.
-**Tooling, S.** Stamp a content hash of the producing path into each
-artefact; `code_state:` becomes `current | historical:<reason>`; fail a
-`current` claim whose artefact predates the code. Hash the **AST**, not the
-bytes, so comment edits do not trip it.
-
-**Not scoreable — it closes a blind spot.** It would have caught **five of
-nine claims** after `0ea02b0`. Its value is that it makes a silent pass
-loud, and it is the only item here that protects every other item's results.
+**G2 overall: L, and not scoreable at any cost today.** What it needs first
+is a mechanism hypothesis that survives §20.1's anti-correlation — research,
+not build.
 
 ---
 
-## What this adds up to
+## CLASS E — Pure scoring, no simulator change
 
-**Four items are scoreable alone**: G9 (S), G11 C3 (XS), C4 (XS), C5 (S),
-plus the BSR-desync question (S). **Together they would take G11 to four
-clauses of five and add G9 — moving the set from eight guarantees with a
-verdict to nine, and G11 from 20 % to 80 % complete — for roughly two
-sessions of build.**
+**The cheapest block on the page, and all three read an artefact that now
+exists post-scaling** (`sweeps/postscaling-2026-09-05/g11_c1_soak.json`,
+30/30 runs at 7.2M slots).
 
-**Two items are not scoreable alone and should not be started as if they
-were**: G2 (needs a mechanism hypothesis that survives §20.1 before any
-build is worth doing) and G11 C2 (counters and trend statistic are jointly
-required).
+**Item E1 — G11 C3**, CoV(p98) ≤ 15 % per instrument flow across fresh
+seeds. *Metric. Cost XS.* **Scoreable alone: YES.** Needs n ≥ 5; we have 10.
+**Divergence: no.** **Where else: nowhere — no other guarantee uses a CoV.**
 
-**One item may not be a build at all**: G7's clipping. Ask the C-side
-question first; if the deployed scheduler does not clip, G7 is structurally
-out and that is a better answer than an unbuilt mechanism.
+**Item E2 — G11 C4**, identical PASS/FAIL verdicts across repeats. *Metric.
+Cost XS.* C1's verdict vector compared across seeds; **C1 exists**.
+**Scoreable alone: YES.** **Divergence: no.** **Where else: nowhere.**
 
-**Two items carry divergence flags** — G7's clipping and G11 C2's trend
-statistic — and both need a justification the port's fidelity argument does
-not supply.
+**Item E3 — G11 C5**, bimodality inspected before signing. *Metric. Cost S.*
+Needs the per-seed p98 **vector**, not the CoV — **C3's named instrument is
+structurally blind to C5**, so it cannot be folded in.
+**Scoreable alone: YES.** **Divergence: no.**
+**Where else — yes, and it matters:** "an aggregate that cannot see the
+structure it is summarising" is exactly the **decompose-before-attributing**
+class, which has four recorded instances in one WP9 item and **was applied to
+one of five sites in its own file**. C5 is a fifth site of that same class,
+approached from the scoring side.
+
+---
+
+## The shape, before any order is picked
+
+| class | items | scoreable alone | divergence flags |
+|---|---|---|---|
+| **A** absolute-time schedules | A1 (5 sites, 4 of them G9) | no — correctness fix | none |
+| **B** built but unreachable | B1 (G7), B2 (G11 C2) | **neither** | **both** |
+| **C** checks that cannot fail | C1 (`verify_claims`) | n/a | none |
+| **D** route not modelled | D1 (BSR-desync), D2 (G2) | **D1 yes, D2 no** | none |
+| **E** pure scoring | E1, E2, E3 (G11 C3/C4/C5) | **all three** | none |
+
+**Four items are scoreable alone: D1, E1, E2, E3** — plus **G9 becomes
+scoreable once A1 lands and its fade is made to outlast `t310`** (2,000 ms =
+8,000 slots at numerology 2; and `sim/driver.py` constructs
+`RlfDetectorConfig()` itself, so setting `JoinConfig.rlf_snr_floor_db` does
+nothing for detection). **That block takes G11 from one clause of five to
+four, adds G9, and answers the largest open question attached to a published
+result — for roughly two sessions.**
+
+**Three items must not be started as if they were scoreable:** B1, B2, D2.
+
+**Two carry divergence flags** — B1 and B2 — and both need a justification
+the port's fidelity argument does not supply.
+
+**And the single highest-leverage item is C1**, because it is the only one
+that protects the correctness of every other item's results.
