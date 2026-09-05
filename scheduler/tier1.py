@@ -85,6 +85,40 @@ _GBR_PENALTY = 1.0e3       # IA_P5G_TIER1_GBR_PENALTY, fixed, every GBR
 _SCA_ALPHA = 0.2           # IA_P5G_TIER1_SCA_ALPHA
 _SCA_MAXITERS = 150        # IA_P5G_TIER1_SCA_MAXITERS
 _SCA_TOL = 1e-6            # IA_P5G_TIER1_SCA_TOL
+
+# --- objective scaling: a numerical fix, NOT a model change --------------
+#
+# `linprog` is handed `c * _OBJ_SCALE`. Scaling a linear objective by a
+# positive constant is EXACTLY argmax-invariant -- the feasible set, the
+# optimal face and the optimal `x` are unchanged as mathematics. It is here
+# because the unscaled objective is not solvable to its own optimum at
+# HiGHS's default tolerances.
+#
+# THE MEASUREMENT (docs/tier1-lp-analysis-2026-09-05.md, 6,842 captured LPs
+# from one real run):
+#   * the objective spans 9.85 orders -- min |c_j| = 1.40e-7, a factor 1.4
+#     above HiGHS's 1e-7 default dual feasibility tolerance, against the
+#     GBR penalty at 1e3. A reduced cost that close to the tolerance is not
+#     distinguishable from zero by the solver's own optimality test.
+#   * the problem separates by direction into a continuous knapsack, so a
+#     greedy solves it EXACTLY. Against that exact reference the unscaled
+#     call is never better, STRICTLY WORSE on 57 of 856 solves, and returns
+#     the correct x on only 11.3 %. Scaled, 98.8 %.
+#   * under an argmax-invariant column permutation the unscaled answer
+#     changes on 88.6 % of solves; scaled, 1.8 %.
+#
+# WHY 1e4 IS NOT A TUNED CONSTANT. The regression corpus is BYTE-IDENTICAL
+# for every K in [1e3, 1e6] -- four decades -- and differs at 1e2 and at
+# 1e7 and above. 1e4 sits in the interior of that band, and it puts the
+# smallest coefficient ~4 orders above the dual tolerance (1.4e-3) while
+# leaving the penalty at 1e7, far from any precision concern. Choosing a
+# plateau interior is the point; the specific decade is not load-bearing.
+#
+# NOT a speedup -- the LP remains ~43.5 % of TwoTier's driver time. NOT the
+# missing `glp_scale_prob(lp, GLP_SF_GM)` the C calls at
+# ia_p5g_scheduler.c:1053, which is a MATRIX treatment for a 2.83-order
+# span and is a separate item.
+_OBJ_SCALE = 1.0e4
 _DELAY_PRIO_THRESH = 20    # IA_P5G_TIER1_DELAY_PRIO_THRESH
 _DELAY_WEIGHT = 5.0        # IA_P5G_TIER1_DELAY_WEIGHT
 _PF_WEIGHT = 1.0           # IA_P5G_TIER1_PF_WEIGHT
@@ -318,7 +352,8 @@ def solve_tier1(
         c[:n] = -coef
         c[n:] = _GBR_PENALTY
 
-        result = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
+        result = linprog(c * _OBJ_SCALE, A_ub=A_ub, b_ub=b_ub,
+                         bounds=bounds, method="highs")
         if not result.success:
             break
 
