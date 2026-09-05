@@ -1,0 +1,89 @@
+{
+  "arm": "PF",
+  "n_ues": 8,
+  "horizon_slots": 20000,
+  "seed": 3,
+  "flows": 32,
+  "total_s": 4.16435909201391,
+  "phases_s": {
+    "scenario_build": 5.69380063097924e-05,
+    "driver_run": 3.518576850008685,
+    "from_summary": 0.000130557018565014,
+    "online_variations": 0.25540786000783555,
+    "persist": 0.18634232299518771,
+    "m13_projection": 0.00010476799798198044,
+    "panel_score": 0.19420207099756226
+  },
+  "phases_pct": {
+    "scenario_build": 0.0013672693697088648,
+    "driver_run": 84.4926379369239,
+    "from_summary": 0.0031351047227263923,
+    "online_variations": 6.133185308097883,
+    "persist": 4.4746939175476195,
+    "m13_projection": 0.0025158252606720805,
+    "panel_score": 4.663432396355736
+  },
+  "accounted_pct": 99.77096775827825,
+  "n_online_rows": 145,
+  "n_panel_metrics": 20,
+  "record_bytes": 1044844,
+  "m13_bytes": 7472,
+  "marks": [
+    [
+      "scenario_build:start",
+      4.199973773211241e-07
+    ],
+    [
+      "scenario_build:end",
+      5.7358003687113523e-05
+    ],
+    [
+      "driver_run:start",
+      5.938200047239661e-05
+    ],
+    [
+      "driver_run:end",
+      3.5186362320091575
+    ],
+    [
+      "from_summary:start",
+      3.5186372229945846
+    ],
+    [
+      "from_summary:end",
+      3.5187677800131496
+    ],
+    [
+      "online_variations:start",
+      3.5283004170050845
+    ],
+    [
+      "online_variations:end",
+      3.78370827701292
+    ],
+    [
+      "persist:start",
+      3.783708678005496
+    ],
+    [
+      "persist:end",
+      3.9700510010006838
+    ],
+    [
+      "m13_projection:start",
+      3.9700513819989283
+    ],
+    [
+      "m13_projection:end",
+      3.9701561499969102
+    ],
+    [
+      "panel_score:start",
+      3.9701563800044823
+    ],
+    [
+      "panel_score:end",
+      4.164358451002045
+    ]
+  ]
+}

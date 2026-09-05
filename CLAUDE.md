@@ -174,7 +174,17 @@ how the solver got there. `presolve` on/choose/off does not change it.
 
 **Two consequences, and the second is the one that will surprise someone.**
 
-1. **A pure-speedup swap of the LP call cannot be bit-identical**, so the
+1. **RE-OPENED 2026-09-05 — THE REASON RECORDED HERE FOR REJECTING THE 41x
+   SWAP IS NOW KNOWN TO BE WRONG.** It was rejected for moving the corpus;
+   its answer (`ue9_qfi9` 5,521,232 -> 5,340,428) is the CORRECT one, and
+   `scheduler/tier1.py`'s `_OBJ_SCALE` has since landed exactly that value
+   by an independent argmax-invariant route (`0ea02b0`). Re-opened is not
+   taken: `docs/tier1-scaling-followup-2026-09-05.md` §3 recommends the
+   EXACT GREEDY over it -- 15.6x vs 41x, but with a free LP worth only
+   1.60x on TwoTier's driver the speed difference is 0.18 s of 12.2 s,
+   so the choice is on correctness and determinism, where the greedy wins.
+   The paragraph below is kept as written for the record.
+   **A pure-speedup swap of the LP call cannot be bit-identical**, so the
    41×-per-call direct-HiGHS optimisation the profile identified is
    **unavailable at this project's own bar** and was reverted rather than
    landed — both the warm (reuse model, change `c`) and cold (rebuild per

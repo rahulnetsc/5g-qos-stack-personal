@@ -53,6 +53,16 @@ results table is indistinguishable from one that failed to produce a number.
 
 ## The list
 
+> **TIER-1 SCALING, 2026-09-05 (`0ea02b0`).** `scheduler/tier1.py` now
+> scales the LP objective (`_OBJ_SCALE = 1e4`); the shipped solve was
+> returning a numerically wrong vertex on ~89 % of solves and a strictly
+> suboptimal point on 6.7 %. The regression baseline was deliberately
+> re-captured (838 values, all TwoTier). **G1, G3, G5, G8 and G10 have been
+> re-scored at n=10 and every verdict HELD** — see
+> `docs/tier1-scaling-followup-2026-09-05.md`. **G4, G6, G11 C1 and G12 have
+> NOT been re-run and their verdicts below are pre-scaling.** PF and
+> Reservation are unaffected in principle and were confirmed bit-identical.
+
 | G | status | result or cause |
 |---|---|---|
 | **G1** | **measured** | M01 p98 **protected fleet**: PF 24.83 / Reservation 24.42 / TwoTier **94.51 ms** against a 100 ms bound — all pass, 3.8× arm separation. **The all-flow reading is saturated and must not be quoted**: ~300 ms on every arm, won by the 5QI-9 filler, pinned at that filler's own PDB, three arms agreeing to 0.25 ms. |

@@ -1,0 +1,23 @@
+{
+ "PF": {
+  "driver_s": 3.5786939149838872,
+  "lp_s": 0.0,
+  "lp_calls": 0,
+  "tier1_s": 0.0,
+  "tier1_calls": 0
+ },
+ "Reservation": {
+  "driver_s": 5.447192635008832,
+  "lp_s": 0.0,
+  "lp_calls": 0,
+  "tier1_s": 0.0,
+  "tier1_calls": 0
+ },
+ "TwoTier": {
+  "driver_s": 12.239075752993813,
+  "lp_s": 4.578225586388726,
+  "lp_calls": 6936,
+  "tier1_s": 4.813332111021737,
+  "tier1_calls": 50
+ }
+}

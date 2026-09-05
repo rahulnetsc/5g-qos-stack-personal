@@ -1,0 +1,89 @@
+{
+  "arm": "Reservation",
+  "n_ues": 8,
+  "horizon_slots": 20000,
+  "seed": 1,
+  "flows": 32,
+  "total_s": 6.018383028014796,
+  "phases_s": {
+    "scenario_build": 5.989300552755594e-05,
+    "driver_run": 5.352252399985446,
+    "from_summary": 0.000133691995870322,
+    "online_variations": 0.26760461600497365,
+    "persist": 0.1907773960265331,
+    "m13_projection": 0.00010782299796119332,
+    "panel_score": 0.19761515498976223
+  },
+  "phases_pct": {
+    "scenario_build": 0.0009951677260945629,
+    "driver_run": 88.93173423943611,
+    "from_summary": 0.002221393940000213,
+    "online_variations": 4.446453719534112,
+    "persist": 3.1699111727932396,
+    "m13_projection": 0.0017915609136090406,
+    "panel_score": 3.283525725595882
+  },
+  "accounted_pct": 99.83663297993904,
+  "n_online_rows": 145,
+  "n_panel_metrics": 20,
+  "record_bytes": 1000676,
+  "m13_bytes": 7485,
+  "marks": [
+    [
+      "scenario_build:start",
+      5.210167728364468e-07
+    ],
+    [
+      "scenario_build:end",
+      6.041402230039239e-05
+    ],
+    [
+      "driver_run:start",
+      6.233801832422614e-05
+    ],
+    [
+      "driver_run:end",
+      5.35231473800377
+    ],
+    [
+      "from_summary:start",
+      5.352315509022446
+    ],
+    [
+      "from_summary:end",
+      5.352449201018317
+    ],
+    [
+      "online_variations:start",
+      5.3622762040176895
+    ],
+    [
+      "online_variations:end",
+      5.629880820022663
+    ],
+    [
+      "persist:start",
+      5.629881180997472
+    ],
+    [
+      "persist:end",
+      5.820658577024005
+    ],
+    [
+      "m13_projection:start",
+      5.820658987999195
+    ],
+    [
+      "m13_projection:end",
+      5.820766810997156
+    ],
+    [
+      "panel_score:start",
+      5.820766982011264
+    ],
+    [
+      "panel_score:end",
+      6.018382137001026
+    ]
+  ]
+}
