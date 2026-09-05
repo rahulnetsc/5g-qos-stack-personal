@@ -1033,3 +1033,37 @@ it had not previously been applied to time.
 **Consequence for the campaign:** any M07 comparison across conditions that
 change when a flow is active needs pre-attach time excluded, or it compares
 arrival schedules. `Scorecard` has no such exclusion today.
+
+---
+
+## #28 — `FlowRecord.key` OMITS DIRECTION, so one UE cannot carry the same 5QI both ways (2026-09-05)
+
+**Found building G2's UL/DL STOP pair.** `FlowRecord.key` is
+`flow_key(ue_id, qfi)` (`sim/run_record.py:154`) — **no direction**. So a UE
+configured with the same QFI in both directions produces **one** record, and
+the other flow vanishes.
+
+**Measured, not inferred:** with a UL 5QI-85 flow added beside the existing DL
+5QI-85 one on the same UE, `rec.flows` contained `ue1_qfi85` and `ue2_qfi85`
+**as UL only** — the DL flows were absent entirely, and every DL statistic
+read `None`. A control that silently disappears is worse than one that fails.
+
+**Why it has not bitten before:** every existing scenario assigns each 5QI to
+one direction, which is the `one DRB per QFI` convention CLAUDE.md records.
+The collision is only reachable by deliberately pairing directions.
+
+**Worked around, not fixed:** G2's UL STOP uses **5QI 86**, which carries the
+**same standardised 5 ms PDB** as 85 in `scheduler/flow.py::FIVE_QI_PDB_MS`,
+so the pair stays comparable and the PDB is still derived rather than
+authored.
+
+**Not fixed because the fix is not obviously right.** Adding direction to the
+key changes every artefact's flow identifiers and every consumer that parses
+them. And the model may be correct as-is: a DRB is directional in 5G, so
+"the same 5QI both ways on one UE" is arguably two DRBs and should be two
+QFIs. **The finding is that the schema enforces that silently rather than
+loudly** — a scenario that violates it loses flows with no error.
+
+**Cheap guard if this is taken up:** `RunRecord.from_summary` could assert
+that `len(set(flow keys)) == len(flow_configs)`, which would have turned a
+silent disappearance into an immediate failure.

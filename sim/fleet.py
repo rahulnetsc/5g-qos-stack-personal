@@ -179,6 +179,28 @@ UGV = DeviceProfile(
         _Flow(85, "DL", "Delay", 0.0, "aperiodic_event",
               {"rate_hz": 0.2, "burst_bytes": 40},
               "E-STOP -- tiniest payload, tightest PDB in the panel (5 ms)"),
+        # G2's UL STOP, added 2026-09-05 (docs/g2-registration.md). The DL
+        # E-STOP above cannot reach G2's named failure mode, which is an
+        # UPLINK mechanism -- so the pair exists to measure the difference
+        # directly: identical 5QI, identical event rate and payload, opposite
+        # direction, on the SAME UE. The UL one pays the SR -> grant -> BSR
+        # round-trip and the DL one does not, which is the operative cost the
+        # app co-design guide names as "~4-8 ms" against a 5 ms PDB.
+        #
+        # OFF unless `ul_stop=True` -- adding a flow to every UE would move
+        # every existing fleet artefact, and this is a diagnostic pair, not a
+        # change to the workload every other result was measured on.
+        # 5QI 86, NOT 85, and the reason is a record-schema constraint
+        # rather than a QoS choice: `FlowRecord.key` is `ue{N}_qfi{Q}` with
+        # NO DIRECTION, so a UE carrying the same QFI in both directions
+        # collides and only one survives into the record. Measured: with the
+        # UL flow at 5QI 85 the DL one vanished entirely from `rec.flows`.
+        # 5QI 86 carries the SAME standardised 5 ms PDB (scheduler/flow.py's
+        # FIVE_QI_PDB_MS), so the pair stays comparable and the PDB is still
+        # derived rather than authored. Parked as defects-log #28.
+        _Flow(86, "UL", "Delay", 0.0, "aperiodic_event",
+              {"rate_hz": 0.2, "burst_bytes": 40},
+              "E-STOP UPLINK -- G2's pair for the DL flow above"),
         _Flow(9, "UL", "PF", 0.0, "poisson",
               {"rate_bps": 500_000.0},
               "logs, non-GBR"),
@@ -273,6 +295,8 @@ def build_fleet(
     composition: str,
     lidar: Optional[LidarActivation] = None,
     video_tier: float = 1.0,
+    ul_stop: bool = False,
+    stop_rate_hz: Optional[float] = None,
 ) -> tuple[list[FlowConfig], list[str]]:
     """Flows for a fleet of `n_ues` in `composition`.
 
@@ -296,7 +320,23 @@ def build_fleet(
     for idx, pname in enumerate(seq):
         ue_id = idx + 1
         for f in PROFILES[pname].flows:
+            # G2's UL STOP is off unless asked for -- see its _Flow comment.
+            # Gated by NOTE rather than by (qfi, direction) so it cannot
+            # silently catch a future UL 5QI-85 flow added for another reason.
+            if "E-STOP UPLINK" in f.note and not ul_stop:
+                continue
             params = dict(f.params)
+            # DIAGNOSTIC RATE OVERRIDE, both directions of the STOP pair.
+            # At the real 0.2 Hz a 5 s run yields ONE event per flow, which
+            # cannot support a percentile. `stop_rate_hz` raises the event
+            # rate for measurement while keeping the payload (40 B) and the
+            # PDB (5 ms) untouched -- the quantity under test is the
+            # per-event access latency, which does not depend on the rate
+            # while the flow stays negligible against other traffic (5 Hz x
+            # 40 B = 1.6 kbps). A DELIBERATE DEVIATION from the real cadence,
+            # stated here rather than buried in a runner.
+            if stop_rate_hz is not None and "STOP" in f.note.upper():
+                params["rate_hz"] = float(stop_rate_hz)
             is_lidar = pname == "ugv" and "LIDAR" in f.note
             if is_lidar:
                 if ue_id not in active_ids:
