@@ -805,3 +805,69 @@ asserted what the horizon could contain, which is right, and therefore could
 not notice that the horizon could contain almost none of it. **The check has
 to be at construction, where the two are compared, not at scoring, where only
 one of them is present.**
+
+---
+
+## #24 — THE PER-LCG BSR ARRAY HAS THE SAME COLD-START DEADLOCK THE SCALAR HAD, AND TWO RANKING TIERS READ IT (2026-09-05)
+
+**Logged and parked.** Found while isolating G5's lever
+(`docs/g5-lever-2026-09-05.md`); it does not make that answer wrong, so it is
+recorded here rather than chased.
+
+### The instance
+
+`scheduler/reservation.py::_ul_gbr_and_pdb` is gated per-LCG on
+`estimated_ul_buffer_per_lcg > 0` (`gNB_scheduler_ulsch.c:2230`, ported
+faithfully). If no LCG passes that gate, the method returns its seeds —
+`has_gbr=False` and `best_remaining_pdb=9999` — and the candidate enters the
+sort with **tiers 2 and 3 both at their no-information values**.
+
+Measured on `sweep_scenario(seed=1097657231, n_ues=8, horizon 40,000)`, by
+wrapping the real method and calling it:
+
+| ue | candidate evaluations | all per-LCG estimates == 0 | any `bytes_reported` > 0 |
+|---|---|---|---|
+| 1–5 | ~30,900 | **1 (0.0 %)** | 100 % |
+| 6–7 | ~30,950 | 31 (0.1 %) | 100 % |
+| **8** | **9,216** | **9,216 (100.0 %)** | **9,216 (100.0 %)** |
+
+**ue8 is eligible on every one of its slots and carries no QoS state on every
+one of them.** It is never once `has_gbr=True`, and its `pdb_ms` is never
+anything but 9999. Not populated-then-collapsed — **never populated**.
+
+### Why it is its own entry
+
+CLAUDE.md already records that the scalar `estimated_ul_buffer` and the
+per-LCG array *legitimately desync between BSRs* — that is faithful to ground
+truth and is not the defect. CLAUDE.md also records the cold-start deadlock
+for `bytes_reported`, and `sim/ul_access.py` was built to break it: SR on
+PUCCH → `sr-ProhibitTimer` → grant → BSR.
+
+**`UlAccessModel` arms the scalar. It does not arm the per-LCG array.** And
+two of Reservation's four UL ranking tiers read the array, not the scalar. So
+a UE that loses early grants never gets the BSR that would populate the
+array, and without the array it ranks below every UE that has one — a
+positive-feedback lock-in on a quantity nothing in the SR path re-arms.
+
+This is the *same* deadlock the project already fixed once, one field over,
+reached through a different consumer. The fix that closed it for eligibility
+does not reach ranking.
+
+### What it would take, and why it is parked
+
+A real fix is a new mechanism (what re-arms the per-LCG array without a
+grant?), not a bug fix — its own commit, its own regression diff, under the
+one-fidelity-change-per-commit rule. It also needs the ground-truth question
+asked first: **does real hardware exhibit this, or does something in the C
+that this port omits keep the array warm?** That is an
+`oai-branches/`-plus-full-checkout question, not a Python one.
+
+### The shape worth carrying
+
+**A deadlock fixed for one consumer of a field is not fixed for another
+consumer of a different field that shares its cause.** The SR path was
+verified against UL *throughput* — the symptom `bytes_reported` produces.
+Nothing checked the array, because nothing had yet asked which fields the
+*ranking* reads. The cheap check is the one this campaign happened to run:
+for any field a scheduler reads, ask what writes it and whether that writer
+can be reached from a starved state.

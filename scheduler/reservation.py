@@ -413,6 +413,7 @@ virtual-queue state in ``ia_p5g_scheduler.c`` is per-LCG, not per-flow).
 from dataclasses import dataclass, field
 
 from .flow import FlowConfig
+from .rank_trace import RankEntry, RankSnapshot, field as trace_field
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
     bits_per_prb,
@@ -655,6 +656,18 @@ class _UeState:
 # it runs).
 
 
+# --- docs/g5-ranking-map.md's ranking hook -------------------------------
+#
+# Names for _ul_rank_key/_dl_rank_key's elements, in the SAME order. UL and
+# DL are two independently-sourced comparators here (5 tiers vs 4 in ground
+# truth) that currently coincide in width -- kept as two names, never one
+# shared tuple, for the same reason the methods themselves are not merged.
+_UL_TERMS = ("has_srb", "has_gbr", "pdb_ms", "-coef")
+_DL_TERMS = ("has_srb", "has_gbr", "pdb_ms", "-coef")
+# Factors of a term rather than tiers of the key -- see rank_trace.RankEntry.
+_FACTORS = ("coef", "bits_per_rb", "snr_db", "bler", "pdb_ms", "has_gbr")
+
+
 @dataclass
 class _Candidate:
     ue_id: int
@@ -695,6 +708,9 @@ class Reservation:
     """
 
     def __init__(self, min_rb: int = 5) -> None:
+        # docs/g5-ranking-map.md's candidate-set hook -- see two_tier.py's
+        # own attribute for the contract. None by default.
+        self.rank_sink = None
         # min_rb: UL's follower-budget floor (nrmac->min_grant_prb) --
         # a deliberate operator/experimenter choice for the calibration
         # campaign, not a physical constant. See module docstring's
@@ -901,6 +917,9 @@ class Reservation:
             return []
 
         candidates.sort(key=lambda c: self._rank_key(c, direction))
+
+        if self.rank_sink is not None:
+            self._emit_rank_snapshot(slot.slot_index, direction, candidates)
 
         # Commit 4: n_followers_need, computed once for the whole sorted
         # list (gNB_scheduler_ulsch.c:2424-2426 / _dlsch.c:911-913 --
@@ -1327,6 +1346,25 @@ class Reservation:
                 be_bytes += overflow
 
         return has_gbr, best_remaining_pdb, guaranteed_bytes, be_bytes
+
+    def _emit_rank_snapshot(self, slot_index, direction, candidates) -> None:
+        """docs/g5-ranking-map.md's hook, at the sort. Calls `_rank_key`
+        itself so the recorded key is the comparator's own -- see
+        two_tier.py's counterpart for why re-listing the tuple is not safe.
+        """
+        names = _UL_TERMS if direction == "UL" else _DL_TERMS
+        self.rank_sink(RankSnapshot(
+            slot_index=slot_index, direction=direction, arm="Reservation",
+            term_names=names,
+            entries=tuple(
+                RankEntry(
+                    ue_id=c.ue_id,
+                    key=self._rank_key(c, direction),
+                    qfis=tuple(f.qfi for f in c.flows),
+                    factors=tuple(
+                        (n, float(trace_field(c, n))) for n in _FACTORS),
+                )
+                for c in candidates)))
 
     def _rank_key(self, candidate: _Candidate, direction: str) -> tuple:
         """Dispatch to the direction's own comparator. UL and DL are

@@ -1,6 +1,7 @@
 from ..buffer import BufferModel
 from ..channel import ChannelModel
 from scheduler import Allocation, FlowConfig, bits_per_prb, cce_aggregation_level
+from scheduler.rank_trace import RankEntry, RankSnapshot
 from ..resource import SlotGrid
 from ._mac import emit_grant
 
@@ -20,6 +21,8 @@ class ProportionalFair:
         self._flows: list[FlowConfig] = []
         # Smoothed throughput per UE, units: bits per slot.
         self._r_avg: dict[int, float] = {}
+        # docs/g5-ranking-map.md's candidate-set hook. None by default.
+        self.rank_sink = None
 
     def configure(self, flows, slot_duration_s, grid) -> None:
         self._flows = list(flows)
@@ -78,6 +81,9 @@ class ProportionalFair:
             return []
         scored.sort(key=lambda x: x[0], reverse=True)
 
+        if self.rank_sink is not None:
+            self._emit_rank_snapshot(slot.slot_index, direction, scored)
+
         prbs_left = slot.prb_count
         cce_left = slot.pdcch_cce_budget
         increment = 1.0 / self.window
@@ -119,3 +125,43 @@ class ProportionalFair:
                 )
             )
         return out
+
+    def _emit_rank_snapshot(self, slot_index, direction, scored) -> None:
+        """docs/g5-ranking-map.md's hook, at the sort.
+
+        PF has ONE ranking term, so the first-difference rule that names the
+        deciding tier on the QoS-aware arms says nothing here -- what decides
+        is which FACTOR of that term moved. Map rows L5 (`_r_avg` is the
+        lever), L6 (`bits_per_rb` is, and it is the CQI-visible SNR so a
+        stale-CQI result is distinguishable from a link-budget one) and L7
+        (`_r_avg` sitting at its `max(1.0, ...)` clamp, where PF is not
+        proportionally fair for that UE at all) are exactly that split, which
+        is why both factors are recorded rather than only the metric.
+
+        The key is recorded NEGATED because PF sorts descending while
+        `decisive_term` reads ascending -- without that, rank 0 would look
+        like the loser.
+
+        Unpacks the scored tuple by the same six names the grant loop below
+        uses. Positional, so a change to that tuple's width raises here
+        rather than silently shifting which field is read -- the tuple
+        equivalent of `rank_trace.field`'s no-default rule.
+        """
+        entries = []
+        for metric, ue_id, flows, bits_per_rb, bler, snr in scored:
+            raw = self._r_avg[ue_id]
+            entries.append(RankEntry(
+                ue_id=ue_id,
+                key=(-metric,),
+                qfis=tuple(f.qfi for f in flows),
+                factors=(("metric", float(metric)),
+                         ("bits_per_rb", float(bits_per_rb)),
+                         ("r_avg_raw", float(raw)),
+                         ("r_avg_used", float(max(1.0, raw))),
+                         ("r_avg_at_clamp", 1.0 if raw <= 1.0 else 0.0),
+                         ("snr_db", float(snr)),
+                         ("bler", float(bler))),
+            ))
+        self.rank_sink(RankSnapshot(
+            slot_index=slot_index, direction=direction, arm="PF",
+            term_names=("-metric",), entries=tuple(entries)))

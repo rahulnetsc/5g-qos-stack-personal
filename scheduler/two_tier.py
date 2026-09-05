@@ -704,6 +704,7 @@ from .link import (
     cce_aggregation_level,
     mcs_index_for_snr,
 )
+from .rank_trace import RankEntry, RankSnapshot, field as trace_field
 from .tier1 import solve_tier1
 
 # ia_p5g_scheduler.c:74-76 -- the deployed macro, not ia_p5g_scheduler.h's
@@ -846,6 +847,24 @@ class _UeState:
     floor_disarmed: bool = False
 
 
+# --- docs/g5-ranking-map.md's ranking hook -------------------------------
+#
+# Names for the elements of _ul_rank_key/_dl_rank_key, in the SAME order.
+# Declared here rather than in the analysis so a key whose width changes is
+# caught by RankSnapshot.__post_init__ instead of being silently re-indexed.
+_UL_TERMS = ("sched_inactive", "floor_fire", "-floor_sil", "-coef")
+_DL_TERMS = ("has_gbr", "pdb_ms", "-coef")
+# Diagnostic quantities that are FACTORS of a term rather than tiers of the
+# key -- the first-difference rule cannot separate these, so they are carried
+# alongside. Every name is read through `trace_field`, which raises on a name
+# that does not resolve; there is no getattr-with-default anywhere here.
+_UL_FACTORS = ("coef", "urgency01", "hyp_tbs_bytes", "ul_total_target_bytes",
+               "gbr_bytes_slot", "bits_per_rb", "snr_db", "bler", "pdb_ms",
+               "has_gbr", "floor_sil")
+_DL_FACTORS = ("coef", "hyp_tbs_bytes", "bits_per_rb", "snr_db", "bler",
+               "pdb_ms", "has_gbr")
+
+
 @dataclass
 class _Candidate:
     ue_id: int
@@ -902,6 +921,10 @@ class TwoTier:
     """
 
     def __init__(self, min_rb: int = 5) -> None:
+        # docs/g5-ranking-map.md's candidate-set hook. Set post-
+        # construction (`sched.rank_sink = sink`); None means the sort
+        # pays one pointer comparison per slot per direction.
+        self.rank_sink = None
         # mac->min_grant_prb, ia_p5g_scheduler.c:2210 -- confirmed the
         # SAME deployment-configured field reservation.py's own follower
         # budget reads (CLAUDE.md's existing invariant), new here as a
@@ -1291,6 +1314,10 @@ class TwoTier:
         rank_key = self._dl_rank_key if direction == "DL" else self._ul_rank_key
         candidates.sort(key=rank_key)
 
+        if self.rank_sink is not None:
+            self._emit_rank_snapshot(slot.slot_index, direction,
+                                     candidates, rank_key)
+
         # [FIX-2] UL only. ia_p5g_scheduler.c:3016-3030 -- gbr_below[i]
         # = count of still-unserved, live-obligation GBR UEs ranked
         # STRICTLY AFTER candidate i in the sorted (served) order.
@@ -1427,6 +1454,31 @@ class TwoTier:
         when their shapes coincide.
         """
         return (0 if candidate.has_gbr else 1, candidate.pdb_ms, -candidate.coef)
+
+    def _emit_rank_snapshot(self, slot_index, direction, candidates,
+                            rank_key) -> None:
+        """docs/g5-ranking-map.md's hook, at the sort.
+
+        Calls `rank_key` itself rather than re-listing the tuple, so the
+        recorded key IS the one the sort used -- a re-listed key could drift
+        from the comparator and would then attribute a loss to the wrong
+        term. `rank_key` is pure, so this cannot change what the run does;
+        that is the bit-identity condition as a property of the code rather
+        than a hope about it.
+        """
+        names = _UL_TERMS if direction == "UL" else _DL_TERMS
+        facs = _UL_FACTORS if direction == "UL" else _DL_FACTORS
+        self.rank_sink(RankSnapshot(
+            slot_index=slot_index, direction=direction, arm="TwoTier",
+            term_names=names,
+            entries=tuple(
+                RankEntry(
+                    ue_id=c.ue_id,
+                    key=rank_key(c),
+                    qfis=tuple(f.qfi for f in c.flows),
+                    factors=tuple((n, float(trace_field(c, n))) for n in facs),
+                )
+                for c in candidates)))
 
     def _ul_rank_key(self, candidate: _Candidate) -> tuple:
         """ia_p5g_ul_cmp, ia_p5g_scheduler.c:2112-2156 -- the *revised*

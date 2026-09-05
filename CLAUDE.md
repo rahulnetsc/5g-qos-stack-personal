@@ -356,6 +356,16 @@ separate `ul_lcg_deficit_bytes`-style counter in the real C, never
 `estimated_ul_buffer_per_lcg` itself; the scalar *is* decremented on real
 data receipt but the per-LCG array is not, so the two legitimately desync
 between BSRs. Both are deliberate, not oversights.
+**AND THE ARRAY HAS ITS OWN COLD-START DEADLOCK, which `sim/ul_access.py`
+does NOT break** (`docs/wp9-defects-log.md` #24, measured 2026-09-05).
+`UlAccessModel`'s SR path re-arms the scalar `bytes_reported`; nothing
+re-arms `estimated_ul_buffer_per_lcg`. Reservation's UL ranking reads the
+ARRAY for two of its four tiers (`_ul_gbr_and_pdb`'s `has_gbr` and
+`pdb_ms`), so a UE that loses early grants never gets the BSR that would
+populate it and then ranks below every UE that has one -- measured at
+9,216 of 9,216 candidate slots with every per-LCG estimate at 0 while
+`bytes_reported` was positive on all 9,216. Eligibility and ranking read
+different fields; fixing the deadlock for one did not fix it for the other.
 **Since WP5: "real data receipt" means *confirmed* receipt, not grant
 time — they stopped being the same event once UL HARQ retry existed.**
 `on_ul_grant(..., delivered_bytes=...)` still decrements unconditionally
