@@ -317,3 +317,47 @@ grants during attach, so the cold-start entry is sim-specific. **Whether the
 fault can be re-entered by an already-served UE losing its estimate is the
 separate question**, and it is what decides whether these four numbers are
 operational risks or upper bounds.
+
+
+---
+
+## CONFIGURED GRANTS WOULD MAKE THIS FAULT STRUCTURALLY IMPOSSIBLE — and they are not in this branch
+
+**Checked, not assumed:** `enable_sps` / `_SPSReservation` / `_allocate_sps`
+appear in the current `sim/` and `scheduler/` **only inside the docstring
+recording their deletion** (`scheduler/two_tier.py:16-17`). Phase 2 two-tier
+commit 1 removed the mechanism because the deployed hardware scheduler defers
+SPS to a Phase 2 that was never built. **So this is an argument from the
+mechanism's definition, not a measurement — and it cannot be measured here
+without re-adding a mechanism CLAUDE.md explicitly forbids re-adding.**
+
+**The argument, and it is short.** The lock-out has exactly one entry: a UE
+whose `estimated_ul_buffer_per_lcg` reads zero enters the sort carrying
+`has_gbr=False` / `pdb_ms=9999`, loses, and therefore cannot earn the grant
+that would repopulate the array. **Every step of that requires the UE to be
+competing in the sort.**
+
+A Configured Grant flow does not compete. Per `simulator-design.md`,
+CG-served flows consume **zero PDCCH per slot** and the BSR chain is
+**bypassed entirely** — the UE simply transmits on its reserved occasion.
+**A flow that never enters the ranking cannot lose it**, so:
+
+> **For a CG-served flow the cold-start lock-out is structurally impossible,
+> because the fault is a ranking outcome and CG removes the flow from the
+> ranking.**
+
+**What that does and does not license.**
+
+- It is the **strongest available statement about the mechanism's scope**:
+  the fault is not a property of uplink, or of BSR, but specifically of
+  *dynamic* scheduling under a QoS ranking that reads BSR-derived state.
+- It is **not** an argument to add SPS to this port. The deployed scheduler
+  does not have it, and the port's job is to match the deployed scheduler.
+- It **does** sharpen the hardware questions in `docs/hardware-findings.md`:
+  the Tier-1.5 floor exists to rescue a UE from this fault, and CG would
+  prevent the fault outright. If the deployed system gains Configured Grants,
+  the floor's dead gate matters less for CG-served flows — and not at all
+  less for dynamically-scheduled ones.
+- **Testable if SPS is ever restored**, and the falsifier is concrete:
+  configure a GBR flow as CG-served, drive it into the conditions that
+  produce `n_never_granted > 0` for a dynamic flow, and it should stay 0.
