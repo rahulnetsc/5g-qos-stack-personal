@@ -61,7 +61,7 @@ problem nor the performance problem any more.**
 |---|---|---|---|
 | **G4** | holds, effect **shrinks** | **HELD.** TwoTier−PF at duty 0.1: **+5.86 → +6.76**, still excluding zero; every other contrast unchanged | **verdict HIT, direction MISS** — the effect *grew* |
 | **G12** | **"moves" — the one I would bet on** | **Verdict HELD** (neither promotion clause fires, registered conclusion applies verbatim). **But TwoTier's lean moved in 2 of 6 conditions**: canonical/mixed_n8 TIE → `[2,4]`, perm104 `[2,4]` → `[4,2]` | **AMBIGUOUS — my own fault.** I predicted "moves" without saying *what*. The statistic moved; the verdict did not |
-| **G11 C1** | holds at 1.000 | *(in flight at the time of writing — 7.2M slots × 30 runs)* | — |
+| **G11 C1** | holds at 1.000 | **HELD.** 30/30 runs, 7.2M slots, memory guard never tripped, 0 failed runs. **1.000 on all three arms, 300 windows each, 0 failing** — identical to pre-scaling. PF and Reservation window counts bit-identical | **HIT** |
 
 **CONTROLS HELD IN BOTH COMPLETED CAMPAIGNS.** G4: PF and Reservation rows
 **bit-identical**. G12: PF and Reservation leans identical in all six
@@ -86,3 +86,33 @@ published one means you have built a different instrument, not that the
 published one is wrong** — check reproduction before reading a diff. This is
 exactly what `verify_claims` exists to enforce, and I did it by hand and got
 it wrong first.
+
+
+### C1's close
+
+**G11 C1 re-run post-scaling: 30/30 runs at 7,200,000 slots, exit 0, memory
+guard never tripped, 0 failed runs. 1.000 on all three arms, 900 windows,
+0 failing — identical to the pre-scaling soak.** Predicted to hold, and it
+held; the margin (0 failures, no near-misses) was never in doubt.
+
+**THE CONSISTENCY DELIVERABLE IS CLOSED.** Every guarantee in
+`docs/verification-2026-09-04.md` is now either measured on post-scaling
+code (G1, G3, G4, G5, G8, G10, G11 C1, G12) or **explicitly marked
+pre-scaling with its reason** (G6 — unscoreable as written, so re-running
+buys three contradictory readings on new numbers instead of three on old
+ones). The provenance table carries a `code state` column for every row.
+
+### Final prediction score
+
+| prediction | outcome |
+|---|---|
+| G4 holds, effect shrinks | verdict **HIT**, direction **MISS** (it grew) |
+| G12 "moves" | **AMBIGUOUS** — statistic moved, verdict held; I named no level |
+| G11 C1 holds at 1.000 | **HIT** |
+| PF/Reservation unchanged everywhere | **HIT**, confirmed bit-identical in all three campaigns |
+
+**Two clean hits, one verdict-hit-direction-miss, one ambiguous of my own
+making.** The recurring lesson across this session and the last: I keep
+predicting *whether* something moves without naming *what* — verdict, point
+estimate, or per-condition lean — and the ambiguity is a defect in the
+prediction, not in the result.
