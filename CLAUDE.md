@@ -126,6 +126,41 @@ wrong value, not the confirmed-real one. Phase 2's rewrite defaults to
 not a special case of the OAI-comment rule, it's the same rule applied to
 a default this codebase itself chose.
 
+**CORRECTED 2026-09-05 — THE DIAGNOSIS BELOW IS WRONG ON ITS CENTRAL
+CLAIM. THE LP IS NOT DEGENERATE; IT IS BADLY SCALED.**
+`docs/tier1-lp-analysis-2026-09-05.md`, 6,842 captured LPs. The optimum is
+**unique on ~98.7 %** of solves. Measured against an exact greedy (the
+problem separates by direction into a continuous knapsack — verified against
+`ia_p5g_scheduler.c:1027-1038`), the shipped LP call is **never better,
+strictly WORSE on 6.7 %**, always feasible, and returns the correct `x` on
+**11.3 %** of solves. Scaling the objective by K (argmax-invariant) takes
+agreement with the exact answer to **98.7 %** at K=1e3 and drops
+vertex ambiguity under column permutation from **88.6 % to 1.8 %**; K=1e3 and
+K=1e6 give byte-identical corpora, so there is a conditioning plateau and the
+shipped default sits below it. The objective spans **9.85 orders**
+(min coef 1.40e-7 against a 1e3 GBR penalty, and 1.4x HiGHS's 1e-7 dual
+tolerance) while the constraint matrix spans only 2.83.
+**So the 73 % different-vertex rate below was a symptom of conditioning, and
+reading it as degeneracy produced the wrong conclusion**: the 41x
+direct-HiGHS optimisation was rejected for moving the corpus, but its answer
+(`ue9_qfi9` 5,521,232 -> 5,340,428) is **exactly** what objective scaling
+gives, and is the correct one. Any fix still moves 838 corpus values and is
+therefore a deliberate re-baseline, not a free change -- its own decision.
+**Note also the C calls `glp_scale_prob(lp, GLP_SF_GM)` (:1053) and this
+port has no equivalent** -- a real omission, but a matrix treatment, so it
+addresses the 2.83-order span and not the 9.85-order one.
+**And there is NO Tier-1 ground truth in this repo** (zero `IA-P5G` lines in
+`calibration-logs/`), so "does the port reproduce GLPK's vertex" is
+unanswerable by measurement -- but an answer unstable under column
+permutation on 88.6 % of solves cannot be reproducing another solver's
+vertex except by coincidence. "Keep simplex for fidelity" is false comfort.
+**What survives unchanged:** the SCA cap finding, now explained -- the
+fixed-point equation forces `r* = v*`, so only vertices are fixed points,
+and every sampled solve whose exact optimum had more strictly-interior
+components (32) than the polytope has rows (10) hit the cap, 13 of 13.
+**And convergence does not mean correctness**: 6 of 7 solves that DID reach
+`_SCA_TOL` stopped 0.3-3.6 Mbps from the exact optimum.
+
 **TIER-1'S LP HAS MULTIPLE OPTIMA AND ITS SCA LOOP DOES NOT CONVERGE —
 so `scheduler/tier1.py`'s output depends on the SOLVER PATH, not only on
 the model.** Measured 2026-09-04 over one real run's 2,437 Tier-1 LPs
