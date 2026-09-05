@@ -723,3 +723,85 @@ The checker also refuses an empty selection, a missing artefact and an
 unknown statistic, and its statistic vocabulary is a small named table rather
 than an expression evaluator — a checker that can compute anything can match
 anything, and stops being a check.
+
+
+---
+
+## #23 — SCRIPTED EVENTS PINNED TO ABSOLUTE TIME SILENTLY NO-OP AT A SHORTER HORIZON (2026-09-05)
+
+Found pricing G11's soak: a 3,200,000-slot run aborted on all three arms with
+*"the STOP flow `ue2_qfi85` is absent from the record — it generated nothing
+at all, so GT-7.1's drill never happened."* The message was true and the run
+was fine.
+
+### The three defects, in order of consequence
+
+**1. THE SCENARIO BUILT HAPPILY WITHOUT ITS OWN SCRIPTED EVENTS.** GT-7.1
+places the firmware push at T+10 min and the STOP drill at T+20 min, both
+absolute because the guarantee states them that way. `build_g11_scenario`
+accepted any horizon and simply produced a scenario without whichever events
+fell outside it. **Every C1 result to date was produced at 400,000 slots
+(100 s), where THREE of the four scripted ingredients are absent** — no
+firmware window, no STOP drill, no waypoint pause, only the teleop duty
+cycle. Nothing raised, because `assert_schedule_fired` correctly has nothing
+to assert about an event the horizon cannot contain.
+
+**Fixed at CONSTRUCTION, not at scoring:** `build_g11_scenario` now refuses a
+horizon below `minimum_horizon_slots()` (derived from the schedule, 4,800,080
+slots) unless the caller passes `allow_partial_schedule=True`.
+`scripted_ingredients_present()` reports which four it actually has. **The
+flag is the point, not an escape hatch** — a short run is legitimate, and
+passing the flag is the caller saying so. **A drill rescaled to fit a short
+run would not be GT-7.1's drill, so rescaling is deliberately not offered.**
+
+**2. AN ASSERTION ABOUT ONE INGREDIENT FIRING ON ANOTHER'S EXPECTATION.**
+`assert_schedule_fired` early-returned only when **both** the STOP and
+firmware counts were zero, then checked the STOP flow unconditionally. Any
+horizon in **[660 s, 1200 s)** — firmware expected, STOP not — aborted on an
+event the horizon cannot contain. That is what killed the 3.2 M battery
+point. Each ingredient is now gated on its own count.
+
+**3. A SCRIPTED WINDOW THAT STARTS AFTER IT ENDS.** `teleop.windows()`
+returns one window past the horizon by construction (`n = h // period + 1`),
+so clipping the last OFF interval produced **(812.0, 800.0)**. Benign
+downstream and wrong to emit: a partition of the run into quiescent-vs-event
+intervals cannot contain an interval outside the run. Inverted windows are
+now dropped.
+
+### THE CATEGORY QUESTION — what else is pinned to absolute time
+
+Asked of the whole scenario layer, since the shape is *"a schedule sized for
+one horizon, run at another"*.
+
+| scenario | scheduled events | clipped to horizon? |
+|---|---|---|
+| `g11.py` | firmware T+600 s, STOP T+1200 s | **was not** — fixed above |
+| **`g9.py` `gt61_warm_rejoin`** | **10 cycles from slot 2000, period 1600** | **NO** |
+| **`g9.py` `gt62_cold_attach`** | **5 cycles from slot 2000, period 3000** | **NO** |
+| **`g9.py` `gt63_rlf_recovery`** | **fade from slot 4000, 12000 slots long** | **NO** |
+| `g12.py` | none — the ramp is one load per run, no mid-run schedule | n/a |
+
+**Measured:** `gt61_warm_rejoin` at h=8,000 places **6 of its 10 events
+beyond the horizon**, and at h=4,000, **8 of 10**. `gt63_rlf_recovery` at
+h=4,000 has its entire fade outside the run.
+
+**And `g9_campaign.expected_event_count` does not clip either** — it returns
+`sum(1 for e in joiner.join.events if e.kind in kinds)`, all of them, so the
+count guard would compare recorded events against a number the horizon cannot
+reach. **At G9's designed horizon (20,000) all events fit, so no published G9
+result is affected** — the defect is **latent**, and G9's actual abort
+(*"2 'warm' events but the scenario schedules 10"*) is a genuine finding at
+the correct horizon, not this.
+
+**NOT FIXED HERE.** G9 is deferred for this delivery, and a fix to its
+scenarios is a change to the scenarios G9's open threads will be re-run on.
+Recorded so the next person meets it before shortening a G9 horizon.
+
+### The shape worth carrying
+
+**A schedule expressed in absolute time is a claim about the horizon**, and
+nothing checked that claim. The guards downstream were all correct: they
+asserted what the horizon could contain, which is right, and therefore could
+not notice that the horizon could contain almost none of it. **The check has
+to be at construction, where the two are compared, not at scoring, where only
+one of them is present.**

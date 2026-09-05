@@ -34,6 +34,7 @@ checks delivery, not just arrival, where the flow is deliverable.
 from __future__ import annotations
 
 import dataclasses
+import math
 from typing import Any, Optional
 
 from scheduler.flow import FlowConfig
@@ -122,6 +123,19 @@ def _with_params(f: FlowConfig, **extra: Any) -> FlowConfig:
     return dataclasses.replace(f, traffic_params={**f.traffic_params, **extra})
 
 
+def minimum_horizon_slots(firmware: "FirmwareWindow" = None,
+                          stop: "StopDrill" = None) -> int:
+    """The shortest horizon that can contain GT-7.1's whole schedule.
+
+    Derived from the schedule, never restated: the last scripted event ends
+    at `stop.at_s + one period`, so anything shorter is a DIFFERENT scenario.
+    """
+    firmware = firmware or FirmwareWindow()
+    stop = stop or StopDrill()
+    last_s = max(firmware.windows()[-1][1], stop.windows()[-1][1])
+    return int(math.ceil(last_s / SLOT_S))
+
+
 def build_g11_scenario(
     seed: int,
     n_ues: int = 4,
@@ -131,8 +145,43 @@ def build_g11_scenario(
     firmware: FirmwareWindow = FirmwareWindow(),
     stop: StopDrill = StopDrill(),
     permutation: int = 0,
+    allow_partial_schedule: bool = False,
 ) -> ScenarioConfig:
-    """GT-7.1's soak. `permutation` rotates the flow list for §9's control."""
+    """GT-7.1's soak. `permutation` rotates the flow list for §9's control.
+
+    REFUSES A HORIZON THAT CANNOT HOLD THE SCHEDULE, unless the caller says
+    `allow_partial_schedule=True`. The firmware push is at T+10 min and the
+    STOP drill at T+20 min, both absolute because GT-7.1 states them that
+    way -- so at any shorter horizon the scenario silently builds WITHOUT
+    them and looks like GT-7.1's while missing its scripted events.
+
+    Measured, and this is why the refusal is at CONSTRUCTION rather than at
+    scoring: at the 400,000-slot (100 s) horizon every C1 result so far was
+    produced on a scenario with **three of the four scripted ingredients
+    absent** -- no firmware window, no STOP drill, no waypoint pause, only
+    the teleop duty cycle. Nothing raised, because `assert_schedule_fired`
+    has nothing to assert about an event the horizon cannot contain, which is
+    correct for what it does and leaves the qualification to the caller.
+
+    THE FLAG IS THE POINT, not an escape hatch: a short run is legitimate --
+    it is how C1 was smoke-tested -- but passing `allow_partial_schedule` is
+    the caller SAYING SO, and `scripted_ingredients_present()` below reports
+    which ones it actually got. A drill rescaled to fit a short run would not
+    be GT-7.1's drill, so rescaling is deliberately not offered.
+    """
+    if not allow_partial_schedule:
+        need = minimum_horizon_slots(firmware, stop)
+        if horizon_slots < need:
+            raise ValueError(
+                f"horizon_slots={horizon_slots:,} ({horizon_slots * SLOT_S:.0f} s) "
+                f"cannot contain GT-7.1's schedule, whose last scripted event "
+                f"(the STOP drill at T+{stop.at_s:.0f} s) ends at "
+                f"{stop.windows()[-1][1]:.2f} s -- it needs at least "
+                f"{need:,} slots. Building it here would produce a scenario "
+                f"that LOOKS like GT-7.1 and is missing its scripted events. "
+                f"Pass allow_partial_schedule=True to build a deliberately "
+                f"short one, and report which ingredients it contains "
+                f"(scripted_ingredients_present).")
     base = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon_slots)
     horizon_s = horizon_slots * SLOT_S
 
@@ -168,13 +217,37 @@ def build_g11_scenario(
     )
 
 
+def scripted_ingredients_present(horizon_slots: int, **kw: Any) -> dict[str, bool]:
+    """Which of GT-7.1's four scripted ingredients this horizon can contain.
+
+    So a deliberately short run REPORTS what it is rather than being
+    indistinguishable from the real one. C1's 400,000-slot results carry
+    {'teleop': True, 'pause': False, 'firmware': False, 'stop': False}.
+    """
+    want = expected_counts(horizon_slots, **kw)
+    return {"teleop": want["teleop_on_windows"] > 0,
+            "pause": want["waypoint_pauses"] > 0,
+            "firmware": want["firmware_windows"] > 0,
+            "stop": want["stop_bursts"] > 0}
+
+
 def scripted_windows(horizon_s: float, teleop=TeleopDuty(), pauses=WaypointPauses(),
                      firmware=FirmwareWindow(), stop=StopDrill()) -> dict:
     """Every scripted interval, for partitioning windows into quiescent vs
     event (E1/E5's partition -- declared once, used by both)."""
     return {
-        "teleop_off": tuple((a + teleop.on_s, min(a + teleop.period_s, horizon_s))
-                            for a, _ in teleop.windows(horizon_s)),
+        # CLIPPED **AND DROPPED** if the clip inverts it. `teleop.windows`
+        # returns one window past the horizon by construction (`n = h //
+        # period + 1`), so the last OFF interval starts after the run ends and
+        # `min(end, horizon_s)` produced e.g. (812.0, 800.0) -- a window whose
+        # start is after its end. Measured in the 3.2 M-slot battery run.
+        # Benign downstream (nothing activates on it) and wrong to emit: a
+        # partition of the run into quiescent-vs-event intervals cannot
+        # contain an interval outside the run.
+        "teleop_off": tuple(
+            w for w in ((a + teleop.on_s, min(a + teleop.period_s, horizon_s))
+                        for a, _ in teleop.windows(horizon_s))
+            if w[0] < w[1]),
         "pause": tuple((w[1], nxt[0]) for w, nxt in
                        zip(pauses.windows(horizon_s), pauses.windows(horizon_s)[1:])),
         "firmware": firmware.windows(),
@@ -213,37 +286,49 @@ def assert_schedule_fired(record: Any, horizon_slots: int, label: str,
     record its full scheduled count and complete none of it.
     """
     want = expected_counts(horizon_slots, **kw)
-    # Nothing to assert about an event the horizon cannot contain. Returning
-    # the (zero) expectations rather than raising is what lets the same
-    # assertion run on a smoke horizon and on the real soak.
-    if not want["stop_bursts"] and not want["firmware_windows"]:
-        return dict(want)
+    # EACH INGREDIENT IS GATED ON ITS OWN EXPECTED COUNT. The previous form
+    # early-returned only when BOTH the STOP and the firmware count were
+    # zero, then checked the STOP flow unconditionally -- so any horizon in
+    # [660 s, 1200 s), where firmware is expected and STOP is not, aborted on
+    # a STOP that the horizon cannot contain. Measured: the 3.2 M-slot
+    # (800 s) battery run failed on all three arms with "the STOP flow is
+    # absent ... GT-7.1's drill never happened", which was true and not a
+    # defect in the run.
+    #
+    # A combined gate makes an assertion about ingredient A fire on the
+    # expectation of ingredient B. Nothing to assert about an event the
+    # horizon cannot contain, per ingredient.
     stop_key = f"ue2_qfi{_QFI_ESTOP}"
     fw_key = f"ue1_qfi{_QFI_FIRMWARE}"
     got: dict[str, int] = {}
 
-    fr = record.flows.get(stop_key)
-    if fr is None:
+    if not want["stop_bursts"]:
+        fr = None
+    else:
+        fr = record.flows.get(stop_key)
+    if want["stop_bursts"] and fr is None:
         raise AssertionError(
             f"{label}: the STOP flow {stop_key} is absent from the record -- "
             "it generated nothing at all, so GT-7.1's drill never happened.")
-    got["stop_bytes_arrived"] = fr.bytes_arrived
-    if fr.bytes_arrived <= 0:
+    if fr is not None:
+        got["stop_bytes_arrived"] = fr.bytes_arrived
+    if fr is not None and fr.bytes_arrived <= 0:
         raise AssertionError(
             f"{label}: STOP drill generated 0 bytes. Expected exactly one "
             f"{kw.get('stop', StopDrill()).burst_bytes}-byte burst at "
             f"T+{kw.get('stop', StopDrill()).at_s:.0f}s.")
-    if fr.bytes_delivered <= 0:
+    if fr is not None and fr.bytes_delivered <= 0:
         raise AssertionError(
             f"{label}: STOP drill generated {fr.bytes_arrived} bytes and "
             f"DELIVERED NONE. Firing and finishing are different questions "
             f"(G9 §34.5a) -- a drill that never lands is not a drill.")
 
-    fw = record.flows.get(fw_key)
-    if fw is None or fw.bytes_arrived <= 0:
+    fw = record.flows.get(fw_key) if want["firmware_windows"] else None
+    if want["firmware_windows"] and (fw is None or fw.bytes_arrived <= 0):
         raise AssertionError(
             f"{label}: the firmware window {fw_key} produced no traffic; "
             f"expected {want['firmware_windows']} window(s) of "
             f"{kw.get('firmware', FirmwareWindow()).duration_s:.0f}s.")
-    got["firmware_bytes_arrived"] = fw.bytes_arrived
+    if fw is not None:
+        got["firmware_bytes_arrived"] = fw.bytes_arrived
     return {**want, **got}

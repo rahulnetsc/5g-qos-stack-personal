@@ -376,6 +376,52 @@ the count of ramp points it affects.
 **telemetry** reading while E1's clean-control check covers M13's GBR
 classes — 5QI 1 is `Delay`, so the control does not cover it.
 
+## G11's horizon question — PRICED, MEASURED, and running
+
+The seed half closed (C1 survives at n=10); the horizon half was the only
+thing between C1 and a real answer. It is now measured rather than projected.
+
+**MEASURED at 7,200,000 slots (30 min sim), N=4, on the campaign path:**
+
+| arm | wall | peak RSS | windows |
+|---|---|---|---|
+| PF | 15.1 min | 1,912 MB | 30 |
+| Reservation | 18.9 min | 1,935 MB | 30 |
+| **TwoTier** | **33.4 min** | **1,960 MB** | 30 |
+
+**Against the projection, which was extrapolated 4.5× beyond its largest
+measured point:** the affine fit over 0.4–1.6 Mslot (461 MB + 186 MB/Mslot,
+R² = 0.998) predicted **1,800 MB**; measured **1,960 MB** — **+8.9 %**.
+
+**The fit is usable and OPTIMISTIC, and 8.9 % lands exactly where it
+matters.** At the projected figure W=12 needs 21.1 GiB of ~24 usable; at the
+measured one it needs **23.0 GiB — 0.9 GiB of headroom**. The error does not
+change whether the soak fits; it changes whether W=12 is a safe operating
+point. **§37's rule — measure at the horizon you will run — paid again, and
+not by refuting the fit.** It paid by showing the fit optimistic at the
+margin where the worker count is decided.
+
+| W | total at 1,960 MB/run | |
+|---|---|---|
+| 16 | 30.6 GiB | exceeds |
+| **12** | **23.0 GiB** | fits, 0.9 GiB spare |
+| **10** | **19.1 GiB** | **the operating point** |
+| 8 | 15.3 GiB | fits |
+
+**Campaign cost: 11.2 h CPU; ~1.3 h wall at W=10** (LPT floor 0.56 h, one
+TwoTier run).
+
+**So C1 at the specified horizon is affordable, and it is running** — n=10,
+W=10, banked per run, launched detached (`setsid`) so a session compaction
+cannot take it. When it lands, C1 stops being a 1/18th-duration pass and
+becomes 30 windows per run against 2. **C2–C5 remain deferred.**
+
+**One thing that measurement exposed, and it qualifies every C1 result so
+far:** at 400,000 slots **three of GT-7.1's four scripted ingredients are
+absent** — no firmware push, no STOP drill, no waypoint pause. C1's existing
+pass is not merely short; it is short *and* missing most of its schedule.
+`docs/wp9-defects-log.md` #23, now refused at construction.
+
 ## What this pass did not cover
 
 **G2, G9, G11's remaining clauses, and G3's delta clause are deferred for

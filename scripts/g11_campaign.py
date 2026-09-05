@@ -57,6 +57,8 @@ from sim.driver import run as driver_run
 from sim.run_record import RunRecord
 from sim.scenarios.g11 import (SLOT_S, SOAK_HORIZON_SLOTS,
                                assert_schedule_fired, build_g11_scenario,
+                               minimum_horizon_slots,
+                               scripted_ingredients_present,
                                expected_counts, scripted_windows)
 from regime_sweep import check_for_orphans, paired_seeds
 from wp9_window import (Window, windowed_flows_from_configs,
@@ -85,7 +87,13 @@ def _arm(name: str):
 def run_one(task: tuple) -> dict:
     arm, seed, horizon, n_ues, permutation = task
     t0 = time.time()
+    # A horizon below the schedule's own minimum is a DELIBERATELY SHORT
+    # run, and the runner says so rather than the scenario silently
+    # dropping GT-7.1's firmware push and STOP drill. Which ingredients
+    # it actually contains travels in the run record.
+    partial = horizon < minimum_horizon_slots()
     sc = build_g11_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
+                            allow_partial_schedule=partial,
                             permutation=permutation)
     horizon_s = horizon * SLOT_S
     windows = [Window(name=f"w{k:03d}", start_s=k * WINDOW_S,
