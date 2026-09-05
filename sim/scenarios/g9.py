@@ -27,6 +27,7 @@ from __future__ import annotations
 from sim.config import (CarrierConfig, FlowConfig, ScenarioConfig,
                         ScriptedFadeWindow, TDDConfig, UEConfig)
 from sim.join import JoinConfig, JoinEvent
+from sim.scenarios.schedule_guard import require_horizon
 
 # QFIs. The handshake pair is distinct from every traffic flow on the
 # joiner, per JoinConfig's own contract.
@@ -175,7 +176,8 @@ def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
 def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
                      n_cycles: int = 10, horizon_slots: int = 20_000,
                      first_slot: int = 2000, period_slots: int = 1600,
-                     bg: bool = True) -> ScenarioConfig:
+                     bg: bool = True,
+                     allow_partial_schedule: bool = False) -> ScenarioConfig:
     """GT-6.1: repeated app restarts on the joiner under neighbour load.
 
     `n_cycles` restarts because the pass line is a **p95 over cycles**; one
@@ -184,6 +186,12 @@ def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
     """
     events = tuple(JoinEvent(slot=first_slot + i * period_slots,
                              kind="app_restart") for i in range(n_cycles))
+    # DEFECT-CLASS GUARD (#23): derived from the schedule, never restated.
+    require_horizon("g9_gt61_warm_rejoin",
+                    max(e.slot for e in events), horizon_slots,
+                    allow_partial=allow_partial_schedule,
+                    detail=f"{n_cycles} cycles from slot {first_slot} at "
+                           f"period {period_slots}. ")
     join = JoinConfig(events=events, handshake_ul_qfi=QFI_HANDSHAKE_UL,
                       handshake_dl_qfi=QFI_HANDSHAKE_DL)
     return _build(f"g9_gt61_warm_n{n_neighbours}", n_neighbours=n_neighbours,
@@ -193,7 +201,8 @@ def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
 def gt62_cold_attach(seed: int = 1, n_neighbours: int = 7, n_cycles: int = 5,
                      horizon_slots: int = 20_000, first_slot: int = 2000,
                      off_slots: int = 800, period_slots: int = 3000,
-                     bg: bool = True) -> ScenarioConfig:
+                     bg: bool = True,
+                     allow_partial_schedule: bool = False) -> ScenarioConfig:
     """GT-6.2: repeated power-cycles. GT-6.2's own pass line is "10
     consecutive cycles", which is why `JoinConfig.events` is a list.
 
@@ -208,6 +217,15 @@ def gt62_cold_attach(seed: int = 1, n_neighbours: int = 7, n_cycles: int = 5,
         base = first_slot + i * period_slots
         events += [JoinEvent(slot=base, kind="power_off"),
                    JoinEvent(slot=base + off_slots, kind="power_on")]
+    # DEFECT-CLASS GUARD (#23): the LAST event is the power_on, not the
+    # power_off -- a cycle that starts inside the horizon and finishes
+    # outside it is exactly the silent-truncation case.
+    require_horizon("g9_gt62_cold_attach",
+                    max(e.slot for e in events), horizon_slots,
+                    allow_partial=allow_partial_schedule,
+                    detail=f"{n_cycles} cycles from slot {first_slot} at "
+                           f"period {period_slots}, each {off_slots} slots "
+                           f"off. ")
     join = JoinConfig(events=tuple(events), initial_state="connected",
                       handshake_ul_qfi=QFI_HANDSHAKE_UL,
                       handshake_dl_qfi=QFI_HANDSHAKE_DL)
@@ -227,7 +245,8 @@ T310_SLOTS_MU2 = int(_T310_MS / _SLOT_MS_MU2)   # 8,000
 def gt63_rlf_recovery(seed: int = 1, n_neighbours: int = 7,
                       horizon_slots: int = 30_000, fade_start_slot: int = 4000,
                       fade_slots: int = 12_000, fade_extra_loss_db: float = 35.0,
-                      bg: bool = True) -> ScenarioConfig:
+                      bg: bool = True,
+                      allow_partial_schedule: bool = False) -> ScenarioConfig:
     """GT-6.3: a scripted deep fade drives RLF, then recovery.
 
     RLF is **never scripted as an event** -- it is emergent, driven by
@@ -254,6 +273,18 @@ def gt63_rlf_recovery(seed: int = 1, n_neighbours: int = 7,
     # own rlf_snr_floor_db of -5.0 (RlfDetectorConfig, which is what the
     # driver constructs -- NOT JoinConfig's identically-named field). Depth
     # arms t310; DURATION is what expires it, and both are needed.
+    # DEFECT-CLASS GUARD (#23): the fade's END, not its start. A fade that
+    # begins inside the horizon and is cut short by it does not just shrink
+    # -- it stops outlasting t310 (8,000 slots) and declares NO RLF at all,
+    # which reads as "recovery was instant" rather than as a scenario that
+    # never fired. That is this builder's own recorded first-version bug,
+    # reachable again purely by shortening the horizon.
+    require_horizon("g9_gt63_rlf_recovery",
+                    fade_start_slot + fade_slots, horizon_slots,
+                    allow_partial=allow_partial_schedule,
+                    detail=f"the fade runs slots {fade_start_slot}-"
+                           f"{fade_start_slot + fade_slots} and must outlast "
+                           f"t310 ({T310_SLOTS_MU2} slots) to declare RLF. ")
     fade = ScriptedFadeWindow(start_slot=fade_start_slot,
                               end_slot=fade_start_slot + fade_slots,
                               extra_loss_db=fade_extra_loss_db)

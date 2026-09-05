@@ -61,24 +61,17 @@ and `g12.py` confirmed n/a.**
 guarantees are blocked by new members of this class, which is why they are
 grouped rather than listed under their guarantees.
 
-**Item B1 — G7's MFBR clipping.** *Mechanism. Cost M.* There is **no MFBR
-enforcement anywhere in `sim/`**: containment is observable, **clipping is
-not**, and clipping is half the pass criterion.
-**Scoreable alone: NO** — building containment measurement without clipping
-still leaves half the criterion unmeasurable.
-**⚠ DIVERGENCE: YES, POSSIBLY THE WHOLE ITEM.** No clipping site has been
-identified in `ia_p5g_scheduler.c`. `mfbr_bps` reaches `has_pending_gbr` and
-the Tier-1.5 floor arming — nothing else. **If the deployed C does not clip,
-building clipping is a divergence, and G7 is structurally out rather than
-unbuilt — a better answer than an unbuilt mechanism.** The C-side question
-is a grep and a read, and must come first.
-**Where else:** `sim/power.py` (PHR, dormant and correctly labelled) and
-`sim/olla.py` are the same *shape* — built, not wired — but both **declare**
-it in their docstrings, which is what B-class hygiene looks like. The
-unlabelled members are `sim/blockage.py` (**confirmed: no scenario, sweep or
-YAML sets `UEConfig.blockage`**), `sync_group`/`phase_offset_ms`, `slice_id`,
-and `FlowConfig.survival_time_ms` — **confirmed still never set outside
-tests, so M14 has still never measured what it defines.**
+**Item B1 — G7's MFBR clipping. ⚠ ANSWERED AND RECLASSIFIED 2026-09-05 —
+NO LONGER A CLASS-B ITEM.** The grep was run
+(`docs/g7-clipping-question-2026-09-05.md`) and **both halves of the recorded
+blocker were wrong**: the C clips at three sites (both arms, both
+directions), and **the port implements all three faithfully — there is no
+divergence flag.** What is clipped is the **GBR target, not delivered
+bytes**: `overflow = lcg_estimate - target; be_bytes += overflow`, so excess
+becomes best-effort and stays deliverable. GT-4.3's criterion is about
+delivered bytes, which are measurable today. **G7 moves to CLASS D (a route
+not modelled) as item D3: it needs an aggressor SCENARIO, not a mechanism.
+Scenario + metric, cost S–M, SCOREABLE ALONE.** See D3 below.
 
 **Item B2 — G11 C2's skip-reason counters.** *Mechanism + metric. Cost M.*
 C2 needs floor-fire rate, `%min_rb` crumb rate and **skip-reason counters**
@@ -153,6 +146,20 @@ its named failure mechanism appears **once more**: G5's subject flow is UL
 while both arms' DL ranking keys are out of scope on the parametric mix —
 already documented, not a defect there, but the same class of "the flow
 cannot reach the mechanism".
+
+**Item D3 — G7's aggressor scenario** *(moved here from B1, 2026-09-05).*
+*Scenario + metric. Cost S–M.* Asset B's camera offered at **2× MFBR**,
+Asset A on a full nominal profile, and a **three-part** verdict: A's SLO,
+B's camera delivered vs MFBR, **and B's own other flows' SLO** — GT-4.3
+requires containment to hold *inside* the misbehaving asset, which is the
+clause easiest to drop.
+**Scoreable alone: YES.** **Divergence: no** — the port matches the C at all
+three clip sites.
+**Where else:** `FlowConfig.aggressor_multiplier` is consumed in
+`sim/traffic.py:168` but **never set outside tests** — a standing class-B
+member this item would retire. And its known issue applies: for `xr_video`
+it scales fragments *after* fragmentation and can exceed `fragment_bytes`,
+so a camera aggressor must scale `traffic_params["avg_bytes"]` instead.
 
 **G2 overall: L, and not scoreable at any cost today.** What it needs first
 is a mechanism hypothesis that survives §20.1's anti-correlation — research,

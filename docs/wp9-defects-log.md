@@ -793,9 +793,25 @@ result is affected** — the defect is **latent**, and G9's actual abort
 (*"2 'warm' events but the scenario schedules 10"*) is a genuine finding at
 the correct horizon, not this.
 
-**NOT FIXED HERE.** G9 is deferred for this delivery, and a fix to its
-scenarios is a change to the scenarios G9's open threads will be re-run on.
-Recorded so the next person meets it before shortening a G9 horizon.
+**FIXED AT THE CATEGORY, 2026-09-05.** `sim/scenarios/schedule_guard.py`
+holds one `require_horizon()` for every scenario that pins events to
+absolute time; g9's three builders and `g9_campaign.expected_event_count`
+are wired to it, and `sim/tests/test_schedule_guard.py` **derives the set of
+schedule-owning builders from the AST** (`-> ScenarioConfig` + a
+`horizon_slots` parameter) and fails when a NEW one does not guard. That
+last test is what makes a fifth instance loud instead of silent -- this
+answer sat written down here, naming four sites, for eight weeks while the
+fix stayed at one.
+
+**And the count guard's failure is the OPPOSITE direction, which is why it
+needed its own note.** A scenario whose events fall past the horizon reports
+FEWER events than scheduled; `expected_event_count`, unclipped, returned the
+FULL scheduled count -- so the guard compared a real count against a number
+the horizon could not reach and **refused to score at all**. That is the
+safe direction to fail in, and it may well be why G9 aborted rather than
+publishing a partial run -- but *"the guard is unsatisfiable"* and *"the arm
+is degenerate"* are different diagnoses and the abort message could not tell
+them apart.
 
 ### The shape worth carrying
 

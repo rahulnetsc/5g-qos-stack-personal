@@ -66,14 +66,34 @@ def _arms():
 
 
 def expected_event_count(sc, want_path: str) -> int | None:
-    """How many events the SCENARIO SPECIFIES -- derived from the schedule,
-    never restated. `reestablish` is emergent (sim/rlf.py observing the SNR
-    trace), so it has no scheduled count and returns None."""
+    """How many events the SCENARIO SPECIFIES **AND THE HORIZON CAN REACH** --
+    derived from the schedule, never restated. `reestablish` is emergent
+    (sim/rlf.py observing the SNR trace), so it has no scheduled count and
+    returns None.
+
+    **THE CLIP IS A DIFFERENT DEFECT FROM A SCENARIO NO-OPPING, AND IT FAILS
+    IN THE OPPOSITE DIRECTION** (`docs/wp9-defects-log.md` #23). A scenario
+    whose events fall past the horizon reports FEWER events than it
+    scheduled; this function, unclipped, reported the FULL scheduled count.
+    So the guard compared a real count against a number the horizon could
+    not reach, and **refused to score at all** -- an abort, not a partial
+    score. That is the safe direction to fail in, and it may well be why G9
+    aborted rather than publishing a partial run; but "the guard is
+    unsatisfiable" and "the arm is degenerate" are different diagnoses and
+    the abort message could not distinguish them.
+
+    `sim/scenarios/schedule_guard.py` now refuses to BUILD such a scenario,
+    so this clip is the second line of defence rather than the first -- kept
+    because a caller may pass `allow_partial_schedule=True`, which is exactly
+    the case where the scheduled and reachable counts legitimately differ.
+    """
     if want_path == "reestablish":
         return None
     joiner = [ue for ue in sc.ues if ue.join is not None][0]
     kinds = {"warm": ("app_restart",), "cold": ("power_on",)}[want_path]
-    return sum(1 for e in joiner.join.events if e.kind in kinds)
+    horizon = getattr(sc, "horizon_slots", None)
+    return sum(1 for e in joiner.join.events
+               if e.kind in kinds and (horizon is None or e.slot < horizon))
 
 
 def assert_events_fired(rec: RunRecord, want_path: str, label: str,
