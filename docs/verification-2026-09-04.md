@@ -37,17 +37,29 @@ part of the result.
 without them is the defect finding 1 is about. All under
 `sweeps/verification-2026-09-04/` unless named otherwise.
 
-| G | artefact | n | horizon |
-|---|---|---|---|
-| G1 | `core_40k_n1.json` (reproduction) + `core_40k_n10.json` + `core.json` | 1, 10, 10 | 40k, 40k, 20k |
-| G3 | `core.json` | 10 | **20k** |
-| G4 | `g4.json` | 10 | 20k |
-| G5 | `core.json` | 10 | **20k** |
-| G6 | `stage6_g6_n40_records.jsonl` | 40 | 20k |
-| G8 | `core_40k_n1.json` + `core_40k_n10.json` | 1, 10 | 40k |
-| G10 | `g10_rows.csv` | 10 | 20k |
-| G11 | `g11_c1_n10.json` (**re-measured**) | **10** | 400k |
-| G12 | `g12.json` | 10 | 20k |
+| G | artefact | n | horizon | **code state** |
+|---|---|---|---|---|
+| G1 | `phase2/core_scaled.json` (**re-run 2026-09-05**) | 10 | 40k | **POST-scaling** |
+| G3 | `phase2/core_scaled.json` (**re-run**) | 10 | 40k | **POST-scaling** |
+| G4 | `postscaling-2026-09-05/g4.json` (**re-run**) | 10 | 20k | **POST-scaling** |
+| G5 | `phase2/core_scaled.json` + `phase2/g5_rank_attach_scaled.json` (**re-run**) | 10 | 40k | **POST-scaling** |
+| **G6** | `stage6_g6_n40_records.jsonl` | 40 | 20k | **PRE-scaling — DELIBERATELY NOT RE-RUN, see its row** |
+| G8 | `phase2/core_scaled.json` (**re-run**) | 10 | 40k | **POST-scaling** |
+| G10 | `phase2/g5_consol_scaled.json` (**re-run**) | 3 per cell | 20k | **POST-scaling** |
+| G11 C1 | `postscaling-2026-09-05/g11_c1_soak.json` (**re-run**) | 10 | **7.2M** | **POST-scaling** |
+| G12 | `postscaling-2026-09-05/g12.json` (**re-run**) | 10 | 20k | **POST-scaling** |
+
+**THE `code state` COLUMN EXISTS BECAUSE `verify_claims` CANNOT SUPPLY IT.**
+That checker re-derives a figure from an **artefact on disk**. Landing
+`_OBJ_SCALE` (`0ea02b0`) changed the **code** and rewrote no artefact, so
+every claim kept passing while some stopped describing current behaviour —
+`G1.M01.n10.twotier.median` still re-derives as **90.125** from its
+pre-scaling file while post-scaling code gives **87.78**. **A green
+`verify_claims` says the prose matches its source; it does not say the source
+matches the code.** Name what the check reads (artefacts), name what the
+change touched (code), observe they do not intersect — the same
+could-have-failed decomposition this project applies elsewhere. Hence this
+column, and hence `code_state:` on every row of `config/published_claims.yml`.
 
 **TWO INCONSISTENCIES THIS TABLE MAKES VISIBLE, and neither was intended.**
 
@@ -70,7 +82,7 @@ reproduction of the published cell, never as the result.
 | **G3** | **measured (bound); delta deferred** | The 500 ms bound passes **0/10 on every arm** (M20 protected, medians PF 132.25 / Reservation 122.75 / TwoTier 238.62 ms). The **delta** clause is G6's and is unresolvable at this precision — see G6 and `sweeps/phase2/sca-convergence-2026-09-04/`. Deferred for this delivery. |
 | **G4** | **measured — BYTE-IDENTICAL** | duty 0.1: PF **106.56** / Reservation **117.50** / TwoTier **112.42** ms; Reservation−PF **+10.94** [+5.93, +16.20], TwoTier−PF **+5.86** [+4.50, +7.25]. Every figure reproduces the published one exactly. |
 | **G5** | **measured — reproduces** | M05 completeness, protected, n=10: PF **0/10** fail, Reservation **7/10**, TwoTier **4/10**, Reservation's median **0.0000**. The published failure ("median worst-flow PDU-set completeness 0.0000 on both QoS-aware arms") holds. |
-| **G6** | **NOT PUBLISHABLE — a second specification defect** | **NEW.** The clause names no estimator over runs, and the three defensible readings give **PASS, INCONCLUSIVE and FAIL on the same cell**. See below. |
+| **G6** | **NOT PUBLISHABLE — a second specification defect; PRE-scaling and deliberately so** | **NEW.** The clause names no estimator over runs, and the three defensible readings give **PASS, INCONCLUSIVE and FAIL on the same cell**. See below. **Excluded from the 2026-09-05 post-scaling re-run on purpose**: no verdict is publishable either way, so re-running buys three readings on new numbers instead of three on old ones. Fix the clause first. |
 | **G7** | **NOT MEASURED — structurally out, unchanged** | No MFBR *enforcement* anywhere in `sim/`; containment is observable, clipping is not, and clipping is half the criterion. |
 | **G8** | **FAILS at n=10 — and the published row is contradicted by its own source** | **NEW.** `core_mfbr.json` (n=3) records Reservation starving `ue8_qfi9` for **10.0 s** on 1 of 3 seeds, under a row reading *"0 on all arms"*. At n=10 both conjuncts fail on both QoS-aware arms. See below. |
 | **G9** | **NOT MEASURED — named cause, deferred** | `g9_campaign.py`'s count guard refuses to score a partially-degenerate run. Unchanged; deferred for this delivery. |

@@ -10,6 +10,19 @@
 # does: G8's row mixed a single seed with a 3-seed mean and each figure
 # matched something, so "matches some estimator" is not a check.
 
+# `code_state` (pre_scaling | post_scaling) is DOCUMENTATION, not something
+# the checker enforces -- and that gap is the point. `verify_claims` re-derives
+# a figure from an ARTEFACT ON DISK. Landing `_OBJ_SCALE` (0ea02b0) changed the
+# CODE and rewrote no artefact, so every claim below kept passing while some of
+# them stopped describing current behaviour: G1.M01.n10.twotier.median still
+# re-derives as 90.125 from its pre-scaling file, while post-scaling code gives
+# 87.78. **A green verify_claims is evidence the prose matches its source, and
+# is NOT evidence the source matches the code.** That is the same "establish
+# the check could have failed" decomposition this project applies elsewhere:
+# name what the check reads (artefacts), name what the change touched (code),
+# and note they do not intersect. Hence the field, and hence the pre/post
+# column in docs/verification-2026-09-04.md's provenance table.
+
 claims:
 
   # --- THE FAILING CASE, KEPT ON PURPOSE ------------------------------------
@@ -21,6 +34,7 @@ claims:
     doc: docs/phase2-results.md (superseded row)
     text: "M22 starvation epochs: 0 on all arms at the core cell"
     artefact: sweeps/phase2/core_mfbr.json
+    code_state: pre_scaling
     n: 3
     horizon: 40000
     field: G8_M22_epochs_prot
@@ -35,6 +49,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "Reservation: M22 epochs on 7/10 seeds"
     artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    code_state: pre_scaling
     n: 10
     horizon: 40000
     where: {arm: Reservation}
@@ -46,6 +61,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "TwoTier: M09 below 0.90 on 3/10 seeds"
     artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    code_state: pre_scaling
     n: 10
     horizon: 40000
     where: {arm: TwoTier}
@@ -58,6 +74,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "TwoTier M01 p98 protected, median 90.12 ms"
     artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    code_state: pre_scaling
     n: 10
     horizon: 40000
     where: {arm: TwoTier}
@@ -70,6 +87,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "0/10 breach the 100 ms bound on every arm"
     artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    code_state: pre_scaling
     n: 10
     horizon: 40000
     field: G1_M01_p98_prot
@@ -81,6 +99,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "0/10 over the 500 ms bound on every arm"
     artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    code_state: pre_scaling
     n: 10
     horizon: 40000
     field: G3_M20_prot_ms
@@ -92,6 +111,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "Reservation fails the 0.99 completeness bar on 7/10 seeds"
     artefact: sweeps/verification-2026-09-04/core_40k_n10.json
+    code_state: pre_scaling
     n: 10
     horizon: 40000
     where: {arm: Reservation}
@@ -104,6 +124,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "PF passes 10/10 seeds at N=8"
     artefact: sweeps/verification-2026-09-04/g10_rows.csv
+    code_state: pre_scaling
     n: 10
     horizon: 20000
     where: {scheduler: PF, n_ues: 8}
@@ -117,6 +138,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "30 runs at 7,200,000 slots (3 arms x 10 seeds)"
     artefact: sweeps/verification-2026-09-04/g11_c1_soak.runs.jsonl
+    code_state: pre_scaling
     n: 10
     horizon: 7200000
     field: n_windows

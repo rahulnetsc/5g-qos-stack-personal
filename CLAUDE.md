@@ -174,6 +174,27 @@ how the solver got there. `presolve` on/choose/off does not change it.
 
 **Two consequences, and the second is the one that will surprise someone.**
 
+**BOTH LP FOLLOW-UPS ARE NOW DEFERRED, 2026-09-05, ON ONE MEASUREMENT — so
+neither gets rediscovered as an opportunity.** The re-profile settled it:
+**a FREE LP buys only 1.60x** on TwoTier's driver (12.24 s -> 7.66 s), and
+41x captures 98 % of that ceiling. So:
+
+- **the direct-HiGHS / configuration-based solver swap: DEFERRED.** There is
+  no performance case (0.18 s of 12.2 s against the greedy, and 4.5 s of
+  12.2 s against today at BEST), and `_OBJ_SCALE` already took the
+  correctness case.
+- **the Tier-1 reformulation (exact greedy, or the closed-form
+  water-filling): DEFERRED.** The greedy is exact and 15.6x faster, but
+  against a 1.60x ceiling that is worth 0.18 s, and taking it would cost a
+  SECOND deliberate corpus re-baseline plus a tie-break fidelity argument
+  that cannot be settled -- there is no Tier-1 ground truth in this repo.
+  **The correctness gap it would close is already closed** (98.7 % exact
+  after scaling, against 11.3 % before).
+
+**The one-line reason for both: the LP is no longer either the correctness
+problem or the performance problem.** Re-opening either needs a NEW
+measurement, not a re-reading of this one.
+
 1. **RE-OPENED 2026-09-05 — THE REASON RECORDED HERE FOR REJECTING THE 41x
    SWAP IS NOW KNOWN TO BE WRONG.** It was rejected for moving the corpus;
    its answer (`ue9_qfi9` 5,521,232 -> 5,340,428) is the CORRECT one, and
