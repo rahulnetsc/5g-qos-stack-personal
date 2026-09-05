@@ -55,6 +55,32 @@
 # none registered), so a caveat travels with the value the same way
 # M14/M03's t_live_s/survival_time_ms do -- never a bare number.
 
+# ---------------------------------------------------------------------------
+# WHAT THIS PANEL CANNOT ANSWER, stated here so each investigation does not
+# rediscover it.
+#
+# THE PANEL AND `record_timeseries` RECORD OUTCOMES PER FLOW. THEY NEVER
+# RECORD DECISIONS. `sim/metrics.py::snapshot_slot` captures backlog, HoL
+# delay, delivered/arrived/dropped bytes per flow and PRB/CCE totals per
+# system -- and no scheduler state at all: no ranking term, no coefficient,
+# no candidate ordering, no reason a flow was passed over. The message ledger
+# is the same shape one level up: it records that a message completed, was
+# late, or died, never which decision did it.
+#
+# EVERY "WHY" QUESTION THIS PROJECT HAS OPEN IS ABOUT A DECISION -- G5's
+# abandoned video flow, the camera's UL loss, G8's starvation epochs, G10's
+# bound on TwoTier. None is answerable from this panel however many metrics
+# it gains, because the quantity that discriminates them is not a property of
+# a flow's outcome.
+#
+# THAT IS WHY TWELVE DIAGNOSTIC PROBES WERE HAND-ROLLED, several since
+# deleted, and at least one of which reported zero for its control as well as
+# its treatment and would have confirmed a hypothesis on no evidence
+# (`docs/wp9-defects-log.md`). Adding a metric is the wrong response to a
+# "why" question; the right one is a decision-site hook with a
+# pre-registered interpretation.
+# ---------------------------------------------------------------------------
+
 schema_version: 1
 
 metrics:

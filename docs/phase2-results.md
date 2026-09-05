@@ -121,6 +121,51 @@ too large and land on the same class every time).
 | PRB lost to **other UEs** | the UE itself granted rarely; its share fine when it is |
 | capacity lost to **retransmissions** | grants issued, bytes not delivered; `bytes_harq_lost` non-zero |
 
+> **TRACED 2026-09-05, and read against this map without amending it**
+> (`sweeps/camera-trace-2026-09-05/`). The first decision-site hook —
+> `sim/trace.py`'s grant stream — on all three failing seeds plus two
+> passing controls.
+>
+> | seed | GFBR | c1: camera's share of its UE's TBs | c2: its UE's grants vs others' mean | c3: retx PRB / failed / `bytes_harq_lost` |
+> |---|---|---|---|---|
+> | **161576974** | 0.4389 | 0.517 | **4,370 vs 7,310** | 0.099 / 0.099 / **0** |
+> | **579362555** | 0.5260 | 0.908 | **4,586 vs 7,516** | 0.101 / 0.099 / **0** |
+> | **1097657231** | 0.8601 | 0.595 | 9,252 vs 9,366 | 0.101 / 0.100 / **0** |
+> | *1826701614* (pass) | 0.9559 | 0.550 | 10,501 vs 10,259 | 0.099 / 0.102 / 288 |
+> | *1367864806* (pass) | 0.9596 | 0.691 | 10,575 vs 9,995 | 0.098 / 0.100 / 183 |
+>
+> **CANDIDATE 3 IS REFUTED, and cleanly.** Retransmission PRB fraction is
+> **0.098–0.101 on failing and passing seeds alike**, the failed-first-grant
+> fraction likewise 0.099–0.102 — no separation at all. And
+> `bytes_harq_lost` is **0 on every failing seed and non-zero on both
+> controls**, which is the *opposite* of the registered signature.
+>
+> **CANDIDATE 1 IS NOT SUPPORTED.** The camera's share of its own UE's TBs
+> does not separate the groups: failing seeds read 0.517 / **0.908** / 0.595
+> against controls at 0.550 / 0.691. The largest share in the table belongs
+> to a failing seed. Sibling contention is not what distinguishes them.
+>
+> **CANDIDATE 2 FIRES — ON TWO OF THE THREE.** The two worst seeds grant the
+> camera's UE **40 % and 39 % less often** than the average of the other
+> UEs, while both controls grant it *more* often than average. That is the
+> registered signature — *"the UE itself granted rarely"* — and it separates
+> exactly where the damage is worst.
+>
+> **AND THE THIRD FAILING SEED IS EXPLAINED BY NONE OF THE THREE.** Seed
+> 1097657231 (GFBR 0.8601) grants its camera UE 9,252 times against a
+> 9,366 mean — a 1.2 % shortfall, indistinguishable from the controls — with
+> a middling share and control-identical retransmissions. **No fourth
+> candidate is added here.** The map was registered in advance precisely so
+> that a residual could be reported as a residual, and this is one: the
+> mildest of the three failures is not accounted for by the mechanism that
+> accounts for the two severe ones.
+>
+> **What this licenses:** the severe camera failures are a *between-UE*
+> scheduling effect, not sibling contention and not retransmission loss.
+> **What it does not:** it does not say *why* those UEs are granted less
+> often — that is the ranking question, which needs the candidate-set hook
+> this one was deliberately scoped short of.
+
 One per-slot trace of one failing seed separates all three. Registered as an
 outcome→meaning map before any trace runs.
 

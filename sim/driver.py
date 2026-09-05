@@ -15,6 +15,7 @@ from .metrics import Metrics
 from .resource import ResourceGrid
 from .rlf import RlfDetectorConfig, RlfDetectorState
 from .rlf import step as rlf_step
+from .trace import GrantSink, GrantTrace
 from .ue_lcp import UeLcp
 from .ul_access import UlAccessModel
 from scheduler import Scheduler
@@ -37,6 +38,7 @@ def run(
     window_slots: Optional[int] = None,
     window_sink: Optional[Callable[[int, list], None]] = None,
     timeseries_resolution: str = "slot",
+    grant_sink: Optional[GrantSink] = None,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -473,6 +475,17 @@ def run(
                     harq_rng_dl, true_snr, proc.snr_used_db, proc.retx_count,
                     harq_combining_mode, symbols=slot_grid.dl_symbols,
                 )
+                # RETRANSMISSIONS CARRY PRBs, carved out of the slot before
+                # the scheduler sees it -- that is the whole of the camera
+                # question's candidate 3, so they are traced, not counted.
+                if grant_sink is not None:
+                    grant_sink(GrantTrace(
+                        slot_index=slot_index, ue_id=proc.ue_id,
+                        direction=proc.direction, prbs=proc.prbs,
+                        bytes_capacity=proc.tb_bytes, cce_cost=proc.cce_cost,
+                        retx_count=proc.retx_count + 1, success=success,
+                        split=tuple(getattr(proc, "ul_split", None) or ()),
+                        qfi=proc.qfi))
                 if success:
                     buffers.drain(proc.ue_id, proc.qfi, proc.tb_bytes, now_s, pdb_s)
                     metrics.record_delivery(proc.ue_id, proc.qfi, proc.tb_bytes)
@@ -517,6 +530,17 @@ def run(
                     harq_rng_ul, true_snr, proc.snr_used_db, proc.retx_count,
                     harq_combining_mode, symbols=slot_grid.ul_symbols,
                 )
+                # RETRANSMISSIONS CARRY PRBs, carved out of the slot before
+                # the scheduler sees it -- that is the whole of the camera
+                # question's candidate 3, so they are traced, not counted.
+                if grant_sink is not None:
+                    grant_sink(GrantTrace(
+                        slot_index=slot_index, ue_id=proc.ue_id,
+                        direction=proc.direction, prbs=proc.prbs,
+                        bytes_capacity=proc.tb_bytes, cce_cost=proc.cce_cost,
+                        retx_count=proc.retx_count + 1, success=success,
+                        split=tuple(getattr(proc, "ul_split", None) or ()),
+                        qfi=proc.qfi))
                 if success:
                     for qfi, byts in remaining_split:
                         pdb_s = pdb_by_flow.get((proc.ue_id, qfi), 1.0)
@@ -657,6 +681,17 @@ def run(
                     filled_bytes=ue_filled_bytes,
                 )
                 ul_access.on_ul_grant(alloc.ue_id)
+                # THE GRANT STREAM (sim/trace.py). One pointer comparison
+                # when no sink is attached; every value below is one the
+                # driver already holds, so attaching a sink cannot change
+                # what the run does.
+                if grant_sink is not None:
+                    grant_sink(GrantTrace(
+                        slot_index=slot_index, ue_id=alloc.ue_id,
+                        direction="UL", prbs=alloc.prbs,
+                        bytes_capacity=alloc.bytes_capacity,
+                        cce_cost=alloc.cce_cost, retx_count=0,
+                        success=success, split=tuple(ue_split)))
                 if success:
                     for qfi, byts in ue_split:
                         pdb_s = pdb_by_flow.get((alloc.ue_id, qfi), 1.0)
@@ -686,6 +721,13 @@ def run(
                     harq_rng_dl, true_snr, alloc.snr_used_db, retx_count=0,
                     mode=harq_combining_mode, symbols=symbols,
                 )
+                if grant_sink is not None:
+                    grant_sink(GrantTrace(
+                        slot_index=slot_index, ue_id=alloc.ue_id,
+                        direction="DL", prbs=alloc.prbs,
+                        bytes_capacity=alloc.bytes_capacity,
+                        cce_cost=alloc.cce_cost, retx_count=0,
+                        success=success, qfi=alloc.qfi))
                 if success:
                     pdb_s = pdb_by_flow.get((alloc.ue_id, alloc.qfi), 1.0)
                     buffers.drain(alloc.ue_id, alloc.qfi, alloc.bytes_capacity, now_s, pdb_s)
