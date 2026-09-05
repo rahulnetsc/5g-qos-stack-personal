@@ -89,6 +89,8 @@ def _load_artefact(path: Path) -> list[dict[str, Any]]:
                 f"row-shaped artefacts. Add a reader here deliberately rather "
                 f"than teaching it to guess a schema.")
         return rows
+    if path.suffix == ".jsonl":
+        return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
     if path.suffix == ".csv":
         with path.open() as fh:
             return list(csv.DictReader(fh))
@@ -209,12 +211,23 @@ def main(argv: list[str]) -> int:
             bad += 1
             print(f"  ERROR  {claim['id']:<28} {exc}")
             continue
-        tag = "ok  " if r["ok"] else "FAIL"
-        if not r["ok"]:
+        # `expect: fail` INVERTS the verdict. The kept demonstration failure
+        # made `--check` exit 1 unconditionally -- a gate that can never pass
+        # is as useless as one that can never fail, and this file argues that
+        # about other people's checks. A claim marked `expect: fail` must
+        # FAIL; if it starts passing, the guard has stopped demonstrating its
+        # own failure mode and THAT is the error.
+        expect_fail = claim.get("expect") == "fail"
+        good = (not r["ok"]) if expect_fail else r["ok"]
+        tag = ("ok* " if expect_fail else "ok  ") if good else "FAIL"
+        if not good:
             bad += 1
         print(f"  {tag}   {claim['id']:<28} {r['declared']}={r['got']:g} "
               f"quoted={r['want']:g}  ({r['n_values']} values, "
               f"{Path(r['artefact']).name})")
+        if expect_fail and good:
+            print(f"         {'':<28} EXPECTED to fail, and does -- this is "
+                  f"the guard demonstrating its own failure mode")
         for m in r["meta"]:
             print(f"         {'':<28} {m}")
         if not r["ok"] and r["also_match"]:
@@ -229,7 +242,8 @@ def main(argv: list[str]) -> int:
             print(f"         {'':<28} (note: {', '.join(r['also_match'])} "
                   f"also match -- the claim is not estimator-discriminating "
                   f"on this data)")
-    print(f"\n{len(claims) - bad} ok, {bad} failing")
+    print(f"\n{len(claims) - bad} as expected, {bad} NOT as expected "
+          f"(`ok*` = a claim that is meant to fail and does)")
     return 1 if (a.check and bad) else 0
 
 

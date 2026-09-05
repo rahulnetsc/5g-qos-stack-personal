@@ -72,6 +72,28 @@ def test_an_unknown_statistic_is_refused():
         vc.check_claim(_claim(statistic="whatever_fits"))
 
 
+def test_check_mode_can_PASS_despite_the_kept_failure():
+    """THE CANNOT-PASS SHAPE, caught in this file's own guard. The kept
+    demonstration failure made `--check` exit 1 unconditionally -- a gate that
+    can never pass is as useless as one that can never fail, and this script
+    argues exactly that about other people's checks. `expect: fail` now
+    inverts the verdict, so the suite as a whole can be green while the
+    demonstration stays red."""
+    assert vc.main(["verify_claims.py", "--check"]) == 0
+
+
+def test_a_kept_failure_that_starts_PASSING_is_an_error():
+    """The other direction: if the demonstration claim stops failing, the
+    guard has stopped demonstrating its failure mode, and that is the error
+    rather than a success."""
+    import yaml
+    doc = yaml.safe_load((vc.REPO / "config" / "published_claims.yml").read_text())
+    kept = [c for c in doc["claims"] if c.get("expect") == "fail"]
+    assert kept, "the demonstration failure has been removed from the claims file"
+    for c in kept:
+        assert not vc.check_claim(c)["ok"]
+
+
 def test_the_shipped_claims_file_is_consistent_apart_from_the_kept_failure():
     """Every claim in config/published_claims.yml re-derives, except the one
     marked `expect: fail` -- which must still fail, or the guard has stopped

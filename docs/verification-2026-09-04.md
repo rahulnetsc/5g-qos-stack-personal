@@ -75,7 +75,7 @@ reproduction of the published cell, never as the result.
 | **G8** | **FAILS at n=10 — and the published row is contradicted by its own source** | **NEW.** `core_mfbr.json` (n=3) records Reservation starving `ue8_qfi9` for **10.0 s** on 1 of 3 seeds, under a row reading *"0 on all arms"*. At n=10 both conjuncts fail on both QoS-aware arms. See below. |
 | **G9** | **NOT MEASURED — named cause, deferred** | `g9_campaign.py`'s count guard refuses to score a partially-degenerate run. Unchanged; deferred for this delivery. |
 | **G10** | **measured — BYTE-IDENTICAL** | Admissible fleet **PF 8 / Reservation 4 / TwoTier 4**, per-seed at N=8 **PF 10/10, Reservation 3/10, TwoTier 6/10**. Every number reproduces. |
-| **G11** | **C1 re-measured at n=10 — the pass SURVIVES; four clauses still unscored** | **The n≤3 exposure is closed.** C1 = **1.000 on all three arms**, 0 failing windows, 0 unscoreable, **10/10 seeds pass on every arm**, over **20 windows** against 6 at n=3. **This does NOT clear G11:** the horizon is still **400,000 slots — 1.7 min — against GT-7.1's specified ≥30 min**, so it is a pass at 1/18th of the specified duration. C2–C5 remain unscored and are deferred for this delivery. |
+| **G11** | **C1 MEASURED at the specified horizon — PASSES; four clauses still unscored** | **THE FIRST G11 MEASUREMENT OF ANYTHING.** At **7,200,000 slots — GT-7.1's specified 30 minutes — with all four scripted ingredients present for the first time**: C1 = **1.000 on all three arms, 300 windows each (900 total), 0 failing, 0 unscoreable, 10/10 seeds**. Schedule confirmed fired on every run: 90 teleop windows, 6 waypoint pauses, 1 firmware push (**60 MB delivered**), 1 STOP burst (**40 bytes**). **Every earlier C1 result is superseded** — see below. C2–C5 remain unscored and are deferred. |
 | **G12** | **TWO cells; the bar is applied and NEITHER CLAUSE FIRES** | **NEW:** a second cell (`drone_heavy_n8`) Phase 2 never reached, and a **fifth pooling defect in `g12_score`** — in the clause that decides promotion. The registered conclusion stands: the ordering is **not** established as a scheduler property. Its E3 failure is filed under **G1/G3**. See below. |
 
 ---
@@ -375,6 +375,53 @@ the count of ramp points it affects.
 *ordering* is not established (the bar does not fire, above), and this is a
 **telemetry** reading while E1's clean-control check covers M13's GBR
 classes — 5QI 1 is `Delay`, so the control does not cover it.
+
+## G11's C1 — THE FIRST REAL MEASUREMENT, and every earlier one is superseded
+
+**EVERY PRIOR C1 RESULT IS SUPERSEDED, AND NOT BECAUSE IT WAS SHORT.** The
+n=3 artefact and the n=10 re-measurement that closed the low-seed exposure
+were both run at **400,000 slots**, where **three of GT-7.1's four scripted
+ingredients do not exist**: no firmware push, no STOP drill, no waypoint
+pause — only the teleop duty cycle (`docs/wp9-defects-log.md` #23). They were
+short **and missing most of their schedule**, and the second is the reason
+they are superseded rather than merely imprecise.
+
+**The low-n conclusion still stands as a conclusion about seed counts.** C1's
+pass did not depend on n — that was measured and it is what it says. **The
+C1 verdict it was attached to does not stand**, because the scenario it was
+measured on was not GT-7.1's.
+
+**THE FIRST NUMBER.** At **7,200,000 slots**, n=10, W=10, all four
+ingredients present:
+
+| arm | windows | failing | unscoreable | pass rate | seeds all-pass |
+|---|---|---|---|---|---|
+| PF | 300 | 0 | 0 | **1.0000** | 10/10 |
+| Reservation | 300 | 0 | 0 | **1.0000** | 10/10 |
+| TwoTier | 300 | 0 | 0 | **1.0000** | 10/10 |
+
+**900 windows against 20.** Schedule confirmed on every run:
+`teleop_on_windows: 90`, `waypoint_pauses: 6`, `firmware_windows: 1`
+(**59,994,505 bytes delivered**), `stop_bursts: 1` (**40 bytes arrived**).
+
+Cost, measured: PF 15.9–16.2 min, Reservation 19.9–20.2, TwoTier 35.0–35.6;
+peak RSS 1,961–2,027 MB per run; 10 workers, ~19.8 GiB, under the 21 GB
+guard.
+
+**Registered before reading, and a MISS.** I predicted C1 would fail — the
+firmware push is 8 Mbps of DL for a full window, C1 conjoins five bounds per
+window, and 900 windows are scored where 20 were. **The counter-argument I
+registered is what happened:** 5QI 8 is in `NON_PROTECTED_5QI`, so the flood
+is the aggressor and is excluded from the statistics C1 scores. **Nothing in
+GT-7.1's schedule is aimed at the statistics GT-7.1 scores** — which was
+knowable in advance from a constant, and is recorded in `PREDICTIONS.md` as a
+pattern across two misses rather than one.
+
+**What this is and is not.** It is C1 — *"every 60 s window of a ≥30 min soak
+passes G1/G3/G5/G8"* — measured as written, for the first time, and passing
+on all three arms. **It is not G11**, which is a conjunction of five clauses;
+C2 (drift), C3 (CoV across repeats), C4 (verdict consistency) and C5
+(bimodality) remain unscored and deferred.
 
 ## G11's horizon question — PRICED, MEASURED, and running
 
