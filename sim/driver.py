@@ -39,6 +39,7 @@ def run(
     window_sink: Optional[Callable[[int, list], None]] = None,
     timeseries_resolution: str = "slot",
     grant_sink: Optional[GrantSink] = None,
+    attach_seed_slots: Optional[dict[int, int]] = None,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -106,6 +107,11 @@ def run(
     # was captured under (docs/wp9-plan.md §18.4).
     bsr = BsrModel(scenario.flows, grid.slot_duration_s,
                    truncated_bsr=truncated_bsr)
+    # MODEL C bookkeeping: which UEs have had their attach seed written.
+    # A set rather than a counter so the seed is exactly-once per UE by
+    # construction, and so the count is derivable for the assertion the
+    # map requires (fired == number of UL UEs, not merely non-zero).
+    _attach_seeded: set[int] = set()
     ul_access = UlAccessModel(
         scenario.flows,
         grid.slot_duration_s,
@@ -578,6 +584,20 @@ def run(
         ul_access.on_arrivals(per_flow_arrived, buffers)
         ul_access.tick(slot_index)
 
+        # MODEL C's attach seed (`docs/attach-path-map.md`), OFF unless
+        # `attach_seed_slots` is passed. Fires once per UE, at the first
+        # slot at or after its attach slot where it actually has UL
+        # backlog -- not at the attach slot unconditionally, because a seed
+        # written against an empty buffer is a silent no-op that would look
+        # exactly like the treatment failing. Placed immediately before
+        # broadcast() so the same slot's bytes_reported already reflects it.
+        if attach_seed_slots is not None:
+            for _ue, _at in attach_seed_slots.items():
+                if slot_index < _at or _ue in _attach_seeded:
+                    continue
+                if bsr.seed_attach_bsr(_ue, buffers):
+                    _attach_seeded.add(_ue)
+
         # Recompute every UL flow's gNB-visible bytes_reported from the
         # current BsrModel state (B = estimated_ul_buffer - sched_ul_bytes,
         # capped per-LCG) -- must run before the scheduler reads state.
@@ -847,6 +867,15 @@ def run(
     # a different thing.
     summary["harq_allocate_calls"] = harq_allocate_calls
     summary["harq_exhausted_count"] = harq_exhausted_count
+    # MODEL C: emitted ONLY when the attach path is on, so an absent key
+    # means "not configured" and a present 0 means "configured and never
+    # fired" -- two states this project has repeatedly conflated. Keeping
+    # it out of the default summary is also what keeps an off run's summary
+    # byte-identical to a pre-Model-C one.
+    if attach_seed_slots is not None:
+        summary["attach_seeds_fired"] = len(_attach_seeded)
+        summary["attach_seeds_expected"] = len(attach_seed_slots)
+        summary["attach_seeded_ues"] = sorted(_attach_seeded)
     summary["harq_masked_flow_double_grant_count"] = harq_masked_flow_double_grant_count
     # WP-Join commit 2: same diagnostic-only idiom as the three counters
     # above -- rlf_step_calls confirms the wiring actually ran every slot

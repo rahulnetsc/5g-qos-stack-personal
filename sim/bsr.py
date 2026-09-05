@@ -584,6 +584,57 @@ class BsrModel:
         st = self._state[ue_id]
         st.estimated_ul_buffer = max(0, st.estimated_ul_buffer - delivered_bytes)
 
+    def seed_attach_bsr(self, ue_id: int, buffers) -> bool:
+        """MODEL C (`docs/attach-path-map.md`): the one BSR a UE would have
+        sent during RRC setup, before this scheduler's ranking ever applies.
+
+        WHY THIS EXISTS. This simulator has no attach procedure -- every UE
+        is present from slot 0 with an empty `estimated_ul_buffer_per_lcg`,
+        so at the first slot every UL ranking key is identical and the
+        served set is decided by list position
+        (`docs/g5-mechanism-2026-09-05.md`). Real hardware runs
+        RACH -> Msg3 -> RRC setup and grants the UE outside this ranking, so
+        its array is populated before it ever competes. This supplies that
+        one write and nothing else.
+
+        IT IS THE C'S OWN LONG-BSR HANDLER, not a new mechanism:
+        `gNB_scheduler_ulsch.c:646-665` memsets the per-LCG array, fills the
+        LCGs the report marks active with `get_long_bsr_value(...)`, sets
+        `estimated_ul_buffer`, and zeroes `sched_ul_bytes`. Same order, same
+        quantiser. Deliberately NOT a privileged write that bypasses
+        quantisation -- a seed more informative than a real BSR would clear
+        the starvation for a reason hardware does not have, which is the
+        one way this experiment could answer its own question wrongly.
+
+        Returns True if it wrote a non-zero array. **A caller must check
+        it**: a seed fired against an empty backlog is a silent no-op, and a
+        no-op seed clears nothing while looking exactly like the treatment
+        having failed (`docs/attach-path-map.md`'s outcome A3).
+        """
+        st = self._state[ue_id]
+        per_lcg_true: dict[int, int] = {}
+        for f in self._ue_flows[ue_id]:
+            per_lcg_true[f.lcg] = per_lcg_true.get(f.lcg, 0) + \
+                buffers.state(f.ue_id, f.qfi).bytes_queued
+        active = [lcg for lcg, b in per_lcg_true.items() if b > 0]
+        if not active:
+            return False
+
+        st.estimated_ul_buffer_per_lcg = [0] * LCG_COUNT
+        total = 0
+        for lcg in active:
+            estim = quantise_long(per_lcg_true[lcg])
+            st.estimated_ul_buffer_per_lcg[lcg] = estim
+            total += estim
+        st.estimated_ul_buffer = total
+        # The C clears sched_ul_bytes on every BSR (:628, :649). Without it
+        # `broadcast`'s own B gate would cap the freshly-written array back
+        # toward zero and the seed would be inert -- the no-op case above,
+        # arrived at from the other direction.
+        st.sched_ul_bytes = 0
+        st.pending = False
+        return True
+
     def broadcast(self, buffers, ul_access) -> None:
         """Every slot, every UE: recompute
         ``B = max(0, estimated_ul_buffer - sched_ul_bytes)`` and write

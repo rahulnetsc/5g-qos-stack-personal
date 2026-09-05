@@ -39,6 +39,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from attach_path_experiment import _stagger, STAGGER_SLOTS  # noqa: E402
 from regime_sweep import arm_cost, paired_seeds, run_cells   # noqa: E402
 from scheduler.rank_trace import LossPointTally              # noqa: E402
 from sim.driver import run as driver_run                     # noqa: E402
@@ -51,16 +52,29 @@ VIDEO_QFI = 2
 DEFAULT_WORKERS = 16
 
 
-def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float) -> dict:
+def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float,
+        attach: bool = False) -> dict:
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
                         load_mult=load_mult)
+    # MODEL C at G5's OWN configuration -- the re-score has to be on
+    # M05, the metric G5 is actually scored on, not on the M07/M08
+    # proxy the consolidation uses. A check must intersect the claim.
+    seed_slots = None
+    if attach:
+        sc, seed_slots = _stagger(sc, STAGGER_SLOTS)
     sched = _arm(arm)
     tally = LossPointTally("UL")
     # The hook is OPT-IN per instance. A scheduler built without it is the
     # object every other runner in this repo uses, unchanged.
     sched.rank_sink = tally
     t0 = time.time()
-    summary = driver_run(sc, sched, cqi_delay_slots=8, record_timeseries=True)
+    summary = driver_run(sc, sched, cqi_delay_slots=8, record_timeseries=True,
+                         attach_seed_slots=seed_slots)
+    if seed_slots is not None and \
+            summary["attach_seeds_fired"] != summary["attach_seeds_expected"]:
+        raise SystemExit("attach seed fired %s of %s -- refusing to score"
+                         % (summary["attach_seeds_fired"],
+                            summary["attach_seeds_expected"]))
     tally.finish()          # RAISES if the hook saw nothing -- see rank_trace
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
@@ -88,6 +102,7 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float) -> dict
     return {
         "arm": arm, "seed": seed, "n_ues": n_ues, "horizon": horizon,
         "load_mult": load_mult, "wall_s": round(time.time() - t0, 1),
+        "attach": attach, "seeds_fired": summary.get("attach_seeds_fired"),
         "M05_fraction": (m05v or {}).get("fraction"),
         "M05_flow": (m05v or {}).get("flow"),
         "per_flow": per_flow,
@@ -119,12 +134,14 @@ def main() -> int:
     ap.add_argument("--horizon", type=int, default=40_000)
     ap.add_argument("--load-mult", type=float, default=1.0)
     ap.add_argument("--out", default="sweeps/phase2/g5_rank.json")
+    ap.add_argument("--attach", action="store_true",
+                    help="MODEL C: staggered arrival + attach BSR seed")
     ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     a = ap.parse_args()
 
     arms = [x for x in a.arms.split(",") if x]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult)
+    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult, a.attach)
              for arm in arms for s in seeds]
     # Derived, never restated -- the count is computed from the population
     # BEFORE any flag narrows it (`docs/wp9-plan.md`'s --time-cell defect).

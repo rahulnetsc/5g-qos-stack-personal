@@ -944,3 +944,76 @@ gate. Changing it would make this simulator diverge from the deployed system
 in the direction of being better, which is the opposite of what this port is
 for. The finding is the deliverable; any change belongs in a conversation
 with whoever owns `ia_p5g_scheduler.c`.
+
+---
+
+## #26 — `summary` CARRIES LIVE OBJECTS, SO TWO IDENTICAL RUNS COMPARE UNEQUAL (2026-09-05)
+
+**Found because a bit-identity test failed against itself.** Model C's first
+acceptance test compared `json.dumps(summary, sort_keys=True, default=str)`
+for a run with the feature off against one with it explicitly disabled. It
+failed — and so did the same comparison between **two byte-identical calls
+with no feature at all**.
+
+`summary` holds `_ue_lcp` and `_message_ledger`, which are live objects.
+`default=str` stringifies them via `repr()`, which embeds a memory address.
+So the serialised summary differs between runs for reasons that have nothing
+to do with the run.
+
+### Why it belongs in this log rather than being fixed in passing
+
+**This is the `default=` serialization-fallback trap CLAUDE.md already
+records for `RunLedger.bank()`, one layer over.** There, `default=str`
+turned `RunRecord`s into their `repr()` — *"valid JSON, silently wrong"*.
+Here it turns object identity into apparent nondeterminism. Same root:
+**a serialization fallback converts an unserializable value into a
+plausible-looking wrong one.**
+
+The difference is the direction of the failure, and this one is the kinder
+of the two. `bank()`'s version produced an artefact that *looked complete*
+and had to be caught by kill-and-resume identity. This version fails
+**loudly and immediately** — the test could not pass, so it could not
+silently check nothing.
+
+### The fix used, and the one not made
+
+The test compares `RunRecord.to_dict()` instead, which is what
+`test_grant_trace.py` already did — the correct comparison surface, since
+`RunRecord` is what every artefact in this project is built from and
+`from_summary` drops these keys anyway.
+
+**Not fixed: `summary` itself.** Removing the live objects would move
+whatever else reads them, and this experiment is not the place. But **any
+future check that serialises `summary` for equality is broken before it is
+written**, and that is the transferable part.
+
+---
+
+## #27 — M07 UNDER A STAGGERED ARRIVAL MEASURES THE STAGGER, NOT THE SCHEDULER (2026-09-05)
+
+**Logged and parked; no result rests on it.** Found scoring outcome A6 of
+`docs/attach-path-map.md`.
+
+M07 is the fraction of GBR flows meeting GFBR **over the whole horizon**. Under
+a staggered attach, a UE that arrives at slot 3,000 of 20,000 generates no
+traffic for 15 % of the window, so its run-average throughput misses GFBR for
+a reason that is not a scheduling outcome.
+
+**What identifies it as an artefact rather than a result: PF shows it too, and
+worse.** At N=16 under `stagger_seed`, M07 is PF **0.062**, Reservation 0.125,
+TwoTier 0.125 — while PF starves nobody in any condition and its M08 is
+healthy. A statistic on which the arm with no lock-in performs *worst* is not
+measuring the lock-in. The dose-response confirms it: M07 is 1.000 at N=2
+(200-slot stagger), 0.500 at N=4, ~0.1 at N=16.
+
+### Why this is worth its own entry
+
+It is the **decompose-before-attributing** rule arriving through a new door.
+Every previous instance was an aggregate summed over the wrong *rows*; this
+one is summed over the wrong *interval*. The check is the same — name the
+window the statistic integrates over and the window the claim is about — and
+it had not previously been applied to time.
+
+**Consequence for the campaign:** any M07 comparison across conditions that
+change when a flow is active needs pre-attach time excluded, or it compares
+arrival schedules. `Scorecard` has no such exclusion today.

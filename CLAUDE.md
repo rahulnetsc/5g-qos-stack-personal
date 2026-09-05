@@ -386,6 +386,19 @@ is the most recent joiner. One difference to keep straight: C's `qsort`
 is not required to be stable while Python's `list.sort` is, so the
 deterministic victim is this port's; the fault state and the dead rescue
 are the product's.
+**AND THE FREQUENCY IS SIM-SPECIFIC, RE-SCORED 2026-09-05**
+(`docs/attach-path-result-2026-09-05.md`). `sim/bsr.py::seed_attach_bsr` +
+`driver.run(attach_seed_slots=...)` supply the one BSR a UE sends during
+RRC setup (off by default, `--check` clean). With it, starvation clears at
+every fleet size, arm and seed, and G5 at its own configuration goes
+Reservation 7/10 -> 1/10 marginal and TwoTier 4/10 -> 0/10. **So every
+blackout rate and admissible-fleet figure measured WITHOUT an attach path
+is an upper bound, G10's PF 8 / Reservation 4 / TwoTier 4 included.** The
+`stagger_only` control matters: staggering alone makes it strictly WORSE
+(Reservation N=16, 4,1,3 -> 7,7,8), so the seed is the lever and a UE
+joining a loaded cell is at MORE risk than one present at cold start.
+Untested and the route hardware would actually take: a Short/Truncated-BSR
+desync emptying an already-served UE's array, which gets no second seed.
 **Since WP5: "real data receipt" means *confirmed* receipt, not grant
 time — they stopped being the same event once UL HARQ retry existed.**
 `on_ul_grant(..., delivered_bytes=...)` still decrements unconditionally
