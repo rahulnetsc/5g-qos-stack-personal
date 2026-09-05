@@ -664,6 +664,8 @@ hardware — not a scheduler indictment.** §2.2.3 says what the evidence does
 | **G6** | M20 liveness residual under the flood | +0.44 % PASS | +1.84 % PASS | **+29.35 % [+4.81, +56.18]** — the only interval excluding zero |
 | **G1** (§28.4) | M01 p98 ≤ 100 ms, base cell | 0/40 | 0/40 | **8/40 FAIL** |
 | **G3** (§28.4) | M03 gap ≤ 500 ms, base cell | 0/40 | 0/40 | **2/40 FAIL** |
+
+> **⚠ SUPERSEDED 2026-09-05.** The G5 figures on this page (**Reservation 30/40**, **TwoTier 34/40** / 35/40 failing M05) are **an artefact of this simulator's missing attach procedure**, not a property of either scheduler. Under an attach path the same configuration gives **Reservation 1/10 marginal and TwoTier 0/10** — see `docs/attach-path-result-2026-09-05.md`. Do not quote them.
 | **G5** (§28.4) | M06 frame age p95 ≤ 67 ms, base cell | 0/40 | 0/40 | **12/40 FAIL** |
 | **G5** (§28.4) | M05 completeness ≥ 0.99, base cell | 3/40 FAIL | 30/40 FAIL | **35/40 FAIL** |
 | **G3** (§24.6) | M03 gap ≤ 500 ms at `duty_cycle` 0.5 | 0/10 | — | **5/10 FAIL** |

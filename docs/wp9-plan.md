@@ -5063,6 +5063,8 @@ hand-listed: M01, M02, M03, M04, M05, M06, M15, M16, M17, M19.
 | | TwoTier | **FAIL 2/40 over 500 ms** | INCONCLUSIVE (med −0.44 %, mean +29.35 %) |
 | **M04** | all | **NOT EVALUABLE** — `pending` | NOT EVALUABLE |
 | **M05** | PF | **FAIL 3/40 under 0.99** | PASS |
+
+> **⚠ SUPERSEDED 2026-09-05.** The G5 figures on this page (**Reservation 30/40**, **TwoTier 34/40** / 35/40 failing M05) are **an artefact of this simulator's missing attach procedure**, not a property of either scheduler. Under an attach path the same configuration gives **Reservation 1/10 marginal and TwoTier 0/10** — see `docs/attach-path-result-2026-09-05.md`. Do not quote them.
 | | Reservation | **FAIL 30/40** | PASS |
 | | TwoTier | **FAIL 35/40** | INCONCLUSIVE |
 | **M06** | PF / Reservation | PASS 0/40 over 67 ms | PASS |
