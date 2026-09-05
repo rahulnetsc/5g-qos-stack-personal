@@ -41,13 +41,21 @@ from sim.trace import GrantCollector                         # noqa: E402
 from g11_campaign import _arm                                # noqa: E402
 
 
-def one(arm: str, seed: int, n_ues: int, horizon: int) -> dict:
+def one(arm: str, seed: int, n_ues: int, horizon: int,
+        attach_seed: bool = False) -> dict:
+    # `attach_seed` supplies the attach BSR at slot 0 with NO stagger, so the
+    # ONLY difference from the control is the seed. The staggered arm in
+    # docs/attach-path-result depresses M07/M08 through pre-attach time
+    # (defects-log #27), which is why that data cannot answer whether the
+    # lock-out sets G10's boundary and this can.
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
                         load_mult=1.0)
+    seed_slots = ({f.ue_id: 0 for f in sc.flows if f.direction == "UL"}
+                  if attach_seed else None)
     grants = GrantCollector()
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
-                   grant_sink=grants)
+                   grant_sink=grants, attach_seed_slots=seed_slots)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows, summary=s,
                                  arm={}, meta={})
@@ -68,6 +76,7 @@ def one(arm: str, seed: int, n_ues: int, horizon: int) -> dict:
     served_slot1 = sum(1 for v in first_slot.values() if v <= 1)
     return {
         "arm": arm, "seed": seed, "n_ues": n_ues, "horizon": horizon,
+        "attach_seed": attach_seed,
         "wall_s": round(time.time() - t0, 1),
         "n_ul_ues": len(all_ues), "n_never_granted": len(never),
         "never_granted": never, "served_at_slot_1": served_slot1,
@@ -88,13 +97,16 @@ def main() -> int:
     ap.add_argument("--n-ues", default="2,4,8,16")
     ap.add_argument("--horizon", type=int, default=20_000)
     ap.add_argument("--out", default="sweeps/phase2/g5_consolidation.json")
+    ap.add_argument("--attach-seed", action="store_true",
+                    help="seed the attach BSR at slot 0, no stagger")
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
 
     arms = [x for x in a.arms.split(",") if x]
     ns = [int(x) for x in a.n_ues.split(",")]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, n, a.horizon) for arm in arms for n in ns for s in seeds]
+    tasks = [(arm, s, n, a.horizon, a.attach_seed)
+             for arm in arms for n in ns for s in seeds]
     print(f"{len(tasks)} runs = {len(arms)} arms x {len(ns)} fleet sizes "
           f"x {len(seeds)} seeds @ horizon {a.horizon}")
 

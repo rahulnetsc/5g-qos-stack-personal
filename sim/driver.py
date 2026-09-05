@@ -39,7 +39,7 @@ def run(
     window_sink: Optional[Callable[[int, list], None]] = None,
     timeseries_resolution: str = "slot",
     grant_sink: Optional[GrantSink] = None,
-    attach_seed_slots: Optional[dict[int, int]] = None,
+    attach_seed_slots: Optional[dict[int, int] | str] = None,
     rejoin_seed_bsr: bool = False,
 ) -> dict:
     """Run one scenario through one scheduler.
@@ -113,6 +113,16 @@ def run(
     # construction, and so the count is derivable for the assertion the
     # map requires (fired == number of UL UEs, not merely non-zero).
     _attach_seeded: set[int] = set()
+    # `attach_seed_slots="all"` seeds every UL UE at slot 0. It exists because
+    # `regime_sweep.sweep` builds the scenario itself, so a caller passing
+    # driver kwargs cannot construct the {ue: slot} map -- and threading the
+    # scenario into driver_kwargs would be a larger change than a sentinel.
+    _attach_map: dict[int, int] = {}
+    if attach_seed_slots == "all":
+        _attach_map = {f.ue_id: 0 for f in scenario.flows
+                       if f.direction == "UL"}
+    elif isinstance(attach_seed_slots, dict):
+        _attach_map = attach_seed_slots
     #: MODEL C AT THE JOIN EDGES (docs/rejoin-seed-and-desync-registration.md).
     #: Counted per edge kind so "it fired" is distinguishable from "it was
     #: configured", and so the warm path -- which never reaches the RADIO
@@ -648,7 +658,7 @@ def run(
         # exactly like the treatment failing. Placed immediately before
         # broadcast() so the same slot's bytes_reported already reflects it.
         if attach_seed_slots is not None:
-            for _ue, _at in attach_seed_slots.items():
+            for _ue, _at in _attach_map.items():
                 if slot_index < _at or _ue in _attach_seeded:
                     continue
                 if bsr.seed_attach_bsr(_ue, buffers):
@@ -935,7 +945,7 @@ def run(
         summary["rejoin_seeds_still_pending"] = len(_rejoin_pending)
     if attach_seed_slots is not None:
         summary["attach_seeds_fired"] = len(_attach_seeded)
-        summary["attach_seeds_expected"] = len(attach_seed_slots)
+        summary["attach_seeds_expected"] = len(_attach_map)
         summary["attach_seeded_ues"] = sorted(_attach_seeded)
     summary["harq_masked_flow_double_grant_count"] = harq_masked_flow_double_grant_count
     # WP-Join commit 2: same diagnostic-only idiom as the three counters

@@ -361,3 +361,17 @@ CG-served flows consume **zero PDCCH per slot** and the BSR chain is
 - **Testable if SPS is ever restored**, and the falsifier is concrete:
   configure a GBR flow as CG-served, drive it into the conditions that
   produce `n_never_granted > 0` for a dynamic flow, and it should stay 0.
+
+
+### AND "CLEARS" DOES NOT MEAN "IMPROVES EVERYTHING"
+
+Measured on G6's n=40 records with the attach seed on
+(`docs/g6-result-2026-09-05.md`): the same intervention that removes the
+starvation makes **TwoTier measurably worse on latency** — M06 within-bound
+failures go **14/40 → 40/40**, M03 **2/40 → 15/40**, M01 **8/40 → 11/40**,
+while M05 improves 34/40 → 17/40.
+
+**Relieving the lock-out does not create capacity.** It returns the
+locked-out UEs to contention, and that contention is paid in delay by
+everyone. **The consolidation above is a claim about the lock-out being one
+mechanism, not a claim that removing it is free.**

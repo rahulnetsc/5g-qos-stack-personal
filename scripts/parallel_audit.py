@@ -77,6 +77,12 @@ ALLOW_SERIAL = {
     "plot_timeseries.py": "one run, to draw it",
     "tbs_counterfactual.py": "replays one existing run's grants offline",
     "g12_ramp_probe.py": "a stop-condition probe, one arm one seed",
+    "bsr_desync_probe.py": "monkeypatches BsrModel._assemble and .broadcast at "
+                           "module level to observe per-slot state; under "
+                           "`spawn` a worker re-imports the module and would "
+                           "run the UNPATCHED code, so a pool would silently "
+                           "measure nothing -- the same trap as a module-level "
+                           "config cell not reaching workers",
     "cqi_study.py": "PHASE 1 STUDY, superseded -- kept because it still runs",
     "maxmin_study.py": "PHASE 1 STUDY, superseded -- kept because it still runs",
     "f2_duty_cycle_trace.py": "single-run trace, by construction",

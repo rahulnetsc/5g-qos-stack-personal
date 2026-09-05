@@ -80,7 +80,7 @@ def _task(task: tuple) -> tuple[list[dict[str, Any]], list[dict]]:
     dicts returned; the parent is the single writer, and nothing live
     crosses back (wp9_sweep.m13_projection's 25 GB note).
     """
-    bg, seed, horizon, keep_records = task
+    bg, seed, horizon, keep_records, attach_seed = task
     _HORIZON[0] = horizon
     records: list[dict] = []
     sink = None
@@ -95,15 +95,24 @@ def _task(task: tuple) -> tuple[list[dict[str, Any]], list[dict]]:
             # was designed for and not on the one that actually moved.
             records.append({"axis_values": dict(axis_values),
                             "record": _strip_timeseries(record.to_dict())})
+    # The attach seed is threaded through driver_kwargs, and it is carried
+    # IN THE TASK rather than a module-level cell because `spawn` workers
+    # re-import this module and would read the default.
+    def _dk(**axis_values):
+        dk = _driver_kwargs(**axis_values)
+        if attach_seed:
+            dk["attach_seed_slots"] = "all"
+        return dk
     rows = sweep(axes={"bg": [bg]}, build_scenario=_build,
                  schedulers=_arms(), seeds=[seed],
-                 driver_kwargs=_driver_kwargs, record_sink=sink)
+                 driver_kwargs=_dk, record_sink=sink)
     return rows, records
 
 
 def collect_rows(n_seeds=N_SEEDS, horizon=HORIZON,
                  records_path: Path | None = None,
-                 workers: int = _DEFAULT_WORKERS) -> list[dict[str, Any]]:
+                 workers: int = _DEFAULT_WORKERS,
+                 attach_seed: bool = False) -> list[dict[str, Any]]:
     """`records_path` is not optional in spirit. The first version of this
     function passed no `record_sink`, so its n_seeds=40 run kept only the
     scored CSV and the per-flow completion timestamps were gone -- see
@@ -112,7 +121,7 @@ def collect_rows(n_seeds=N_SEEDS, horizon=HORIZON,
     # Serial order is bg-major then seed then arm, and `sweep()` supplies the
     # arm order within a task -- so placing each task's rows at its own index
     # reproduces the serial list exactly, whatever order they complete in.
-    tasks = [(bg, seed, horizon, records_path is not None)
+    tasks = [(bg, seed, horizon, records_path is not None, attach_seed)
              for bg in (False, True) for seed in seeds]
     per_task: list[tuple | None] = [None] * len(tasks)
     for i, res in run_cells(_task, tasks, workers,
@@ -217,6 +226,8 @@ def report(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--attach-seed", action="store_true",
+                    help="Model C at slot 0 -- G6 clause 1 re-score")
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--root", default="sweeps/wp9")
     ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
@@ -227,11 +238,13 @@ def main(argv: list[str]) -> int:
     root.mkdir(parents=True, exist_ok=True)
     if args.smoke:
         rows = collect_rows(n_seeds=2, horizon=2000, workers=args.workers,
+                            attach_seed=args.attach_seed,
                             records_path=root / "stage6_g6_SMOKE_records.jsonl")
         write_csv(rows, str(root / "stage6_g6_SMOKE.csv"))
         print(f"smoke: {len(rows)} rows -- machinery only, NOT a result")
         return 0
-    rows = collect_rows(records_path=root / "stage6_g6_n40_records.jsonl",
+    rows = collect_rows(attach_seed=args.attach_seed,
+                        records_path=root / "stage6_g6_n40_records.jsonl",
                         workers=args.workers)
     ok = control_vs_stage1(rows, root / "stage1" / "stage1_rows.csv")
     write_csv(rows, str(root / "stage6_g6_n40.csv"))
