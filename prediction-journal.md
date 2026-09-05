@@ -1609,3 +1609,50 @@ what the core probe suggested. n=3 → n=40 is exactly where seed-luck dies.
 **Control:** PF and Reservation must stay put. On the conjunction run they
 were byte-identical to the published values, which is why TwoTier's movement
 there is attributable. If they move here, the comparison is void.
+
+---
+
+# FORM RULE (fourth): A PREDICTION MUST NAME **WHAT** MOVES, NOT MERELY **WHETHER** SOMETHING MOVES
+
+**Added 2026-09-05, after it cost two consecutive sessions of unscoreable
+predictions — both mine.**
+
+**"G4 will move" and "G4's verdict will flip" are different claims, and only
+the second is scoreable.** A guarantee carries at least three levels that can
+move independently:
+
+| level | example | moves easily? |
+|---|---|---|
+| **the verdict** | PASS → FAIL, `excl 0` → `incl 0` | rarely — it is a threshold crossing |
+| **the point estimate** | +5.86 → +6.76 ms | almost always |
+| **the direction / per-condition lean** | `[4,2]` → `[2,4]` on one of six cells | sometimes, and independently of the verdict |
+
+**The two instances that produced this rule:**
+
+1. **G1 and G5 registered as "AT RISK" before the Tier-1 scaling landed.**
+   Both **held**, and both moved *away* from their bounds. The prediction
+   reasoned from **margin** (5.5 % and 0.0032) and never named the level or
+   the direction — and margin is symmetric while the underlying change was
+   not: correcting a numerically degraded optimum makes the scheduler behave
+   *better*, so "close to the bound" was the wrong variable entirely.
+2. **G12 registered as "MOVES — the one I would bet on".** Its **verdict
+   held** (neither promotion clause fired, the registered conclusion applied
+   verbatim) while its **per-condition lean moved in 2 of 6 conditions**.
+   **Both halves are defensible readings of the prediction, which is exactly
+   the defect** — it could not be scored a hit or a miss, so it was scored
+   AMBIGUOUS, and an ambiguous prediction is worth nothing.
+
+**The rule, mechanically:** a prediction names the **statistic**, the
+**level** and the **direction**, and states what would falsify it. *"G12's
+TwoTier lean will flip in at least one canonical condition"* is scoreable.
+*"G12 moves"* is not.
+
+**Why this belongs beside the dynamic-range rule rather than under it.**
+J5's failure was an expectation that **no value could contradict**. This one
+is an expectation that **too many outcomes satisfy** — the opposite failure
+mode, same consequence: nothing is learned, and the prediction gets cited as
+a hit if anything moved at all.
+
+**Same family as predicting a SHAPE rather than a MECHANISM.** Both are
+predictions loose enough to survive any outcome, and both feel like
+knowledge at the time they are written.
