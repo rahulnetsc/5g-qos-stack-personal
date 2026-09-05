@@ -274,3 +274,46 @@ Until then G5 is a measured failure with a named, product-side cause.
 - `oai-branches/reservation/gNB_scheduler_ulsch.c:41-70, 625-665`
 - `oai-branches/two-tier/ia_p5g_scheduler.c:2119-2135, 2325`
 - `/home/smart/projects/Oai_Ran_QoS_Supported_MultiDRB/openair2/LAYER2/NR_MAC_gNB/gNB_scheduler_primitives.c:2974-2999`
+
+
+---
+
+## THE STRONGEST SINGLE CLAIM IN THIS PROJECT — stated once, here, where the mechanism lives
+
+**Four observations. One mechanism. One intervention that clears all four.**
+
+This belongs in the mechanism's own section rather than implied across four
+guarantee rows, because the consolidation is the result — each row on its own
+reads as a separate scheduler weakness.
+
+| observation | what was measured | cleared by the intervention |
+|---|---|---|
+| **G5** — PDU-set completeness | Reservation 7/10 and TwoTier 4/10 seeds failing M05; the worst flow completing **0 of 299 frames** | **yes** — Reservation 1/10 marginal, TwoTier 0/10 |
+| **G10** — admissible fleet | PF 8 / Reservation 4 / TwoTier 4, the boundary set by `n_never_granted > 0` | **yes** — starvation clears at every fleet size, arm and seed |
+| **the UL blackout rate** | a "total UL blackout" *is* a never-granted UE — the same count under another name | **yes** — same measurement |
+| **G9** — join counts | the count guard refusing at 2, then 4, of 10 scripted warm events | **yes** — 10/10 warm, 5/5 cold, 1/1 rlf on every arm |
+
+**The intervention is one thing:** supply the BSR that a real attach or
+re-attach would have produced, which this simulator never generates because
+it has no RA procedure and no SRB traffic. Applied at scenario level it is
+`attach_seed_slots` (Model C); applied at the join edges it is
+`rejoin_seed_bsr`. **Both write the same array through the same
+`seed_attach_bsr`.**
+
+**Why the consolidation is the claim rather than the four rows.** Each row
+alone invites a per-guarantee explanation — a completeness problem, a
+capacity limit, a join-timing problem. **They are one fault**: a UE whose
+`estimated_ul_buffer_per_lcg` reads zero enters the sort carrying
+`has_gbr=False` and `pdb_ms=9999`, loses to every UE holding real QoS state,
+and cannot earn the grant that would repopulate the array. **Four different
+metrics were measuring the same UE not being scheduled.**
+
+**And the supporting evidence is a prediction that held across all of it:**
+`n_never_granted > 0 ⟺ M08 floored`, **zero counterexamples in 144 runs**
+spanning three arms, four fleet sizes and three experimental conditions.
+
+**What it does NOT establish** is the frequency on hardware — hardware always
+grants during attach, so the cold-start entry is sim-specific. **Whether the
+fault can be re-entered by an already-served UE losing its estimate is the
+separate question**, and it is what decides whether these four numbers are
+operational risks or upper bounds.
