@@ -330,7 +330,43 @@ class RunRecord:
         JSON-serialisable -- are intentionally dropped here; neither is read
         by this method at all.
         """
+        # DEFECT #28's GUARD, and it is deliberately an assertion rather than
+        # a schema change. `flow_key` is (ue_id, qfi) with NO DIRECTION, so a
+        # UE configured with the same 5QI both ways collapses to ONE record
+        # and the other flow VANISHES -- found when a G2 control read `None`
+        # for a DL flow that was present in the scenario and absent from the
+        # record. Nothing else would have flagged it.
+        #
+        # Category question asked and answered before fixing: **zero** (ue,
+        # qfi) pairs appear in both directions across every scenario in the
+        # repository -- parametric at n=2/4/8/16/32, sensor_dense,
+        # factory_robots, latency_bound, all three G9 builders, G11, and all
+        # three fleet compositions. **No published result lost a flow this
+        # way.** Fixed anyway, because "latent" is what the absolute-time
+        # class was too.
+        #
+        # WHY NOT ADD DIRECTION TO THE KEY. It would rename every flow
+        # identifier in every artefact and every consumer that parses one --
+        # and the model may be right as it stands: a DRB is directional in
+        # 5G, so "one 5QI both ways on a UE" is arguably two DRBs and should
+        # carry two QFIs. The defect is that the schema enforced that
+        # SILENTLY. This makes it loud, which is the same shape as
+        # `schedule_guard.require_horizon` refusing an unrepresentable
+        # scenario rather than truncating it.
         meta_by_key = {flow_key(f.ue_id, f.qfi): f for f in flow_configs}
+        if len(meta_by_key) != len(flow_configs):
+            seen: dict[str, list[str]] = {}
+            for f in flow_configs:
+                seen.setdefault(flow_key(f.ue_id, f.qfi), []).append(f.direction)
+            clashes = {k: v for k, v in seen.items() if len(v) > 1}
+            raise ValueError(
+                f"flow key collision: {len(flow_configs)} flows collapse to "
+                f"{len(meta_by_key)} records, so {len(flow_configs) - len(meta_by_key)} "
+                f"would be SILENTLY LOST. `flow_key` is (ue_id, qfi) with no "
+                f"direction, so one UE cannot carry the same 5QI both ways "
+                f"(docs/wp9-defects-log.md #28). Colliding: {clashes}. "
+                f"Give the second flow its own 5QI -- e.g. 5QI 86 carries the "
+                f"same standardised 5 ms PDB as 85.")
         ts = summary.get("timeseries") or {}
         ts_per_flow = ts.get("per_flow", {})
 
