@@ -1,0 +1,73 @@
+{
+  "GT-6.1_warm": {
+    "PF": {
+      "events_per_run": 10,
+      "m18_p95_median": 16.62499999999989,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.05339999999999989,
+          "lo": -0.975,
+          "hi": 1.0068849999999991,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.05339999999999989,
+        "median": 0.125,
+        "p25": -0.25,
+        "p75": 1.0,
+        "frac_worse": 0.5
+      }
+    },
+    "Reservation": {
+      "events_per_run": 10,
+      "m18_p95_median": 21.00000000000002,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 2.45,
+          "lo": -0.12562499999999996,
+          "hi": 6.15,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 2.45,
+        "median": 1.25,
+        "p25": 0.0,
+        "p75": 2.5,
+        "frac_worse": 0.7
+      }
+    }
+  },
+  "_partial": true
+}

@@ -169,7 +169,8 @@ def _neighbour_stats(rec: RunRecord, neighbours: list[int]) -> dict:
             "worst_p98_ms": max((fr.delay_p98_ms for fr in flows), default=0.0)}
 
 
-def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on):
+def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on,
+            rejoin_seed=False):
     """One run. `joiner_on=False` builds the paired CONTROL -- same seed,
     same fleet, no join schedule -- so the neighbours delta is within-seed."""
     sc = build(seed=seed, n_neighbours=n_neighbours)
@@ -178,7 +179,7 @@ def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on):
                for ue in sc.ues]
         sc = dataclasses.replace(sc, ues=ues, name=sc.name + "_control")
     summary = run(sc, arm_factory(), cqi_delay_slots=CQI_DELAY_SLOTS,
-                  record_timeseries=True)
+                  record_timeseries=True, rejoin_seed_bsr=rejoin_seed)
     return sc, RunRecord.from_summary(
         scenario_name=sc.name, scheduler_name=arm_name, seed=seed,
         flow_configs=sc.flows, summary=summary, arm={}, meta={})
@@ -193,11 +194,14 @@ def _task(task: tuple) -> dict:
     RunRecords stay in the worker and die with it; nothing live crosses back
     (wp9_sweep.m13_projection's 25 GB note).
     """
-    label, arm_name, seed, n_nb = task
+    # The re-join-seed flag travels IN THE TASK, not in a module-level
+    # cell: `spawn` workers re-import this module and would read the
+    # default. Same trap as monkeypatching a pool worker.
+    label, arm_name, seed, n_nb, rejoin_seed = task
     build, want_path = CASES[label]
     factory = _arms()[arm_name]
     sc, rec = run_one(build, want_path, arm_name, factory, seed, n_nb,
-                      joiner_on=True)
+                      joiner_on=True, rejoin_seed=rejoin_seed)
     joiner, neighbours = joiner_ue_id(sc), neighbour_ue_ids(sc)
     n_ev = assert_events_fired(rec, want_path, f"{label}/{arm_name}",
                                expected=expected_event_count(sc, want_path))
@@ -212,7 +216,7 @@ def _task(task: tuple) -> dict:
         v = (scored[key].value or {}).get("by_path", {}).get(want_path)
         out[key] = v["p95_ms"] if v and v.get("p95_ms") is not None else None
     _, ctl = run_one(build, want_path, arm_name, factory, seed, n_nb,
-                     joiner_on=False)
+                     joiner_on=False, rejoin_seed=rejoin_seed)
     a, b = _neighbour_stats(rec, neighbours), _neighbour_stats(ctl, neighbours)
     # M02 on the neighbours is SATURATED AT ZERO even with bg at 0.876 UL
     # utilisation -- their protected flows sit at p98 15.5 ms against a
@@ -249,6 +253,9 @@ def _aggregate(per_seed: list[dict]) -> dict:
 
 def main(argv):
     ap = argparse.ArgumentParser()
+    ap.add_argument("--rejoin-seed", action="store_true",
+                    help="MODEL C at the join edges "
+                         "(docs/rejoin-seed-and-desync-registration.md)")
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--neighbours", type=int, default=7)
@@ -275,7 +282,7 @@ def main(argv):
     # Task order is the serial order -- case, then arm, then seed -- so the
     # per-arm lists the aggregation reads are seed-ordered whatever order the
     # pool returns them in. The seeded bootstrap makes that load-bearing.
-    tasks = [(label, arm_name, seed, n_nb)
+    tasks = [(label, arm_name, seed, n_nb, args.rejoin_seed)
              for label in CASES for arm_name in arms for seed in seeds]
     results: list[dict | None] = [None] * len(tasks)
     per_group = len(seeds)
@@ -300,7 +307,7 @@ def main(argv):
     for i, res in run_cells(_task, tasks, args.workers,
                             cost=lambda t: arm_cost(t[1])):
         results[i] = res
-        label, arm_name, seed, _ = tasks[i]
+        label, arm_name, seed, _, _ = tasks[i]
         # PER-RESULT HEARTBEAT. Without it the only progress signal is
         # process liveness: this runner's first launch wrote a ZERO-LINE log
         # for its entire duration, because Python block-buffers a redirected
@@ -312,7 +319,7 @@ def main(argv):
         done_in_group[key] = done_in_group.get(key, 0) + 1
         if done_in_group[key] != per_group:
             continue
-        idx0 = tasks.index((label, arm_name, seeds[0], n_nb))
+        idx0 = tasks.index((label, arm_name, seeds[0], n_nb, args.rejoin_seed))
         group = [results[idx0 + k] for k in range(per_group)]
         # ASSERTION 2's population is PRINTED, not assumed (§31.6).
         print(f"\n{'=' * 78}\n{label}/{arm_name}\n{'=' * 78}", flush=True)

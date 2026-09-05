@@ -40,6 +40,7 @@ def run(
     timeseries_resolution: str = "slot",
     grant_sink: Optional[GrantSink] = None,
     attach_seed_slots: Optional[dict[int, int]] = None,
+    rejoin_seed_bsr: bool = False,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -112,6 +113,18 @@ def run(
     # construction, and so the count is derivable for the assertion the
     # map requires (fired == number of UL UEs, not merely non-zero).
     _attach_seeded: set[int] = set()
+    #: MODEL C AT THE JOIN EDGES (docs/rejoin-seed-and-desync-registration.md).
+    #: Counted per edge kind so "it fired" is distinguishable from "it was
+    #: configured", and so the warm path -- which never reaches the RADIO
+    #: edge -- cannot be silently unserved by a change aimed at the wrong one.
+    _rejoin_seeded = {"app": 0, "radio": 0, "armed": 0}
+    #: UEs whose join edge has fired but which had no backlog AT the edge.
+    #: The seed ARMS at the edge and FIRES at the first slot the UE actually
+    #: has something to report -- the same shape Model C uses at attach, and
+    #: for the same reason: an app that has just restarted has not generated
+    #: traffic yet, so seeding AT the edge writes zeros and does nothing.
+    #: Measured before this was fixed: 7 edges, 7 refusals, 0 seeds.
+    _rejoin_pending: dict[int, str] = {}
     ul_access = UlAccessModel(
         scenario.flows,
         grid.slot_duration_s,
@@ -313,6 +326,39 @@ def run(
                 # pending HARQ before it can keep consuming retx PRBs/CCE
                 # through the outage (sec1.4/sec2b).
                 harq_pool.flush_ue(ue.ue_id)
+            # MODEL C AT THE JOIN EDGES -- off unless `rejoin_seed_bsr`.
+            #
+            # WHY BOTH EDGES, and this is the whole point of the change:
+            # `radio_connected_this_slot` does NOT fire on the warm path
+            # (the driver's own comment below says so -- the radio never
+            # drops for an app restart), and the warm path is the one G9's
+            # count guard fails on. Seeding only at the radio edge would
+            # have produced a change that provably could not affect the
+            # clause it was built for.
+            #
+            # The warm path reaches the same fault by a different door: the
+            # app stops, backlog drains, a BSR fires with no active LCG, and
+            # `_assemble` memsets `estimated_ul_buffer_per_lcg` and returns
+            # early on fmt=="none" -- leaving it all zero while the app
+            # restarts and real backlog returns.
+            #
+            # THIS IS A MECHANISM CHANGE, NOT A SCENARIO TREATMENT, because
+            # the trigger is an internal FSM edge rather than a
+            # caller-supplied schedule. Its justification is the one Model C
+            # already rests on: real hardware grants during attach and
+            # re-establishment (RACH msg3, then RRC signalling on SRB) and
+            # those grants carry BSRs. This simulator has no RA procedure
+            # and no SRB traffic (`has_srb` is hardcoded False), so a
+            # re-attaching UE never receives a grant hardware would always
+            # give it. The seed supplies the EFFECT of an input the deployed
+            # system has and the sim lacks; it changes no scheduler, no
+            # ranking and no ported constant.
+            if rejoin_seed_bsr and (jres.app_connected_this_slot
+                                    or jres.radio_connected_this_slot):
+                _rejoin_pending[ue.ue_id] = (
+                    "app" if jres.app_connected_this_slot else "radio")
+                _rejoin_seeded["armed"] += 1
+
             if jres.radio_connected_this_slot:
                 # Re-arm: a fresh RlfDetectorState, constructed exactly
                 # here, at the instant rrc_connected flips true (sec1.6) --
@@ -583,6 +629,16 @@ def run(
         bsr.tick_timers(slot_index)
         ul_access.on_arrivals(per_flow_arrived, buffers)
         ul_access.tick(slot_index)
+
+        # MODEL C AT THE JOIN EDGES: fire any armed re-join seed for a UE
+        # that now has backlog. Armed at the edge (above), fired here --
+        # `seed_attach_bsr` refuses an empty buffer rather than writing
+        # zeros, and an app that has just restarted has not produced traffic
+        # yet, so firing AT the edge is a guaranteed no-op.
+        if _rejoin_pending:
+            for _ue in list(_rejoin_pending):
+                if bsr.seed_attach_bsr(_ue, buffers):
+                    _rejoin_seeded[_rejoin_pending.pop(_ue)] += 1
 
         # MODEL C's attach seed (`docs/attach-path-map.md`), OFF unless
         # `attach_seed_slots` is passed. Fires once per UE, at the first
@@ -872,6 +928,11 @@ def run(
     # fired" -- two states this project has repeatedly conflated. Keeping
     # it out of the default summary is also what keeps an off run's summary
     # byte-identical to a pre-Model-C one.
+    if rejoin_seed_bsr:
+        summary["rejoin_seeds_app"] = _rejoin_seeded["app"]
+        summary["rejoin_seeds_radio"] = _rejoin_seeded["radio"]
+        summary["rejoin_seeds_armed"] = _rejoin_seeded["armed"]
+        summary["rejoin_seeds_still_pending"] = len(_rejoin_pending)
     if attach_seed_slots is not None:
         summary["attach_seeds_fired"] = len(_attach_seeded)
         summary["attach_seeds_expected"] = len(attach_seed_slots)

@@ -1,0 +1,14 @@
+g11 campaign: 9 runs (3 arms x 3 seeds), N=4, horizon=400000 (1.7 min), 3 workers
+expected per run: {'teleop_on_windows': 5, 'waypoint_pauses': 0, 'firmware_windows': 0, 'stop_bursts': 0}
+resume: 0 run(s) already complete, 9 to run
+submitted 9 task(s); per-task timeout 67 min
+  1/9 TwoTier/seed1826701614/p0 wall=107.1s rss=520.2MB windows=2 elapsed=1.8m
+  2/9 TwoTier/seed1367864806/p0 wall=107.0s rss=520.4MB windows=2 elapsed=1.8m
+  3/9 TwoTier/seed1097657231/p0 wall=108.1s rss=518.5MB windows=2 elapsed=1.8m
+  4/9 Reservation/seed1826701614/p0 wall=58.1s rss=528.0MB windows=2 elapsed=2.8m
+  5/9 Reservation/seed1367864806/p0 wall=58.2s rss=531.9MB windows=2 elapsed=2.8m
+  6/9 Reservation/seed1097657231/p0 wall=57.7s rss=527.2MB windows=2 elapsed=2.8m
+  7/9 PF/seed1826701614/p0 wall=45.5s rss=530.9MB windows=2 elapsed=3.6m
+  8/9 PF/seed1367864806/p0 wall=45.8s rss=531.9MB windows=2 elapsed=3.6m
+  9/9 PF/seed1097657231/p0 wall=45.1s rss=530.3MB windows=2 elapsed=3.6m
+DONE 9/9 runs in 3.6 min; guard tripped=False; victims=[]; failures=0

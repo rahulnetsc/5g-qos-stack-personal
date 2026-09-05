@@ -126,3 +126,32 @@ nowhere to put one, so a `current` claim citing either fails permanently.
 discovered: a non-JSON artefact under a `current` claim is a test failure
 naming the claim. Both such claims were repointed or removed in the triage;
 a future one needs a sidecar, and that is not built.
+
+---
+
+## 8. The first real cost of the guard, observed the same day
+
+**Adding `rejoin_seed_bsr` to `sim/driver.py` — a new parameter defaulting
+to `False`, verified bit-identical when off — invalidated every stamped
+artefact and failed two tests.**
+
+**That is the guard working to specification, not noise.** Its question is
+*"was this artefact produced by the current code?"*, and the answer was
+genuinely no. The remedy is the designed one: re-run. Cost this time was
+~10 minutes for `core_scaled.json` and `g5_consol_scaled.json`.
+
+**It was NOT tuned, and the tempting tune is named here so the next person
+recognises it:** one could exclude parameters that default to their previous
+behaviour, or hash only "reachable" code. **Both would convert the guard
+from "was this produced by current code" into "was this produced by code I
+judge equivalent", and that judgement is exactly what the guard exists to
+replace.** A check tuned until it stops firing is a shape this project has
+recorded four times.
+
+**The real cost, stated plainly so it can be traded off deliberately:** any
+change to `sim/` or `scheduler/` invalidates every artefact, so a project
+that touches those often will re-run often. **The finer-grained alternative
+— hashing only the modules an artefact's producer actually imports — is a
+real option and is not built.** It would reduce false alarms and would also
+be substantially harder to get right, since the dependency set is dynamic.
+**Recorded as an option with its trade-off, not adopted.**
