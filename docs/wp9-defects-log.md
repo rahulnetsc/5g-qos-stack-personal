@@ -1140,3 +1140,51 @@ such judgement and shows the same thing more directly.**
 CCE was the only unguarded denominator in the metrics layer, and the scoring
 layer's ratios (M07's GBR list, M09's qualifying windows, M19's gaps) each
 carry an explicit population already.
+
+---
+
+## #30 — G12's published artefact was computed with a flow SILENTLY LOST
+
+**Found 2026-09-06**, by the full re-run. `scripts/g12_campaign.py` now exits
+non-zero:
+
+```
+ValueError: flow key collision: 31 flows collapse to 30 records, so 1 would be
+SILENTLY LOST. `flow_key` is (ue_id, qfi) with no direction ... Colliding:
+{'ue8_qfi9': ['DL', 'UL']}
+```
+
+**The guard is new; the collision is not.** Defect #28's assertion was added to
+`sim/run_record.py::from_summary` *after* `sweeps/postscaling-2026-09-05/
+g12.json` was produced. So the published G12 run hit the same collision, had
+no guard to stop it, and **dropped one of `ue8`'s two 5QI-9 flows from the
+record** — the aggregate was computed over 30 flows while the scenario
+declares 31.
+
+**Why this one is material rather than cosmetic.** G12's clause-4 finding is
+stated as *"telemetry M02 reaches 1.000 while 5QI 9 is still carrying
+11.6 Mbps"*. The lost flow **is a 5QI-9 flow**, i.e. it is in the denominator
+of the very aggregate the claim is about. With 8 UEs the background
+population is ~16 flows, so the published background throughput is computed
+over ~15 of them.
+
+**What it does and does not overturn.** It does **not** overturn the
+qualitative claim — 11.6 Mbps against a floored telemetry flow is not a
+margin one missing flow reverses. It **does** mean the published figure is
+not the number it says it is, and **G12 currently has no reproducible
+artefact at all**, because the guard correctly refuses to produce one.
+
+**Disposition: reported, not fixed.** The fix is a scenario change — give the
+second flow its own 5QI (5QI 86 carries the same standardised 5 ms PDB as 85,
+the same workaround `sim/fleet.py`'s UL E-STOP flow already uses) — and that
+is a new build with its own re-score, not a drive-by inside a re-run whose
+whole purpose was to change nothing.
+
+**The transferable shape, and it is the reason this is logged rather than
+just fixed:** *a guard added after a result was published retroactively tells
+you the result was unsound.* The re-run did not find a number that moved; it
+found a number that **could not be recomputed**, which is strictly more
+informative and would have been invisible to any check that only compares
+values. Cross-references #28 (the collision), and the standing rule that a
+check must be able to fail — here a check that did not exist yet is exactly
+why nothing failed the first time.
