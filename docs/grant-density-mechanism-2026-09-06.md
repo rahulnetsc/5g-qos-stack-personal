@@ -1,5 +1,32 @@
 # The grant-density mechanism — one mechanism, four observations
 
+> **SUPERSEDED IN PART, 2026-09-06 (same day), BY
+> `docs/two-tier-settled-2026-09-06.md`. READ THAT FIRST.**
+>
+> **The central claim below is refuted on its own data by a change of units.**
+> The correlation between grant count and the deferral tail is **ρ = +0.794
+> when the tail is counted in GRANTS** and **ρ = +0.115, p = 0.21 — not
+> significant — when it is measured in MILLISECONDS** (n = 120). "Skipped
+> grants" has grant count in its own definition, so correlating the two is
+> correlating a rate against its denominator. **Latency is in milliseconds,
+> and in milliseconds the protected flow waits 105–135 ms (p98) on every arm
+> in every cell**, whether that arm issued 2,048 grants or 25,221.
+>
+> **What survives:** intra-UE LCP deferral is real and measured (the flow
+> rides on 0.5–3.3 % of its own UE's grants; zero deferral on `sensor_dense`,
+> which has no sibling), the disadvantaged UE is **not** under-granted
+> (1.003× the fleet median), and §2's refutation of *"Tier-1's objective
+> favours periodic flows"* stands. **What does not survive is the claim that
+> grant density explains the ARM differences.**
+>
+> **The replacement mechanism is service REGULARITY**, which survives in
+> milliseconds: burstiness (gap p98/p50) predicts the protected flow's p98
+> within each workload at ρ = +0.646 (parametric) and +0.698
+> (`sensor_dense`), and TwoTier is the burstiest arm where it loses and the
+> most regular where it wins.
+>
+> Kept unedited below for the record.
+
 **2026-09-06.** Stated once, here, the way the cold-start lock-out is stated
 in `docs/STATE.md` §3. **Four results previously carried as separate,
 unexplained scheduler behaviours are one mechanism**, and the explanations

@@ -101,7 +101,9 @@ same intervention takes TwoTier's M06 failures from 14/40 to **40/40**. And
 
 ---
 
-## 3a. The second consolidation — grant density, four more observations
+## 3a. The second consolidation — SUPERSEDED, see `docs/two-tier-settled-2026-09-06.md`
+
+**The grant-density framing below is refuted by a change of units** (ρ = +0.794 in grant counts, **+0.115, p = 0.21 in milliseconds**). **The surviving mechanism is service REGULARITY** — burstiness predicts the protected flow's p98 within each workload at ρ = +0.646 / +0.698, and TwoTier is the burstiest arm where it loses and the most regular where it wins. Intra-UE LCP deferral is still real and still not the arm differentiator. Kept below for the record.
 
 **Full statement: `docs/grant-density-mechanism-2026-09-06.md`.** Trace
 `sweeps/rerun-2026-09-06/traces.json`, 4 cells × 3 arms × 10 seeds,

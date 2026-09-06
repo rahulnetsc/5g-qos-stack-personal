@@ -78,6 +78,13 @@ rather than a ranked excerpt.
 
 ## 4. What this audit found
 
+> **REVISED 2026-09-06 — see `docs/two-tier-settled-2026-09-06.md`.** The
+> grant-density answer these rows cite is **refuted in milliseconds** (ρ =
+> +0.115, p = 0.21) and replaced by **service regularity** (ρ = +0.646 /
+> +0.698 within workload). U1's refutation of the Tier-1-objective candidate
+> stands; **U2(b)'s "PF grants ~5.8× less" is NOT a supported explanation**,
+> because grant count does not predict the wait in time.
+
 **Six rows rested on inference alone** — U1, U2(b), U3, U5a (four candidates),
 U5b's arm attribution. **Four of those are now closed by one trace**
 ([the grant-density mechanism](grant-density-mechanism-2026-09-06.md)): U1,

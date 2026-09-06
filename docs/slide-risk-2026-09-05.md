@@ -8,7 +8,16 @@ it goes if an audience finds it before we say it.
 
 ## Tier 1 — would be a retraction on stage
 
-**0. THE BIGGEST ONE, ADDED 2026-09-06: our headline scheduler comparison is
+**0. THE BIGGEST ONE, ADDED 2026-09-06, REVISED THE SAME DAY: our headline
+scheduler comparison was attributed three different ways in a week, and two
+of the three were wrong — including one I published.** The current, settled
+account is `docs/two-tier-settled-2026-09-06.md`: the differentiator is
+**service REGULARITY** (TwoTier's ranking serves a UE in clusters then long
+gaps — burstiness ratio 125 against PF's 1.3), not grant density and not
+Tier-1's objective. **What an audience must not be told is the version below
+without that correction.** The original text follows.
+
+**0a. (superseded) our headline scheduler comparison is
 partly not a scheduler result.** *"TwoTier is worst by 3.5x on latency"* — and
 G7's *"PF contains the aggressor better than the arms that clamp"* — are
 **a UE-side LCP effect that is identical code in all three arms, and no
