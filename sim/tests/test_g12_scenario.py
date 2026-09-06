@@ -28,10 +28,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sim.fleet import LIDAR_ACTIVE_BPS, LIDAR_MAX_CONCURRENT  # noqa: E402
+from scheduler.flow import priority_for_5qi
 from sim.scenarios.g12 import (BG_OFFERED_BPS, GBR_CLASSES,  # noqa: E402
                                GUARANTEE_RAMP_TOP_MULT,
                                MEASURED_CEILING_BPS, REFERENCE_COMMITTED_BPS,
-                               LIDAR_STREAM_BPS, QFI_BG, RAMP,
+                               LIDAR_STREAM_BPS, QFI_BG, QFI_BG_UL, RAMP,
                                assert_cell_is_scoreable,
                                assert_order_non_degenerate,
                                assert_ramp_bottom_clean, build_g12_scenario,
@@ -123,18 +124,53 @@ def test_lidar_max_concurrent_still_binds():
 
 # --- the invisible substitution -----------------------------------------
 
-def test_bg_is_5qi_9_and_not_the_5qi_8_aggressor():
-    """G12 names 5QI 9 by number. `sim/parametric.py`'s bg and
-    `sim/scenarios/g9.py`'s QFI_AGGRESSOR are both 5QI 8, and BOTH 8 and 9
-    sit in `Scorecard.NON_PROTECTED_5QI` -- so the wrong one would load the
-    cell correctly and be invisible to every protected-fleet statistic."""
+def test_the_bg_class_is_9_and_the_FLOOD_is_8_after_the_collision_fix():
+    """G12 names 5QI 9 by number, and the saturating flood now carries 5QI 8.
+
+    **This test used to assert "5QI 8 has no role in G12" and it caught the
+    collision fix in the act** -- correctly, because `sim/parametric.py`'s bg
+    and `sim/scenarios/g9.py`'s QFI_AGGRESSOR are both 5QI 8 and a mix-up
+    would be invisible to every protected-fleet statistic.
+
+    **8 is nonetheless the only available label, and the constraint that
+    settles it is `Scorecard.NON_PROTECTED_5QI`.** The flood must be
+    non-protected (it has no contract and must not enter a protected-fleet
+    statistic) and must keep 5QI 9's 300 ms PDB. Only 8 and 9 satisfy both,
+    and 9 is what it is aliasing against -- 5QI 6 has the same 300 ms PDB but
+    is NOT in NON_PROTECTED_5QI, so it would score the flood as fleet.
+
+    So the hazard this test was written for is real and is handled by
+    construction rather than by avoiding the number: the flood is the ONLY
+    5QI-8 flow in a G12 scenario, and the scorer selects the background as a
+    POPULATION (`BG_QFIS`), not by a single label.
+    """
     sc = _build(1.0)
-    assert QFI_BG == 9
-    bg = [f for f in sc.flows if f.qfi == QFI_BG
-          and f.traffic_params.get("rate_bps") == BG_OFFERED_BPS]
-    assert len(bg) == 1, "expected exactly one saturating 5QI 9 flow"
+    assert QFI_BG == 9 and QFI_BG_UL == 8
+    bg = [f for f in sc.flows
+          if f.traffic_params.get("rate_bps") == BG_OFFERED_BPS]
+    assert len(bg) == 1, "expected exactly one saturating background flow"
+    assert bg[0].qfi == QFI_BG_UL and bg[0].direction == "UL"
     assert bg[0].flow_class == "PF" and bg[0].gfbr_bps == 0.0
-    assert not _flows(sc, 8), "5QI 8 has no role in G12"
+    assert _flows(sc, 8) == bg, "the flood is the only 5QI-8 flow in G12"
+    # both background labels must stay outside the protected fleet, or the
+    # relabel would quietly move a 50 Mbps flood INTO the fleet statistics
+    from sim.scorecard import Scorecard
+    assert {QFI_BG, QFI_BG_UL} <= set(Scorecard.NON_PROTECTED_5QI)
+    # and the relabel is de-aliasing only: 5QI 9's priority is pinned on
+    assert bg[0].priority_level == priority_for_5qi(QFI_BG)
+
+
+def test_no_ue_carries_one_5qi_in_both_directions():
+    """The defect the relabel exists to fix (defects log #30). Kept HERE too,
+    beside the scenario, and not only in the repo-wide sweep."""
+    import collections
+    for comp in ("mixed", "ugv_heavy", "drone_heavy", "sensor_dense"):
+        for n in (4, 8):
+            sc = _build(1.0, composition=comp, n_ues=n)
+            dupes = {k: v for k, v in
+                     collections.Counter((f.ue_id, f.qfi)
+                                         for f in sc.flows).items() if v > 1}
+            assert not dupes, f"{comp} n={n}: {dupes}"
 
 
 def test_bg_can_be_switched_off_for_a_control():

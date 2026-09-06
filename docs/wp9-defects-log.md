@@ -1188,3 +1188,31 @@ informative and would have been invisible to any check that only compares
 values. Cross-references #28 (the collision), and the standing rule that a
 check must be able to fail — here a check that did not exist yet is exactly
 why nothing failed the first time.
+
+**#30 UPDATED 2026-09-06 — FIXED, RE-SCORED, AND THIS ENTRY'S OWN FRAMING WAS
+TOO NARROW.** Two corrections to what is written above:
+
+1. **It was not primarily a record-keying defect.** `BufferModel` keys on
+   `(ue_id, qfi)` with no direction and `register()` **overwrites**, so the
+   two flows **shared one queue**: the 2 kbps DL flow's eligibility gate read
+   the 50 Mbps flood's BSR-managed `bytes_reported`, and **DL grants drained
+   the UL flood**. The published cell simulated a queue that does not exist.
+2. **The dropped record itself is negligible** — a 2 kbps flow against an
+   11.6 Mbps figure, 0.02 %. This entry said the lost flow was "in the
+   denominator of the claim", which is true and misleading about magnitude.
+   **The shared queue is the whole effect.**
+
+**Measured after the fix** (`docs/g12-collision-fix-result-2026-09-06.md`):
+the background at `drone_heavy_n8` falls **17.5 → 8.5 Mbps on PF** and
+**16.8 → 0.079 on Reservation** — up to **~1,200×**, not the <2× predicted.
+**Most of the published background throughput was the phantom DL drain.**
+Clause 4 still fails on PF and TwoTier (more strongly on TwoTier); on
+Reservation telemetry **improves** at three ramp points, so that arm's
+published degradation was partly the collision.
+
+**The category answer was also wrong.** `test_flow_key_collision.py` asserted
+zero; re-sweeping properly finds the collision at **four** grid points
+(`drone_heavy` n=8, and `mixed`/`ugv_heavy` at **n=4**). The first sweep
+enumerated **nullary** builders and could not reach a parameterised one.
+`sim/tests/test_flow_key_collision_sweep.py` enumerates by reflection and
+**asserts its own coverage**.

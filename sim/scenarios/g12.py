@@ -76,7 +76,7 @@ from sim.config import CarrierConfig, FlowConfig, ScenarioConfig, TDDConfig, UEC
 from sim.fleet import COMPOSITIONS, LIDAR_MAX_CONCURRENT, LidarActivation, build_fleet
 
 __all__ = [
-    "QFI_BG", "BG_OFFERED_BPS", "LIDAR_STREAM_BPS", "GBR_CLASSES", "RAMP",
+    "QFI_BG", "QFI_BG_UL", "BG_OFFERED_BPS", "LIDAR_STREAM_BPS", "GBR_CLASSES", "RAMP",
     "GUARANTEE_RAMP_TOP_MULT", "MEASURED_CEILING_BPS",
     "REFERENCE_COMMITTED_BPS",
     "build_g12_scenario", "lidar_for_horizon", "permute_flows",
@@ -94,6 +94,13 @@ __all__ = [
 # invisible to every protected-fleet statistic and would never have been
 # caught downstream (§35.3).
 QFI_BG = 9
+#: The UL flood's own 5QI. Distinct from `QFI_BG` so a UE can carry both
+#: without the two aliasing onto one `(ue_id, qfi)` buffer -- see the
+#: comment at its construction below.
+QFI_BG_UL = 8
+#: 5QI 9's priority, pinned onto the relabelled flow so the change is
+#: de-aliasing and nothing else.
+_QFI_BG_PRIORITY = 90
 
 # "saturating", per the test plan's §2.1 bg row (GFBR 0 / MFBR 100 Mbps).
 # The rate matches `sim/parametric.py`'s existing aggressor so G12's cell
@@ -258,9 +265,29 @@ def build_g12_scenario(
         # own reasoning for its aggressor: a shift in the protected
         # statistics is then attributable to this flow rather than to every
         # UE having gained one.
+        # 5QI 8, NOT 9 (`QFI_BG`), and the reason is a SIMULATION defect
+        # rather than a QoS choice. `sim/buffer.py::BufferModel` keys every
+        # structure on `(ue_id, qfi)` with NO DIRECTION, and `register()`
+        # OVERWRITES -- so when this flood landed on a UE that `build_fleet`
+        # had already given a DL 5QI-9 flow (drone_heavy at n=8, ue8), the
+        # two shared ONE BufferState: the DL flow's eligibility gate read the
+        # flood's BSR-managed `bytes_reported`, and DL grants drained the
+        # flood's 50 Mbps UL queue. That is not a reporting problem, it is a
+        # queue that does not exist (defects log #30).
+        #
+        # `priority_level` is PINNED to 5QI 9's 90 rather than taking 5QI 8's
+        # own 80. 8 and 9 are the same standardised non-GBR class -- 300 ms
+        # PDB, 1e-6 PER -- differing only in priority, and every other QoS
+        # field here is already declared explicitly, so pinning the one
+        # derived field makes this purely DE-ALIASING. Stricter than the
+        # 5QI 85 -> 86 precedent in `sim/fleet.py`, which let priority and
+        # LCG move: that flow is a diagnostic pair that is off by default,
+        # this one is the workload's own background flood and a re-score must
+        # not be confounded by a priority change.
         flows.append(FlowConfig(
             ue_id=n_ues if bg_ue_id is None else bg_ue_id,
-            qfi=QFI_BG, direction="UL", flow_class="PF", pdb_ms=300.0, lcg=6,
+            qfi=QFI_BG_UL, direction="UL", flow_class="PF", pdb_ms=300.0,
+            lcg=6, priority_level=_QFI_BG_PRIORITY,
             traffic_kind="poisson",
             traffic_params={"rate_bps": bg_offered_bps},
         ))

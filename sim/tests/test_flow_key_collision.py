@@ -6,10 +6,25 @@ guard, a scenario that violated the constraint produced one record and the
 other flow vanished with no error; it was found only because a G2 control
 read `None`.
 
-THE CATEGORY QUESTION WAS ASKED BEFORE FIXING and the answer was zero: no
-scenario in the repository puts a (ue, qfi) pair in both directions, so no
-published result lost a flow. Fixed anyway -- the absolute-time class was
-latent too, right up until someone shortened a horizon.
+THE CATEGORY QUESTION WAS ASKED BEFORE FIXING AND THE ANSWER WAS WRONG.
+This docstring used to read "the answer was zero: no scenario in the
+repository puts a (ue, qfi) pair in both directions, so no published result
+lost a flow." **A published result did.** `build_g12_scenario` puts 5QI 9 on
+the flood UE in both directions, and the consequence is worse than a lost
+record: `BufferModel.register()` overwrites, so the two flows shared ONE
+queue and DL grants drained a 50 Mbps UL flood (defects log #30).
+
+**Why the first sweep said zero:** it enumerated the NULLARY scenario
+functions. The collision is reachable only through a parameterised builder,
+at particular compositions and fleet sizes, and only with the background
+flood on -- and re-running that sweep properly finds it at FOUR grid points,
+not one. `sim/tests/test_flow_key_collision_sweep.py` is the replacement: it
+enumerates builders by reflection, drives them over a grid, and asserts its
+own COVERAGE so a new builder fails loudly instead of widening the blind
+spot.
+
+The guard below is unchanged and was always right; only the claim about the
+category was wrong.
 """
 
 from __future__ import annotations

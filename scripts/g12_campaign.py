@@ -58,7 +58,8 @@ from sim.baselines.pf import ProportionalFair  # noqa: E402
 from sim.driver import run  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
 from sim.scenarios.g12 import (GBR_CLASSES, GUARANTEE_RAMP_TOP_MULT,  # noqa: E402
-                               QFI_BG, RAMP, assert_cell_is_scoreable,
+                               QFI_BG, QFI_BG_UL, RAMP,
+                               assert_cell_is_scoreable,
                                assert_order_non_degenerate,
                                assert_ramp_bottom_clean, build_g12_scenario,
                                class_of, gbr_flow_census, permute_flows)
@@ -67,6 +68,11 @@ from sim.scorecard import Scorecard  # noqa: E402
 _TT = str(Path(__file__).resolve().parent.parent / "scheduler"
           / "scheduler_config.yaml")
 CQI_DELAY_SLOTS = 8
+#: The background POPULATION, derived from the scenario module's own
+#: constants rather than restated -- a literal here would drift the
+#: moment another label is added.
+BG_QFIS = frozenset({QFI_BG, QFI_BG_UL})
+
 HORIZON_SLOTS = 20_000
 # 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
 # G12's ramp makes every task 8 runs long, so the pool is well fed even at
@@ -191,8 +197,17 @@ def run_ramp(comp: str, n_ues: int, arm_name: str, arm_factory, seed: int,
 
         # Clause 1: 5QI 9 has no contract, so "exhausted" is a throughput
         # statement and nothing else can carry it.
+        #
+        # BOTH background 5QIs. The UL flood was relabelled 9 -> 8 to stop it
+        # aliasing onto a DL 5QI-9 flow's buffer (defects log #30), and a
+        # selector written as `qfi == QFI_BG` silently stopped counting it --
+        # 11.6 Mbps -> 4 kbps, which is the population defect with a label
+        # change as its cause rather than a boolean coercion. The background
+        # is a POPULATION ("the non-GBR flood and its class"), and it now
+        # carries two labels for a record-keying reason, so the selector
+        # follows the population.
         bg_bps = sum(fr.throughput_bps for fr in rec.flows.values()
-                     if fr.qfi == QFI_BG)
+                     if fr.qfi in BG_QFIS)
         # Clause 4: GT-7.3's own FAIL example is "telemetry GAP grows while
         # bg still moves bytes", so the instrument is a gap, not a contract.
         tele = _restricted(rec, {QFI_TELEMETRY})

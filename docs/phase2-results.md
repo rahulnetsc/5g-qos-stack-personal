@@ -77,11 +77,12 @@ results table is indistinguishable from one that failed to produce a number.
 > Reservation fails M09 on 1/10 seeds here and 10/10 there.
 
 
-> **COUNT, corrected 2026-09-06: TEN guarantees carry a verdict, one of those
+> **COUNT, as of 2026-09-06: ELEVEN guarantees carry a verdict, one of those
 > is partial (G11 — 2 clauses of 5), and G6's is "fails clause 1" rather than
-> a clean result. G2 AND G12 have none** — G12 lost its verdict, not just its
-> figure: no reproducible artefact exists (defects log #30). Use that wording
-> rather than "11 of 12" or "12 guarantees".
+> a clean result. G2 alone has none.** G12 lost its verdict to a flow
+> collision and regained it the same day after the fix and re-score
+> (`docs/g12-collision-fix-result-2026-09-06.md`); **its published figures did
+> NOT survive.** Use that wording rather than "11 of 12" or "12 guarantees".
 
 | G | status | result or cause |
 |---|---|---|

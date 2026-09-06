@@ -3,16 +3,19 @@
 **2026-09-06.** A cold-start document. Everything below is current; where a
 number is superseded it says so and says by what.
 
-**Count, corrected 2026-09-06: TEN guarantees carry a verdict. One of those
-is partial (G11 — two clauses of five). G6's is "fails clause 1" rather than a
-clean result. G2 AND G12 have none.**
+**Count, as of 2026-09-06: ELEVEN guarantees carry a verdict. One of those is
+partial (G11 — two clauses of five). G6's is "fails clause 1" rather than a
+clean result. G2 alone has none.**
 
-**G12 changed status, it did not merely lose a figure.** Its published
-artefact silently dropped a flow that sits in clause 4's own denominator, and
-the guard that would have caught it postdates the run — so the re-run cannot
-reproduce it and **there is no artefact to score from**. That puts G12 in
-G2's position, not in a scored guarantee's: **not "a verdict with a
-withdrawn number", but no verdict.** Defects log #30.
+**G12 lost its verdict and got it back the same day.** Its published artefact
+had a flow collision — two flows sharing one buffer, not merely one record
+(defects log #30) — so the re-run refused it. **Fixed and re-scored**
+(`docs/g12-collision-fix-result-2026-09-06.md`): the flood is now 5QI 8 with
+priority pinned, `mixed_n8` is bit-identical, and clause 4 still fails. **The
+published FIGURES do not survive** — the background at the point telemetry
+floors is **8.5 Mbps (PF) / 14.6 (TwoTier)**, not 11.6, because most of the
+published background throughput was DL grants draining a UL queue that should
+never have been shared.
 
 Use that wording rather than "11 of 12" or "12 guarantees".
 
@@ -37,7 +40,7 @@ measured on earlier code and its numbers are indicative, not current.
 | **G9** | **SCOREABLE (first time).** Counts complete 10/10, 5/5, 1/1 with the re-join seed. **Clause 4 FAILS on TwoTier** | `postscaling/g9_seeded.json` | 10 | 20k | G9 scenarios | stale |
 | **G10** | **PF 8 / Res 4 / TT 4 — UPPER BOUND, not capacity.** Cause established, §3 | `phase2/g5_consol_scaled.json` | 10 | 20k | parametric | **current** |
 | **G11** | **TWO CLAUSES OF FIVE.** C1 PASS (900 windows, 0 failing); C3 PASS. C4 not independent; C5 not scoreable; C2 not scoreable | `postscaling/g11_c1_soak.json` | 10 | **7.2M** | G11 scripted | stale |
-| **G12** | **NO VERDICT — the same position as G2.** No reproducible artefact exists: the published one silently dropped a 5QI-9 flow sitting in clause 4's own denominator, and defect #28's guard (added later) now refuses the run. Ordering was already **not established**; the clause-4 figure is **withdrawn**, its qualitative direction stands but is unscored. Defects log #30. | **none** | — | 20k | fleet ramp | **NO ARTEFACT** |
+| **G12** | **RE-SCORED after the collision fix. Clause 4 FAILS on PF and TwoTier** — telemetry M02 ≥ 0.92 while background still carries **8.5–14.6 Mbps**; **TwoTier floors at ×1.6, one ramp point EARLIER than published**. **Not satisfied as written on Reservation** (its background is gone by the time telemetry floors). Ordering **still not established** — the permutation control still flips it. | `g12-rescore-2026-09-06/g12.json` | 10 | 20k | fleet ramp | **current** |
 
 **Also measured on sensor_dense** (30 UL sensors, **15 ms PDB**, n=10, 20k):
 G1 **PASS all arms** (PF 13.50 / Res 14.25 / **TwoTier 11.00 ms**), G3, G8
@@ -158,7 +161,6 @@ the study credits for the 30/30-vs-2/30 win, are deleted from this branch —
 
 | item | state | what it needs |
 |---|---|---|
-| **G12** | **no verdict — the same position as G2** | Its published artefact dropped `ue8_qfi9` (DL/UL collision, defect #28) and the guard postdates it, so nothing is reproducible. Needs a **scenario change** — give the second flow its own 5QI, as `sim/fleet.py`'s UL E-STOP already does with 5QI 86 — then a full re-score. **A build, not a re-run.** |
 | **G2** | no verdict | Its named failure mode — the BSR/SR desync — **is shown not to occur**. A UL STOP flow was built and measures a different cost: the access chain takes **35–40 % of a 5 ms budget**, failing 1–3 of 10 seeds. **A specification decision, not a build.** |
 | **G6** | "fails clause 1" | The clause **names no estimator**; we chose the median and documented it. Not verdict-determining here, but it would be on data where clause 1 passes. **Test-plan owner's call.** |
 | **G11 C2** | not scoreable | **6 of the C's 9 skip-reason counters cannot exist** — no beam model, no `do_sched`, no `transm_interrupt`. Plus a scheduler edit, a windowed emission path, and a trend statistic with no C counterpart. **Stopped at the scope check.** |

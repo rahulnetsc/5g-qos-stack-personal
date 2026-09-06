@@ -26,12 +26,12 @@ say it, every scheduler comparison on the slide is in question at once.
 **Say it ourselves, in the same breath as the number.** Full statement:
 `docs/grant-density-mechanism-2026-09-06.md`.
 
-**1. "Twelve guarantees" is not twelve.** Updated 2026-09-06: **G12 joined G2
-in having no verdict at all** — its published artefact is unsound (a flow was
-silently dropped from clause 4's own denominator) and the re-run cannot
-reproduce it, so **ten carry a verdict**, one of those is partial (G11: 2
-clauses of 5), and G6's is "fails clause 1" rather than a clean result.
-**G2 and G12 have none.**
+**1. "Twelve guarantees" is not twelve.** **Eleven carry a verdict**, one of
+those is partial (G11: 2 clauses of 5), and G6's is "fails clause 1" rather
+than a clean result. **G2 alone has none.** G12 briefly had none — its
+published artefact had a flow collision — and was fixed and re-scored on
+2026-09-06; **its published FIGURES were withdrawn** (background 11.6 -> 8.5
+Mbps) even though clause 4 still fails.
 G7 is *structurally* out — there is no MFBR enforcement anywhere in `sim/`,
 and clipping is half its pass criterion. Any slide that says "we evaluated
 twelve guarantees" invites the one question we cannot answer.
