@@ -40,7 +40,7 @@ from typing import Any, Callable, Optional
 
 import yaml
 
-from code_state import artefact_state, core_hash
+from code_state import artefact_state, core_hash, expected_for
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -82,13 +82,14 @@ class ClaimError(Exception):
 
 
 def _load_artefact(path: Path, _state: Optional[list] = None) -> list[dict[str, Any]]:
-    """Rows, and (via `_state`) the artefact's code-state stamp if it has one."""
+    """Rows, and (via `_state`) the artefact's stamp AND the hash it should
+    be compared against -- which depends on the scope the producer recorded."""
     if not path.exists():
         raise ClaimError(f"artefact absent: {path}")
     if path.suffix == ".json":
         blob = json.loads(path.read_text())
         if _state is not None:
-            _state.append(artefact_state(blob))
+            _state.append((artefact_state(blob), *expected_for(blob)))
         rows = blob.get("rows")
         if rows is None:
             raise ClaimError(
@@ -200,16 +201,16 @@ def check_claim(claim: dict) -> dict:
     if isinstance(cs, str) and cs.startswith("historical"):
         pass                                    # pinned on purpose
     else:
-        got_state = _st[0] if _st else None
-        want_state = core_hash()
+        got_state, want_state, how = (_st[0] if _st else (None, core_hash(),
+                                                          "whole core"))
         if got_state is None:
             stale = ("UNSTAMPED -- this artefact predates code-state stamping, "
                      "so it cannot be shown to match current code. Unknown is "
                      "NOT treated as matching.")
         elif got_state != want_state:
-            stale = (f"STALE -- produced by code {got_state}, HEAD is "
-                     f"{want_state}. Re-run the campaign, or mark the claim "
-                     f"`code_state: historical: <reason>`.")
+            stale = (f"STALE ({how}) -- produced by code {got_state}, HEAD "
+                     f"is {want_state}. Re-run the campaign, or mark the "
+                     f"claim `code_state: historical: <reason>`.")
 
     return {"id": claim["id"], "ok": ok and not meta and stale is None,
             "got": got, "want": want,

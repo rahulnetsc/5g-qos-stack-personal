@@ -10,7 +10,30 @@
  },
  "code_state": {
   "sim_core_ast_sha256_16": "b9122b2283053cd5",
-  "n_core_files": 45
+  "n_core_files": 45,
+  "scope": [
+   "code_state",
+   "code_state.stamp",
+   "regime_sweep",
+   "regime_sweep.RunLedger",
+   "regime_sweep.arm_cost",
+   "regime_sweep.run_cells",
+   "sim.driver",
+   "sim.driver.run",
+   "sim.parametric",
+   "sim.parametric.sweep_scenario",
+   "sim.run_record",
+   "sim.run_record.RunRecord",
+   "sim.scorecard",
+   "sim.scorecard.Population",
+   "sim.scorecard.Scorecard",
+   "g11_campaign",
+   "g11_campaign._arm",
+   "regime_sweep",
+   "regime_sweep.paired_seeds"
+  ],
+  "scoped_ast_sha256_16": "4f1634c5cb7663e5",
+  "n_scoped_files": 33
  },
  "rows": [
   {

@@ -132,3 +132,93 @@ def test_every_current_claim_in_the_real_file_cites_a_stamped_artefact():
             bad.append(f"{c['id']} (unstamped)")
     assert not bad, ("current claims citing artefacts that cannot be shown to "
                      "match HEAD: " + ", ".join(bad))
+
+
+# --- THE NARROWING: hash only what a producer imports ---------------------
+
+def test_the_scope_is_DERIVED_from_the_caller_not_restated():
+    """A hand-written module list per producer is the restated-count defect:
+    it drifts the moment imports change, and it drifts toward UNDER-covering.
+    So `stamp()` reads the caller's own imports."""
+    from code_state import _caller_scope
+    # called from a test in sim/tests/, not scripts/ -- so it finds nothing
+    # and falls back, which is the fail-wide direction
+    assert _caller_scope() == ()
+
+
+def test_scoping_is_NARROWER_than_the_core_but_covers_what_matters():
+    from code_state import _reachable_from, core_files
+    ents = ("sim.driver", "sim.scorecard", "sim.fleet", "sim.baselines.pf")
+    files = {p.name for p in _reachable_from(ents)}
+    assert len(files) < len(core_files()), "narrowing achieved nothing"
+    # the files a campaign's numbers actually depend on
+    for must in ("tier1.py", "two_tier.py", "reservation.py", "bsr.py",
+                 "harq.py", "pf.py", "scorecard.py", "fleet.py"):
+        assert must in files, f"{must} fell outside the scope"
+
+
+def test_an_IN_SCOPE_change_still_moves_the_scoped_hash(tmp_path, monkeypatch):
+    """THE VERIFICATION THAT MATTERS. A narrowing that stops firing is worse
+    than no narrowing -- it is the silent under-coverage this whole mechanism
+    exists to catch."""
+    import ast as _ast
+    import code_state as CS
+    ents = ("sim.driver",)
+    before = CS.scoped_hash(ents)[0]
+    real = CS._hash_files
+
+    def perturbed(files):
+        # simulate an edit to an IN-SCOPE file by hashing it differently
+        h = real(files)
+        names = {p.name for p in files}
+        return h + "X" if "tier1.py" in names else h
+
+    monkeypatch.setattr(CS, "_hash_files", perturbed)
+    assert CS.scoped_hash(ents)[0] != before, (
+        "the scoped hash did not move on an in-scope change")
+
+
+def test_an_OUT_OF_SCOPE_change_does_NOT_move_the_scoped_hash():
+    """The point of the narrowing: five firings in one session, zero false
+    alarms, ~10 minutes each. A module the producer never imports should not
+    cost a re-run."""
+    from code_state import _reachable_from
+    ents = ("sim.scorecard",)
+    files = {p.name for p in _reachable_from(ents)}
+    # scorecard does not reach the schedulers
+    assert "tier1.py" not in files and "two_tier.py" not in files
+
+
+def test_stamp_records_BOTH_hashes_so_a_narrow_one_cannot_pass_as_broad():
+    from code_state import stamp
+    d = stamp(("sim.driver",))
+    assert d["sim_core_ast_sha256_16"]          # the whole core, always
+    assert d["scoped_ast_sha256_16"]            # and the scope
+    assert d["scope"] == ["sim.driver"]
+    assert d["n_scoped_files"] <= d["n_core_files"]
+
+
+def test_an_unresolvable_scope_FAILS_WIDE():
+    """A narrowing may only ever err broad. Under-covering is the defect."""
+    from code_state import _reachable_from, core_files
+    assert len(_reachable_from(("nonexistent.module",))) == len(core_files())
+
+
+def test_a_PARTIALLY_unresolvable_sim_scope_also_fails_wide():
+    """The first version failed wide only when NOTHING resolved. A scope with
+    one good entry and one dead one silently narrowed -- which is how
+    `sim/baselines/pf.py` fell out of two campaigns' scopes."""
+    from code_state import _reachable_from, core_files
+    got = _reachable_from(("sim.driver", "sim.deleted_module"))
+    assert len(got) == len(core_files())
+
+
+def test_the_walk_TRAVERSES_scripts_without_hashing_them():
+    """A producer reaches most of the core through `scripts/` helpers. The
+    walk has to follow them or the scope under-covers; it must not hash them,
+    or a comment in a runner would invalidate every artefact."""
+    from code_state import _reachable_from
+    got = _reachable_from(("g11_campaign",))
+    names = {p.name for p in got}
+    assert "pf.py" in names, "the walk stopped at the scripts/ boundary"
+    assert not any("scripts" in str(p) for p in got), "a script got hashed"
