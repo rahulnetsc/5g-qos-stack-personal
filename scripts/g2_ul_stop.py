@@ -53,6 +53,13 @@ STOP_PDB_MS = 5.0
 DIAG_RATE_HZ = 5.0
 
 
+#: Registered decision, docs/attach-path-default-registration.md.
+#: `"all"` seeds every UL UE with the BSR hardware supplies during
+#: attach. A DIVERGENCE from the port, justified by the sim having no
+#: RA procedure (Reservation's `has_srb` is hardcoded False), not by
+#: the outcome. Module-level so `spawn` workers inherit it.
+ATTACH_SEED = None
+
 def build(seed: int, n_ues: int, horizon: int):
     flows, _seq = build_fleet(n_ues, "mixed", ul_stop=True,
                               stop_rate_hz=DIAG_RATE_HZ)
@@ -63,11 +70,13 @@ def build(seed: int, n_ues: int, horizon: int):
         ues=ues, flows=flows)
 
 
-def one(arm: str, seed: int, n_ues: int, horizon: int) -> dict:
+def one(arm: str, seed: int, n_ues: int, horizon: int,
+        attach: bool = False) -> dict:
     sc = build(seed, n_ues, horizon)
     grants = GrantCollector()
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
+                   attach_seed_slots=("all" if attach else None),
                    grant_sink=grants)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
@@ -118,12 +127,20 @@ def main() -> int:
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--n-ues", type=int, default=8)
     ap.add_argument("--horizon", type=int, default=20_000)
+    ap.add_argument("--attach-seed", action="store_true",
+                    help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/postscaling-2026-09-05/g2_ul_stop.json")
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
     arms = [x for x in a.arms.split(",") if x]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, a.n_ues, a.horizon) for arm in arms for s in seeds]
+    # THE ATTACH FLAG TRAVELS IN THE TASK TUPLE, NOT A MODULE GLOBAL.
+    # A global set in main() does not reach a `spawn` worker -- the
+    # worker re-imports the module and sees the declared default. The
+    # first version did exactly that and produced a with-attach run
+    # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
+    # CLAUDE.md records from G9.
+    tasks = [(arm, s, a.n_ues, a.horizon, a.attach_seed) for arm in arms for s in seeds]
     print(f"{len(tasks)} runs; STOP pair at {DIAG_RATE_HZ} Hz, PDB {STOP_PDB_MS} ms")
     rows = [None] * len(tasks)
     for i, (idx, r) in enumerate(run_cells(_task, tasks, a.workers,

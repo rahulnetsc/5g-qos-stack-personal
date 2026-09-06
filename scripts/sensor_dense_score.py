@@ -52,12 +52,20 @@ from g11_campaign import _arm                                 # noqa: E402
 PDB_MS = 15.0
 
 
-def one(arm: str, seed: int, horizon: int) -> dict:
+#: Registered decision, docs/attach-path-default-registration.md.
+#: `"all"` seeds every UL UE with the BSR hardware supplies during
+#: attach. A DIVERGENCE from the port, justified by the sim having no
+#: RA procedure (Reservation's `has_srb` is hardcoded False), not by
+#: the outcome. Module-level so `spawn` workers inherit it.
+ATTACH_SEED = None
+
+def one(arm: str, seed: int, horizon: int, attach: bool = False) -> dict:
     sc = sensor_dense_scenario()
     sc = dataclasses.replace(sc, seed=seed, horizon_slots=horizon)
     grants = GrantCollector()
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
+                   attach_seed_slots=("all" if attach else None),
                    grant_sink=grants)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
@@ -132,12 +140,20 @@ def main() -> int:
     ap.add_argument("--arms", default="PF,Reservation,TwoTier")
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--horizon", type=int, default=20_000)
+    ap.add_argument("--attach-seed", action="store_true",
+                    help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/postscaling-2026-09-05/sensor_dense.json")
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
     arms = [x for x in a.arms.split(",") if x]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, a.horizon) for arm in arms for s in seeds]
+    # THE ATTACH FLAG TRAVELS IN THE TASK TUPLE, NOT A MODULE GLOBAL.
+    # A global set in main() does not reach a `spawn` worker -- the
+    # worker re-imports the module and sees the declared default. The
+    # first version did exactly that and produced a with-attach run
+    # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
+    # CLAUDE.md records from G9.
+    tasks = [(arm, s, a.horizon, a.attach_seed) for arm in arms for s in seeds]
     print(f"{len(tasks)} runs = {len(arms)} arms x {len(seeds)} seeds, "
           f"sensor_dense @ horizon {a.horizon}, PDB {PDB_MS} ms")
     rows = [None] * len(tasks)

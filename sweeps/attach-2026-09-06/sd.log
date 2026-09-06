@@ -1,0 +1,33 @@
+30 runs = 3 arms x 10 seeds, sensor_dense @ horizon 20000, PDB 15.0 ms
+  [1/30] Reservation  seed=1367864806 on_time=30/30 starved=0 cce=0.652 never=0
+  [2/30] Reservation  seed=1826701614 on_time=30/30 starved=0 cce=0.652 never=0
+  [3/30] TwoTier      seed=1367864806 on_time=30/30 starved=0 cce=0.454 never=0
+  [4/30] TwoTier      seed=1826701614 on_time=30/30 starved=0 cce=0.453 never=0
+  [5/30] TwoTier      seed=1746484539 on_time=30/30 starved=0 cce=0.459 never=0
+  [6/30] TwoTier      seed=661058651 on_time=30/30 starved=0 cce=0.458 never=0
+  [7/30] TwoTier      seed=579362555 on_time=30/30 starved=0 cce=0.455 never=0
+  [8/30] TwoTier      seed=87989972 on_time=30/30 starved=0 cce=0.450 never=0
+  [9/30] TwoTier      seed=1097657231 on_time=30/30 starved=0 cce=0.442 never=0
+  [10/30] TwoTier      seed=376383645 on_time=30/30 starved=0 cce=0.452 never=0
+  [11/30] TwoTier      seed=161576974 on_time=30/30 starved=0 cce=0.448 never=0
+  [12/30] TwoTier      seed=35492826 on_time=30/30 starved=0 cce=0.450 never=0
+  [13/30] Reservation  seed=1097657231 on_time=30/30 starved=0 cce=0.651 never=0
+  [14/30] Reservation  seed=579362555 on_time=30/30 starved=0 cce=0.651 never=0
+  [15/30] PF           seed=1826701614 on_time=30/30 starved=0 cce=0.635 never=0
+  [16/30] PF           seed=1367864806 on_time=30/30 starved=0 cce=0.637 never=0
+  [17/30] PF           seed=1097657231 on_time=30/30 starved=0 cce=0.635 never=0
+  [18/30] PF           seed=579362555 on_time=30/30 starved=0 cce=0.637 never=0
+  [19/30] Reservation  seed=87989972 on_time=30/30 starved=0 cce=0.652 never=0
+  [20/30] Reservation  seed=661058651 on_time=30/30 starved=0 cce=0.652 never=0
+  [21/30] Reservation  seed=376383645 on_time=30/30 starved=0 cce=0.653 never=0
+  [22/30] Reservation  seed=1746484539 on_time=30/30 starved=0 cce=0.651 never=0
+  [23/30] Reservation  seed=161576974 on_time=30/30 starved=0 cce=0.652 never=0
+  [24/30] Reservation  seed=35492826 on_time=30/30 starved=0 cce=0.652 never=0
+  [25/30] PF           seed=87989972 on_time=30/30 starved=0 cce=0.636 never=0
+  [26/30] PF           seed=661058651 on_time=30/30 starved=0 cce=0.636 never=0
+  [27/30] PF           seed=161576974 on_time=30/30 starved=0 cce=0.636 never=0
+  [28/30] PF           seed=376383645 on_time=30/30 starved=0 cce=0.636 never=0
+  [29/30] PF           seed=35492826 on_time=30/30 starved=0 cce=0.636 never=0
+  [30/30] PF           seed=1746484539 on_time=30/30 starved=0 cce=0.638 never=0
+
+wrote sweeps/attach-2026-09-06/sensor_dense.json

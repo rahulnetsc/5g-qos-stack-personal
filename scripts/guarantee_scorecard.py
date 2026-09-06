@@ -34,6 +34,14 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ARMS = ("PF", "Reservation", "TwoTier")
 SEV_DIR = "sweeps/sev-2026-09-06"          # artefacts carrying uniform M02
+ATT_DIR = "sweeps/attach-2026-09-06"       # the same grid WITH the attach path
+
+#: `--attach` scores the with-attach column. BOTH are reported: the without
+#: column is what a COLD-STARTING deployment sees before any UE has been
+#: granted, and it is the worst case the fault produces; the with-attach
+#: column is the steady state hardware reaches
+#: (docs/attach-path-default-registration.md).
+USE_ATTACH = False
 
 GUARANTEE = {
     "G1": "Every drive command reaches the robot in time to feel responsive",
@@ -52,6 +60,8 @@ GUARANTEE = {
 
 
 def load(rel):
+    if USE_ATTACH:
+        rel = rel.replace(SEV_DIR, ATT_DIR)
     p = REPO / rel
     return json.loads(p.read_text()) if p.exists() else None
 
@@ -177,24 +187,54 @@ def _nested():
                     per))
     g12 = load("sweeps/g12-rescore-2026-09-06/g12.json")
     if g12:
+        # THE PREDICATE WAS UNSOUND AND REPORTED 0/20 ON EVERY ARM.
+        # Clause 4 is a CONJUNCTION -- telemetry starved WHILE a lower class
+        # still has throughput -- and the first version tested the second half
+        # as `bg_bps > 0`. Measured: bg_bps is NEVER exactly 0 in any of the
+        # 480 ramp points, so the pass branch was unreachable and the verdict
+        # merged two different things. It is the mirror of the C1 vacuity: a
+        # predicate that could not report SUCCESS.
+        #
+        # Three verdicts now, because the clause has three states:
+        #   VIOLATION      telemetry starved while background is meaningfully
+        #                  alive -- the thing clause 4 prohibits
+        #   PREMISE FAILS  telemetry starved and background also dead -- the
+        #                  cell is simply exhausted; clause 4 says nothing
+        #   PASS           telemetry never starved
+        #
+        # `tau` is the floor for "still has throughput", which the test plan
+        # does NOT state -- a specification gap, recorded as one. It does not
+        # matter where it goes: the arms separate by ~2,800x (PF 8.63 Mbps
+        # median at the starved points against Reservation's 3.1 kbps), so
+        # every tau from 0.01 to 8 Mbps gives PF 20/20 VIOLATION and
+        # Reservation 0/20. Robustness measured, not assumed.
+        TAU_BPS = 1.0e6            # 2 % of the background's own 50 Mbps offer
         per = {}
         for arm in ARMS:
-            npass = ntot = 0
+            viol = prem = ok = 0
             sev = []
             for cell in g12["cells"].values():
                 if arm not in cell:
                     continue
                 for sd in cell[arm]["per_seed"]:
-                    ntot += 1
-                    bad = [pt for pt in sd["per_point"]
-                           if (pt.get("telemetry_m02") or 0) >= 0.99
-                           and (pt.get("bg_bps") or 0) > 0]
-                    npass += (not bad)
-                    sev.append(max((pt.get("telemetry_m02") or 0)
-                                   for pt in sd["per_point"]))
-            per[arm] = dict(n=ntot, passes=npass, sev=med(sev), sev_fail=med(sev))
-        out.append((dict(g="G12", clause="clause 4: never 5QI 1 while a lower class still has throughput",
-                         source="test plan L106, verbatim"), per))
+                    starved = [p for p in sd["per_point"]
+                               if (p.get("telemetry_m02") or 0) >= 0.99]
+                    sev.append(max((p.get("telemetry_m02") or 0)
+                                   for p in sd["per_point"]))
+                    if not starved:
+                        ok += 1
+                    elif any((p.get("bg_bps") or 0) >= TAU_BPS for p in starved):
+                        viol += 1
+                    else:
+                        prem += 1
+            per[arm] = dict(n=viol + prem + ok, passes=ok + prem,
+                            sev=med(sev), sev_fail=None,
+                            note=f"{viol} violation / {prem} premise-fails / {ok} pass")
+        out.append((dict(g="G12", clause="c4: never starve telemetry while a lower class is served",
+                         source="test plan L106. FLOOR FOR 'still has throughput' "
+                                "IS NOT STATED -- tau=1 Mbps (2 % of the 50 Mbps "
+                                "offer); verdict robust for tau in [0.01, 8] Mbps"),
+                    per))
     return out
 
 
@@ -282,7 +322,11 @@ def main(argv) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--denominators", action="store_true")
+    ap.add_argument("--attach", action="store_true",
+                    help="score the WITH-ATTACH column")
     a = ap.parse_args(argv)
+    global USE_ATTACH
+    USE_ATTACH = a.attach
     if a.selftest:
         print("PREDICATE FALSIFIABILITY -- can each clause report a failure?")
         return selftest()
@@ -301,8 +345,9 @@ def main(argv) -> int:
             d = per[arm]
             sev = "--" if d["sev"] is None else f"{d['sev']:.5f}"
             sf = "--" if d["sev_fail"] is None else f"{d['sev_fail']:.5f}"
+            note = f"   {d['note']}" if d.get("note") else ""
             print(f"{c['g']:4s} {c['clause'][:46]:46s} {arm:12s} "
-                  f"{d['passes']:>4d}/{d['n']:<4d} {sev:>10s} {sf:>9s}")
+                  f"{d['passes']:>4d}/{d['n']:<4d} {sev:>10s} {sf:>9s}{note}")
         print()
     print("NOT COMPUTABLE:")
     for g, cl, why, art in NOT_COMPUTABLE:

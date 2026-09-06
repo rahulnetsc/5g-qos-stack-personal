@@ -44,11 +44,20 @@ SLOT_S = 0.00025
 _DEFAULT_WORKERS = 16
 
 
-def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float) -> dict:
+#: Registered decision, docs/attach-path-default-registration.md.
+#: `"all"` seeds every UL UE with the BSR hardware supplies during
+#: attach. A DIVERGENCE from the port, justified by the sim having no
+#: RA procedure (Reservation's `has_srb` is hardcoded False), not by
+#: the outcome. Module-level so `spawn` workers inherit it.
+ATTACH_SEED = None
+
+def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float,
+        attach: bool = False) -> dict:
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
                         load_mult=load_mult)
     t0 = time.time()
     summary = driver_run(sc, _arm(arm), cqi_delay_slots=8,
+                         attach_seed_slots=("all" if attach else None),
                          record_timeseries=True)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
@@ -118,6 +127,8 @@ def main() -> int:
     ap.add_argument("--n-ues", type=int, default=8)
     ap.add_argument("--horizon", type=int, default=40_000)   # 10 s at mu=2
     ap.add_argument("--load-mult", type=float, default=1.0)
+    ap.add_argument("--attach-seed", action="store_true",
+                    help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/phase2/core_fast.json")
     ap.add_argument("--workers", type=int, default=_DEFAULT_WORKERS,
                     help="0 or 1 runs serially -- the reference path the "
@@ -131,7 +142,13 @@ def main() -> int:
     # each result at its own index reproduces the serial `rows` list exactly.
     # Submission order is longest-first inside run_cells; the two are
     # independent because the index travels with the result.
-    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult)
+    # THE ATTACH FLAG TRAVELS IN THE TASK TUPLE, NOT A MODULE GLOBAL.
+    # A global set in main() does not reach a `spawn` worker -- the
+    # worker re-imports the module and sees the declared default. The
+    # first version did exactly that and produced a with-attach run
+    # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
+    # CLAUDE.md records from G9.
+    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult, a.attach_seed)
              for s in seeds for arm in arms]
 
     # BANKED AS EACH RUN COMPLETES, not written once at the end. This runner

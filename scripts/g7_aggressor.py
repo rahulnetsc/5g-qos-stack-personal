@@ -70,6 +70,13 @@ OFFER_X_MFBR = 2.1   # target; the ACHIEVED rate is asserted >= 2.0 below,
 TOLERANCES = (0.05, 0.10, 0.25)
 
 
+#: Registered decision, docs/attach-path-default-registration.md.
+#: `"all"` seeds every UL UE with the BSR hardware supplies during
+#: attach. A DIVERGENCE from the port, justified by the sim having no
+#: RA procedure (Reservation's `has_srb` is hardcoded False), not by
+#: the outcome. Module-level so `spawn` workers inherit it.
+ATTACH_SEED = None
+
 def build(seed: int, n_ues: int, horizon: int, offer_x_mfbr: float,
           load_mult: float = 1.0):
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
@@ -95,10 +102,11 @@ def build(seed: int, n_ues: int, horizon: int, offer_x_mfbr: float,
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int, offer: float,
-        load_mult: float = 1.0) -> dict:
+        load_mult: float = 1.0, attach: bool = False) -> dict:
     sc = build(seed, n_ues, horizon, offer, load_mult)
     t0 = time.time()
-    s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True)
+    s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
+                   attach_seed_slots=("all" if attach else None))
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
                                  summary=s, arm={}, meta={})
@@ -156,6 +164,8 @@ def main() -> int:
     ap.add_argument("--horizon", type=int, default=20_000)
     ap.add_argument("--offer", type=float, default=OFFER_X_MFBR,
                     help="offered rate as a MULTIPLE OF MFBR (GT-4.3: >= 2)")
+    ap.add_argument("--attach-seed", action="store_true",
+                    help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/postscaling-2026-09-05/g7.json")
     ap.add_argument("--load-mult", type=float, default=1.0,
                     help="background load; the registered second read for "
@@ -165,7 +175,13 @@ def main() -> int:
 
     arms = [x for x in a.arms.split(",") if x]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, a.n_ues, a.horizon, a.offer, a.load_mult)
+    # THE ATTACH FLAG TRAVELS IN THE TASK TUPLE, NOT A MODULE GLOBAL.
+    # A global set in main() does not reach a `spawn` worker -- the
+    # worker re-imports the module and sees the declared default. The
+    # first version did exactly that and produced a with-attach run
+    # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
+    # CLAUDE.md records from G9.
+    tasks = [(arm, s, a.n_ues, a.horizon, a.offer, a.load_mult, a.attach_seed)
              for arm in arms for s in seeds]
     print(f"{len(tasks)} runs = {len(arms)} arms x {len(seeds)} seeds, "
           f"asset B (ue{ASSET_B}) camera offered at {a.offer}x MFBR")
