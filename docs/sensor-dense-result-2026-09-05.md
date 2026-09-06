@@ -15,8 +15,13 @@ periodic flows (5 ms period, 200 B), all `Delay` class, PDB 15 ms.**
 | UL PRB | 93 % | 44–93 % |
 | tightest PDB | 100 ms | **15 ms** |
 
-**But the control channel is LOADED, not BOUND: CCE never exceeds 0.650 in
-30 runs.** So the PDCCH-bound regime `scheduler-study.md` §7.2 reports is
+**⚠ CORRECTED 2026-09-06 — I had the normalisation wrong.** I wrote that the
+control channel was *"LOADED, not BOUND"* because CCE never exceeded 0.650.
+**For an uplink-only workload the achievable ceiling is 0.7000, not 1.0** —
+the D-slot budget is in the denominator and cannot be spent (`DSUUU`, budgets
+D=48/S=16/U=32, so 112 usable of 160). **sensor_dense is therefore at 90.8 %
+of its achievable maximum, with 2,308 slots at the per-slot cap: the control
+channel DOES bind here.** See `docs/cce-binding-2026-09-06.md`. So the PDCCH-bound regime `scheduler-study.md` §7.2 reports is
 **still not reached in this branch** — and the reason is structural:
 Configured Grants were deleted at Phase 2 two-tier commit 1, so TwoTier
 cannot demonstrate the CG bypass, and without SPS reserving capacity the CCE

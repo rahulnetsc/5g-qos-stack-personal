@@ -1,0 +1,110 @@
+{
+ "code_state": {
+  "sim_core_ast_sha256_16": "857290e95843a5b8",
+  "n_core_files": 45
+ },
+ "rows": [
+  {
+   "arm": "PF",
+   "n_ues": 30,
+   "snr_db": 12.0,
+   "spread_db": 0.0,
+   "seed": 1826701614,
+   "horizon": 8000,
+   "cce_util": 0.6356640625,
+   "ul_prb_util": 0.6978802710843374,
+   "ul_grants": 42417,
+   "al_histogram": {
+    "2": 4557,
+    "4": 37813,
+    "8": 47
+   },
+   "mean_cce_per_dci": 3.789565504396822,
+   "slots_with_a_grant": 6391,
+   "grants_per_busy_slot_max": 11,
+   "grants_per_busy_slot_mean": 6.6369895165075885,
+   "cce_per_busy_slot_max": 32,
+   "busy_slots_at_or_over_32": 2308,
+   "n_flows_delivering": 30,
+   "n_starved": 0
+  },
+  {
+   "arm": "PF",
+   "n_ues": 30,
+   "snr_db": 12.0,
+   "spread_db": 8.0,
+   "seed": 1826701614,
+   "horizon": 8000,
+   "cce_util": 0.59572265625,
+   "ul_prb_util": 0.7700978915662651,
+   "ul_grants": 41473,
+   "al_histogram": {
+    "1": 2346,
+    "2": 16271,
+    "4": 16799,
+    "8": 6022,
+    "16": 35
+   },
+   "mean_cce_per_dci": 3.636582837026499,
+   "slots_with_a_grant": 6363,
+   "grants_per_busy_slot_max": 15,
+   "grants_per_busy_slot_mean": 6.517837498035518,
+   "cce_per_busy_slot_max": 32,
+   "busy_slots_at_or_over_32": 1247,
+   "n_flows_delivering": 30,
+   "n_starved": 0
+  },
+  {
+   "arm": "PF",
+   "n_ues": 30,
+   "snr_db": 12.0,
+   "spread_db": 16.0,
+   "seed": 1826701614,
+   "horizon": 8000,
+   "cce_util": 0.5449453125,
+   "ul_prb_util": 0.8069164156626506,
+   "ul_grants": 37307,
+   "al_histogram": {
+    "1": 12333,
+    "2": 9044,
+    "4": 8788,
+    "8": 5255,
+    "16": 1887
+   },
+   "mean_cce_per_dci": 3.6938108129841583,
+   "slots_with_a_grant": 6253,
+   "grants_per_busy_slot_max": 17,
+   "grants_per_busy_slot_mean": 5.9662561970254275,
+   "cce_per_busy_slot_max": 32,
+   "busy_slots_at_or_over_32": 853,
+   "n_flows_delivering": 30,
+   "n_starved": 0
+  },
+  {
+   "arm": "PF",
+   "n_ues": 30,
+   "snr_db": 12.0,
+   "spread_db": 24.0,
+   "seed": 1826701614,
+   "horizon": 8000,
+   "cce_util": 0.53725390625,
+   "ul_prb_util": 0.7829442771084337,
+   "ul_grants": 36030,
+   "al_histogram": {
+    "1": 16382,
+    "2": 5734,
+    "4": 5807,
+    "8": 5604,
+    "16": 2503
+   },
+   "mean_cce_per_dci": 3.773466555648071,
+   "slots_with_a_grant": 6194,
+   "grants_per_busy_slot_max": 18,
+   "grants_per_busy_slot_mean": 5.816919599612528,
+   "cce_per_busy_slot_max": 32,
+   "busy_slots_at_or_over_32": 819,
+   "n_flows_delivering": 26,
+   "n_starved": 4
+  }
+ ]
+}

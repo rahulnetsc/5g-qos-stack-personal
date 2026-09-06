@@ -1,5 +1,8 @@
 # Two questions settled with existing data: the C port, and the configuration approach
 
+> **⚠ CCE NORMALISATION, corrected 2026-09-06.** Any CCE-utilisation figure on this page is against a denominator that includes the D-slot budget. For an **uplink-only** workload the achievable ceiling is **0.7000**, not 1.0 (`DSUUU`; D=48, S=16, U=32; 112 usable of 160). So sensor_dense's 0.636 is **90.8 % of achievable and the control channel DOES bind**, while the parametric mix's 0.073–0.094 is 10–13 %. See `docs/cce-binding-2026-09-06.md`.
+
+
 **2026-09-05. Analysis only — nothing built.** Both are answered from data
 already on disk plus one query.
 

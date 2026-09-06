@@ -1,5 +1,8 @@
 # Phase 2 — complete results  ·  **SUPERSEDED**
 
+> **⚠ CCE NORMALISATION, corrected 2026-09-06.** Any CCE-utilisation figure on this page is against a denominator that includes the D-slot budget. For an **uplink-only** workload the achievable ceiling is **0.7000**, not 1.0 (`DSUUU`; D=48, S=16, U=32; 112 usable of 160). So sensor_dense's 0.636 is **90.8 % of achievable and the control channel DOES bind**, while the parametric mix's 0.073–0.094 is 10–13 %. See `docs/cce-binding-2026-09-06.md`.
+
+
 > **⛔ SUPERSEDED 2026-09-04 by `docs/verification-2026-09-04.md`.** Every
 > guarantee has been re-measured on current code. **The "Phase 2" label is
 > retired** — it meant *fast numbers to check the plumbing*, and that is what

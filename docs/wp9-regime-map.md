@@ -1,5 +1,8 @@
 # WP9 regime map — the bridge artefact for the hardware campaign
 
+> **⚠ CCE NORMALISATION, corrected 2026-09-06.** Any CCE-utilisation figure on this page is against a denominator that includes the D-slot budget. For an **uplink-only** workload the achievable ceiling is **0.7000**, not 1.0 (`DSUUU`; D=48, S=16, U=32; 112 usable of 160). So sensor_dense's 0.636 is **90.8 % of achievable and the control channel DOES bind**, while the parametric mix's 0.073–0.094 is 10–13 %. See `docs/cce-binding-2026-09-06.md`.
+
+
 > **⚠ CORRECTED 2026-09-05 — NARROWER THAN THIS DOCUMENT'S FIRST CORRECTION
 > SAID.** The PDCCH bound is real and this project has measured a genuinely
 > PDCCH-bound regime: `sensor_dense` (30 periodic UL sensors), where CCE
