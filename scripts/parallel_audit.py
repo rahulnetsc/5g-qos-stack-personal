@@ -77,6 +77,10 @@ ALLOW_SERIAL = {
     "plot_timeseries.py": "one run, to draw it",
     "tbs_counterfactual.py": "replays one existing run's grants offline",
     "g12_ramp_probe.py": "a stop-condition probe, one arm one seed",
+    "cce_bind_probe.py": "a diagnostic sweep, one arm one seed per cell -- the "
+                         "question is which RESOURCE binds, which needs no "
+                         "seed replication, and each cell prints as it "
+                         "completes so ordering is the readable form",
     "bsr_desync_probe.py": "monkeypatches BsrModel._assemble and .broadcast at "
                            "module level to observe per-slot state; under "
                            "`spawn` a worker re-imports the module and would "
