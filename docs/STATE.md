@@ -3,9 +3,18 @@
 **2026-09-06.** A cold-start document. Everything below is current; where a
 number is superseded it says so and says by what.
 
-**Count: eleven guarantees carry a verdict. One of those is partial (G11 —
-two clauses of five). G6's is "fails clause 1" rather than a clean result.
-G2 alone has none.** Use that wording rather than "11 of 12".
+**Count, corrected 2026-09-06: TEN guarantees carry a verdict. One of those
+is partial (G11 — two clauses of five). G6's is "fails clause 1" rather than a
+clean result. G2 AND G12 have none.**
+
+**G12 changed status, it did not merely lose a figure.** Its published
+artefact silently dropped a flow that sits in clause 4's own denominator, and
+the guard that would have caught it postdates the run — so the re-run cannot
+reproduce it and **there is no artefact to score from**. That puts G12 in
+G2's position, not in a scored guarantee's: **not "a verdict with a
+withdrawn number", but no verdict.** Defects log #30.
+
+Use that wording rather than "11 of 12" or "12 guarantees".
 
 ---
 
@@ -21,14 +30,14 @@ measured on earlier code and its numbers are indicative, not current.
 | **G2** | **NO VERDICT** — see §5 | `postscaling/g2_ul_stop.json` | 10 | 20k | fleet + UL STOP | stale |
 | **G3** | **INCONCLUSIVE.** M20 TwoTier +21.34 % [−2.81, +50.02] | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
 | **G4** | **PASS.** Separation only at duty 0.1; TwoTier−PF +6.76 [+5.52, +7.93] | `postscaling/g4.json` | 10 | 20k | parametric | stale |
-| **G5** | **RE-SCORED — the published rate is an artefact.** Was Res 30/40, TT 34/40; under an attach path **Res 1/10 marginal, TT 0/10** | `phase2/core_scaled.json` + `g5_rank_attach_scaled.json` | 10 | 40k | parametric | **current** |
+| **G5** | **RE-SCORED — the published rate is an artefact**, and its residual is now **CLOSED** (§3a: M05 0.993–0.997 on all arms post-attach). Was Res 30/40, TT 34/40; under an attach path **Res 1/10 marginal, TT 0/10** | `phase2/core_scaled.json` + `g5_rank_attach_scaled.json` | 10 | 40k | parametric | **current** |
 | **G6** | **FAILS clause 1, every arm.** Not a clean result — see §5 | `postscaling/g6seeded/` | 40 | 20k | parametric + aggressor | stale |
-| **G7** | **FAILS clause 2.** Both QoS arms deliver **2.0–2.1× MFBR**; PF (no MFBR concept) contains better at 1.05× | `postscaling/g7.json` | 10 | 20k | fleet + aggressor | stale |
+| **G7** | **FAILS clause 2.** Both QoS arms deliver **2.0–2.1× MFBR**; PF (no MFBR concept) contains better at 1.05×. **PF's containment is now EXPLAINED and is not a fairness property — it grants ~5.8× less** (§3a) | `rerun-2026-09-06/g7.json` | 10 | 20k | fleet + aggressor | **current** |
 | **G8** | **FAILS.** M09 protected: Res 1/10, **TT 3/10** below 0.90 | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
 | **G9** | **SCOREABLE (first time).** Counts complete 10/10, 5/5, 1/1 with the re-join seed. **Clause 4 FAILS on TwoTier** | `postscaling/g9_seeded.json` | 10 | 20k | G9 scenarios | stale |
 | **G10** | **PF 8 / Res 4 / TT 4 — UPPER BOUND, not capacity.** Cause established, §3 | `phase2/g5_consol_scaled.json` | 10 | 20k | parametric | **current** |
 | **G11** | **TWO CLAUSES OF FIVE.** C1 PASS (900 windows, 0 failing); C3 PASS. C4 not independent; C5 not scoreable; C2 not scoreable | `postscaling/g11_c1_soak.json` | 10 | **7.2M** | G11 scripted | stale |
-| **G12** | **NO ARTEFACT — the published one is unsound.** The 2026-09-06 re-run cannot reproduce it: defect #28's guard (added later) refuses the run, and the published artefact silently dropped a 5QI-9 flow that is in clause 4's own denominator. Ordering was already **not established**; the clause-4 *figure* is now withdrawn, the qualitative finding stands. See defects log #30. | — | — | 20k | fleet ramp | **BLOCKED** |
+| **G12** | **NO VERDICT — the same position as G2.** No reproducible artefact exists: the published one silently dropped a 5QI-9 flow sitting in clause 4's own denominator, and defect #28's guard (added later) now refuses the run. Ordering was already **not established**; the clause-4 figure is **withdrawn**, its qualitative direction stands but is unscored. Defects log #30. | **none** | — | 20k | fleet ramp | **NO ARTEFACT** |
 
 **Also measured on sensor_dense** (30 UL sensors, **15 ms PDB**, n=10, 20k):
 G1 **PASS all arms** (PF 13.50 / Res 14.25 / **TwoTier 11.00 ms**), G3, G8
@@ -89,6 +98,41 @@ same intervention takes TwoTier's M06 failures from 14/40 to **40/40**. And
 
 ---
 
+## 3a. The second consolidation — grant density, four more observations
+
+**Full statement: `docs/grant-density-mechanism-2026-09-06.md`.** Trace
+`sweeps/rerun-2026-09-06/traces.json`, 4 cells × 3 arms × 10 seeds,
+bit-identical with the hooks off on 120 of 120 cells.
+
+A grant is a TB for a **UE**; which flow it carries is decided **inside the
+UE** by LCP, and **the gNB cannot see that split**. An arm therefore chooses
+only **how often a UE is granted**. Measured, monotone, and in the same arm
+order in every cell — **PF grants least, TwoTier most**:
+
+| | the UE's UL grants | % carrying 5QI 1 | skipped p98 |
+|---|---|---|---|
+| PF | 2,048–3,286 | **2.5–3.3 %** | **41–74** |
+| Reservation | 6,366–13,680 | 0.6–1.0 % | 154–261 |
+| TwoTier | 10,865–25,221 | **0.5–0.8 %** | **284–340** |
+
+ρ = **+0.79** (grants vs deferral tail) over 120 runs, p = 2.8e−27.
+
+| observation | what it said before | what it is |
+|---|---|---|
+| the **workload inversion** (TwoTier 3.5× worst on the mix, best on `sensor_dense`) | "Tier-1's objective favours periodic over saturating" | **refuted** — intra-UE LCP; the UE gets 1.003× the fleet median |
+| **G7's inversion** (PF contains better) | why PF contained was unknown | **PF grants ~5.8× less**, so its flow rides on 5.1× more grants |
+| **the attach path's M06 regression** (14/40 → 40/40) | "returns locked-out UEs to contention" | tail 286 → 340; the median p95 slightly *improves* — the cost is in the tail, which is what a failing-seed count reads |
+| **G5's residual** | open at "4/10" | **empty** — 4/10 was the pre-attach figure |
+
+**The attributional statement, which is the part that matters for a deck: a
+headline that reads as a scheduler result is a UE-side LCP effect identical
+across all three arms, and no scheduler change reaches it.** The numbers are
+right; the attribution was not, and the attribution is what *"is two-tier
+needed"* turns on. **The mechanism transfers to hardware (LCP is real 3GPP);
+the magnitude does not** — it is uncalibrated.
+
+---
+
 ## 4. Coverage — no workload can score the set
 
 | guarantee | parametric mix | sensor_dense |
@@ -114,11 +158,13 @@ the study credits for the 30/30-vs-2/30 win, are deleted from this branch —
 
 | item | state | what it needs |
 |---|---|---|
+| **G12** | **no verdict — the same position as G2** | Its published artefact dropped `ue8_qfi9` (DL/UL collision, defect #28) and the guard postdates it, so nothing is reproducible. Needs a **scenario change** — give the second flow its own 5QI, as `sim/fleet.py`'s UL E-STOP already does with 5QI 86 — then a full re-score. **A build, not a re-run.** |
 | **G2** | no verdict | Its named failure mode — the BSR/SR desync — **is shown not to occur**. A UL STOP flow was built and measures a different cost: the access chain takes **35–40 % of a 5 ms budget**, failing 1–3 of 10 seeds. **A specification decision, not a build.** |
 | **G6** | "fails clause 1" | The clause **names no estimator**; we chose the median and documented it. Not verdict-determining here, but it would be on data where clause 1 passes. **Test-plan owner's call.** |
 | **G11 C2** | not scoreable | **6 of the C's 9 skip-reason counters cannot exist** — no beam model, no `do_sched`, no `transm_interrupt`. Plus a scheduler edit, a windowed emission path, and a trend statistic with no C counterpart. **Stopped at the scope check.** |
 | **G11 C5** | not scoreable | p98 is quantised to the 0.25 ms slot; 3–6 distinct levels over 10 seeds. Needs ≥30 seeds or a finer instrument. |
 | **TB quantisation** | unbuilt, deliberately | §20.1 measured it would not close G2 — **13,214 of 13,214 grants at padding 0, unchanged**. |
+| **G7 × declaration order** | **registered, not investigated** | TwoTier's sort is tied — decided by declaration order — on **14.6 %** of adjacencies in the G7 aggressor cell, against 0.3–5.7 % in every other cell traced. That is the artefact that stopped G12's ordering being promoted, most active in exactly the cell G7's inversion is measured on. **One permutation control**, not a campaign. `docs/declaration-order-in-g7-registration.md`. |
 | **A third workload** | not built | Nothing here has a tight PDB *and* GBR/PDU-set structure. Scenario-design question. |
 
 **Deferred with reasons: the C port** (a *free* LP buys 1.60×; largest file

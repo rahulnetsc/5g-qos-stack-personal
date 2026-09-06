@@ -8,12 +8,34 @@ it goes if an audience finds it before we say it.
 
 ## Tier 1 — would be a retraction on stage
 
-**1. "Twelve guarantees" is not twelve.** **G2, G7 and G9 are NOT MEASURED**
-and G6 is **not scoreable**, so **eleven carry a verdict, one of those is partial (G11: 2 clauses of 5), and G6's is "fails clause 1" rather than a clean result** — G2 alone has none.
+**0. THE BIGGEST ONE, ADDED 2026-09-06: our headline scheduler comparison is
+partly not a scheduler result.** *"TwoTier is worst by 3.5x on latency"* — and
+G7's *"PF contains the aggressor better than the arms that clamp"* — are
+**a UE-side LCP effect that is identical code in all three arms, and no
+scheduler change reaches it.** A grant is a transport block for a **UE**; which
+of that UE's flows it carries is decided inside the UE by logical-channel
+prioritisation, and **the gNB cannot see that split**. An arm chooses only how
+often a UE is granted, and measured over 120 runs the more it grants, the
+longer its protected flow's deferral tail (ρ = +0.79, p = 2.8e-27). PF
+"contains" because it grants **~5.8x less**.
+
+**Why this is Tier 1 rather than a caveat:** the numbers are correct and will
+survive scrutiny; **the attribution will not**, and the attribution is exactly
+what *"is two-tier needed"* turns on. If an audience works this out before we
+say it, every scheduler comparison on the slide is in question at once.
+**Say it ourselves, in the same breath as the number.** Full statement:
+`docs/grant-density-mechanism-2026-09-06.md`.
+
+**1. "Twelve guarantees" is not twelve.** Updated 2026-09-06: **G12 joined G2
+in having no verdict at all** — its published artefact is unsound (a flow was
+silently dropped from clause 4's own denominator) and the re-run cannot
+reproduce it, so **ten carry a verdict**, one of those is partial (G11: 2
+clauses of 5), and G6's is "fails clause 1" rather than a clean result.
+**G2 and G12 have none.**
 G7 is *structurally* out — there is no MFBR enforcement anywhere in `sim/`,
 and clipping is half its pass criterion. Any slide that says "we evaluated
 twelve guarantees" invites the one question we cannot answer.
-**Say "eleven with a verdict, one partial", and name G2 and why.**
+**Say "ten with a verdict, one partial", and name G2 AND G12 and why.**
 
 **2. G11 "passes" is one clause of five.** C1 passed at the specified
 horizon — 1.000 on all three arms, 900 windows, 0 failing. **C2–C5 are

@@ -48,10 +48,10 @@ measured".**
 
 | # | observation | current classification | rests on | honest status |
 |---|---|---|---|---|
-| **U1** | **The workload inversion.** TwoTier is **worst by 3.5×** on the parametric mix (M01 p98 protected: PF 25.25 / Res 23.00 / **TT 87.78** ms) and **best** on `sensor_dense` (PF 13.50 / Res 14.25 / **TT 11.00** ms). | *"Tier-1's objective favours periodic flows over saturating ones."* | **I — nothing.** | **A story.** The largest unexplained result in the campaign, and it bears directly on *"is two-tier needed"*. No trace has been taken. |
-| **U2** | **G7's inversion.** Both QoS arms deliver **2.0–2.1× MFBR**; **PF, which has no MFBR concept at all, contains the aggressor at 1.05×**. | Two halves, and only one is established. **(a)** *Why the QoS arms overflow*: the MFBR clamp limits `_target` (the GBR obligation); the excess is reclassified best-effort and stays deliverable. **(b)** *Why PF contains it*: unknown. | **(a) C — established.** **(b) I — nothing.** | **Half a story.** (b) is the half the client will ask about, because it is the one that reads as "your QoS scheduler is beaten by the naive one". Whether PF's containment is a **fairness property** (transfers) or an **artefact of this traffic mix** (does not) is exactly what is unknown. |
-| **U3** | **The attach path makes TwoTier worse on latency.** The same intervention that clears four lock-out observations takes TwoTier's M06 failures from **14/40 to 40/40**. | *"It returns locked-out UEs to contention."* | **I — nothing.** | **A story, and an uncomfortable one:** our own remedy degrades a metric by 3×. If the mechanism is real it is a genuine scheduler finding; if it is an artefact of seeding a *full* BSR estimate rather than a realistic one, it is ours. |
-| **U4** | **G5's residual after the lock-out clears.** | — | **T (the numbers are measured).** | **The premise needs correcting before this is worth tracing.** Pre-attach: Res **7/10**, TT **4/10** seeds failing M05. Post-attach: Res **1/10 marginal**, TT **0/10**. So the residual is *one marginal Reservation seed*, not 4/10 — the 4/10 is the pre-attach figure. **This item is very nearly empty and should drop below U5.** |
+| **U1** | **ANSWERED 2026-09-06 — see [the grant-density mechanism](grant-density-mechanism-2026-09-06.md). The workload inversion.** TwoTier is **worst by 3.5×** on the parametric mix (M01 p98 protected: PF 25.25 / Res 23.00 / **TT 87.78** ms) and **best** on `sensor_dense` (PF 13.50 / Res 14.25 / **TT 11.00** ms). | ~~*"Tier-1's objective favours periodic flows over saturating ones."*~~ **REFUTED.** It is intra-UE LCP: the flow waits through 310 (p98) of its own UE's grants while that UE gets 1.003x the fleet median. | **T** — trace, 10 seeds x 3 arms x 2 workloads | **Answered.** Not a scheduler-ranking property at all, and the rank trace was the wrong instrument — gate A0b caught that before any of it was read. |
+| **U2** | **G7's inversion.** Both QoS arms deliver **2.0–2.1× MFBR**; **PF, which has no MFBR concept at all, contains the aggressor at 1.05×**. | Two halves, and only one is established. **(a)** *Why the QoS arms overflow*: the MFBR clamp limits `_target` (the GBR obligation); the excess is reclassified best-effort and stays deliverable. **(b)** *Why PF contains it*: unknown. | **(a) C — established.** **(b) T — ANSWERED 2026-09-06: PF grants ~5.8x LESS** (2,048 vs 11,902), so its protected flow rides on 5.1x more of them. Not a fairness property of its ranking; the same grant-density effect seen from the side where it helps. | ~~Half a story.~~ **Both halves now established.** (b) is the half the client will ask about, because it is the one that reads as "your QoS scheduler is beaten by the naive one". Whether PF's containment is a **fairness property** (transfers) or an **artefact of this traffic mix** (does not) is exactly what is unknown. |
+| **U3** | **The attach path makes TwoTier worse on latency.** The same intervention that clears four lock-out observations takes TwoTier's M06 failures from **14/40 to 40/40**. | **T — ANSWERED 2026-09-06.** Refined into something measured: the deferral tail goes 286 -> 340 while grants stay ~11k, and the median worst-flow M06 p95 slightly IMPROVES (50.8 -> 47.4 ms) — so the damage is in the tail across seeds, which is what a failing-seed count reads and a median does not. | **Answered.** Was: a story, and an uncomfortable one: our own remedy degrades a metric by 3×. If the mechanism is real it is a genuine scheduler finding; if it is an artefact of seeding a *full* BSR estimate rather than a realistic one, it is ours. |
+| **U4** | **G5's residual after the lock-out clears.** | — | **T — CLOSED 2026-09-06. Post-attach M05 is 0.993-0.997 on ALL THREE ARMS; nothing remains.** | **The item is empty and the premise was wrong.** Pre-attach: Res **7/10**, TT **4/10** seeds failing M05. Post-attach: Res **1/10 marginal**, TT **0/10**. So the residual is *one marginal Reservation seed*, not 4/10 — the 4/10 is the pre-attach figure. **This item is very nearly empty and should drop below U5.** |
 | **U5a** | **G9 clause 4's sign.** Neighbour p98 is **worse** in the treatment on TwoTier (+3.08 ms [+2.22, +4.05] warm) — backwards from the control's own logic, since the control keeps the joiner transmitting *continuously*, so neighbours should be *better* when it is intermittently absent. PF and Reservation show the expected sign (−0.62 to −1.77). | Four candidates, **none tested**: (a) re-join perturbs Tier-1's demand vector, forcing capped SCA re-solves; (b) `reset_ue()` clears the joiner's fairness ledger so it outranks neighbours; (c) `due_this_slot()`'s shared insertion order; (d) **the re-join seed itself**. | **I ×4.** | **A story with a confound.** (d) is not separable today: clause 4 *had* to be measured with the seed on, because without it the count guard refuses and no neighbour delta exists. **Treatment and instrument cannot currently be told apart.** |
 | **U5b** | **G12 clause 4.** Telemetry (5QI 1) reaches **M02 = 1.000** — every resolved byte PDB-violated — while 5QI 9 still carries **11.6 Mbps**. PF/Res degrade from 102 % of ceiling; **TwoTier from nominal load on 9/10 seeds**. | Filed as a **G1/G3** finding (a telemetry flow PDB-violated at nominal load is drive-command latency), not a G12 one. | **T for the measurement.** **I for the arm difference.** | **The measurement is solid; the arm attribution is not.** Two qualifications already on the row: the arm difference is **untested under flow-list permutation**, and G12's clean ramp-bottom control **structurally cannot cover telemetry** (it reads M13's GBR classes; 5QI 1 is `Delay`). |
 
@@ -78,10 +78,16 @@ rather than a ranked excerpt.
 
 ## 4. What this audit found
 
-**Six rows rest on inference alone** — U1, U2(b), U3, U5a (four candidates),
-U5b's arm attribution. Two of them (U1, U2b) are the ones a client would ask
-about first, because both read as *"the QoS scheduler loses to the naive
-one"*.
+**Six rows rested on inference alone** — U1, U2(b), U3, U5a (four candidates),
+U5b's arm attribution. **Four of those are now closed by one trace**
+([the grant-density mechanism](grant-density-mechanism-2026-09-06.md)): U1,
+U2(b), U3 and U4, which turn out to be **one mechanism, not four results**.
+**Two remain open: U5a and U5b's arm attribution.**
+
+**And the two a client would ask about first — U1 and U2(b), both of which
+read as "the QoS scheduler loses to the naive one" — are the two the
+mechanism reframes**: the effect is UE-side LCP, identical in all three arms,
+and no scheduler change reaches it.
 
 **Three rows are stronger than they are currently being reported.** R1 is a
 control that fired — a genuine negative result, and the discipline that
@@ -99,8 +105,11 @@ mechanism the adoption argument credits for winning it is not.
 
 ## 5. Order of work
 
-U1 first — largest, most decision-relevant, and the **rank-trace hook already
-exists for exactly this question**. Then U2(b), then U3. U5a and U5b after.
-U4 drops to last on the corrected premise.
+~~U1 first, then U2(b), then U3.~~ **DONE 2026-09-06 — U1, U2(b), U3 and U4
+are closed together by the grant-density mechanism.** What remains is **U5a**
+(G9's clause-4 sign, whose treatment and instrument cannot currently be
+separated) and **U5b's arm attribution** (untested under flow-list
+permutation). **G12's own status changed at the same time — it now has no
+reproducible artefact at all** (defects log #30).
 
 Each gets registered before it is traced.
