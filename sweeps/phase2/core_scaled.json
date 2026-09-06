@@ -6,10 +6,10 @@
   "horizon": 40000,
   "load_mult": 1.0,
   "out": "sweeps/phase2/core_scaled.json",
-  "workers": 8
+  "workers": 12
  },
  "code_state": {
-  "sim_core_ast_sha256_16": "b9122b2283053cd5",
+  "sim_core_ast_sha256_16": "42046a4db022297e",
   "n_core_files": 45,
   "scope": [
    "code_state",
@@ -32,7 +32,7 @@
    "regime_sweep",
    "regime_sweep.paired_seeds"
   ],
-  "scoped_ast_sha256_16": "4f1634c5cb7663e5",
+  "scoped_ast_sha256_16": "fbf4c6511b23c317",
   "n_scoped_files": 33
  },
  "rows": [

@@ -775,7 +775,21 @@ def test_documented_defaults_match_the_code():
     from pathlib import Path
 
     actual = inspect.signature(TwoTier.__init__).parameters
-    assert set(actual) - {"self"} == {"min_rb"}, (
+    # `anti_hysteresis*` are DIAGNOSTIC knobs, not ported behaviour: they
+    # exist only to answer docs/burstiness-intervention-registration.md and
+    # are asserted OFF by default just below, so a default TwoTier is
+    # byte-identical to the shipped scheduler. If either default ever becomes
+    # non-zero this test fails, which is the point of listing them here
+    # rather than widening the set to "whatever the constructor has".
+    import inspect as _inspect
+    _defaults = {k: v.default for k, v in
+                 _inspect.signature(TwoTier.__init__).parameters.items()}
+    assert _defaults.get("anti_hysteresis") == 0.0, (
+        "the anti-hysteresis damper is a divergence probe and must stay OFF "
+        "by default -- the Python model matches the deployed scheduler")
+    assert _defaults.get("anti_hysteresis_slots") == 0
+    assert set(actual) - {"self"} == {"min_rb", "anti_hysteresis",
+                                      "anti_hysteresis_slots"}, (
         "TwoTier's knob set changed -- update this test's expected set "
         "(and design-docs/scheduler-study.md sec4.5 once a knob has real "
         "ground truth behind it, docs/phase2-plan.md)"

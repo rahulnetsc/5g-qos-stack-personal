@@ -71,8 +71,23 @@ that makes this cheap — **value-neutral**. No corpus scenario collides
 splits nothing. **The re-baseline is a pure rename, and that is checkable:**
 compare the multiset of values before and after; it must be identical.
 
-**Recommendation: worth doing, as its own commit, with the `--capture`
-justified as "keys renamed, values provably identical".** It converts "a
+**DONE IN PART, 2026-09-06, AND MY COST ESTIMATE WAS WRONG.** The buffer
+layer took direction cleanly (`register()` already had `is_ul`), and
+`_resolve` now **raises** on an ambiguous `(ue_id, qfi)` — verified: a
+colliding scenario now fails **from `BufferModel`**, before the reporting
+layer sees it. `--check` is **clean, no re-capture needed**, because
+`flow_key` was not touched.
+
+**The metrics and record layers are NOT done, and the "~25 sites" figure was
+too low.** Direction is not in scope at their call sites: `traffic.generate`
+yields `(ue_id, qfi, bytes)`, the expire loop iterates `buffers.keys()`, and
+several per-flow dicts are keyed on the pair. Threading direction through
+means widening those interfaces too — a wider change than costed, and its own
+commit.
+
+**What the partial fix already achieves:** a collision **cannot be simulated
+silently**. That was the whole of the damage in #30; the remaining rename is
+clarity, not correctness. It converts "a
 collision is caught at the reporting layer after the simulation has already
 been wrong" into "a collision cannot be constructed". Nothing published
 currently depends on it — because G12 was the only collision and it is fixed

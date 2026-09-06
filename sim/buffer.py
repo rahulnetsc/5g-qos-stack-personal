@@ -52,21 +52,68 @@ class BufferModel:
     """
 
     def __init__(self) -> None:
-        self._buffers: dict[tuple[int, int], BufferState] = {}
+        #: (ue_id, qfi) -> the full keys registered under it. One entry is
+        #: the normal case; two means a DL/UL pair, which `_resolve` refuses.
+        self._index: dict[tuple[int, int], list] = {}
+        self._buffers: dict[tuple[int, int, str], BufferState] = {}
         # Each chunk is [timestamp_s, bytes_remaining, message_or_None];
         # FIFO via deque.
-        self._chunks: dict[tuple[int, int], deque] = {}
+        self._chunks: dict[tuple[int, int, str], deque] = {}
         # Monotone lifetime counters (bytes). Used by schedulers that need a
         # windowed view of offered/served load.
-        self._arrived_cum: dict[tuple[int, int], int] = {}
-        self._delivered_cum: dict[tuple[int, int], int] = {}
+        self._arrived_cum: dict[tuple[int, int, str], int] = {}
+        self._delivered_cum: dict[tuple[int, int, str], int] = {}
         # Flows whose bytes_reported is externally driven by BsrModel.
         self._bsr_managed: set[tuple[int, int]] = set()
         # Completed messages not yet collected via pop_completions().
         self._completed: dict[tuple[int, int], list[MessageCompletion]] = {}
 
-    def register(self, ue_id: int, qfi: int, is_ul: bool = False, lcg: int = -1) -> None:
-        key = (ue_id, qfi)
+    def _resolve(self, ue_id: int, qfi: int):
+        """The full key for a (ue_id, qfi), or a LOUD failure if ambiguous.
+
+        One entry is the normal case. Two means a UE carries the same 5QI in
+        both directions -- the shape that silently shared a queue before
+        (defects log #28/#30). It raises rather than picking one, because
+        picking one is exactly what `register()` used to do.
+        """
+        keys = self._index.get((ue_id, qfi))
+        if not keys:
+            raise KeyError((ue_id, qfi))
+        if len(keys) > 1:
+            raise ValueError(
+                f"ue{ue_id} qfi{qfi} is registered in {len(keys)} directions "
+                f"{[k[2] for k in keys]} -- a lookup through the direction-"
+                f"blind BufferView cannot say which is meant, and choosing "
+                f"one is how a DL flow came to drain a UL queue "
+                f"(docs/wp9-defects-log.md #30). Give one flow its own 5QI.")
+        return keys[0]
+
+    def register(self, ue_id: int, qfi: int, is_ul: bool = False,
+                 lcg: int = -1, direction: str | None = None) -> None:
+        """Registering the same (ue_id, qfi) twice USED TO OVERWRITE.
+
+        That is how a DL and a UL flow on one UE came to share a queue, a
+        FIFO and an `is_ul` flag -- the DL flow's eligibility gate read the
+        UL flood's BSR-managed `bytes_reported`, and DL grants drained a UL
+        queue (defects log #30). The record loss everyone noticed was 0.02 %
+        of the damage.
+
+        The store is now keyed by `(ue_id, qfi, direction)` so the two cannot
+        alias. `direction` defaults to a value derived from `is_ul` so every
+        existing caller keeps working unchanged.
+
+        **Lookups still take `(ue_id, qfi)`** -- the `BufferView` Protocol's
+        arity is deliberately untouched, since 47 call sites across the
+        schedulers read through it and this is a correctness fix, not an
+        interface change. `_resolve` RAISES if a pair is ambiguous, so a
+        colliding scenario fails at its first lookup instead of simulating a
+        queue that does not exist.
+        """
+        direction = direction or ("UL" if is_ul else "DL")
+        key = (ue_id, qfi, direction)
+        self._index.setdefault((ue_id, qfi), [])
+        if key not in self._index[(ue_id, qfi)]:
+            self._index[(ue_id, qfi)].append(key)
         self._buffers[key] = BufferState(lcg=lcg)
         self._chunks[key] = deque()
         self._arrived_cum[key] = 0
@@ -77,7 +124,7 @@ class BufferModel:
 
     def arrived_cum(self, ue_id: int, qfi: int) -> int:
         """Cumulative bytes ever enqueued for this flow."""
-        return self._arrived_cum[(ue_id, qfi)]
+        return self._arrived_cum[self._resolve(ue_id, qfi)]
 
     def dropped_cum(self, ue_id: int, qfi: int) -> int:
         """Cumulative bytes discarded on PDB expiry for this flow."""
@@ -88,13 +135,21 @@ class BufferModel:
 
         Excludes PDB-expired bytes — those leave via expire(), not drain().
         """
-        return self._delivered_cum[(ue_id, qfi)]
+        return self._delivered_cum[self._resolve(ue_id, qfi)]
 
     def keys(self) -> list[tuple[int, int]]:
-        return list(self._buffers.keys())
+        """(ue_id, qfi) pairs -- the PUBLIC contract, unchanged.
+
+        The store is keyed by `(ue_id, qfi, direction)` internally, but every
+        caller of this unpacks two values, and widening it here would push a
+        direction-blind interface's problem outward into the driver and the
+        schedulers. Insertion order is preserved, so a caller that iterates
+        gets the same order as before.
+        """
+        return [(u, q) for (u, q, _d) in self._buffers]
 
     def state(self, ue_id: int, qfi: int) -> BufferState:
-        return self._buffers[(ue_id, qfi)]
+        return self._buffers[self._resolve(ue_id, qfi)]
 
     def enqueue(
         self,
@@ -106,7 +161,7 @@ class BufferModel:
     ) -> None:
         if bytes_count <= 0:
             return
-        key = (ue_id, qfi)
+        key = self._resolve(ue_id, qfi)
         state = self._buffers[key]
         chunks = self._chunks[key]
         if state.bytes_queued == 0:
@@ -139,7 +194,7 @@ class BufferModel:
         """
         if bytes_count <= 0:
             return 0
-        key = (ue_id, qfi)
+        key = self._resolve(ue_id, qfi)
         state = self._buffers[key]
         chunks = self._chunks[key]
         remaining = bytes_count
@@ -206,7 +261,7 @@ class BufferModel:
         matching `drain()`'s own optional-`pdb_s` convention."""
         if bytes_count <= 0:
             return 0
-        key = (ue_id, qfi)
+        key = self._resolve(ue_id, qfi)
         state = self._buffers[key]
         chunks = self._chunks[key]
         remaining = bytes_count
@@ -238,7 +293,7 @@ class BufferModel:
 
     def expire(self, now_s: float, pdb_s: float, ue_id: int, qfi: int) -> int:
         """Drop bytes whose age exceeds the per-flow PDB. Returns bytes dropped."""
-        key = (ue_id, qfi)
+        key = self._resolve(ue_id, qfi)
         state = self._buffers[key]
         chunks = self._chunks[key]
         dropped = 0
@@ -266,13 +321,13 @@ class BufferModel:
         """Return and clear this flow's ``MessageCompletion``s recorded by
         ``drain()``/``expire()`` since the last call. Empty for any chunk
         enqueued without a ``message=`` -- see the class docstring."""
-        key = (ue_id, qfi)
+        key = self._resolve(ue_id, qfi)
         out = self._completed[key]
         self._completed[key] = []
         return out
 
     def hol_delay_s(self, ue_id: int, qfi: int, now_s: float) -> float:
-        state = self._buffers[(ue_id, qfi)]
+        state = self._buffers[self._resolve(ue_id, qfi)]
         if state.bytes_queued == 0:
             return 0.0
         return now_s - state.hol_timestamp_s

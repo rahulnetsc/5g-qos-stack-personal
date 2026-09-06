@@ -85,7 +85,7 @@ population defect wearing a correlation coefficient.**
 | **2** | **Supply a BSR at attach.** | **PRODUCT CONFIGURATION** — hardware already does this via RA/msg3 | **measured**: starvation clears at every fleet size, arm and seed; G5 Reservation 7/10 → 1/10, TwoTier 4/10 → 0/10; G10's boundary becomes common at 8 | Largest measured effect of any change tried |
 | **3** | **Decide what MFBR is for.** It bounds entitlement, not throughput — so G7 clause 2 fails by construction. | **SPECIFICATION** | **measured**: 2.0–2.1× delivered; the C read is established | Either the guarantee's wording changes or the C gains a rate limiter. **Owner: the test-plan/design owner** |
 | **4** | **Give Reservation a floor** | **PRODUCT CODE** | the complement of #1 | Unknown — no floor exists to measure |
-| **5** | **Reduce TwoTier's service burstiness** (§3) | **PRODUCT CODE** | **measured** correlation, **UNTESTED** intervention | ρ ≈ 0.65–0.70 within workload; the causal step is unverified |
+| **5 → now 3-equal** | **Reduce TwoTier's service burstiness** (§3) | **PRODUCT CODE** | **TESTED 2026-09-06** — `docs/burstiness-intervention-result-2026-09-06.md` | **−13 to −17 ms of a 98 ms p98**, CI excluding zero at α = 0.25 and 0.5, 8/10 seeds better, **with M07 unchanged and UL throughput slightly higher**. Burstiness is a **cause**, not a co-symptom. One workload, one fleet size |
 | **6** | `array("d")` for `hol_delay_samples_s` | sim only | measured ~12 % of residual | Not a scheduler improvement; listed so it is not mistaken for one |
 
 **Deliberately absent:** the direct-HiGHS swap and the Tier-1 reformulation.
@@ -128,12 +128,20 @@ evenly spaced". That is a property of the ranking's temporal dynamics, and
 a scheduler can change it — by damping the urgency term, by an anti-hysteresis
 penalty on a UE served in the previous slot, or by a service-interval target.
 
-**What is NOT established, stated plainly:** that reducing burstiness
-*improves* p98. The correlation is measured; **the intervention has never
-been run.** It is rank 5 in §2 for exactly that reason. **The cheapest test
-is a diagnostic arm with a per-UE anti-hysteresis penalty, and a
-within-seed comparison of burstiness and M01 — roughly one campaign, ~20
-minutes at n=10.**
+**TESTED 2026-09-06, and the answer is LEVER.** A diagnostic anti-hysteresis
+damper (`TwoTier(anti_hysteresis=α)`, off by default and byte-identical when
+off) cut burstiness **23.0 → 5.0** and improved the protected flow's p98 by a
+paired **−16.8 ms [−40.6, −1.6]** at α = 0.25, 8/10 seeds better, **with GBR
+delivery unchanged and UL throughput slightly higher**.
+
+**And it refuted the retracted grant-density claim a second time, by
+intervention rather than by argument: grant count ROSE (9,424 → 9,959) while
+burstiness fell and latency improved.** Observational retraction and
+interventional retraction agree.
+
+**Still not established:** that it should ship, that it transfers to
+`sensor_dense` (where TwoTier is already the most regular arm), or to any
+workload without a saturating sibling.
 
 **And LCP is not the answer here.** Deferral exists (0.5–3.3 % carrying) but
 does not differentiate the arms in time, so LCP parameterisation explains the

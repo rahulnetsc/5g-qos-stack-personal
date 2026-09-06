@@ -920,7 +920,30 @@ class TwoTier:
     what lands in later commits.
     """
 
-    def __init__(self, min_rb: int = 5) -> None:
+    def __init__(self, min_rb: int = 5,
+                 anti_hysteresis: float = 0.0,
+                 anti_hysteresis_slots: int = 0) -> None:
+        """`anti_hysteresis` is a DIAGNOSTIC KNOB, OFF BY DEFAULT (0.0), and
+        it is not a port of anything in the C.
+
+        It exists to test one registered question
+        (`docs/burstiness-intervention-registration.md`): TwoTier serves a
+        UE's protected flow in clusters then long gaps -- burstiness ratio
+        (gap p98/p50) **125** against PF's **1.3** -- and burstiness predicts
+        the protected flow's p98 within a workload (rho = +0.646 / +0.698).
+        **The correlation is measured; the intervention has never been run**,
+        so whether burstiness is a LEVER or a SYMPTOM is open.
+
+        When non-zero it multiplies a UE's UL coefficient by
+        `(1 - anti_hysteresis)` if that UE was granted within the last
+        `anti_hysteresis_slots` slots, damping the run-on that produces the
+        clusters. At 0.0 the multiplication is skipped entirely, so a default
+        TwoTier is byte-identical to before -- asserted, not assumed.
+
+        **It must not become a default.** The Python model matches the
+        deployed scheduler; this is a divergence probe whose only job is to
+        answer the question and be reported.
+        """
         # docs/g5-ranking-map.md's candidate-set hook. Set post-
         # construction (`sched.rank_sink = sink`); None means the sort
         # pays one pointer comparison per slot per direction.
@@ -932,6 +955,11 @@ class TwoTier:
         # needs it (module docstring). NOT ia_p5g_scheduler.c:1632's
         # separate, hardcoded min_rbSize=5 DL-side literal.
         self.min_rb = min_rb
+        self.anti_hysteresis = anti_hysteresis
+        self.anti_hysteresis_slots = anti_hysteresis_slots
+        #: ue_id -> last slot in which this UE received a UL grant
+        self._last_ul_grant_slot: dict[int, int] = {}
+        self._cur_slot = -1
         self._flows: list[FlowConfig] = []
         self._ue_state: dict[int, _UeState] = {}
         self._snr_avg: dict[int, float] = {}
@@ -969,6 +997,9 @@ class TwoTier:
         channel: ChannelView,
     ) -> list[Allocation]:
         self._update_snr_ewma(channel)
+        # Only read by the anti-hysteresis diagnostic; assigned always so the
+        # two paths cannot diverge in when it is set.
+        self._cur_slot = slot.slot_index
         if slot.slot_index - self._last_solve_slot >= self.tier1_period_slots:
             self._resolve_tier1(slot.slot_index, buffers)
             self._last_solve_slot = slot.slot_index
@@ -983,6 +1014,12 @@ class TwoTier:
             out.extend(self._allocate_direction(slot, buffers, channel, "UL"))
         if slot.dl_symbols > 0:
             out.extend(self._allocate_direction(slot, buffers, channel, "DL"))
+        # Bookkeeping for the anti-hysteresis diagnostic only, and skipped
+        # entirely when it is off so the default arm does no extra work.
+        if self.anti_hysteresis > 0.0:
+            for a in out:
+                if a.direction == "UL":
+                    self._last_ul_grant_slot[a.ue_id] = slot.slot_index
         return out
 
     def reset_ue(self, ue_id: int, scope: str, buffers: BufferView) -> None:
@@ -1440,6 +1477,14 @@ class TwoTier:
             phi = (u**_DELAY_EXP) / (1.0 - ub + _URG_BARRIER_EPS)
             urg = _DELAY_URGENCY_W * phi * norm
             c.coef = (base_q + urg) * c.hyp_tbs_bytes
+        # The diagnostic damper. Skipped entirely when off, so the default
+        # arm's arithmetic is untouched rather than multiplied by 1.0.
+        if self.anti_hysteresis > 0.0:
+            for c in candidates:
+                last = self._last_ul_grant_slot.get(c.ue_id)
+                if (last is not None
+                        and self._cur_slot - last <= self.anti_hysteresis_slots):
+                    c.coef *= (1.0 - self.anti_hysteresis)
 
     def _dl_rank_key(self, candidate: _Candidate) -> tuple:
         """ia_p5g_dl_cmp, ia_p5g_scheduler.c:1397-1411 -- the *original*,
