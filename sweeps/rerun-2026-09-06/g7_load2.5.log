@@ -1,0 +1,15 @@
+12 runs = 3 arms x 4 seeds, asset B (ue2) camera offered at 2.1x MFBR
+  [1/12] PF           seed=1367864806 B_cam=8.74 Mbps (MFBR 8.0)
+  [2/12] PF           seed=1826701614 B_cam=8.54 Mbps (MFBR 8.0)
+  [3/12] PF           seed=579362555 B_cam=8.38 Mbps (MFBR 8.0)
+  [4/12] PF           seed=1097657231 B_cam=8.65 Mbps (MFBR 8.0)
+  [5/12] Reservation  seed=1367864806 B_cam=16.12 Mbps (MFBR 8.0)
+  [6/12] Reservation  seed=1097657231 B_cam=15.86 Mbps (MFBR 8.0)
+  [7/12] Reservation  seed=579362555 B_cam=16.00 Mbps (MFBR 8.0)
+  [8/12] Reservation  seed=1826701614 B_cam=16.18 Mbps (MFBR 8.0)
+  [9/12] TwoTier      seed=1826701614 B_cam=16.10 Mbps (MFBR 8.0)
+  [10/12] TwoTier      seed=579362555 B_cam=15.90 Mbps (MFBR 8.0)
+  [11/12] TwoTier      seed=1097657231 B_cam=15.69 Mbps (MFBR 8.0)
+  [12/12] TwoTier      seed=1367864806 B_cam=15.99 Mbps (MFBR 8.0)
+achieved offered rate: 1.99-2.06x MFBR (GT-4.3 requires >= 2.0x)
+the aggressor offered only 1.99x MFBR -- this is not GT-4.3's scenario and must not be scored as it

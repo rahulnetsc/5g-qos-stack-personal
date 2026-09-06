@@ -1,0 +1,164 @@
+    ... GT-6.2_cold/TwoTier seed 1367864806 done
+    ... GT-6.2_cold/TwoTier seed 1826701614 done
+    ... GT-6.1_warm/TwoTier seed 35492826 done
+    ... GT-6.1_warm/TwoTier seed 1367864806 done
+    ... GT-6.1_warm/TwoTier seed 1826701614 done
+    ... GT-6.1_warm/TwoTier seed 1746484539 done
+    ... GT-6.1_warm/TwoTier seed 661058651 done
+    ... GT-6.1_warm/TwoTier seed 1097657231 done
+    ... GT-6.1_warm/TwoTier seed 579362555 done
+    ... GT-6.1_warm/TwoTier seed 161576974 done
+    ... GT-6.1_warm/TwoTier seed 376383645 done
+    ... GT-6.1_warm/TwoTier seed 87989972 done
+
+==============================================================================
+GT-6.1_warm/TwoTier
+==============================================================================
+  [TwoTier] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  TwoTier      events/run= 10.0  M18 p95=168.37499999999994  M19 p95=0.0  M21 p95=None
+               neighbours ΔM02  mean -0.000010 [-0.000044,+0.000034]  median -0.000022 worse 10%  n_seeds=10 paired
+               neighbours Δp98  mean +3.077 ms [+2.222,+4.050]  median +2.558 worse 100%
+    ... GT-6.2_cold/TwoTier seed 1097657231 done
+    ... GT-6.2_cold/TwoTier seed 661058651 done
+    ... GT-6.2_cold/TwoTier seed 35492826 done
+    ... GT-6.2_cold/TwoTier seed 579362555 done
+    ... GT-6.2_cold/TwoTier seed 87989972 done
+    ... GT-6.2_cold/TwoTier seed 376383645 done
+    ... GT-6.2_cold/TwoTier seed 161576974 done
+    ... GT-6.2_cold/TwoTier seed 1746484539 done
+
+==============================================================================
+GT-6.2_cold/TwoTier
+==============================================================================
+  [TwoTier] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  TwoTier      events/run=  5.0  M18 p95=282.12499999999994  M19 p95=0.0  M21 p95=None
+               neighbours ΔM02  mean +0.011438 [-0.000075,+0.034429]  median -0.000034 worse 20%  n_seeds=10 paired
+               neighbours Δp98  mean +0.475 ms [-1.698,+2.970]  median -0.363 worse 50%
+    ... GT-6.1_warm/Reservation seed 1826701614 done
+    ... GT-6.1_warm/Reservation seed 1367864806 done
+    ... GT-6.3_rlf/TwoTier seed 1367864806 done
+    ... GT-6.3_rlf/TwoTier seed 1097657231 done
+    ... GT-6.3_rlf/TwoTier seed 579362555 done
+    ... GT-6.3_rlf/TwoTier seed 1826701614 done
+    ... GT-6.1_warm/Reservation seed 1097657231 done
+    ... GT-6.1_warm/Reservation seed 661058651 done
+    ... GT-6.1_warm/Reservation seed 579362555 done
+    ... GT-6.1_warm/Reservation seed 87989972 done
+    ... GT-6.1_warm/Reservation seed 161576974 done
+    ... GT-6.1_warm/Reservation seed 35492826 done
+    ... GT-6.1_warm/Reservation seed 376383645 done
+    ... GT-6.1_warm/Reservation seed 1746484539 done
+
+==============================================================================
+GT-6.1_warm/Reservation
+==============================================================================
+  [Reservation] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  Reservation  events/run= 10.0  M18 p95=19.125000000000004  M19 p95=0.0  M21 p95=0.0
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean +2.475 ms [-0.850,+7.851]  median +0.375 worse 60%
+    ... GT-6.3_rlf/TwoTier seed 661058651 done
+    ... GT-6.3_rlf/TwoTier seed 87989972 done
+    ... GT-6.3_rlf/TwoTier seed 161576974 done
+    ... GT-6.3_rlf/TwoTier seed 376383645 done
+    ... GT-6.2_cold/Reservation seed 1367864806 done
+    ... GT-6.2_cold/Reservation seed 1826701614 done
+    ... GT-6.2_cold/Reservation seed 1097657231 done
+    ... GT-6.3_rlf/TwoTier seed 35492826 done
+    ... GT-6.3_rlf/TwoTier seed 1746484539 done
+
+==============================================================================
+GT-6.3_rlf/TwoTier
+==============================================================================
+  [TwoTier] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  TwoTier      events/run=  1.0  M18 p95=None  M19 p95=0.0  M21 p95=None
+               neighbours ΔM02  mean +0.016354 [-0.024513,+0.064862]  median -0.000869 worse 20%  n_seeds=10 paired
+               neighbours Δp98  mean +2.350 ms [+0.372,+4.574]  median +1.931 worse 70%
+    ... GT-6.2_cold/Reservation seed 579362555 done
+    ... GT-6.2_cold/Reservation seed 661058651 done
+    ... GT-6.2_cold/Reservation seed 87989972 done
+    ... GT-6.2_cold/Reservation seed 161576974 done
+    ... GT-6.2_cold/Reservation seed 35492826 done
+    ... GT-6.2_cold/Reservation seed 1746484539 done
+    ... GT-6.2_cold/Reservation seed 376383645 done
+
+==============================================================================
+GT-6.2_cold/Reservation
+==============================================================================
+  [Reservation] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  Reservation  events/run=  5.0  M18 p95=147.75  M19 p95=0.0  M21 p95=2948.8749999999995
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -0.425 ms [-1.875,+0.950]  median +0.000 worse 30%
+    ... GT-6.3_rlf/Reservation seed 1826701614 done
+    ... GT-6.3_rlf/Reservation seed 1097657231 done
+    ... GT-6.3_rlf/Reservation seed 1367864806 done
+    ... GT-6.3_rlf/Reservation seed 579362555 done
+    ... GT-6.3_rlf/Reservation seed 661058651 done
+    ... GT-6.3_rlf/Reservation seed 87989972 done
+    ... GT-6.1_warm/PF seed 1826701614 done
+    ... GT-6.1_warm/PF seed 1367864806 done
+    ... GT-6.1_warm/PF seed 1097657231 done
+    ... GT-6.1_warm/PF seed 579362555 done
+    ... GT-6.1_warm/PF seed 661058651 done
+    ... GT-6.1_warm/PF seed 87989972 done
+    ... GT-6.3_rlf/Reservation seed 161576974 done
+    ... GT-6.3_rlf/Reservation seed 35492826 done
+    ... GT-6.3_rlf/Reservation seed 1746484539 done
+    ... GT-6.3_rlf/Reservation seed 376383645 done
+
+==============================================================================
+GT-6.3_rlf/Reservation
+==============================================================================
+  [Reservation] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  Reservation  events/run=  1.0  M18 p95=1181.1249999999998  M19 p95=0.0  M21 p95=130.12500000000006
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -0.550 ms [-1.650,+0.875]  median -0.500 worse 10%
+    ... GT-6.1_warm/PF seed 161576974 done
+    ... GT-6.1_warm/PF seed 376383645 done
+    ... GT-6.1_warm/PF seed 1746484539 done
+    ... GT-6.1_warm/PF seed 35492826 done
+
+==============================================================================
+GT-6.1_warm/PF
+==============================================================================
+  [PF] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  PF           events/run= 10.0  M18 p95=16.50000000000018  M19 p95=0.0  M21 p95=0.0
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -0.622 ms [-1.501,+0.303]  median -0.125 worse 20%
+    ... GT-6.2_cold/PF seed 1826701614 done
+    ... GT-6.2_cold/PF seed 1367864806 done
+    ... GT-6.2_cold/PF seed 1097657231 done
+    ... GT-6.2_cold/PF seed 579362555 done
+    ... GT-6.2_cold/PF seed 87989972 done
+    ... GT-6.2_cold/PF seed 161576974 done
+    ... GT-6.2_cold/PF seed 661058651 done
+    ... GT-6.2_cold/PF seed 35492826 done
+    ... GT-6.2_cold/PF seed 376383645 done
+    ... GT-6.2_cold/PF seed 1746484539 done
+
+==============================================================================
+GT-6.2_cold/PF
+==============================================================================
+  [PF] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  PF           events/run=  5.0  M18 p95=144.6250000000001  M19 p95=0.0  M21 p95=2948.8749999999995
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -1.772 ms [-3.047,-0.572]  median -1.108 worse 0%
+    ... GT-6.3_rlf/PF seed 1826701614 done
+    ... GT-6.3_rlf/PF seed 1367864806 done
+    ... GT-6.3_rlf/PF seed 1097657231 done
+    ... GT-6.3_rlf/PF seed 579362555 done
+    ... GT-6.3_rlf/PF seed 661058651 done
+    ... GT-6.3_rlf/PF seed 87989972 done
+    ... GT-6.3_rlf/PF seed 161576974 done
+    ... GT-6.3_rlf/PF seed 35492826 done
+    ... GT-6.3_rlf/PF seed 376383645 done
+    ... GT-6.3_rlf/PF seed 1746484539 done
+
+==============================================================================
+GT-6.3_rlf/PF
+==============================================================================
+  [PF] neighbours population (21 flows): ['ue2_qfi1', 'ue2_qfi2', 'ue2_qfi82', 'ue3_qfi1'] ...
+  PF           events/run=  1.0  M18 p95=1168.0000000000002  M19 p95=0.0  M21 p95=130.12500000000006
+               neighbours ΔM02  mean +0.000000 [+0.000000,+0.000000]  median +0.000000 worse 0%  n_seeds=10 paired
+               neighbours Δp98  mean -1.321 ms [-2.185,-0.505]  median -0.500 worse 0%
+
+wrote sweeps/rerun-2026-09-06/g9.json

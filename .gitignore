@@ -52,3 +52,7 @@ sweeps/**/*.jsonl
 sweeps/phase2/lp-analysis-*/lps*.pkl
 sweeps/**/stage6_g6_n40_records.jsonl
 sweeps/**/g12.runs.jsonl
+
+# G6's per-record dump is 246 MB of raw RunRecords -- reproducible from the
+# runner, and nothing cites it. The scored artefacts beside it are committed.
+sweeps/rerun-2026-09-06/g6/stage6_g6_n40_records.jsonl

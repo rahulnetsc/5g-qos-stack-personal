@@ -1,0 +1,7 @@
+  persisted 240 records to sweeps/rerun-2026-09-06/g6/stage6_g6_n40_records.jsonl
+==============================================================================
+CONTROL, read before any effect size: do stage 1's own 10 seeds reproduce?
+==============================================================================
+  stage-1 CSV absent (sweeps/rerun-2026-09-06/g6/stage1/stage1_rows.csv) -- control CANNOT be run, and this is reported as unverified, not as a pass.
+
+wrote sweeps/rerun-2026-09-06/g6/stage6_g6_n40.csv and .json

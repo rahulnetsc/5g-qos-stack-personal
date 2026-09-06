@@ -1,0 +1,62 @@
+
+==============================================================================
+G4 -- latency vs the SILENCE THAT PRECEDED the message (p98 ms)
+==============================================================================
+  No silence threshold is chosen; the gap axis IS the answer.
+
+   duty arm                      [0,1)          [10,100)        [100,1000)        [1000,inf)
+    1.0 PF              160.99/   838B      9.24/   633B     21.62/   300B                 -
+    1.0 Reservation     159.40/   838B     11.61/   614B     20.58/   300B                 -
+    1.0 TwoTier         125.35/   839B     20.24/   595B     42.50/   300B                 -
+
+    0.5 PF              169.33/   857B      5.10/   850B     18.01/   400B                 -
+    0.5 Reservation     167.39/   857B     13.58/   811B     13.59/   388B                 -
+    0.5 TwoTier         152.87/   857B     20.48/   811B     19.45/   388B                 -
+
+    0.1 PF              222.53/   873B                 -      5.06/  1250B     77.23/  3000B
+    0.1 Reservation     217.80/   872B                 -     50.60/  1233B     64.87/  3000B
+    0.1 TwoTier         221.94/   873B                 -     25.40/  1250B     71.93/  3000B
+
+  cells are  p98_ms / mean message size.  '-' = no message in that gap bucket.
+
+------------------------------------------------------------------------------
+ACROSS DUTY, within an arm -- CARRIES THE SIZE CONFOUND
+------------------------------------------------------------------------------
+  `_burstify` grows the burst by exactly 1/duty at constant mean
+  rate, so a size-proportional latency baseline IS 1/duty. The
+  excess over that baseline is the part access delay could explain.
+  PF           duty 0.1   p98   106.55 ms vs    61.89 at duty 1.0  ->  x  1.72   size baseline x10.0   excess x 0.17
+  PF           duty 0.5   p98    64.15 ms vs    61.89 at duty 1.0  ->  x  1.04   size baseline x2.0   excess x 0.52
+  Reservation  duty 0.1   p98   118.40 ms vs    61.44 at duty 1.0  ->  x  1.93   size baseline x10.0   excess x 0.19
+  Reservation  duty 0.5   p98    62.77 ms vs    61.44 at duty 1.0  ->  x  1.02   size baseline x2.0   excess x 0.51
+  TwoTier      duty 0.1   p98   113.32 ms vs    57.55 at duty 1.0  ->  x  1.97   size baseline x10.0   excess x 0.20
+  TwoTier      duty 0.5   p98    62.47 ms vs    57.55 at duty 1.0  ->  x  1.09   size baseline x2.0   excess x 0.54
+
+------------------------------------------------------------------------------
+ACROSS ARMS at one duty level -- CONFOUND-FREE (identical sizes)
+------------------------------------------------------------------------------
+
+  duty_cycle = 0.1
+    PF           p98   106.56 ms  [  106.22,   106.94]  n=10
+    Reservation  p98   117.50 ms  [  112.56,   122.43]  n=10
+    TwoTier      p98   113.32 ms  [  112.17,   114.41]  n=10
+      Reservation - PF:   +10.94 ms [   +5.93,   +16.20] *
+      TwoTier - PF:    +6.76 ms [   +5.52,    +7.93] *
+
+  duty_cycle = 0.5
+    PF           p98    64.15 ms  [   63.91,    64.40]  n=10
+    Reservation  p98    62.64 ms  [   60.89,    64.29]  n=10
+    TwoTier      p98    59.25 ms  [   42.16,    74.33]  n=10
+      Reservation - PF:    -1.51 ms [   -3.09,    +0.06]  
+      TwoTier - PF:    -4.90 ms [  -22.23,    +8.67]  
+
+  duty_cycle = 1.0
+    PF           p98    61.89 ms  [   61.68,    62.06]  n=10
+    Reservation  p98    61.27 ms  [   59.39,    62.70]  n=10
+    TwoTier      p98    51.47 ms  [   30.73,    71.34]  n=10
+      Reservation - PF:    -0.62 ms [   -2.65,    +0.97]  
+      TwoTier - PF:   -10.41 ms [  -30.38,    +9.47]  
+
+  (* = paired bootstrap CI excludes zero)
+
+wrote sweeps/rerun-2026-09-06/g4.json  (3852 flow-bucket rows)

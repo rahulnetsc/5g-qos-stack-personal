@@ -1,0 +1,43 @@
+G12 campaign -- ramp [1.0, 1.6, 2.3, 2.7, 3.3, 4.0, 6.0, 8.0] (8 points), in-range <= x3.3: [1.0, 1.6, 2.3, 2.7, 3.3]
+  scoreable cells (3): [('mixed', 8), ('ugv_heavy', 8), ('drone_heavy', 8)]
+  EXCLUDED ('sensor_dense', 8): g12_sensor_dense_n8_x1.0: GBR classes [4] absent (census {2: 1})
+  3 arms x 10 seeds; 720 runs
+==============================================================================
+E1's CONTROL PASS -- ramp bottom only, every cell, read FIRST
+==============================================================================
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/regime_sweep.py", line 500, in _run_one_indexed
+    return idx, fn(task)
+                ^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g12_campaign.py", line 235, in _task
+    return run_ramp(comp, n, arm_name, _arms()[arm_name], seed, ramp,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g12_campaign.py", line 187, in run_ramp
+    rec = RunRecord.from_summary(
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/sim/run_record.py", line 362, in from_summary
+    raise ValueError(
+ValueError: flow key collision: 31 flows collapse to 30 records, so 1 would be SILENTLY LOST. `flow_key` is (ue_id, qfi) with no direction, so one UE cannot carry the same 5QI both ways (docs/wp9-defects-log.md #28). Colliding: {'ue8_qfi9': ['DL', 'UL']}. Give the second flow its own 5QI -- e.g. 5QI 86 carries the same standardised 5 ms PDB as 85.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g12_campaign.py", line 638, in <module>
+    raise SystemExit(main(sys.argv))
+                     ^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g12_campaign.py", line 451, in main
+    kept, control_report = control_pass(kept, arms, seeds, args.workers)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g12_campaign.py", line 341, in control_pass
+    for i, r in run_cells(_task, tasks, workers, cost=_ramp_cost):
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/regime_sweep.py", line 491, in run_cells
+    for idx, result in pool.imap_unordered(
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 873, in next
+    raise value
+ValueError: flow key collision: 31 flows collapse to 30 records, so 1 would be SILENTLY LOST. `flow_key` is (ue_id, qfi) with no direction, so one UE cannot carry the same 5QI both ways (docs/wp9-defects-log.md #28). Colliding: {'ue8_qfi9': ['DL', 'UL']}. Give the second flow its own 5QI -- e.g. 5QI 86 carries the same standardised 5 ms PDB as 85.

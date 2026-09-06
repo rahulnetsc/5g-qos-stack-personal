@@ -1,0 +1,29 @@
+=== [07:36:52] START g1358_parametric
+=== [07:37:41] END   g1358_parametric rc=0 49s
+=== [07:37:41] START g138_sensor_dense
+=== [07:38:05] END   g138_sensor_dense rc=0 24s
+=== [07:38:05] START g5_g10_consolidation
+=== [07:39:18] END   g5_g10_consolidation rc=0 73s
+=== [07:39:18] START g10
+=== [07:42:35] END   g10 rc=0 197s
+=== [07:42:35] START g4
+=== [07:43:48] END   g4 rc=0 73s
+=== [07:43:48] START g6
+=== [07:46:46] END   g6 rc=1 178s
+=== [07:46:46] START g7
+=== [07:47:08] END   g7 rc=0 22s
+=== [07:47:08] START g7_load1.5
+=== [07:47:21] END   g7_load1.5 rc=0 13s
+=== [07:47:21] START g7_load2.5
+=== [07:47:34] END   g7_load2.5 rc=1 13s
+=== [07:47:34] START g9
+=== [07:48:55] END   g9 rc=0 81s
+=== [07:48:55] START g12
+=== [07:49:13] END   g12 rc=1 18s
+=== [07:49:13] START g2
+=== [07:49:25] END   g2 rc=0 12s
+=== [07:49:25] START g11_c1_soak
+=== [09:02:00] END   g11_c1_soak rc=0 4355s
+=== [09:02:00] START g11_c345
+=== [09:02:00] END   g11_c345 rc=0 0s
+=== ALL DONE 5108s

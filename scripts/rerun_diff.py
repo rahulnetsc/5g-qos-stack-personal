@@ -12,6 +12,15 @@ from __future__ import annotations
 import json, sys
 from pathlib import Path
 
+#: Artefacts that are NOT row-shaped, compared by a deep diff -- but PAIRED
+#: ON IDENTITY first. `run_cells` yields in COMPLETION order, so a positional
+#: deep diff of a parallel campaign reports every run against a different
+#: run's numbers: G11 C1 read as 14,477 differences and was byte-identical.
+DEEP = [
+    ("G11 C1 soak", "sweeps/postscaling-2026-09-05/g11_c1_soak.json",
+     "sweeps/rerun-2026-09-06/g11_c1_soak.json", "runs", ("arm", "seed")),
+]
+
 PAIRS = [
     ("G1 G3 G5 G8 (parametric)", "sweeps/phase2/core_scaled.json",
      "sweeps/rerun-2026-09-06/core.json", ("arm", "seed")),
