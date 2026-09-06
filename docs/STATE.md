@@ -28,7 +28,7 @@ measured on earlier code and its numbers are indicative, not current.
 | **G9** | **SCOREABLE (first time).** Counts complete 10/10, 5/5, 1/1 with the re-join seed. **Clause 4 FAILS on TwoTier** | `postscaling/g9_seeded.json` | 10 | 20k | G9 scenarios | stale |
 | **G10** | **PF 8 / Res 4 / TT 4 — UPPER BOUND, not capacity.** Cause established, §3 | `phase2/g5_consol_scaled.json` | 10 | 20k | parametric | **current** |
 | **G11** | **TWO CLAUSES OF FIVE.** C1 PASS (900 windows, 0 failing); C3 PASS. C4 not independent; C5 not scoreable; C2 not scoreable | `postscaling/g11_c1_soak.json` | 10 | **7.2M** | G11 scripted | stale |
-| **G12** | **Neither promotion clause fires.** Ordering **not established** as a scheduler property | `postscaling/g12.json` | 10 | 20k | fleet ramp | stale |
+| **G12** | **NO ARTEFACT — the published one is unsound.** The 2026-09-06 re-run cannot reproduce it: defect #28's guard (added later) refuses the run, and the published artefact silently dropped a 5QI-9 flow that is in clause 4's own denominator. Ordering was already **not established**; the clause-4 *figure* is now withdrawn, the qualitative finding stands. See defects log #30. | — | — | 20k | fleet ramp | **BLOCKED** |
 
 **Also measured on sensor_dense** (30 UL sensors, **15 ms PDB**, n=10, 20k):
 G1 **PASS all arms** (PF 13.50 / Res 14.25 / **TwoTier 11.00 ms**), G3, G8
