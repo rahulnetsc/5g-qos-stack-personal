@@ -20,6 +20,9 @@ class Metrics:
         self._ul_prbs_total = 0
         self._cce_used = 0
         self._cce_total = 0
+        self._cce_by_kind: dict[str, tuple[int, int]] = {}
+        self._cce_slots = 0
+        self._cce_slots_at_cap = 0
 
         # Per-slot time series (opt-in to keep memory footprint small).
         self.record_ts = record_timeseries
@@ -94,9 +97,37 @@ class Metrics:
         else:
             self._ul_prbs_used += prbs
 
-    def record_cce(self, used: int, total: int) -> None:
+    def record_cce(self, used: int, total: int,
+                   slot_kind: str = "?") -> None:
+        """Per-slot PDCCH spend and budget.
+
+        `slot_kind` ("D"/"S"/"U") is recorded because **the aggregate ratio
+        alone is not interpretable** -- see `docs/wp9-defects-log.md` #29,
+        the third instance of the population defect. `_cce_total` sums the
+        budget of EVERY slot, but a workload with no downlink flows can
+        never spend a D-slot's budget, so its achievable ceiling is below
+        1.0. On this repository's `DSUUU` carrier (D=48, S=16, U=32) that
+        ceiling is 112/160 = **0.70**, and 0.6357 read as "loaded" against
+        1.0 is **90.8 % of achievable** against 0.70.
+
+        Note the asymmetry that made this findable: `record_grid_capacity`
+        IS direction-gated (`dl_prbs=... if slot_grid.dl_symbols > 0 else
+        0`), so PRB utilisation already has the right denominator. CCE was
+        the one that did not.
+
+        The per-slot series is kept too, because **binding is a property of
+        the worst slot, not the mean** -- a channel saturated on 2,308 slots
+        and idle otherwise averages to something comfortable.
+        """
         self._cce_used += used
         self._cce_total += total
+        self._cce_by_kind[slot_kind] = (
+            self._cce_by_kind.get(slot_kind, (0, 0))[0] + used,
+            self._cce_by_kind.get(slot_kind, (0, 0))[1] + total)
+        if total > 0:
+            self._cce_slots += 1
+            if used >= total:
+                self._cce_slots_at_cap += 1
 
     def snapshot_slot(
         self,
@@ -210,6 +241,28 @@ class Metrics:
             "dl_prb_utilization": self._dl_prbs_used / max(1, self._dl_prbs_total),
             "ul_prb_utilization": self._ul_prbs_used / max(1, self._ul_prbs_total),
             "cce_utilization": self._cce_used / max(1, self._cce_total),
+            # PER-SLOT-KIND UTILISATION, which is what makes the aggregate
+            # interpretable (#29). A "ceiling" field was tried first and
+            # abandoned: deriving it from "kinds this run spent anything in"
+            # reads 1.0 here, because D-slots carry 524 of 76,800 CCEs
+            # (0.7 %) rather than exactly zero -- so any usage threshold for
+            # "reachable" is an arbitrary judgement. The BREAKDOWN needs no
+            # such judgement and shows the same thing more directly: on
+            # sensor_dense it is D 0.7 %, S 81.5 %, U 92.2 %, against an
+            # aggregate of 0.637 that averages an unspendable D budget into
+            # a saturated U one.
+            "cce_budget_by_slot_kind": {
+                k: v[1] for k, v in sorted(self._cce_by_kind.items())},
+            "cce_used_by_slot_kind": {
+                k: v[0] for k, v in sorted(self._cce_by_kind.items())},
+            "cce_utilization_by_slot_kind": {
+                k: (v[0] / v[1] if v[1] else 0.0)
+                for k, v in sorted(self._cce_by_kind.items())},
+            # BINDING IS A PROPERTY OF THE WORST SLOT, NOT THE MEAN (#29).
+            "cce_slots_with_budget": self._cce_slots,
+            "cce_slots_at_cap": self._cce_slots_at_cap,
+            "cce_frac_slots_at_cap": (
+                self._cce_slots_at_cap / max(1, self._cce_slots)),
             "flows": {},
         }
         for (ue_id, qfi), m in sorted(self._flow.items()):

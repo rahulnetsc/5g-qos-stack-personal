@@ -1084,6 +1084,38 @@ fix was one line — capture `n_real_cells` before the truncation — and it is
 only findable by reading the code, never by reading the output, because
 "22 min" is exactly as plausible as "64 min".
 
+**AND THE SAME QUESTION APPLIES TO A DENOMINATOR — third instance,
+defects-log #29.** A ratio whose denominator includes capacity that cannot
+contribute is the same defect one level down. CCE utilisation summed the
+budget of EVERY slot, but an uplink-only workload can never spend a D-slot's
+budget: `DSUUU` with D=48/S=16/U=32 gives 160 per period of which only 112 is
+reachable, so the ceiling is **0.70, not 1.0**. The same 0.6357 reads
+"loaded" against 1.0 and **90.8 % of achievable** against 0.70 — opposite
+conclusions from one number. **`record_grid_capacity` is already
+direction-gated, so PRB utilisation does NOT have this defect**; CCE was the
+only unguarded denominator.
+
+**Two rules follow, and both are cheap:**
+
+1. **For any utilisation or capacity figure, report the achievable ceiling
+   beside it, DERIVED FROM STRUCTURE.** 112/160 is derivable from the TDD
+   pattern. A percentage without its ceiling is not interpretable. Prefer a
+   per-population BREAKDOWN (`cce_utilization_by_slot_kind`) to a computed
+   "ceiling" — deriving the ceiling needs a rule for what counts as
+   reachable, and any usage threshold for that is arbitrary.
+2. **For any BINDING claim, report the per-slot distribution, not the mean.**
+   2,308 slots at the per-slot cap was in the data all along and is the
+   direct evidence; an aggregate that averages a saturated condition with
+   idle slots cannot show binding either way. **Binding is a property of the
+   worst slot.**
+
+**And note what this bounds: `verify_claims`, `--check`, `parallel_audit` and
+the suite ALL PASSED on the wrong conclusion**, because the arithmetic was
+right and only the denominator's meaning was wrong. No guard asks whether a
+denominator is the right denominator, and none can — it is a modelling
+judgement. This one was caught by being asked to sweep a parameter, not by a
+rule.
+
 **DECOMPOSE BEFORE ATTRIBUTING: for any aggregate about a protected set,
 ask what rows actually entered the sum before quoting it.** Not an instinct
 — a check with a definite question, because it caught **four** errors in a

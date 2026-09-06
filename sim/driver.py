@@ -835,7 +835,8 @@ def run(
                 dl_prbs_used_this_slot += alloc.prbs
             else:
                 ul_prbs_used_this_slot += alloc.prbs
-        metrics.record_cce(cce_used_this_slot, slot_grid.pdcch_cce_budget)
+        metrics.record_cce(cce_used_this_slot, slot_grid.pdcch_cce_budget,
+                           slot_kind=slot_grid.direction)
         # Close the loop for rate-adaptive sources: their offered load
         # responds to what they actually got.
         traffic.observe_delivery(per_flow_delivered)

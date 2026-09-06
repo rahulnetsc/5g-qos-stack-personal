@@ -1067,3 +1067,76 @@ loudly** — a scenario that violates it loses flows with no error.
 **Cheap guard if this is taken up:** `RunRecord.from_summary` could assert
 that `len(set(flow keys)) == len(flow_configs)`, which would have turned a
 silent disappearance into an immediate failure.
+
+---
+
+## #29 — THE POPULATION DEFECT, THIRD INSTANCE, AND THIS TIME IN A DENOMINATOR (2026-09-06)
+
+**The class: a ratio whose denominator includes capacity that cannot
+contribute.** Two instances were about rows; this one is about slots, and it
+is the same shape.
+
+| instance | the statistic ranged over | what could not contribute |
+|---|---|---|
+| M03's worst liveness gap | **every flow** | a saturating background aggressor the scheduler starves **by design** |
+| M02's PDB-violation rate | **every flow**, byte-weighted | the aggressor's own bytes |
+| **#29 — CCE utilisation** | **every slot's budget** | **D-slot budget an uplink-only workload can never spend** |
+
+### The arithmetic
+
+`DSUUU`, per-slot PDCCH budgets **D=48, S=16, U=32** → 160 per period. A
+workload with no downlink flows can spend only **S + U = 112**. So **30 % of
+the denominator was unreachable and the ceiling was 0.70, not 1.0.**
+
+**Same measured number, opposite conclusion.** `0.6357` against 1.0 reads
+*"loaded, not bound"* — which is what `docs/sensor-dense-result-2026-09-05.md`
+said. Against 0.70 it reads **90.8 % of achievable**, and the control channel
+binds.
+
+### WHY NO GUARD CAUGHT IT, and this bounds what the guards protect
+
+- **`verify_claims`** confirms a figure matches its cited artefact. **It did.**
+- **`regression_corpus --check`** compares against a baseline computed the
+  same way. **No drift, because the same denominator was on both sides.**
+- **`parallel_audit`** and the suite are orthogonal.
+
+**All four passed on a wrong conclusion, because the arithmetic was right and
+only the denominator's MEANING was wrong.** No guard asks *is this the right
+denominator*, and **none can** — that is a modelling judgement, not a
+property of the code.
+
+**What caught it was being pushed to sweep the UE count**, which forced a
+re-derivation of the ceiling. **It was not caught by a rule**, and saying so
+is the honest bound on what this project's guards are for.
+
+### THE SECOND LESSON, and it may be the more useful one
+
+**2,308 slots were at the per-slot cap, and that was in the data the whole
+time.** An aggregate ratio cannot show binding: a channel saturated on 2,308
+slots and idle otherwise averages to something comfortable.
+
+> **Binding is a property of the worst slot, not the average one.**
+
+### What was added
+
+1. **`cce_utilization_by_slot_kind`** — D/S/U separately, so the aggregate is
+   interpretable without any ceiling arithmetic. On sensor_dense: **D 0.7 %,
+   S 81.5 %, U 92.2 %** against an aggregate of 0.637.
+2. **`cce_slots_at_cap` / `cce_frac_slots_at_cap`** — the per-slot
+   distribution. sensor_dense: **3,254 of 8,000 slots (40.7 %)**; the
+   parametric mix: **0 of 8,000**.
+
+**A `cce_achievable_ceiling` field was tried first and abandoned**, because
+deriving it from *"slot kinds this run spent anything in"* reads 1.0 — D-slots
+carry 524 of 76,800 CCEs (0.7 %) rather than exactly zero, so any usage
+threshold for "reachable" is an arbitrary judgement. **The breakdown needs no
+such judgement and shows the same thing more directly.**
+
+### The sweep for the same shape elsewhere
+
+**`record_grid_capacity` is ALREADY direction-gated** —
+`dl_prbs=slot_grid.prb_count if slot_grid.dl_symbols > 0 else 0` — so
+**PRB utilisation does not have the mirrored defect**, in either direction.
+CCE was the only unguarded denominator in the metrics layer, and the scoring
+layer's ratios (M07's GBR list, M09's qualifying windows, M19's gaps) each
+carry an explicit population already.
