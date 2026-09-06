@@ -74,7 +74,13 @@ def one(arm: str, seed: int, n_ues: int, horizon: int,
     # How many distinct UEs the FIRST ranked slot could actually serve --
     # the quantity the consolidation says sets everything else.
     served_slot1 = sum(1 for v in first_slot.values() if v <= 1)
+    _m02 = scored.get("M02")
+    _m02 = _m02.value if _m02 else None
     return {
+        # SEVERITY, uniform across the scorecard: the fraction of RESOLVED
+        # bytes that missed their PDB (M02). See phase2_core.py.
+        "M02_prot": _m02,
+
         "arm": arm, "seed": seed, "n_ues": n_ues, "horizon": horizon,
         "attach_seed": attach_seed,
         "wall_s": round(time.time() - t0, 1),

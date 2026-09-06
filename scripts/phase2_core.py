@@ -70,6 +70,13 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float) -> dict
     return {
         "arm": arm, "seed": seed, "n_ues": n_ues, "load_mult": load_mult,
         "sim_s": horizon * SLOT_S, "wall_s": round(time.time() - t0, 1),
+        # SEVERITY, uniform across the scorecard: M02 is the fraction of
+        # RESOLVED bytes that missed their PDB. Recorded here so the
+        # guarantee scorecard's severity column is a traffic fraction on
+        # every row rather than a different quantity per guarantee -- which
+        # is the population defect at the level of a table.
+        "M02_all": val(full, "M02"),
+        "M02_prot": val(prot, "M02"),
         # G1 -- p98 latency and jitter, BOTH populations
         "G1_M01_p98_all": val(full, "M01", "p98"),
         "G1_M01_flow_all": val(full, "M01", "flow"),

@@ -40,7 +40,8 @@ from regime_sweep import arm_cost, paired_seeds, run_cells    # noqa: E402
 from sim.config import CarrierConfig, ScenarioConfig, UEConfig  # noqa: E402
 from sim.driver import run as driver_run                      # noqa: E402
 from sim.fleet import build_fleet                             # noqa: E402
-from sim.run_record import RunRecord                          # noqa: E402
+from sim.run_record import RunRecord
+from sim.scorecard import Population, Scorecard                          # noqa: E402
 from sim.trace import GrantCollector                          # noqa: E402
 from g11_campaign import _arm                                 # noqa: E402
 
@@ -71,8 +72,15 @@ def one(arm: str, seed: int, n_ues: int, horizon: int) -> dict:
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
                                  summary=s, arm={}, meta={})
+    # SEVERITY, uniform across the scorecard: the fraction of RESOLVED
+    # bytes that missed their PDB (M02). See phase2_core.py.
+    _card = Scorecard()
+    _m02a = _card.score(rec, population=Population.all_flows()).get("M02")
+    _m02p = _card.score(rec, population=Population.protected_fleet()).get("M02")
     out = {"arm": arm, "seed": seed, "n_ues": n_ues, "horizon": horizon,
-           "wall_s": round(time.time() - t0, 1)}
+           "wall_s": round(time.time() - t0, 1),
+           "M02_all": _m02a.value if _m02a else None,
+           "M02_prot": _m02p.value if _m02p else None}
     for direction in ("UL", "DL"):
         # DELIVERY IS A PRECONDITION. A flow that delivered nothing reports
         # p98 = 0.0 and would score as inside the budget -- the defect caught

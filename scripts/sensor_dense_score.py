@@ -97,7 +97,13 @@ def one(arm: str, seed: int, horizon: int) -> dict:
             if g.direction == "UL" and not g.retx_count}
     all_ul = {f.ue_id for f in sc.flows if f.direction == "UL"}
 
+    _m02 = full.get("M02")
+    _m02 = _m02.value if _m02 else None
     return {
+        # SEVERITY, uniform across the scorecard: the fraction of RESOLVED
+        # bytes that missed their PDB (M02). See phase2_core.py.
+        "M02_all": _m02,
+
         "arm": arm, "seed": seed, "horizon": horizon,
         "wall_s": round(time.time() - t0, 1),
         "n_flows": len(rec.flows),

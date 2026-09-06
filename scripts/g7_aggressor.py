@@ -43,7 +43,8 @@ from code_state import stamp                                  # noqa: E402
 from regime_sweep import arm_cost, paired_seeds, run_cells    # noqa: E402
 from sim.driver import run as driver_run                      # noqa: E402
 from sim.parametric import sweep_scenario                     # noqa: E402
-from sim.run_record import RunRecord                          # noqa: E402
+from sim.run_record import RunRecord
+from sim.scorecard import Population, Scorecard                          # noqa: E402
 from g11_campaign import _arm                                 # noqa: E402
 
 #: The misbehaving asset. UE 2 rather than UE 1 so the aggressor is not also
@@ -101,9 +102,16 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, offer: float,
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
                                  summary=s, arm={}, meta={})
+    # SEVERITY, uniform across the scorecard: the fraction of RESOLVED
+    # bytes that missed their PDB (M02). See phase2_core.py.
+    _card = Scorecard()
+    _m02a = _card.score(rec, population=Population.all_flows()).get("M02")
+    _m02p = _card.score(rec, population=Population.protected_fleet()).get("M02")
     out = {"arm": arm, "seed": seed, "n_ues": n_ues, "horizon": horizon,
            "offer_x_mfbr_target": offer, "load_mult": load_mult,
-           "wall_s": round(time.time() - t0, 1)}
+           "wall_s": round(time.time() - t0, 1),
+           "M02_all": _m02a.value if _m02a else None,
+           "M02_prot": _m02p.value if _m02p else None}
 
     for fr in rec.flows.values():
         if fr.direction != "UL":
