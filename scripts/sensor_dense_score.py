@@ -107,10 +107,16 @@ def one(arm: str, seed: int, horizon: int, attach: bool = False) -> dict:
 
     _m02 = full.get("M02")
     _m02 = _m02.value if _m02 else None
+    # Severity is ONE population across the whole scorecard: the protected
+    # fleet. Mixing M02_all and M02_prot in one column is the population
+    # defect at table level (docs/scorecard-audit-2026-09-07.md 4.1).
+    _m02p = card.score(rec, population=Population.protected_fleet()).get("M02")
+    _m02p = _m02p.value if _m02p else None
     return {
         # SEVERITY, uniform across the scorecard: the fraction of RESOLVED
         # bytes that missed their PDB (M02). See phase2_core.py.
         "M02_all": _m02,
+        "M02_prot": _m02p,
 
         "arm": arm, "seed": seed, "horizon": horizon,
         "wall_s": round(time.time() - t0, 1),

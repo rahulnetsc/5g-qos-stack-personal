@@ -33,8 +33,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 ARMS = ("PF", "Reservation", "TwoTier")
-SEV_DIR = "sweeps/sev-2026-09-06"          # artefacts carrying uniform M02
-ATT_DIR = "sweeps/attach-2026-09-06"       # the same grid WITH the attach path
+SEV_DIR = "sweeps/fixed-2026-09-07/plain"   # audit fixes applied, attach OFF
+ATT_DIR = "sweeps/fixed-2026-09-07/attach"  # the same grid WITH the attach path
 
 #: `--attach` scores the with-attach column. BOTH are reported: the without
 #: column is what a COLD-STARTING deployment sees before any UE has been
@@ -71,6 +71,40 @@ def med(xs):
     return st.median(xs) if xs else None
 
 
+class MissingPopulation(ValueError):
+    """A clause without a declared population does not score.
+
+    THE AUDIT'S OWN CONCLUSION, MADE STRUCTURAL. Every defect this scorecard
+    has produced -- the C1 vacuity, the G1 threshold, G12's unreachable pass
+    branch, G3's background flood, the four-population severity column -- is
+    one class: **an aggregate arithmetically correct over the wrong
+    population**. The three automated checks (--selftest, --denominators,
+    threshold citation) were each added AFTER a defect of that exact shape
+    shipped; they are trailing indicators, and the one check that catches this
+    class cannot be automated.
+
+    So it is not automated. It is made REQUIRED, as data, at the point of use:
+    every clause declares `sums_over` (the rows the predicate ranges over) and
+    `claim_about` (the rows the guarantee's clause is about). Scoring raises
+    if either is absent, and the report prints both beside the verdict so a
+    mismatch is visible without reading the source.
+
+    This does not make the judgement for anyone. It forces the question to be
+    answered where the row is written rather than in a document nobody rereads
+    -- which is precisely where the audit found the documentation was not
+    reaching.
+    """
+
+
+def _require_population(c):
+    for f in ("sums_over", "claim_about"):
+        if not c.get(f):
+            raise MissingPopulation(
+                f"{c['g']} '{c['clause']}' declares no {f!r}. Name the rows "
+                f"the predicate sums over and the rows the clause is about; "
+                f"if they differ, say so in the row rather than in a comment.")
+
+
 # --- CLAUSES ---------------------------------------------------------------
 # stat:   run -> the statistic under test
 # ok:     stat -> bool
@@ -81,55 +115,95 @@ CLAUSES = [
       art=f"{SEV_DIR}/core.json", rows="rows",
       stat=lambda r: r["G1_M01_p98_prot"], ok=lambda v: v is not None and v <= 95.0,
       sev=lambda r: r.get("M02_prot"),
+      sums_over="M01 worst-flow p98 over the PROTECTED FLEET (5QI 1 and 2)",
+      claim_about="the drive-command flow (5QI 1) only. MISMATCH: 4 of 30 "
+                  "rows are scored on 5QI 2 video; all 3 failures are on "
+                  "5QI 1, so the verdict holds on this data",
       source="test plan L95: 'p98 <= RAN PDB (95 ms of the 100 ms 5QI-1 budget)'"),
  dict(g="G1", clause="p98 <= PDB (15 ms, sensor_dense)",
       art=f"{SEV_DIR}/sensor_dense.json", rows="rows",
       stat=lambda r: r["G1_M01_p98"], ok=lambda v: v is not None and v <= 15.0,
-      sev=lambda r: r.get("M02_all"),
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M01 worst-flow p98, sensor_dense (one 5QI, so all flows ARE "
+                "the protected fleet)",
+      claim_about="the same set -- no mismatch possible here",
       source="test plan L95 + the workload's own 15 ms PDB"),
  dict(g="G3", clause="max telemetry gap <= 500 ms",
       art=f"{SEV_DIR}/core.json", rows="rows",
-      stat=lambda r: r["G3_M03_all_ms"], ok=lambda v: v is not None and v <= 500.0,
-      sev=lambda r: r.get("M02_all"),
+      stat=lambda r: r["G3_M03_prot_ms"], ok=lambda v: v is not None and v <= 500.0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M03 max inter-arrival gap over the PROTECTED FLEET",
+      claim_about="telemetry liveness. FIXED 2026-09-07: this row read "
+                  "M03 over ALL flows, so a saturating 5QI-9 flood's own "
+                  "starvation scored as a telemetry failure -- every breach "
+                  "was ue*_qfi9 (wp9-plan.md 24.2, recurring)",
       source="test plan L97: 'Max telemetry inter-arrival gap <= T_live/4 (500 ms)'"),
  dict(g="G5", clause=">= 99 % PDU sets complete within PDB",
       art=f"{SEV_DIR}/core.json", rows="rows",
       stat=lambda r: r["G5_M05_prot"], ok=lambda v: v is not None and v >= 0.99,
       sev=lambda r: r.get("M02_prot"),
+      sums_over="M05 PDU-set completeness over the PROTECTED FLEET",
+      claim_about="the video feed. Same set -- PDU sets exist only on the "
+                  "framed video flow",
       source="test plan L99: '>= 99 % of PDU sets complete within PDB'"),
  dict(g="G8", clause="per-1 s Jain >= 0.90 (parametric)",
       art=f"{SEV_DIR}/core.json", rows="rows",
       stat=lambda r: r["G8_M09_worst_prot"], ok=lambda v: v is not None and v >= 0.90,
       sev=lambda r: r.get("M02_prot"),
+      sums_over="M09 worst per-1 s Jain over the PROTECTED FLEET",
+      claim_about="the same set. NOTE: M09's panel status is `proxy`, not "
+                  "`ok` -- the metric itself is provisional",
       source="test plan L102: 'Per-1 s Jain >= 0.9 per role across assets'"),
  dict(g="G8", clause="per-1 s Jain >= 0.90 (sensor_dense)",
       art=f"{SEV_DIR}/sensor_dense.json", rows="rows",
       stat=lambda r: r["G8_M09_worst"], ok=lambda v: v is not None and v >= 0.90,
-      sev=lambda r: r.get("M02_all"),
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M09 worst per-1 s Jain, sensor_dense (one 5QI)",
+      claim_about="the same set; `proxy` caveat as above",
       source="test plan L102"),
  dict(g="G2", clause="STOP p98 <= 100 ms (UL)",
       art=f"{SEV_DIR}/g2_ul_stop.json", rows="rows",
       stat=lambda r: r["UL_stop_p98_ms"], ok=lambda v: v is not None and v <= 100.0,
-      sev=lambda r: r.get("M02_all"),
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the UL STOP flow's p98",
+      claim_about="100 % of STOP EVENTS, i.e. the MAXIMUM. MISMATCH: p98 is "
+                  "weaker than the clause and is labelled, not equated",
       source="test plan L96: '100 % of STOP events <= 100 ms'. SUBSTITUTION: "
              "the artefact records p98, not the max, so this is WEAKER than "
              "the stated clause and is labelled rather than silently equated"),
  dict(g="G7", clause="clause 2: aggressor's excess clipped at MFBR",
       art=f"{SEV_DIR}/g7.json", rows="rows",
       stat=lambda r: (r["B_camera_throughput_bps"] or 0) / max(r["B_camera_mfbr_bps"] or 1, 1),
-      ok=lambda v: v <= 1.02,
-      sev=lambda r: r.get("M02_all"),
+      # TOLERANCE REMOVED 2026-09-07. The clause says "clipped at MFBR" with
+      # NO tolerance; the 1.02 was invented. Swept as G12's tau was:
+      # Reservation and TwoTier are INSENSITIVE (ratios ~2.0, 0/10 at every
+      # tolerance to 1.5), but PF sits ON the boundary -- 1/10 at <=1.02,
+      # 5/10 at 1.05, 10/10 at 1.25. So the invented number was deciding 9 of
+      # PF's 10 runs. Scored as written.
+      ok=lambda v: v <= 1.0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the AGGRESSOR camera's delivered/MFBR ratio",
+      claim_about="the same flow -- the clause is about B's excess",
       source="test plan L101: \"B's excess clipped at MFBR\""),
  dict(g="G7", clause="clause 1: victim's PDU sets >= 99 % complete",
       art=f"{SEV_DIR}/g7.json", rows="rows",
       stat=lambda r: r["A_camera_m05"], ok=lambda v: v is not None and v >= 0.99,
       sev=lambda r: r.get("M02_prot"),
+      sums_over="the VICTIM camera's PDU-set completeness",
+      claim_about="\"A's G1/G3/G5 unchanged within epsilon\". MISMATCH: "
+                  "epsilon is unspecified, so this row substitutes G5's "
+                  "absolute 99 % bound -- a different question, and the only "
+                  "row whose threshold is downstream of another clause",
       source="test plan L101 (A's G5 unchanged) + L99's 99 % bound"),
  dict(g="G10", clause="every GBR flow meets contract (per fleet size x seed)",
       art=f"{SEV_DIR}/g10_attach.json", rows="rows",
       stat=lambda r: (r["M07_met"], r["M07_total"]),
       ok=lambda v: v[0] == v[1],
       sev=lambda r: r.get("M02_prot"),
+      sums_over="M07 GBR contract count over the PROTECTED FLEET, per "
+                "(fleet size, seed)",
+      claim_about="\"largest N with G1-G8 all-pass\". MISMATCH: this tests "
+                  "the GBR contract only, a narrower question",
       source="test plan L104: 'largest asset count with G1-G8 all-pass'. "
              "SCOPED: this artefact carries the GBR contract only"),
 ]
@@ -182,6 +256,12 @@ def _nested():
             per[arm] = dict(n=len(R), passes=len(ok), sev=med(sev),
                             sev_fail=None)
         out.append((dict(g="G11", clause="C1: every 60 s window within PDB conformance",
+                         sums_over="M02w per 60 s window, subset 'all' -- the "
+                                   "ONLY subset the artefact carries",
+                         claim_about="'every 60 s window passes', i.e. the "
+                                     "guarantees, which bind the protected "
+                                     "fleet. MISMATCH: wider population, and "
+                                     "scoped to PDB conformance only",
                          source="test plan L105 'every 60 s window passes' + "
                                 "L122's 98 % conformance basis -> M02w <= 0.02"),
                     per))
@@ -231,6 +311,9 @@ def _nested():
                             sev=med(sev), sev_fail=None,
                             note=f"{viol} violation / {prem} premise-fails / {ok} pass")
         out.append((dict(g="G12", clause="c4: never starve telemetry while a lower class is served",
+                         sums_over="telemetry M02 and background throughput, "
+                                   "per ramp point",
+                         claim_about="the same two flows -- no mismatch",
                          source="test plan L106. FLOOR FOR 'still has throughput' "
                                 "IS NOT STATED -- tau=1 Mbps (2 % of the 50 Mbps "
                                 "offer); verdict robust for tau in [0.01, 8] Mbps"),
@@ -241,6 +324,7 @@ def _nested():
 def score():
     out = []
     for c in CLAUSES:
+        _require_population(c)          # a row without one does not score
         blob = load(c["art"])
         if blob is None:
             out.append((c, None))
@@ -348,6 +432,8 @@ def main(argv) -> int:
             note = f"   {d['note']}" if d.get("note") else ""
             print(f"{c['g']:4s} {c['clause'][:46]:46s} {arm:12s} "
                   f"{d['passes']:>4d}/{d['n']:<4d} {sev:>10s} {sf:>9s}{note}")
+        print(f"       sums over : {c.get('sums_over')}")
+        print(f"       claim about: {c.get('claim_about')}")
         print()
     print("NOT COMPUTABLE:")
     for g, cl, why, art in NOT_COMPUTABLE:

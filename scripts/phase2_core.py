@@ -97,6 +97,17 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float,
         # G3 -- liveness gap: M03 is all-flow by design, M20 is the fleet
         "G3_M03_all_ms": val(full, "M03", "max_gap_ms"),
         "G3_M03_flow_all": val(full, "M03", "flow"),
+        # G3's clause is "max TELEMETRY inter-arrival gap". Scoring it over
+        # ALL flows let a saturating 5QI-9 flood's own starvation count as a
+        # telemetry liveness failure -- every breach in the 2026-09-06
+        # artefact was ue*_qfi9 (wp9-plan.md 24.2, recurring). The panel
+        # declares M03's population as protected_fleet; that is the clause's
+        # population and what the scorecard reads now.
+        "G3_M03_prot_ms": val(prot, "M03", "max_gap_ms"),
+        "G3_M03_flow_prot": val(prot, "M03", "flow"),
+        # L97's SECOND half -- "zero gaps >= T_live over the full campaign" --
+        # which the scorecard was not scoring at all.
+        "G3_M03_gaps_over_tlive_prot": val(prot, "M03", "gap_count_over_t_live"),
         "G3_M20_prot_ms": val(full, "M20", "max_gap_ms"),
         "G3_M20_flow": val(full, "M20", "flow"),
         "G3_M20_caveats": len((full.get("M20").caveats if full.get("M20") else []) or []),

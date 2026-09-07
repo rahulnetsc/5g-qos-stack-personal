@@ -1,0 +1,33 @@
+30 runs; STOP pair at 5.0 Hz, PDB 5.0 ms
+  [1/30] Reservation  seed=1826701614 UL p98=5.25 DL p98=2.25
+  [2/30] Reservation  seed=1367864806 UL p98=3.25 DL p98=4.75
+  [3/30] TwoTier      seed=579362555 UL p98=4.5 DL p98=3.25
+  [4/30] TwoTier      seed=1367864806 UL p98=4.75 DL p98=3.25
+  [5/30] TwoTier      seed=1746484539 UL p98=5.0 DL p98=2.25
+  [6/30] TwoTier      seed=87989972 UL p98=5.0 DL p98=3.75
+  [7/30] TwoTier      seed=1826701614 UL p98=4.0 DL p98=1.5
+  [8/30] TwoTier      seed=1097657231 UL p98=5.25 DL p98=1.75
+  [9/30] TwoTier      seed=161576974 UL p98=4.0 DL p98=2.0
+  [10/30] TwoTier      seed=661058651 UL p98=3.5 DL p98=2.25
+  [11/30] TwoTier      seed=376383645 UL p98=5.0 DL p98=1.75
+  [12/30] TwoTier      seed=35492826 UL p98=4.5 DL p98=3.0
+  [13/30] Reservation  seed=1097657231 UL p98=5.25 DL p98=3.25
+  [14/30] Reservation  seed=579362555 UL p98=4.0 DL p98=3.25
+  [15/30] PF           seed=579362555 UL p98=2.0 DL p98=3.0
+  [16/30] PF           seed=1826701614 UL p98=4.0 DL p98=2.25
+  [17/30] PF           seed=1097657231 UL p98=4.75 DL p98=1.75
+  [18/30] PF           seed=1367864806 UL p98=3.0 DL p98=3.75
+  [19/30] PF           seed=661058651 UL p98=5.25 DL p98=2.0
+  [20/30] PF           seed=87989972 UL p98=5.0 DL p98=3.0
+  [21/30] Reservation  seed=661058651 UL p98=4.75 DL p98=2.25
+  [22/30] Reservation  seed=161576974 UL p98=3.5 DL p98=1.5
+  [23/30] Reservation  seed=87989972 UL p98=3.75 DL p98=2.25
+  [24/30] Reservation  seed=35492826 UL p98=5.25 DL p98=3.75
+  [25/30] Reservation  seed=376383645 UL p98=2.25 DL p98=2.25
+  [26/30] Reservation  seed=1746484539 UL p98=4.75 DL p98=2.25
+  [27/30] PF           seed=161576974 UL p98=4.25 DL p98=2.25
+  [28/30] PF           seed=35492826 UL p98=5.0 DL p98=2.25
+  [29/30] PF           seed=376383645 UL p98=2.5 DL p98=1.75
+  [30/30] PF           seed=1746484539 UL p98=5.25 DL p98=2.25
+
+wrote sweeps/fixed-2026-09-07/plain/g2_ul_stop.json
