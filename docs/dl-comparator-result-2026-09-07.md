@@ -39,29 +39,58 @@ a tie on the rest.
 of Reservation**. TwoTier's uplink comparator is `-coef` alone at 96.6 %; its
 downlink comparator is a coin-flip on declaration order.
 
-## Why — and it makes Step 4 (CFG-2) load-bearing rather than tidy
+## Why — MEASURED, and it refutes half of my own first explanation
 
-Two conditions co-occur on downlink and both are scenario choices, not fidelity
-gaps:
+I first attributed the tie rate to two scenario choices: an idle DL link and
+`snr_spread_db = 0`. **Tested by varying the spread directly** (one seed,
+6,000 slots, N=8):
 
-1. **The DL link is idle.** Every 5QI-9 background flow in every built scenario
-   is uplink, so only ~160-214 slots per run carry any DL grant, and the DL
-   adjacency count is **~1/140th** of uplink's. Few candidates per slot.
-2. **`snr_spread_db = 0.0` in every artefact the scorecard reads**, so every UE
-   has the same mean SNR. With identical channels the coefficient terms
-   **cannot separate candidates**, and a lexicographic comparator falls through
-   to the tie.
+| spread | Reservation TIED | TwoTier TIED |
+|---|---|---|
+| 0 dB | **80.3 %** | 97.7 % |
+| 6 dB | 72.4 % | 98.1 % |
+| 12 dB | **50.5 %** | **98.6 %** |
 
-**So the 98 % tie rate is the measurable consequence of CFG-2**, and it is the
-first direct evidence that equal channels are not a harmless simplification.
+**Right for Reservation — 80 % → 50 %, so channel spread genuinely explains a
+large part of its DL ties.** `-coef` rises from 19.3 % to 49.5 % as channels
+separate, which is exactly the opportunism CFG-2 says is switched off.
+
+**Wrong for TwoTier — its tie rate does not fall, it slightly RISES.** So the
+explanation had to be somewhere else, and it is:
+
+**TwoTier's DL coefficient is 0.0 for EVERY candidate, in EVERY snapshot,
+across an entire run — exactly one distinct value.** Dumped from the rank
+stream at spread 12, where `hyp_tbs_bytes` plainly differs (30, 30, 41, 52):
+
+```
+ue1 key=(1, 100, -0.0)  coef=0.0  hyp_tbs=30.0  has_gbr=0.0
+ue2 key=(1, 100, -0.0)  coef=0.0  hyp_tbs=30.0  has_gbr=0.0
+ue3 key=(1, 100, -0.0)  coef=0.0  hyp_tbs=41.0  has_gbr=0.0
+ue4 key=(1, 100, -0.0)  coef=0.0  hyp_tbs=52.0  has_gbr=0.0
+```
+
+**All three tiers of TwoTier's DL key are degenerate on this workload:**
+
+| tier | value | why |
+|---|---|---|
+| `has_gbr` | **False for every candidate** | the only DL flow is 5QI 82, `Delay` class, **GFBR 0** |
+| `pdb_ms` | identical for most | one periodic flow, same period and PDB on every UE |
+| `-coef` | **0.0 for every candidate** | `coef = sum_q × hyp_tbs_bytes`, and `sum_q` is Tier-1's virtual queue — **zero for a flow with no GBR target**, so the channel term is multiplied by nothing |
+
+**So TwoTier's downlink comparator is a CONSTANT on every built scenario, and
+its ordering is declaration order by construction — not by tie-breaking luck,
+and not fixable by adding channel spread.** `-coef` decides 0 % of DL
+adjacencies because it cannot decide anything: `0.0 × anything = 0.0`.
 
 ## What this does and does not license
 
 **Does:** it answers Step 3's own question — **B3's DL half matters, but not
-yet.** A 4-UE-per-slot DL cap applied to a comparator that is 98 % ties would
-be capping an essentially arbitrary order. **The DL background flow and
-`snr_spread_db` must come first**, or M-6's DL half measures the cap's
-interaction with a coin flip.
+yet, and for a sharper reason than I first gave.** A 4-UE-per-slot DL cap
+applied to TwoTier would be capping an order that is a **constant**, not merely
+a noisy one. For Reservation the DL cap is meaningful once channels differ
+(its `-coef` reaches 49.5 % at 12 dB). **So CFG-2 unblocks Reservation's DL
+half; TwoTier's needs a DL flow with a GBR target**, which no built scenario
+has — every DL flow in the repo is `Delay` class with GFBR 0.
 
 **Does not:** it says nothing about which DL tier would dominate on a contended,
 channel-diverse downlink — that is exactly what the trace will answer once the

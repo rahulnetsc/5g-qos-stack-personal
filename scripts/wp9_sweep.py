@@ -27,6 +27,7 @@ import multiprocessing as mp
 import sys
 import time
 from pathlib import Path
+import inspect
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -45,21 +46,65 @@ import wp9_gate
 _TT_CONFIG = str(Path(__file__).resolve().parent.parent / "scheduler" / "scheduler_config.yaml")
 
 # docs/wp9-plan.md §1: the base point. Every excursion is one key away.
-BASE: dict[str, Any] = {
-    "n_ues": 8,
-    "load_mult": 1.0,
+#: Deliberate divergences from the builder's own defaults. **Divergence on
+#: purpose is fine; divergence silently is the finding** -- the
+#: `parallel_audit.ALLOW_SERIAL` pattern, applied to configuration.
+BASE_OVERRIDES: dict[str, tuple[Any, str]] = {
+    "mfbr_multiple": (
+        0.0,
+        "DRIFT, NOT A CHOICE -- and preserved deliberately rather than "
+        "corrected in place. `sweep_scenario` defaults this to 2.0; this "
+        "hand-listed BASE has carried 0.0, so every artefact built through it "
+        "(G4 via g4_postsilence.py, G6 via g6_seed_extension.py, wp9_part_c, "
+        "analyse_stage6) ran with two-tier's MFBR-dependent protections INERT, "
+        "while G1/G3/G5/G7/G8/G10 ran at MFBR 8 Mbps. Setting it to 2.0 here "
+        "would silently RE-MEASURE G4 and G6 rather than fix a config bug, so "
+        "the value stays and the inconsistency is now visible. Re-running them "
+        "under the builder's default is a separate, deliberate decision."),
+}
+
+#: Driver kwargs, not scenario parameters -- they are not in
+#: `sweep_scenario`'s signature and must be listed.
+BASE_DRIVER_KWARGS: dict[str, Any] = {
     "min_rb": 5,
-    "mix": "factory",
-    "duty_cycle": 1.0,
-    "snr_spread_db": 0.0,
-    "pdb_ms": None,
-    "shared_lcg": False,
-    "mfbr_multiple": 0.0,
-    "bg": False,
-    "inf_scenario": None,
     "sr_period_slots": 10,
     "k2_slots": 2,
 }
+
+
+def _derive_base() -> dict[str, Any]:
+    """BASE, DERIVED from `sweep_scenario`'s signature rather than hand-listed.
+
+    A hand-listed base point is the restated-count defect applied to a
+    configuration: it drifts the moment the builder's defaults change, and it
+    drifts INVISIBLY, because a WP9 artefact records an axis value only when it
+    is *off-base* -- 1,740 of 1,770 stage-1 rows carry a blank `mfbr_multiple`,
+    and a blank means "whatever BASE said at the time". The effective
+    configuration cannot be read off the artefact at all.
+
+    So the base is derived, an explicit override map carries any deliberate
+    divergence with its reason, and `sim/tests/test_base_derivation.py` fails
+    if a new signature parameter appears without one.
+    """
+    sig = inspect.signature(sweep_scenario)
+    base: dict[str, Any] = {}
+    for name, prm in sig.parameters.items():
+        if prm.default is inspect.Parameter.empty:
+            continue            # `seed` -- supplied per cell, never a base value
+        if name == "horizon_slots":
+            continue            # set per campaign, not a sweep axis
+        base[name] = prm.default
+    for name, (value, _reason) in BASE_OVERRIDES.items():
+        if name not in base:
+            raise KeyError(
+                f"BASE_OVERRIDES names {name!r}, which is not a parameter of "
+                f"sweep_scenario -- the override would be silently ignored.")
+        base[name] = value
+    base.update(BASE_DRIVER_KWARGS)
+    return base
+
+
+BASE: dict[str, Any] = _derive_base()
 
 CORE_PLANE = {
     "n_ues": [2, 4, 8, 16, 24, 32],
