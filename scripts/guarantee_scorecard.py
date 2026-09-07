@@ -299,6 +299,15 @@ CLAUSES = [
 ]
 
 NOT_COMPUTABLE = [
+ ("G4", "p99 <= 300 ms at silence 1 s / 5 s / 60 s (0 of 3)",
+  "THREE reasons, each independently fatal: (a) the artefact records p98, "
+  "not p99, and p98 <= p99 so substituting is OPTIMISTIC; (b) the axis is "
+  "`duty_cycle` {1.0, 0.5, 0.1}, not silence length, and under _burstify's "
+  "constant-mean-rate design duty cycle moves message SIZE with it, so the "
+  "two are confounded; (c) GAP_BUCKETS_MS tops out at [1000, inf), so 1 s "
+  "and 60 s land in the SAME bucket -- the instrument cannot resolve the "
+  "clause's own buckets even if the axis existed",
+  "rerun-2026-09-06/g4.json"),
  ("G4", "first packet after silence p99 <= 300 ms",
   "the artefact records p98, not p99, and p98 <= p99 -- so substituting it "
   "would be OPTIMISTIC, not conservative. Its rows are also per (duty, ue, "
@@ -444,7 +453,59 @@ def _nested():
                          source="test plan L105: 'across repeats, CoV(p98) "
                                 "<= 15 %'"), per))
 
-    g12 = load("sweeps/g12-rescore-2026-09-06/g12.json")
+    # --- G9: the artefact stores PER-ARM medians across runs, so no success
+    # RATE can be formed -- but the clause's three time bounds and its
+    # neighbour clause CAN be scored as single-value rows, exactly as G11 C3
+    # is. Denominator 1, and the row says so.
+    g9 = load("sweeps/rerun-2026-09-06/g9.json")
+    if g9:
+        BOUNDS = [("GT-6.1_warm", 1000.0, "warm re-handshake p95 <= 1 s"),
+                  ("GT-6.2_cold", 15000.0, "attach-to-streaming <= 15 s"),
+                  ("GT-6.3_rlf", 10000.0, "post-RLF time-to-SLO <= 10 s")]
+        for scen, bound, label in BOUNDS:
+            per = {}
+            for arm in ARMS:
+                d = (g9.get(scen) or {}).get(arm) or {}
+                v = d.get("m18_p95_median")
+                # None = the arm REGISTERED its events and COMPLETED none.
+                # That is a FAIL, not a missing value -- CLAUDE.md's
+                # firing-vs-finishing rule.
+                ok = int(v is not None and v <= bound)
+                note = (f"{v:.1f} ms" if v is not None
+                        else "NO COMPLETION -- events fired, none finished")
+                per[arm] = dict(n=1, passes=ok, sev=None, sev_fail=None, note=note)
+            src = ("test plan L103. NOTE for the attach bound: there is no RA "
+                   "procedure in this simulator, so it measures the APP-level "
+                   "handshake, not attach-to-streaming"
+                   if scen == "GT-6.2_cold" else "test plan L103")
+            out.append((dict(g="G9", clause=label,
+                             column=_NO_ATTACH_COLUMN,
+                             sums_over="M18 p95, median ACROSS runs, per arm",
+                             claim_about="the same set. DENOMINATOR IS 1 -- the "
+                                         "artefact stores a per-arm median, not "
+                                         "per-run values, so no success rate exists",
+                             source=src), per))
+        # neighbours unaffected -- a paired delta whose CI is carried
+        per = {}
+        for arm in ARMS:
+            d = (g9.get("GT-6.1_warm") or {}).get(arm) or {}
+            ci = (d.get("neighbour_dp98_ms") or {}).get("ci") or {}
+            lo, hi = ci.get("lo"), ci.get("hi")
+            # "unaffected" = the interval includes zero. An interval strictly
+            # above zero is neighbours made WORSE by the join.
+            ok = int(lo is not None and hi is not None and lo <= 0.0 <= hi)
+            per[arm] = dict(n=1, passes=ok, sev=None, sev_fail=None,
+                            note=(f"dp98 {ci.get('point', float('nan')):+.2f} ms "
+                                  f"[{lo:+.2f}, {hi:+.2f}]" if lo is not None else "no CI"))
+        out.append((dict(g="G9", clause="neighbours unaffected throughout",
+                         column=_NO_ATTACH_COLUMN,
+                         sums_over="paired neighbour delta-p98, 10 seeds, as a CI",
+                         claim_about="the same set. 'Unaffected' is read as the "
+                                     "interval including zero; strictly above "
+                                     "zero is neighbours made WORSE",
+                         source="test plan L103, fourth part"), per))
+
+    g12 = load("sweeps/axis-2026-09-07/g12_rebased_final.json")
     if g12:
         # THE PREDICATE WAS UNSOUND AND REPORTED 0/20 ON EVERY ARM.
         # Clause 4 is a CONJUNCTION -- telemetry starved WHILE a lower class
