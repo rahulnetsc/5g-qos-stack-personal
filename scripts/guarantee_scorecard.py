@@ -373,7 +373,10 @@ def _nested():
     # full panel in both populations, and bg=False IS the unperturbed paired
     # baseline the clause requires.
     import csv as _csv
-    g6p = REPO / "sweeps/rerun-2026-09-06/g6/stage6_g6_n40.csv"
+    # Re-run under M-6 on current code (the 2026-09-06 artefact predates
+    # both M-9 and M-6 and is UNSTAMPED, so it cannot be shown to match
+    # any code state).
+    g6p = REPO / "sweeps/g6-m6-2026-09-07/stage6_g6_n40.csv"
     if g6p.exists():
         rows6 = list(_csv.DictReader(g6p.open()))
         def _f(r, k):

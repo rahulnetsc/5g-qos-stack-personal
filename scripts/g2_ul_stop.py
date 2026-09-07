@@ -71,12 +71,14 @@ def build(seed: int, n_ues: int, horizon: int):
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int,
-        attach: bool = False) -> dict:
+        attach: bool = False,
+        max_sched_ues: int | None = None) -> dict:
     sc = build(seed, n_ues, horizon)
     grants = GrantCollector()
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
                    attach_seed_slots=("all" if attach else None),
+                   max_sched_ues=max_sched_ues,
                    grant_sink=grants)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
@@ -127,6 +129,10 @@ def main() -> int:
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--n-ues", type=int, default=8)
     ap.add_argument("--horizon", type=int, default=20_000)
+    ap.add_argument("--max-sched-ues", type=int, default=None,
+                    help="M-6: force the per-slot UE cap (the deployment's "
+                         "N_RB 106 gives 4; this carrier derives 2). Default "
+                         "derives from the grid.")
     ap.add_argument("--attach-seed", action="store_true",
                     help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/postscaling-2026-09-05/g2_ul_stop.json")
@@ -140,7 +146,7 @@ def main() -> int:
     # first version did exactly that and produced a with-attach run
     # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
     # CLAUDE.md records from G9.
-    tasks = [(arm, s, a.n_ues, a.horizon, a.attach_seed) for arm in arms for s in seeds]
+    tasks = [(arm, s, a.n_ues, a.horizon, a.attach_seed, a.max_sched_ues) for arm in arms for s in seeds]
     print(f"{len(tasks)} runs; STOP pair at {DIAG_RATE_HZ} Hz, PDB {STOP_PDB_MS} ms")
     rows = [None] * len(tasks)
     for i, (idx, r) in enumerate(run_cells(_task, tasks, a.workers,

@@ -53,12 +53,14 @@ _DEFAULT_WORKERS = 16
 ATTACH_SEED = None
 
 def one(arm: str, seed: int, n_ues: int, horizon: int, load_mult: float,
-        attach: bool = False) -> dict:
+        attach: bool = False,
+        max_sched_ues: int | None = None) -> dict:
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
                         load_mult=load_mult)
     t0 = time.time()
     summary = driver_run(sc, _arm(arm), cqi_delay_slots=8,
                          attach_seed_slots=("all" if attach else None),
+                   max_sched_ues=max_sched_ues,
                          record_timeseries=True)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
@@ -139,6 +141,10 @@ def main() -> int:
     ap.add_argument("--n-ues", type=int, default=8)
     ap.add_argument("--horizon", type=int, default=40_000)   # 10 s at mu=2
     ap.add_argument("--load-mult", type=float, default=1.0)
+    ap.add_argument("--max-sched-ues", type=int, default=None,
+                    help="M-6: force the per-slot UE cap (the deployment's "
+                         "N_RB 106 gives 4; this carrier derives 2). Default "
+                         "derives from the grid.")
     ap.add_argument("--attach-seed", action="store_true",
                     help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/phase2/core_fast.json")
@@ -160,7 +166,7 @@ def main() -> int:
     # first version did exactly that and produced a with-attach run
     # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
     # CLAUDE.md records from G9.
-    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult, a.attach_seed)
+    tasks = [(arm, s, a.n_ues, a.horizon, a.load_mult, a.attach_seed, a.max_sched_ues)
              for s in seeds for arm in arms]
 
     # BANKED AS EACH RUN COMPLETES, not written once at the end. This runner

@@ -133,4 +133,4 @@ G8  BOTH conjuncts -- M09 per-1s Jain (>=0.9) AND M22 starvation epochs (==0)
   Reservation     0.7133    0.7498           9            6      10.00     ue3_qfi9
   TwoTier         0.6908    0.7557          14            8      10.00     ue7_qfi9
 
-wall: 501s total
+wall: 499s total

@@ -11,6 +11,7 @@ class SlotGrid:
     ul_symbols: int
     prb_count: int
     pdcch_cce_budget: int
+    max_sched_ues_override: int | None = None
 
     @property
     def max_sched_ues(self) -> int:
@@ -37,6 +38,8 @@ class SlotGrid:
         fixed 4 to derive a UE-COUNT CAP. "Model it fixed or SNR-dependent" was
         the wrong question.
         """
+        if self.max_sched_ues_override is not None:
+            return self.max_sched_ues_override
         return max(1, min(self.prb_count // (4 * 6), 8))
 
 
@@ -44,9 +47,17 @@ SYMBOLS_PER_SLOT = 14
 
 
 class ResourceGrid:
-    def __init__(self, carrier: CarrierConfig, tdd: TDDConfig):
+    def __init__(self, carrier: CarrierConfig, tdd: TDDConfig,
+                 max_sched_ues_override: int | None = None):
         self.carrier = carrier
         self.tdd = tdd
+        #: M-6 fidelity knob, DEFAULT None = derive from this carrier's PRB
+        #: count. Set only to answer "what would the DEPLOYMENT's cap do here"
+        #: -- the deployment runs N_RB 106 (cap 4) while this repo's parametric
+        #: cell is 55 PRB (cap 2), so the faithful FORMULA yields a harsher
+        #: VALUE than the deployed system's. Never a default; every run states
+        #: which value it used.
+        self.max_sched_ues_override = max_sched_ues_override
         self.slot_duration_s = 0.001 / (2 ** carrier.numerology)
         self.prb_count = self._compute_prb_count()
         self.pattern = tdd.pattern
@@ -81,4 +92,5 @@ class ResourceGrid:
             ul_symbols=int(ul * oh),
             prb_count=self.prb_count,
             pdcch_cce_budget=cce,
+            max_sched_ues_override=self.max_sched_ues_override,
         )

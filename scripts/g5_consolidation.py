@@ -42,7 +42,7 @@ from g11_campaign import _arm                                # noqa: E402
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int,
-        attach_seed: bool = False) -> dict:
+        attach_seed: bool = False, max_sched_ues: int | None = None) -> dict:
     # `attach_seed` supplies the attach BSR at slot 0 with NO stagger, so the
     # ONLY difference from the control is the seed. The staggered arm in
     # docs/attach-path-result depresses M07/M08 through pre-attach time
@@ -55,7 +55,8 @@ def one(arm: str, seed: int, n_ues: int, horizon: int,
     grants = GrantCollector()
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
-                   grant_sink=grants, attach_seed_slots=seed_slots)
+                   grant_sink=grants, attach_seed_slots=seed_slots,
+                         max_sched_ues=max_sched_ues)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows, summary=s,
                                  arm={}, meta={})
@@ -103,6 +104,8 @@ def main() -> int:
     ap.add_argument("--n-ues", default="2,4,8,16")
     ap.add_argument("--horizon", type=int, default=20_000)
     ap.add_argument("--out", default="sweeps/phase2/g5_consolidation.json")
+    ap.add_argument("--max-sched-ues", type=int, default=None,
+                    help="M-6: force the per-slot UE cap")
     ap.add_argument("--attach-seed", action="store_true",
                     help="seed the attach BSR at slot 0, no stagger")
     ap.add_argument("--workers", type=int, default=8)
@@ -111,7 +114,7 @@ def main() -> int:
     arms = [x for x in a.arms.split(",") if x]
     ns = [int(x) for x in a.n_ues.split(",")]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, n, a.horizon, a.attach_seed)
+    tasks = [(arm, s, n, a.horizon, a.attach_seed, a.max_sched_ues)
              for arm in arms for n in ns for s in seeds]
     print(f"{len(tasks)} runs = {len(arms)} arms x {len(ns)} fleet sizes "
           f"x {len(seeds)} seeds @ horizon {a.horizon}")

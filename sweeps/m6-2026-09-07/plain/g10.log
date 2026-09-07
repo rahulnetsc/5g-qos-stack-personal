@@ -1,6 +1,6 @@
 120 runs = 3 arms x 4 fleet sizes x 10 seeds @ horizon 20000
-  [1/120] Reservation  N=16  never_granted=5   M08=0.0
-  [2/120] Reservation  N=16  never_granted=3   M08=0.0
+  [1/120] Reservation  N=16  never_granted=3   M08=0.0
+  [2/120] Reservation  N=16  never_granted=5   M08=0.0
   [3/120] TwoTier      N=16  never_granted=9   M08=0.0
   [4/120] TwoTier      N=16  never_granted=10  M08=0.0
   [5/120] TwoTier      N=16  never_granted=10  M08=0.0
@@ -15,61 +15,61 @@
   [14/120] Reservation  N=16  never_granted=3   M08=0.0
   [15/120] TwoTier      N=8   never_granted=2   M08=0.0
   [16/120] TwoTier      N=8   never_granted=3   M08=0.0
-  [17/120] TwoTier      N=8   never_granted=3   M08=0.0
-  [18/120] Reservation  N=16  never_granted=5   M08=0.0
-  [19/120] TwoTier      N=8   never_granted=2   M08=0.0
-  [20/120] Reservation  N=16  never_granted=6   M08=0.0
-  [21/120] Reservation  N=16  never_granted=5   M08=0.0
-  [22/120] Reservation  N=16  never_granted=3   M08=0.0
+  [17/120] Reservation  N=16  never_granted=6   M08=0.0
+  [18/120] TwoTier      N=8   never_granted=3   M08=0.0
+  [19/120] Reservation  N=16  never_granted=5   M08=0.0
+  [20/120] Reservation  N=16  never_granted=5   M08=0.0
+  [21/120] Reservation  N=16  never_granted=3   M08=0.0
+  [22/120] TwoTier      N=8   never_granted=2   M08=0.0
   [23/120] Reservation  N=16  never_granted=3   M08=0.0
   [24/120] Reservation  N=16  never_granted=4   M08=0.0
   [25/120] TwoTier      N=8   never_granted=2   M08=0.0
   [26/120] TwoTier      N=8   never_granted=2   M08=0.0
-  [27/120] PF           N=16  never_granted=0   M08=0.9375152
-  [28/120] PF           N=16  never_granted=0   M08=0.9320888
-  [29/120] PF           N=16  never_granted=0   M08=0.9434108
+  [27/120] PF           N=16  never_granted=0   M08=0.9320888
+  [28/120] PF           N=16  never_granted=0   M08=0.9434108
+  [29/120] PF           N=16  never_granted=0   M08=0.9375152
   [30/120] PF           N=16  never_granted=0   M08=0.9372592
   [31/120] PF           N=16  never_granted=0   M08=0.926094
   [32/120] PF           N=16  never_granted=0   M08=0.93398
   [33/120] TwoTier      N=8   never_granted=3   M08=0.0
   [34/120] TwoTier      N=8   never_granted=2   M08=0.0
-  [35/120] TwoTier      N=8   never_granted=3   M08=0.0
-  [36/120] TwoTier      N=8   never_granted=2   M08=0.0
-  [37/120] Reservation  N=8   never_granted=0   M08=0.9578576
-  [38/120] PF           N=16  never_granted=0   M08=0.9031244
-  [39/120] PF           N=16  never_granted=0   M08=0.9433376
+  [35/120] TwoTier      N=8   never_granted=2   M08=0.0
+  [36/120] TwoTier      N=8   never_granted=3   M08=0.0
+  [37/120] PF           N=16  never_granted=0   M08=0.9031244
+  [38/120] PF           N=16  never_granted=0   M08=0.9433376
+  [39/120] Reservation  N=8   never_granted=0   M08=0.9578576
   [40/120] Reservation  N=8   never_granted=2   M08=0.0
   [41/120] Reservation  N=8   never_granted=1   M08=0.0
   [42/120] Reservation  N=8   never_granted=2   M08=0.0
   [43/120] Reservation  N=8   never_granted=3   M08=0.0
   [44/120] Reservation  N=8   never_granted=2   M08=0.0
   [45/120] Reservation  N=8   never_granted=3   M08=0.0
-  [46/120] PF           N=16  never_granted=0   M08=0.9150292
+  [46/120] PF           N=16  never_granted=0   M08=0.9371144
   [47/120] Reservation  N=8   never_granted=3   M08=0.0
-  [48/120] PF           N=16  never_granted=0   M08=0.9371144
-  [49/120] TwoTier      N=4   never_granted=0   M08=0.9645452
+  [48/120] PF           N=16  never_granted=0   M08=0.9150292
+  [49/120] Reservation  N=8   never_granted=2   M08=0.0
   [50/120] TwoTier      N=4   never_granted=0   M08=0.959984
-  [51/120] TwoTier      N=4   never_granted=0   M08=0.9595132
+  [51/120] TwoTier      N=4   never_granted=0   M08=0.9645452
   [52/120] TwoTier      N=4   never_granted=0   M08=0.9662888000000001
-  [53/120] Reservation  N=8   never_granted=2   M08=0.0
-  [54/120] Reservation  N=8   never_granted=3   M08=0.0
+  [53/120] Reservation  N=8   never_granted=3   M08=0.0
+  [54/120] TwoTier      N=4   never_granted=0   M08=0.9595132
   [55/120] TwoTier      N=4   never_granted=0   M08=0.9635072
-  [56/120] TwoTier      N=4   never_granted=0   M08=0.9685688
-  [57/120] TwoTier      N=4   never_granted=0   M08=0.9756164
-  [58/120] TwoTier      N=4   never_granted=0   M08=0.9621716
+  [56/120] TwoTier      N=4   never_granted=0   M08=0.9756164
+  [57/120] TwoTier      N=4   never_granted=0   M08=0.9621716
+  [58/120] TwoTier      N=4   never_granted=0   M08=0.9685688
   [59/120] TwoTier      N=4   never_granted=0   M08=0.9631616
   [60/120] TwoTier      N=4   never_granted=0   M08=0.9625315999999999
   [61/120] PF           N=8   never_granted=0   M08=0.9578576
   [62/120] PF           N=8   never_granted=0   M08=0.9587068000000001
-  [63/120] PF           N=8   never_granted=0   M08=0.9537664
+  [63/120] PF           N=8   never_granted=0   M08=0.9667652
   [64/120] PF           N=8   never_granted=0   M08=0.9636376
-  [65/120] PF           N=8   never_granted=0   M08=0.9667652
-  [66/120] Reservation  N=4   never_granted=0   M08=0.958986
-  [67/120] PF           N=8   never_granted=0   M08=0.9645228
-  [68/120] Reservation  N=4   never_granted=0   M08=0.9645452
+  [65/120] Reservation  N=4   never_granted=0   M08=0.958986
+  [66/120] Reservation  N=4   never_granted=0   M08=0.9645452
+  [67/120] PF           N=8   never_granted=0   M08=0.9537664
+  [68/120] PF           N=8   never_granted=0   M08=0.9645228
   [69/120] PF           N=8   never_granted=0   M08=0.950306
-  [70/120] PF           N=8   never_granted=0   M08=0.9666928
-  [71/120] PF           N=8   never_granted=0   M08=0.9690408
+  [70/120] PF           N=8   never_granted=0   M08=0.9690408
+  [71/120] PF           N=8   never_granted=0   M08=0.9666928
   [72/120] PF           N=8   never_granted=0   M08=0.9663271999999999
   [73/120] Reservation  N=4   never_granted=0   M08=0.9653648
   [74/120] Reservation  N=4   never_granted=0   M08=0.9595132
@@ -77,40 +77,40 @@
   [76/120] Reservation  N=4   never_granted=0   M08=0.9685688
   [77/120] Reservation  N=4   never_granted=0   M08=0.9621716
   [78/120] Reservation  N=4   never_granted=0   M08=0.9766556
-  [79/120] Reservation  N=4   never_granted=0   M08=0.9618055999999999
-  [80/120] Reservation  N=4   never_granted=0   M08=0.9631616
+  [79/120] Reservation  N=4   never_granted=0   M08=0.9631616
+  [80/120] Reservation  N=4   never_granted=0   M08=0.9618055999999999
   [81/120] TwoTier      N=2   never_granted=0   M08=0.9811892
   [82/120] TwoTier      N=2   never_granted=0   M08=0.96231
-  [83/120] TwoTier      N=2   never_granted=0   M08=0.9745048000000001
-  [84/120] TwoTier      N=2   never_granted=0   M08=0.9641224
+  [83/120] TwoTier      N=2   never_granted=0   M08=0.9641224
+  [84/120] TwoTier      N=2   never_granted=0   M08=0.9745048000000001
   [85/120] TwoTier      N=2   never_granted=0   M08=0.9543088000000001
-  [86/120] PF           N=4   never_granted=0   M08=0.9587135999999999
-  [87/120] PF           N=4   never_granted=0   M08=0.9645452
-  [88/120] TwoTier      N=2   never_granted=0   M08=0.9580144
-  [89/120] TwoTier      N=2   never_granted=0   M08=0.964992
+  [86/120] TwoTier      N=2   never_granted=0   M08=0.964992
+  [87/120] TwoTier      N=2   never_granted=0   M08=0.9580144
+  [88/120] PF           N=4   never_granted=0   M08=0.9645452
+  [89/120] PF           N=4   never_granted=0   M08=0.9587135999999999
   [90/120] TwoTier      N=2   never_granted=0   M08=0.9712076
-  [91/120] TwoTier      N=2   never_granted=0   M08=0.9665368000000001
-  [92/120] TwoTier      N=2   never_granted=0   M08=0.9739536
-  [93/120] PF           N=4   never_granted=0   M08=0.9662888000000001
+  [91/120] TwoTier      N=2   never_granted=0   M08=0.9739536
+  [92/120] PF           N=4   never_granted=0   M08=0.9662888000000001
+  [93/120] TwoTier      N=2   never_granted=0   M08=0.9665368000000001
   [94/120] PF           N=4   never_granted=0   M08=0.9595132
   [95/120] PF           N=4   never_granted=0   M08=0.9635072
   [96/120] PF           N=4   never_granted=0   M08=0.9685688
-  [97/120] Reservation  N=2   never_granted=0   M08=0.9811892
-  [98/120] Reservation  N=2   never_granted=0   M08=0.9628871999999999
+  [97/120] Reservation  N=2   never_granted=0   M08=0.9628871999999999
+  [98/120] Reservation  N=2   never_granted=0   M08=0.9811892
   [99/120] PF           N=4   never_granted=0   M08=0.9621716
-  [100/120] Reservation  N=2   never_granted=0   M08=0.9745048000000001
-  [101/120] Reservation  N=2   never_granted=0   M08=0.9641224
-  [102/120] PF           N=4   never_granted=0   M08=0.9766556
+  [100/120] PF           N=4   never_granted=0   M08=0.9766556
+  [101/120] Reservation  N=2   never_granted=0   M08=0.9745048000000001
+  [102/120] Reservation  N=2   never_granted=0   M08=0.9641224
   [103/120] Reservation  N=2   never_granted=0   M08=0.9543088000000001
-  [104/120] PF           N=4   never_granted=0   M08=0.9631616
-  [105/120] PF           N=4   never_granted=0   M08=0.9625315999999999
+  [104/120] PF           N=4   never_granted=0   M08=0.9625315999999999
+  [105/120] PF           N=4   never_granted=0   M08=0.9631616
   [106/120] Reservation  N=2   never_granted=0   M08=0.964992
   [107/120] Reservation  N=2   never_granted=0   M08=0.9580144
   [108/120] Reservation  N=2   never_granted=0   M08=0.9712076
-  [109/120] PF           N=2   never_granted=0   M08=0.9811892
-  [110/120] PF           N=2   never_granted=0   M08=0.9628871999999999
-  [111/120] Reservation  N=2   never_granted=0   M08=0.9665368000000001
-  [112/120] Reservation  N=2   never_granted=0   M08=0.9739536
+  [109/120] Reservation  N=2   never_granted=0   M08=0.9739536
+  [110/120] PF           N=2   never_granted=0   M08=0.9811892
+  [111/120] PF           N=2   never_granted=0   M08=0.9628871999999999
+  [112/120] Reservation  N=2   never_granted=0   M08=0.9665368000000001
   [113/120] PF           N=2   never_granted=0   M08=0.9745048000000001
   [114/120] PF           N=2   never_granted=0   M08=0.9641224
   [115/120] PF           N=2   never_granted=0   M08=0.9543088000000001

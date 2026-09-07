@@ -1,0 +1,31 @@
+  RAMP OVERRIDDEN: 16 points 1.0..2.5
+G12 campaign -- ramp [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5] (16 points), in-range <= x3.3: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5]
+  NOTE: this ramp has no out-of-range points, so REGION 2 is not reported at all.
+  scoreable cells (3): [('mixed', 8), ('ugv_heavy', 8), ('drone_heavy', 8)]
+  EXCLUDED ('sensor_dense', 8): g12_sensor_dense_n8_x1.0: GBR classes [4] absent (census {2: 1})
+  3 arms x 10 seeds; 1440 runs
+==============================================================================
+E1's CONTROL PASS -- ramp bottom only, every cell, read FIRST
+==============================================================================
+  mixed_n8   CONTAMINATED: 10/30 (arm, seed) groups breach at x1.0; EXCLUDED WHOLE
+      TwoTier/seed1826701614: 5QI [2, 4] worst {2: 0.2007, 4: 0.9006}
+      TwoTier/seed1367864806: 5QI [2] worst {2: 0.5366, 4: 0.9717}
+      TwoTier/seed1097657231: 5QI [2] worst {2: 0.1649, 4: 0.9858}
+      TwoTier/seed579362555: 5QI [2] worst {2: 0.3593, 4: 0.9999}
+      ... and 6 more
+  ugv_heavy_n8   CONTAMINATED: 12/30 (arm, seed) groups breach at x1.0; EXCLUDED WHOLE
+      PF/seed579362555: 5QI [2] worst {2: 0.9472, 4: 1.0}
+      Reservation/seed579362555: 5QI [2] worst {2: 0.9468, 4: 1.0}
+      TwoTier/seed1826701614: 5QI [2, 4] worst {2: 0.1941, 4: 0.6101}
+      TwoTier/seed1367864806: 5QI [2, 4] worst {2: 0.1106, 4: 0.7023}
+      ... and 8 more
+  drone_heavy_n8   CONTAMINATED: 10/30 (arm, seed) groups breach at x1.0; EXCLUDED WHOLE
+      TwoTier/seed1826701614: 5QI [2] worst {2: 0.0168, 4: 0.9718}
+      TwoTier/seed1367864806: 5QI [2, 4] worst {2: 0.1076, 4: 0.873}
+      TwoTier/seed1097657231: 5QI [2, 4] worst {2: 0.0199, 4: 0.6332}
+      TwoTier/seed579362555: 5QI [2, 4] worst {2: 0.0202, 4: 0.9437}
+      ... and 6 more
+
+  cells with a clean control: []
+
+NO CELL HAS A CLEAN CONTROL. E1 fails outright and no ordering is computed -- that is the result (§35.9 E1).

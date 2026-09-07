@@ -1,0 +1,136 @@
+
+n_ues=8 load=1.0 horizon=40000 (10s sim) seeds=10
+
+G1  M01 p98 (ms) and M15 jitter (ms) -- ALL flows vs PROTECTED fleet
+  arm            p98 all       winner  p98 prot       winner   M15 all  M15 prot
+  PF              300.00     ue8_qfi9     41.75     ue6_qfi1     40.00     40.00
+  Reservation     300.25     ue8_qfi9     29.25     ue3_qfi1     29.50     29.50
+  TwoTier         300.25     ue8_qfi9    104.67     ue4_qfi2    175.00     82.55
+  PF              300.00     ue8_qfi9     26.75     ue5_qfi1     42.00     42.00
+  Reservation     300.25     ue8_qfi9     29.75     ue5_qfi1     29.75     29.75
+  TwoTier         300.25     ue8_qfi9     98.47     ue6_qfi2    186.25     72.00
+  PF              300.25     ue8_qfi9     23.00     ue5_qfi1     32.50     32.50
+  Reservation     300.25     ue8_qfi9     33.00     ue2_qfi1     31.25     31.25
+  TwoTier         300.25     ue7_qfi9    106.62     ue7_qfi2    189.50     87.50
+  PF              300.25     ue8_qfi9     22.50     ue7_qfi1     30.25     30.25
+  Reservation     300.25     ue8_qfi9     27.75     ue3_qfi1     28.00     28.00
+  TwoTier         300.25     ue8_qfi9    113.10     ue8_qfi2    159.75     94.15
+  PF              300.25     ue8_qfi9     30.75     ue3_qfi1     48.50     48.50
+  Reservation     300.25     ue8_qfi9     28.00     ue5_qfi1     29.50     29.50
+  TwoTier         300.25     ue7_qfi9     98.33     ue2_qfi2    178.75     81.61
+  PF              300.25     ue8_qfi9     18.25     ue7_qfi1     46.75     46.75
+  Reservation     300.25     ue8_qfi9     31.00     ue5_qfi1     30.00     30.00
+  TwoTier         300.25     ue8_qfi9    114.25     ue3_qfi2    175.00     87.06
+  PF              300.25     ue8_qfi9     24.25     ue3_qfi1     67.00     67.00
+  Reservation     300.25     ue8_qfi9     34.50     ue7_qfi1     29.25     29.25
+  TwoTier         300.25     ue8_qfi9    102.34     ue5_qfi2    190.00     85.49
+  PF              300.00     ue8_qfi9     24.50     ue4_qfi1     67.25     67.25
+  Reservation     300.25     ue8_qfi9     26.00     ue6_qfi1     29.75     29.75
+  TwoTier         300.25     ue8_qfi9    117.18     ue5_qfi2    227.50     83.95
+  PF              300.25     ue8_qfi9     23.00     ue1_qfi1     45.25     45.25
+  Reservation     300.25     ue8_qfi9     32.00     ue1_qfi1     29.75     29.75
+  TwoTier         300.25     ue8_qfi9    110.98     ue1_qfi2    171.50     85.68
+  PF              300.00     ue8_qfi9     18.50     ue5_qfi1     29.00     29.00
+  Reservation     300.25     ue8_qfi9     29.75     ue3_qfi1     30.00     30.00
+  TwoTier         300.25     ue8_qfi9    111.35     ue2_qfi2    190.00     86.81
+
+G3  liveness gap (ms) -- M03 all-flow vs M20 protected fleet
+  arm            M03 all       winner  M20 prot       winner  caveats
+  PF              138.50     ue6_qfi1    138.50     ue6_qfi1        1
+  Reservation     133.00     ue3_qfi1    133.00     ue3_qfi1        1
+  TwoTier        1134.75     ue2_qfi9    728.75     ue3_qfi1        1
+  PF              141.75     ue5_qfi1    141.75     ue5_qfi1        1
+  Reservation     135.00     ue5_qfi1    135.00     ue5_qfi1        1
+  TwoTier        1049.50     ue5_qfi1   1049.50     ue5_qfi1        1
+  PF              132.25     ue5_qfi1    132.25     ue5_qfi1        1
+  Reservation     136.50     ue1_qfi1    136.50     ue1_qfi1        1
+  TwoTier        1047.75     ue1_qfi9    722.75     ue7_qfi1        1
+  PF              131.50     ue1_qfi1    131.50     ue1_qfi1        1
+  Reservation     129.25     ue6_qfi1    129.25     ue6_qfi1        1
+  TwoTier        1192.25     ue8_qfi9    851.25     ue8_qfi1        1
+  PF              132.25     ue3_qfi1    132.25     ue3_qfi1        1
+  Reservation     134.50     ue4_qfi1    134.50     ue4_qfi1        1
+  TwoTier         884.25     ue2_qfi9    587.50     ue4_qfi1        1
+  PF              141.75     ue7_qfi1    141.75     ue7_qfi1        1
+  Reservation     131.75     ue2_qfi1    131.75     ue2_qfi1        1
+  TwoTier        1052.50     ue3_qfi9    837.50     ue3_qfi1        1
+  PF              168.00     ue3_qfi1    168.00     ue3_qfi1        1
+  Reservation     134.25     ue7_qfi1    134.25     ue7_qfi1        1
+  TwoTier        1150.25     ue5_qfi9    898.50     ue5_qfi1        1
+  PF              165.50     ue4_qfi1    165.50     ue4_qfi1        1
+  Reservation     131.50     ue3_qfi1    131.50     ue3_qfi1        1
+  TwoTier         982.25     ue5_qfi9    969.00     ue5_qfi1        1
+  PF              197.50     ue4_qfi1    197.50     ue4_qfi1        1
+  Reservation     134.75     ue1_qfi1    134.75     ue1_qfi1        1
+  TwoTier         989.75     ue4_qfi9    664.25     ue8_qfi1        1
+  PF              130.25     ue5_qfi1    130.25     ue5_qfi1        1
+  Reservation     135.25     ue3_qfi1    135.25     ue3_qfi1        1
+  TwoTier        2279.00     ue2_qfi9   2269.50     ue2_qfi1        1
+
+G5  PDU-set completeness (>=0.99) and frame age p95 (<=67 ms)
+  arm            M05 all  M05 prot   M06 p95
+  PF              0.9967    0.9967     24.84
+  Reservation     0.9967    0.9967     26.55
+  TwoTier         0.9801    0.9801     98.30
+  PF              0.9934    0.9934     25.26
+  Reservation     0.9967    0.9967     26.27
+  TwoTier         0.9900    0.9900     95.95
+  PF              0.9934    0.9934     24.65
+  Reservation     0.9967    0.9967     26.60
+  TwoTier         0.9934    0.9934     99.85
+  PF              0.9967    0.9967     25.33
+  Reservation     0.9967    0.9967     26.39
+  TwoTier         0.9636    0.9636    105.20
+  PF              0.9967    0.9967     24.84
+  Reservation     1.0000    1.0000     26.81
+  TwoTier         0.9868    0.9868    102.59
+  PF              0.9967    0.9967     25.40
+  Reservation     0.9967    0.9967     27.30
+  TwoTier         0.9867    0.9867     97.84
+  PF              1.0000    1.0000     27.80
+  Reservation     0.9967    0.9967     26.56
+  TwoTier         0.9670    0.9670     99.39
+  PF              1.0000    1.0000     27.16
+  Reservation     0.9868    0.9868     26.87
+  TwoTier         0.9439    0.9439    109.00
+  PF              0.9967    0.9967     24.71
+  Reservation     0.9901    0.9901     25.85
+  TwoTier         0.9834    0.9834    102.14
+  PF              0.9967    0.9967     25.63
+  Reservation     0.9967    0.9967     25.69
+  TwoTier         0.8119    0.8119    103.42
+
+G8  BOTH conjuncts -- M09 per-1s Jain (>=0.9) AND M22 starvation epochs (==0)
+  arm           Jain all Jain prot  epochs all  epochs prot  longest s   worst flow
+  PF              0.9450    0.9998           0            0       0.00         None
+  Reservation     0.9329    0.9997           0            0       0.00         None
+  TwoTier         0.7258    0.8795           0            0       0.00         None
+  PF              0.9447    0.9998           0            0       0.00         None
+  Reservation     0.9335    0.9998           0            0       0.00         None
+  TwoTier         0.7558    0.9159           2            1       1.05     ue5_qfi1
+  PF              0.9465    0.9998           0            0       0.00         None
+  Reservation     0.9373    0.9998           0            0       0.00         None
+  TwoTier         0.7696    0.9343           0            0       0.00         None
+  PF              0.9422    0.9998           0            0       0.00         None
+  Reservation     0.9324    0.9998           0            0       0.00         None
+  TwoTier         0.7503    0.9128           0            0       0.00         None
+  PF              0.9413    0.9998           0            0       0.00         None
+  Reservation     0.9280    0.9998           0            0       0.00         None
+  TwoTier         0.7314    0.8871           0            0       0.00         None
+  PF              0.9435    0.9998           0            0       0.00         None
+  Reservation     0.9281    0.9998           0            0       0.00         None
+  TwoTier         0.7514    0.9055           0            0       0.00         None
+  PF              0.9375    0.9998           0            0       0.00         None
+  Reservation     0.9266    0.9998           0            0       0.00         None
+  TwoTier         0.7498    0.9009           0            0       0.00         None
+  PF              0.9417    0.9998           0            0       0.00         None
+  Reservation     0.9274    0.9998           0            0       0.00         None
+  TwoTier         0.7406    0.9009           0            0       0.00         None
+  PF              0.9464    0.9994           0            0       0.00         None
+  Reservation     0.9369    0.9998           0            0       0.00         None
+  TwoTier         0.7350    0.8895           0            0       0.00         None
+  PF              0.9501    0.9998           0            0       0.00         None
+  Reservation     0.9400    0.9998           0            0       0.00         None
+  TwoTier         0.7845    0.8983           3            2       2.28     ue2_qfi9
+
+wall: 505s total

@@ -1,0 +1,9 @@
+  persisted 240 records to sweeps/g6-m6-2026-09-07/stage6_g6_n40_records.jsonl
+==============================================================================
+CONTROL, read before any effect size: do stage 1's own 10 seeds reproduce?
+==============================================================================
+  30 shared (arm, seed) pairs, 3 metrics
+  worst absolute difference: 1.385e+03   at ('TwoTier', 1826701614) / M03.max_gap_ms: 1835.0 vs 450.25000000000045
+  -> FAIL  -- the extension is NOT read; the runner and stage 1 disagree about the scenario.
+
+wrote sweeps/g6-m6-2026-09-07/stage6_g6_n40.csv and .json

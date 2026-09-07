@@ -423,6 +423,14 @@ def _fmt_dist(orders: list[list[int]]) -> str:
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--ramp", default=None,
+                    help="comma-separated committed_mult ramp, overriding "
+                         "sim/scenarios/g12.RAMP. GT-7.3 specifies +10 % "
+                         "steps to 145 %; the shipped tuple uses steps up to "
+                         "2.0 and five of its eight points carry no ordering "
+                         "information.")
+    ap.add_argument("--max-sched-ues", type=int, default=None,
+                    help="M-6: force the per-slot UE cap")
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--perm-seeds", type=int, default=5)
     ap.add_argument("--time-cell", action="store_true",
@@ -435,7 +443,15 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv[1:])
 
     n_seeds = 2 if args.smoke else args.seeds
-    ramp = RAMP[:3] if args.smoke else RAMP
+    # NOTE: rebinding sim.scenarios.g12.RAMP would NOT reach this module's
+    # already-imported `RAMP` name, so the override is applied to the LOCAL
+    # value that is actually used. Getting that wrong is the silent-no-op
+    # shape this project keeps recording.
+    _ramp_src = (tuple(float(x) for x in args.ramp.split(",")) if args.ramp
+                 else RAMP)
+    ramp = _ramp_src[:3] if args.smoke else _ramp_src
+    if args.ramp:
+        print(f"  RAMP OVERRIDDEN: {len(ramp)} points {ramp[0]}..{ramp[-1]}")
     in_range = tuple(m for m in ramp if m <= GUARANTEE_RAMP_TOP_MULT)
     has_out_of_range = len(ramp) > len(in_range)
     seeds = paired_seeds(n_seeds)

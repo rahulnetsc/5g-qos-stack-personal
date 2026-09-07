@@ -30,6 +30,11 @@ def run(
     cqi_loss_rate: float = 0.0,
     sr_period_slots: int = 10,
     sr_offset_slots: int = 0,
+    #: M-6: force the per-slot UE cap instead of deriving it from this
+    #: carrier's PRB count. Used ONLY to run the deployment's own value
+    #: (N_RB 106 -> 4) on a narrower carrier; None derives, and every
+    #: artefact records which was used.
+    max_sched_ues: int | None = None,
     k1_slots: int = 4,
     k2_slots: int = 2,
     harq_round_max: int = 4,
@@ -79,7 +84,8 @@ def run(
     decoding, no separate feedback-transit delay to model on that side).
     """
     rng = np.random.default_rng(scenario.seed)
-    grid = ResourceGrid(scenario.carrier, scenario.tdd)
+    grid = ResourceGrid(scenario.carrier, scenario.tdd,
+                        max_sched_ues_override=max_sched_ues)
     channel = ChannelModel(
         scenario.ues,
         rng,

@@ -102,11 +102,13 @@ def build(seed: int, n_ues: int, horizon: int, offer_x_mfbr: float,
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int, offer: float,
-        load_mult: float = 1.0, attach: bool = False) -> dict:
+        load_mult: float = 1.0, attach: bool = False,
+        max_sched_ues: int | None = None) -> dict:
     sc = build(seed, n_ues, horizon, offer, load_mult)
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
-                   attach_seed_slots=("all" if attach else None))
+                   attach_seed_slots=("all" if attach else None),
+                   max_sched_ues=max_sched_ues)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
                                  summary=s, arm={}, meta={})
@@ -164,6 +166,10 @@ def main() -> int:
     ap.add_argument("--horizon", type=int, default=20_000)
     ap.add_argument("--offer", type=float, default=OFFER_X_MFBR,
                     help="offered rate as a MULTIPLE OF MFBR (GT-4.3: >= 2)")
+    ap.add_argument("--max-sched-ues", type=int, default=None,
+                    help="M-6: force the per-slot UE cap (the deployment's "
+                         "N_RB 106 gives 4; this carrier derives 2). Default "
+                         "derives from the grid.")
     ap.add_argument("--attach-seed", action="store_true",
                     help="seed the attach BSR on every UL UE (registered decision, docs/attach-path-default-registration.md)")
     ap.add_argument("--out", default="sweeps/postscaling-2026-09-05/g7.json")
@@ -181,7 +187,7 @@ def main() -> int:
     # first version did exactly that and produced a with-attach run
     # BYTE-IDENTICAL to the without one, i.e. a false null. Same trap
     # CLAUDE.md records from G9.
-    tasks = [(arm, s, a.n_ues, a.horizon, a.offer, a.load_mult, a.attach_seed)
+    tasks = [(arm, s, a.n_ues, a.horizon, a.offer, a.load_mult, a.attach_seed, a.max_sched_ues)
              for arm in arms for s in seeds]
     print(f"{len(tasks)} runs = {len(arms)} arms x {len(seeds)} seeds, "
           f"asset B (ue{ASSET_B}) camera offered at {a.offer}x MFBR")
