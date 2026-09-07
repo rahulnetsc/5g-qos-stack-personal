@@ -91,6 +91,8 @@ UNCHANGED everywhere.* Neither arm touches Tier-1. Any movement is a defect.
 | **G6** | TwoTier worse; M02 clause 2 FAIL | **holds (still fails)**, counts move | already failing; a few percent will not restore it |
 | **G8** | both conjuncts fail on both QoS arms at n=10 | **holds (still fails)** | failure is large, not marginal |
 | **G10** | PF 8 / Reservation 4 / **TwoTier 4** | **TwoTier's number may move; PF and Reservation MUST NOT** | admissibility is a threshold on TwoTier's own targets |
+
+> **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 | **G11 C1** | 300 windows/arm, **0 failing** | **holds** | zero failures with no near-misses recorded |
 | **G12** | TwoTier `[4,2]` 5/10, `[2,4]` 4/10, one degenerate `[2]` | **TwoTier's counts move; PF's `[4,2]` 10/10 MUST NOT** | first-violation order is order-sensitive by construction |
 

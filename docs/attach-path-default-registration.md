@@ -45,6 +45,8 @@ Registered before the run. Direction and, where possible, magnitude.
 | | | Reservation | **3/10 → ~9/10** (1/10 marginal) |
 | | | PF | 10/10, **unchanged** |
 | **G10** stated fleet size | GBR contract met | all | **improves**; the arm spread collapses — previously PF 8 / Res 4 / TT 4 became a **common boundary of 8** |
+
+> **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 | **G1** responsive commands | p98 ≤ 95 ms (parametric) | TwoTier | **WORSE or unchanged.** The attach path took M06 failures 14/40 → 40/40; more UEs in contention lengthens the tail |
 | | | PF, Reservation | ~unchanged |
 | **G1** | p98 ≤ 15 ms (sensor_dense) | all | unchanged — one flow per UE, no lock-out to clear |

@@ -38,7 +38,9 @@ measured on earlier code and its numbers are indicative, not current.
 | **G7** | **FAILS clause 2.** Both QoS arms deliver **2.0–2.1× MFBR**; PF (no MFBR concept) contains better at 1.05×. **PF's containment is now EXPLAINED and is not a fairness property — it grants ~5.8× less** (§3a) | `rerun-2026-09-06/g7.json` | 10 | 20k | fleet + aggressor | **current** |
 | **G8** | **FAILS.** M09 protected: Res 1/10, **TT 3/10** below 0.90 | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
 | **G9** | **SCOREABLE (first time).** Counts complete 10/10, 5/5, 1/1 with the re-join seed. **Clause 4 FAILS on TwoTier** | `postscaling/g9_seeded.json` | 10 | 20k | G9 scenarios | stale |
-| **G10** | **PF 8 / Res 4 / TT 4 — UPPER BOUND, not capacity.** Cause established, §3 | `phase2/g5_consol_scaled.json` | 10 | 20k | parametric | **current** |
+| **G10** | **PF 6 / Res 6 / TT 5** (superseded 8/4/4; PF non-monotone, boundary = last pass before first failure). **UPPER BOUND, not capacity.** Cause established, §3 | `phase2/g5_consol_scaled.json` | 10 | 20k | parametric | **current** |
+
+> **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 | **G11** | **TWO CLAUSES OF FIVE.** C1 PASS (900 windows, 0 failing); C3 PASS. C4 not independent; C5 not scoreable; C2 not scoreable | `postscaling/g11_c1_soak.json` | 10 | **7.2M** | G11 scripted | stale |
 | **G12** | **RE-SCORED after the collision fix. Clause 4 FAILS on PF and TwoTier** — telemetry M02 ≥ 0.92 while background still carries **8.5–14.6 Mbps**; **TwoTier floors at ×1.6, one ramp point EARLIER than published**. **Not satisfied as written on Reservation** (its background is gone by the time telemetry floors). Ordering **still not established** — the permutation control still flips it. | `g12-rescore-2026-09-06/g12.json` | 10 | 20k | fleet ramp | **current** |
 
@@ -85,7 +87,7 @@ and **cannot earn the grant that would repopulate the array**.
 | observation | cleared by supplying the attach BSR? |
 |---|---|
 | G5's completeness (Res 7/10, TT 4/10 failing) | **yes** — Res 1/10 marginal, TT 0/10 |
-| G10's admissible fleet (PF 8 / Res 4 / TT 4) | **yes** — all three arms identical, common boundary 8 |
+| G10's admissible fleet (superseded: **PF 6 / Res 6 / TT 5**) | **yes** — all three arms near-identical |
 | the UL blackout rate | **yes** — same count, renamed |
 | G9's join counts (4 of 10 warm events) | **yes** — 10/10, 5/5, 1/1 |
 

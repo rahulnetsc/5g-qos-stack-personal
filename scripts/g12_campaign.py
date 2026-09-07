@@ -323,6 +323,7 @@ def order_for(ramped: dict[str, Any], ramp: tuple[float, ...], label: str,
 
 
 def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int],
+                 ramp_origin: float = RAMP[0],
                  workers: int = _DEFAULT_WORKERS
                  ) -> tuple[list[tuple[str, int]], dict[str, Any]]:
     """E1's control, run at CELL granularity BEFORE any ordering.
@@ -349,7 +350,11 @@ def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int],
     print("E1's CONTROL PASS -- ramp bottom only, every cell, read FIRST")
     print("=" * 78)
     clean, report = [], {}
-    bottom = (RAMP[0],)
+    # The bottom must be the ORIGIN OF THE RAMP BEING RUN, not the module
+    # constant. Reading RAMP[0] here made `--ramp` a silent no-op for the
+    # control: a re-based origin produced byte-identical contamination
+    # figures, which is indistinguishable from "re-basing does not help".
+    bottom = (ramp_origin,)
     arm_names = list(arms)
     tasks = _ramp_tasks(cells, arm_names, seeds, bottom)
     results: list[dict | None] = [None] * len(tasks)
@@ -371,7 +376,7 @@ def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int],
         report[f"{comp}_n{n}"] = {"n_groups": n_groups, "contaminated": bad}
         if bad:
             print(f"  {comp}_n{n:<3} CONTAMINATED: {len(bad)}/{n_groups} "
-                  f"(arm, seed) groups breach at x{RAMP[0]}; EXCLUDED WHOLE")
+                  f"(arm, seed) groups breach at x{ramp_origin}; EXCLUDED WHOLE")
             for b in bad[:4]:
                 print(f"      {b['arm']}/seed{b['seed']}: 5QI {b['5qi']} "
                       f"worst {b['worst']}")
@@ -379,7 +384,7 @@ def control_pass(cells: list[tuple[str, int]], arms: dict, seeds: list[int],
                 print(f"      ... and {len(bad) - 4} more")
         else:
             print(f"  {comp}_n{n:<3} clean: 0/{n_groups} groups breach at "
-                  f"x{RAMP[0]}")
+                  f"x{ramp_origin}")
             clean.append((comp, n))
     print(f"\n  cells with a clean control: {clean}")
     return clean, report
@@ -479,7 +484,9 @@ def main(argv: list[str]) -> int:
 
     control_report: dict[str, Any] = {}
     if not args.time_cell:
-        kept, control_report = control_pass(kept, arms, seeds, args.workers)
+        kept, control_report = control_pass(kept, arms, seeds,
+                                            workers=args.workers,
+                                            ramp_origin=ramp[0])
         if not kept:
             print("\nNO CELL HAS A CLEAN CONTROL. E1 fails outright and no "
                   "ordering is computed -- that is the result (§35.9 E1).")

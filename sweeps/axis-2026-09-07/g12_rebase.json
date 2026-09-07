@@ -1,0 +1,3904 @@
+{
+  "ramp": [
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "in_range": [
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "excluded_cells": [
+    [
+      [
+        "sensor_dense",
+        8
+      ],
+      "g12_sensor_dense_n8_x1.0: GBR classes [4] absent (census {2: 1})"
+    ]
+  ],
+  "control_pass": {
+    "mixed_n8": {
+      "n_groups": 30,
+      "contaminated": []
+    },
+    "ugv_heavy_n8": {
+      "n_groups": 30,
+      "contaminated": [
+        {
+          "arm": "PF",
+          "seed": 579362555,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9472,
+            "4": 0.9945
+          }
+        },
+        {
+          "arm": "Reservation",
+          "seed": 579362555,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9472,
+            "4": 1.0
+          }
+        },
+        {
+          "arm": "TwoTier",
+          "seed": 579362555,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9472,
+            "4": 1.0
+          }
+        }
+      ]
+    },
+    "drone_heavy_n8": {
+      "n_groups": 30,
+      "contaminated": [
+        {
+          "arm": "TwoTier",
+          "seed": 1826701614,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9468,
+            "4": 1.0
+          }
+        },
+        {
+          "arm": "TwoTier",
+          "seed": 1097657231,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9142,
+            "4": 1.0
+          }
+        },
+        {
+          "arm": "TwoTier",
+          "seed": 579362555,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9234,
+            "4": 0.9997
+          }
+        },
+        {
+          "arm": "TwoTier",
+          "seed": 87989972,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9254,
+            "4": 1.0
+          }
+        },
+        {
+          "arm": "TwoTier",
+          "seed": 161576974,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9261,
+            "4": 1.0
+          }
+        },
+        {
+          "arm": "TwoTier",
+          "seed": 376383645,
+          "5qi": [
+            2
+          ],
+          "worst": {
+            "2": 0.9325,
+            "4": 0.999
+          }
+        }
+      ]
+    }
+  },
+  "cells": {
+    "mixed_n8": {
+      "PF": {
+        "in_range_orders": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "full_orders": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "per_seed": [
+          {
+            "seed": 1826701614,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9639,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9639,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 42949884.8,
+                "telemetry_max_gap_ms": 107.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638706666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 41082398.4,
+                "telemetry_max_gap_ms": 109.25000000000028,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638880000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39629792.0,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.963908,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 37111822.4,
+                "telemetry_max_gap_ms": 111.49999999999993,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.963918,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 35367123.199999996,
+                "telemetry_max_gap_ms": 114.74999999999991,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639245714285714,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 32995681.6,
+                "telemetry_max_gap_ms": 111.7499999999998,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639285000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 30713422.4,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639333333333333,
+                  "4": 0.999058962962963
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 28895721.6,
+                "telemetry_max_gap_ms": 113.99999999999989,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639371999999999,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1367864806,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9709,
+                "4": 0.9984
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9709,
+                "4": 0.9984
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 44407755.2,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9707840000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 42887043.2,
+                "telemetry_max_gap_ms": 108.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.97081,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 40620292.8,
+                "telemetry_max_gap_ms": 110.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708224,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 38351800.0,
+                "telemetry_max_gap_ms": 113.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708353333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 37083049.6,
+                "telemetry_max_gap_ms": 110.75,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708434285714286,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 35113920.0,
+                "telemetry_max_gap_ms": 111.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96926,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 32956240.0,
+                "telemetry_max_gap_ms": 111.75000000000024,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9705226666666666,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 30591729.6,
+                "telemetry_max_gap_ms": 115.75,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.970856,
+                  "4": 0.9984186666666667
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1097657231,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9608,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9608,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 40075811.2,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611466666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 38320185.599999994,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96118,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 36323793.6,
+                "telemetry_max_gap_ms": 109.25000000000028,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611871999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 34367798.4,
+                "telemetry_max_gap_ms": 109.50000000000016,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611993333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 32126224.0,
+                "telemetry_max_gap_ms": 111.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9612074285714285,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 30722019.2,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9612139999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 28464998.400000002,
+                "telemetry_max_gap_ms": 114.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9612164444444445,
+                  "4": 0.9988023703703703
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 26530953.599999998,
+                "telemetry_max_gap_ms": 117.75000000000003,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9607508,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 579362555,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9631,
+                "4": 0.9986
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9631,
+                "4": 0.9986
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 43683913.6,
+                "telemetry_max_gap_ms": 107.49999999999993,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9629786666666665,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 42183411.199999996,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9607180000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39755337.6,
+                "telemetry_max_gap_ms": 110.75,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630168,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 37474929.6,
+                "telemetry_max_gap_ms": 111.75000000000024,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630313333333335,
+                  "4": 0.9980737777777778
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 35905364.800000004,
+                "telemetry_max_gap_ms": 111.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630365714285714,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 34016051.2,
+                "telemetry_max_gap_ms": 112.50000000000027,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.963043,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 31989094.4,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630462222222222,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 29994616.0,
+                "telemetry_max_gap_ms": 115.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630516,
+                  "4": 0.9986394666666666
+                }
+              }
+            ]
+          },
+          {
+            "seed": 661058651,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9711,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9711,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 45181801.599999994,
+                "telemetry_max_gap_ms": 106.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.97144,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 42964180.8,
+                "telemetry_max_gap_ms": 107.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971481,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 40770958.4,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9714936,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 38949340.800000004,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9711966666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 37224340.8,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9715091428571428,
+                  "4": 0.9968891428571428
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 35053268.800000004,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9715105,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 32892412.8,
+                "telemetry_max_gap_ms": 112.75000000000013,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9701746666666666,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 30763889.599999998,
+                "telemetry_max_gap_ms": 118.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971066,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 87989972,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9571,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9571,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 40173488.0,
+                "telemetry_max_gap_ms": 106.7499999999999,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9569946666666668,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 38297884.8,
+                "telemetry_max_gap_ms": 108.75000000000013,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.957015,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 36701361.599999994,
+                "telemetry_max_gap_ms": 107.25,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570368,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 34577902.4,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570413333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 32923217.6,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570428571428572,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 31220707.2,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570525,
+                  "4": 0.9976740000000001
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 28779939.2,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570582222222223,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 27069176.0,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.957062,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 161576974,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9632,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9632,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 42597360.0,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638559999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 40853174.400000006,
+                "telemetry_max_gap_ms": 109.25000000000028,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96388,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 38912481.6,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638992,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 36843086.400000006,
+                "telemetry_max_gap_ms": 111.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639059999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 34845968.0,
+                "telemetry_max_gap_ms": 114.74999999999991,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9637451428571429,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 32641750.4,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96392,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 30214552.0,
+                "telemetry_max_gap_ms": 115.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638822222222222,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 28329960.0,
+                "telemetry_max_gap_ms": 115.25,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9631831999999999,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 35492826,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9714,
+                "4": 0.9993
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9714,
+                "4": 0.9993
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 41512148.800000004,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713013333333335,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39326896.0,
+                "telemetry_max_gap_ms": 106.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971323,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 37771393.6,
+                "telemetry_max_gap_ms": 108.75000000000013,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713352,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 35581777.6,
+                "telemetry_max_gap_ms": 109.50000000000016,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713473333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 34247646.4,
+                "telemetry_max_gap_ms": 114.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713548571428572,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 32161246.4,
+                "telemetry_max_gap_ms": 111.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713575,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 29950582.4,
+                "telemetry_max_gap_ms": 111.7499999999998,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713653333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 27956056.0,
+                "telemetry_max_gap_ms": 114.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713651999999999,
+                  "4": 0.9993072000000001
+                }
+              }
+            ]
+          },
+          {
+            "seed": 376383645,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9685,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9685,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 42339705.6,
+                "telemetry_max_gap_ms": 107.49999999999993,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684173333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 40573347.2,
+                "telemetry_max_gap_ms": 107.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.968443,
+                  "4": 0.9977826666666666
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39065046.4,
+                "telemetry_max_gap_ms": 110.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684544,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 36696785.6,
+                "telemetry_max_gap_ms": 110.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684680000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 35213289.6,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684777142857143,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 33579529.6,
+                "telemetry_max_gap_ms": 111.75000000000024,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.968479,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 31289987.2,
+                "telemetry_max_gap_ms": 113.99999999999989,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9679617777777777,
+                  "4": 0.9998222222222222
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 29095033.599999998,
+                "telemetry_max_gap_ms": 115.25,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684891999999999,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1746484539,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9724,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9724,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 46206492.800000004,
+                "telemetry_max_gap_ms": 107.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723306666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 44302483.199999996,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723569999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 42012035.199999996,
+                "telemetry_max_gap_ms": 107.0000000000002,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723704,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 40250408.0,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723866666666666,
+                  "4": 0.9972284444444445
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 37620825.6,
+                "telemetry_max_gap_ms": 112.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.972308,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 35212148.800000004,
+                "telemetry_max_gap_ms": 112.50000000000027,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723210000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 33359249.599999998,
+                "telemetry_max_gap_ms": 112.99999999999999,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9724013333333332,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 31079081.6,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9724056,
+                  "4": 1.0
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "Reservation": {
+        "in_range_orders": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "full_orders": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "per_seed": [
+          {
+            "seed": 1826701614,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9639,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9639,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 42530803.199999996,
+                "telemetry_max_gap_ms": 107.75000000000023,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638706666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 40383008.0,
+                "telemetry_max_gap_ms": 112.75000000000013,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638880000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 38213977.599999994,
+                "telemetry_max_gap_ms": 111.75000000000024,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.963908,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 35952030.4,
+                "telemetry_max_gap_ms": 114.99999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.963918,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 33954923.199999996,
+                "telemetry_max_gap_ms": 116.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639245714285714,
+                  "4": 0.9991603809523809
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 30871406.400000002,
+                "telemetry_max_gap_ms": 114.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9635905,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 28869219.2,
+                "telemetry_max_gap_ms": 121.99999999999989,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639333333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 26516576.0,
+                "telemetry_max_gap_ms": 124.24999999999997,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639371999999999,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1367864806,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9707,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9707,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 43905544.0,
+                "telemetry_max_gap_ms": 109.75000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9707840000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 41570640.0,
+                "telemetry_max_gap_ms": 109.49999999999972,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.97081,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39385289.6,
+                "telemetry_max_gap_ms": 204.49999999999991,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708224,
+                  "4": 0.9995168
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 37066137.6,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708353333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 34989323.2,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708434285714286,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 32849412.799999997,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.970848,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 30223012.8,
+                "telemetry_max_gap_ms": 119.25000000000009,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708524444444444,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 27969347.200000003,
+                "telemetry_max_gap_ms": 112.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9707116,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1097657231,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9606,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9606,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 39724219.2,
+                "telemetry_max_gap_ms": 105.75,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611466666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 37272001.6,
+                "telemetry_max_gap_ms": 115.24999999999963,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96118,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 35350428.800000004,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611871999999999,
+                  "4": 0.9997322666666666
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 32787150.4,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611993333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 30800784.0,
+                "telemetry_max_gap_ms": 114.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9612074285714285,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 28348931.2,
+                "telemetry_max_gap_ms": 117.24999999999986,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9602035000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 26113371.2,
+                "telemetry_max_gap_ms": 119.7499999999998,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9612164444444445,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24082619.2,
+                "telemetry_max_gap_ms": 117.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9606332,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 579362555,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9631,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9631,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 43442131.2,
+                "telemetry_max_gap_ms": 107.74999999999979,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9629786666666665,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 41316966.4,
+                "telemetry_max_gap_ms": 111.00000000000021,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9604039999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 38929588.800000004,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630168,
+                  "4": 0.9976245333333333
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 36837920.0,
+                "telemetry_max_gap_ms": 114.99999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630313333333335,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 34446148.8,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630365714285714,
+                  "4": 0.9980205714285714
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 32097849.599999998,
+                "telemetry_max_gap_ms": 117.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9626575,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 29623204.8,
+                "telemetry_max_gap_ms": 119.49999999999994,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630462222222222,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 27540769.599999998,
+                "telemetry_max_gap_ms": 121.99999999999989,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630516,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 661058651,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9715,
+                "4": 0.9991
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9715,
+                "4": 0.9991
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 44734520.0,
+                "telemetry_max_gap_ms": 108.74999999999969,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.97144,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 41977732.8,
+                "telemetry_max_gap_ms": 111.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971481,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39921088.0,
+                "telemetry_max_gap_ms": 114.4999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9714936,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 37617019.199999996,
+                "telemetry_max_gap_ms": 114.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9714966666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 35423713.6,
+                "telemetry_max_gap_ms": 114.24999999999974,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9715091428571428,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 32787145.599999998,
+                "telemetry_max_gap_ms": 116.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9715105,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 30378873.6,
+                "telemetry_max_gap_ms": 119.7499999999998,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971516,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 28352089.599999998,
+                "telemetry_max_gap_ms": 119.49999999999994,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971522,
+                  "4": 0.9990762666666666
+                }
+              }
+            ]
+          },
+          {
+            "seed": 87989972,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9564,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9564,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 39833044.800000004,
+                "telemetry_max_gap_ms": 111.25000000000007,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9569946666666668,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 37760464.0,
+                "telemetry_max_gap_ms": 112.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.957015,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 35845454.4,
+                "telemetry_max_gap_ms": 113.99999999999989,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570368,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 33762638.4,
+                "telemetry_max_gap_ms": 115.7499999999998,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570413333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 31367952.0,
+                "telemetry_max_gap_ms": 112.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9569571428571428,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 28910332.8,
+                "telemetry_max_gap_ms": 117.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570525,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 26731036.8,
+                "telemetry_max_gap_ms": 114.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9570582222222223,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24743803.2,
+                "telemetry_max_gap_ms": 119.7499999999998,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9563691999999999,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 161576974,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9613,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9613,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 41960096.0,
+                "telemetry_max_gap_ms": 107.74999999999979,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638559999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39635089.6,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96388,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 37492670.4,
+                "telemetry_max_gap_ms": 115.00000000000021,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638992,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 35300161.6,
+                "telemetry_max_gap_ms": 117.50000000000016,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9639059999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 32893998.4,
+                "telemetry_max_gap_ms": 114.99999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9636228571428571,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 30207976.0,
+                "telemetry_max_gap_ms": 115.00000000000021,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96392,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 27815956.799999997,
+                "telemetry_max_gap_ms": 120.00000000000011,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9634302222222222,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 25615984.0,
+                "telemetry_max_gap_ms": 119.49999999999994,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9612516,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 35492826,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9706,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9706,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 40750726.4,
+                "telemetry_max_gap_ms": 105.75,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713013333333335,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39348531.199999996,
+                "telemetry_max_gap_ms": 110.25000000000018,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971323,
+                  "4": 0.999616
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 36734600.0,
+                "telemetry_max_gap_ms": 114.99999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9690064,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 34200228.8,
+                "telemetry_max_gap_ms": 116.24999999999997,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713473333333333,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 31978632.0,
+                "telemetry_max_gap_ms": 112.24999999999996,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713548571428572,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 30051457.599999998,
+                "telemetry_max_gap_ms": 112.74999999999969,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713575,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 27446121.6,
+                "telemetry_max_gap_ms": 119.49999999999994,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9713653333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 25616120.0,
+                "telemetry_max_gap_ms": 120.00000000000011,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9705992,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 376383645,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9677,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9677,
+                "4": 1.0
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 41837243.199999996,
+                "telemetry_max_gap_ms": 108.49999999999982,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684173333333334,
+                  "4": 0.998040888888889
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39625244.8,
+                "telemetry_max_gap_ms": 112.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.967993,
+                  "4": 0.9961506666666667
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 37812568.0,
+                "telemetry_max_gap_ms": 112.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684544,
+                  "4": 0.9993845333333333
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 35506622.4,
+                "telemetry_max_gap_ms": 115.00000000000021,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.967294,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 33621491.199999996,
+                "telemetry_max_gap_ms": 114.74999999999991,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684777142857143,
+                  "4": 0.9996548571428572
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 31033289.6,
+                "telemetry_max_gap_ms": 113.99999999999989,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.968479,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 29146782.4,
+                "telemetry_max_gap_ms": 116.75000000000013,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.968484888888889,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 26698040.0,
+                "telemetry_max_gap_ms": 117.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9676728,
+                  "4": 1.0
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1746484539,
+            "in_range": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9724,
+                "4": 0.9995
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [],
+              "first_fail_at_index": {},
+              "ties": [],
+              "never_failed": [
+                2,
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.9724,
+                "4": 0.9995
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 46036158.4,
+                "telemetry_max_gap_ms": 107.74999999999979,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723306666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 43448568.0,
+                "telemetry_max_gap_ms": 106.50000000000004,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723569999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 41221971.199999996,
+                "telemetry_max_gap_ms": 112.49999999999983,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723704,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 38431449.6,
+                "telemetry_max_gap_ms": 114.99999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723866666666666,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 36059950.4,
+                "telemetry_max_gap_ms": 114.99999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723937142857143,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 33266731.200000003,
+                "telemetry_max_gap_ms": 112.0000000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.972396,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 31129054.400000002,
+                "telemetry_max_gap_ms": 195.74999999999986,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9724013333333332,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 28515620.8,
+                "telemetry_max_gap_ms": 131.25000000000009,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9724056,
+                  "4": 0.9995381333333333
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "TwoTier": {
+        "in_range_orders": [
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "full_orders": [
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "per_seed": [
+          {
+            "seed": 1826701614,
+            "in_range": {
+              "order": [
+                2,
+                4
+              ],
+              "first_fail_at_index": {
+                "2": 4,
+                "4": 7
+              },
+              "ties": [],
+              "never_failed": [],
+              "terminal_fraction": {
+                "2": 0.2007,
+                "4": 0.9006
+              },
+              "is_scoreable": true
+            },
+            "full": {
+              "order": [
+                2,
+                4
+              ],
+              "first_fail_at_index": {
+                "2": 4,
+                "4": 7
+              },
+              "ties": [],
+              "never_failed": [],
+              "terminal_fraction": {
+                "2": 0.2007,
+                "4": 0.9006
+              },
+              "is_scoreable": true
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 45478064.0,
+                "telemetry_max_gap_ms": 157.2499999999999,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638706666666667,
+                  "4": 0.9994879999999999
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 42306428.8,
+                "telemetry_max_gap_ms": 177.75000000000003,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96329,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39541374.400000006,
+                "telemetry_max_gap_ms": 502.0,
+                "telemetry_m02": 0.08,
+                "worst_by_class": {
+                  "2": 0.963908,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 35491836.8,
+                "telemetry_max_gap_ms": 757.5000000000001,
+                "telemetry_m02": 0.15525,
+                "worst_by_class": {
+                  "2": 0.9608986666666666,
+                  "4": 0.9994871111111111
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 30518091.200000003,
+                "telemetry_max_gap_ms": 1004.0,
+                "telemetry_m02": 0.43107142857142855,
+                "worst_by_class": {
+                  "2": 0.891464,
+                  "4": 0.9999428571428571
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 27072030.4,
+                "telemetry_max_gap_ms": 2001.75,
+                "telemetry_m02": 0.6712463556851312,
+                "worst_by_class": {
+                  "2": 0.7564855,
+                  "4": 0.9998493333333333
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 26065230.4,
+                "telemetry_max_gap_ms": 2281.5,
+                "telemetry_m02": 0.7366522366522367,
+                "worst_by_class": {
+                  "2": 0.4973662222222222,
+                  "4": 0.9674305185185185
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24429323.2,
+                "telemetry_max_gap_ms": null,
+                "telemetry_m02": 0.9795918367346939,
+                "worst_by_class": {
+                  "2": 0.2007336,
+                  "4": 0.9005781333333333
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1367864806,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.5366,
+                "4": 0.9717
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.5366,
+                "4": 0.9717
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 46399771.199999996,
+                "telemetry_max_gap_ms": 157.49999999999974,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9707840000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 43364489.6,
+                "telemetry_max_gap_ms": 175.00000000000026,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.97081,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 40704734.4,
+                "telemetry_max_gap_ms": 183.7500000000003,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9708224,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 37540580.800000004,
+                "telemetry_max_gap_ms": 288.00000000000006,
+                "telemetry_m02": 0.0415,
+                "worst_by_class": {
+                  "2": 0.9708353333333333,
+                  "4": 0.9997991111111111
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 32797824.0,
+                "telemetry_max_gap_ms": 599.0000000000001,
+                "telemetry_m02": 0.24449708454810495,
+                "worst_by_class": {
+                  "2": 0.9607988571428571,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 28901048.0,
+                "telemetry_max_gap_ms": 915.5000000000001,
+                "telemetry_m02": 0.5618075801749272,
+                "worst_by_class": {
+                  "2": 0.896624,
+                  "4": 0.9869493333333333
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 26392761.599999998,
+                "telemetry_max_gap_ms": 1661.0,
+                "telemetry_m02": 0.6448979591836734,
+                "worst_by_class": {
+                  "2": 0.7531213333333333,
+                  "4": 0.9805837037037037
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24833561.6,
+                "telemetry_max_gap_ms": 1808.0,
+                "telemetry_m02": 0.8867711370262391,
+                "worst_by_class": {
+                  "2": 0.5365911999999999,
+                  "4": 0.9717205333333334
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1097657231,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 3
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.1649,
+                "4": 0.9858
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 3
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.1649,
+                "4": 0.9858
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 42531046.400000006,
+                "telemetry_max_gap_ms": 165.99999999999991,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9611466666666667,
+                  "4": 0.9986506666666667
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39568419.2,
+                "telemetry_max_gap_ms": 169.74999999999994,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96118,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 35648696.0,
+                "telemetry_max_gap_ms": 306.4999999999998,
+                "telemetry_m02": 0.06928571428571428,
+                "worst_by_class": {
+                  "2": 0.9611871999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 32173816.0,
+                "telemetry_max_gap_ms": 803.9999999999998,
+                "telemetry_m02": 0.31993440233236153,
+                "worst_by_class": {
+                  "2": 0.90858,
+                  "4": 0.9936595555555555
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 28257635.2,
+                "telemetry_max_gap_ms": 1201.5000000000002,
+                "telemetry_m02": 0.5047376093294461,
+                "worst_by_class": {
+                  "2": 0.7954977142857144,
+                  "4": 0.9718902857142857
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 26578200.0,
+                "telemetry_max_gap_ms": 1606.25,
+                "telemetry_m02": 0.6215014577259476,
+                "worst_by_class": {
+                  "2": 0.678728,
+                  "4": 0.9624953333333333
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 24555332.8,
+                "telemetry_max_gap_ms": 1807.0000000000002,
+                "telemetry_m02": 0.9183673469387755,
+                "worst_by_class": {
+                  "2": 0.27001733333333333,
+                  "4": 0.9791336296296296
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24036824.0,
+                "telemetry_max_gap_ms": 186.5,
+                "telemetry_m02": 0.9693877551020408,
+                "worst_by_class": {
+                  "2": 0.1648576,
+                  "4": 0.9857664
+                }
+              }
+            ]
+          },
+          {
+            "seed": 579362555,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.3593,
+                "4": 0.9999
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.3593,
+                "4": 0.9999
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 45815161.6,
+                "telemetry_max_gap_ms": 171.74999999999986,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9629786666666665,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 42494099.2,
+                "telemetry_max_gap_ms": 166.5,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.963002,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 39390198.4,
+                "telemetry_max_gap_ms": 186.49999999999966,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9630168,
+                  "4": 0.9998047999999999
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 36148265.6,
+                "telemetry_max_gap_ms": 204.99999999999997,
+                "telemetry_m02": 0.016892857142857143,
+                "worst_by_class": {
+                  "2": 0.9627313333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 31396475.2,
+                "telemetry_max_gap_ms": 685.4999999999998,
+                "telemetry_m02": 0.30464285714285716,
+                "worst_by_class": {
+                  "2": 0.9543514285714285,
+                  "4": 0.9998605714285715
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 27111403.2,
+                "telemetry_max_gap_ms": 2313.5000000000005,
+                "telemetry_m02": 0.7,
+                "worst_by_class": {
+                  "2": 0.7904264999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 25444270.4,
+                "telemetry_max_gap_ms": 4574.25,
+                "telemetry_m02": 0.8673469387755102,
+                "worst_by_class": {
+                  "2": 0.5884764444444445,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24355171.200000003,
+                "telemetry_max_gap_ms": 4668.5,
+                "telemetry_m02": 0.8787878787878788,
+                "worst_by_class": {
+                  "2": 0.3592816,
+                  "4": 0.9999024000000001
+                }
+              }
+            ]
+          },
+          {
+            "seed": 661058651,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.4826,
+                "4": 0.976
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.4826,
+                "4": 0.976
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 46883075.2,
+                "telemetry_max_gap_ms": 168.25,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.97144,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 43614592.0,
+                "telemetry_max_gap_ms": 174.74999999999997,
+                "telemetry_m02": 0.01,
+                "worst_by_class": {
+                  "2": 0.971481,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 40822062.400000006,
+                "telemetry_max_gap_ms": 214.00000000000003,
+                "telemetry_m02": 0.01025,
+                "worst_by_class": {
+                  "2": 0.9714936,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 37449408.0,
+                "telemetry_max_gap_ms": 478.75,
+                "telemetry_m02": 0.08,
+                "worst_by_class": {
+                  "2": 0.9714966666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 34227476.8,
+                "telemetry_max_gap_ms": 832.0,
+                "telemetry_m02": 0.2897857142857143,
+                "worst_by_class": {
+                  "2": 0.9594131428571427,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 30525230.4,
+                "telemetry_max_gap_ms": 1278.75,
+                "telemetry_m02": 0.44,
+                "worst_by_class": {
+                  "2": 0.8957210000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 27629046.4,
+                "telemetry_max_gap_ms": 1776.75,
+                "telemetry_m02": 0.601530612244898,
+                "worst_by_class": {
+                  "2": 0.6784635555555555,
+                  "4": 0.9903306666666666
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24539446.4,
+                "telemetry_max_gap_ms": 3672.5000000000005,
+                "telemetry_m02": 0.9693877551020408,
+                "worst_by_class": {
+                  "2": 0.48258840000000003,
+                  "4": 0.9759925333333334
+                }
+              }
+            ]
+          },
+          {
+            "seed": 87989972,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 4
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.206,
+                "4": 0.9885
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 4
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.206,
+                "4": 0.9885
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 43076745.599999994,
+                "telemetry_max_gap_ms": 154.50000000000009,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9569946666666668,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39507608.0,
+                "telemetry_max_gap_ms": 170.50000000000009,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.957015,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 36169761.599999994,
+                "telemetry_max_gap_ms": 299.74999999999994,
+                "telemetry_m02": 0.03,
+                "worst_by_class": {
+                  "2": 0.9570368,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 32857924.8,
+                "telemetry_max_gap_ms": 492.50000000000017,
+                "telemetry_m02": 0.15532142857142858,
+                "worst_by_class": {
+                  "2": 0.9570413333333334,
+                  "4": 0.9976906666666666
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 28199406.400000002,
+                "telemetry_max_gap_ms": 1103.5,
+                "telemetry_m02": 0.4958819241982507,
+                "worst_by_class": {
+                  "2": 0.83514,
+                  "4": 0.9895306666666667
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 25018486.4,
+                "telemetry_max_gap_ms": 171.75,
+                "telemetry_m02": 0.9285714285714286,
+                "worst_by_class": {
+                  "2": 0.6197955,
+                  "4": 0.9779253333333332
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 24700480.0,
+                "telemetry_max_gap_ms": 180.75,
+                "telemetry_m02": 0.9387755102040817,
+                "worst_by_class": {
+                  "2": 0.3741164444444444,
+                  "4": 0.9775093333333335
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24318384.0,
+                "telemetry_max_gap_ms": 182.5,
+                "telemetry_m02": 0.9693877551020408,
+                "worst_by_class": {
+                  "2": 0.2060092,
+                  "4": 0.9884986666666666
+                }
+              }
+            ]
+          },
+          {
+            "seed": 161576974,
+            "in_range": {
+              "order": [
+                2,
+                4
+              ],
+              "first_fail_at_index": {
+                "2": 4,
+                "4": 7
+              },
+              "ties": [],
+              "never_failed": [],
+              "terminal_fraction": {
+                "2": 0.1626,
+                "4": 0.915
+              },
+              "is_scoreable": true
+            },
+            "full": {
+              "order": [
+                2,
+                4
+              ],
+              "first_fail_at_index": {
+                "2": 4,
+                "4": 7
+              },
+              "ties": [],
+              "never_failed": [],
+              "terminal_fraction": {
+                "2": 0.1626,
+                "4": 0.915
+              },
+              "is_scoreable": true
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 44502172.800000004,
+                "telemetry_max_gap_ms": 165.25000000000034,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9638559999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 41110630.400000006,
+                "telemetry_max_gap_ms": 189.74999999999963,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.96388,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 38847953.6,
+                "telemetry_max_gap_ms": 189.25000000000003,
+                "telemetry_m02": 0.01,
+                "worst_by_class": {
+                  "2": 0.9638992,
+                  "4": 0.9966122666666666
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 33827433.6,
+                "telemetry_max_gap_ms": 511.0,
+                "telemetry_m02": 0.098,
+                "worst_by_class": {
+                  "2": 0.9639059999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 29882624.0,
+                "telemetry_max_gap_ms": 1314.5000000000002,
+                "telemetry_m02": 0.37575,
+                "worst_by_class": {
+                  "2": 0.9128468571428572,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 26214595.2,
+                "telemetry_max_gap_ms": 1409.0,
+                "telemetry_m02": 0.7085276967930029,
+                "worst_by_class": {
+                  "2": 0.8057719999999999,
+                  "4": 0.9868126666666667
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 24781915.2,
+                "telemetry_max_gap_ms": 182.5,
+                "telemetry_m02": 0.9285714285714286,
+                "worst_by_class": {
+                  "2": 0.36002666666666666,
+                  "4": 0.9740189629629631
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24114606.4,
+                "telemetry_max_gap_ms": 182.25,
+                "telemetry_m02": 0.9693877551020408,
+                "worst_by_class": {
+                  "2": 0.1625964,
+                  "4": 0.915048
+                }
+              }
+            ]
+          },
+          {
+            "seed": 35492826,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 4
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.2767,
+                "4": 0.9878
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 4
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.2767,
+                "4": 0.9878
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 43610491.2,
+                "telemetry_max_gap_ms": 157.2499999999999,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9709173333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 39935088.0,
+                "telemetry_max_gap_ms": 165.49999999999977,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.971323,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 37517353.6,
+                "telemetry_max_gap_ms": 262.00000000000045,
+                "telemetry_m02": 0.004642857142857143,
+                "worst_by_class": {
+                  "2": 0.9711048000000001,
+                  "4": 0.9996927999999999
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 33568566.4,
+                "telemetry_max_gap_ms": 773.7499999999998,
+                "telemetry_m02": 0.12,
+                "worst_by_class": {
+                  "2": 0.9656866666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 29868115.2,
+                "telemetry_max_gap_ms": 522.7499999999998,
+                "telemetry_m02": 0.3175655976676385,
+                "worst_by_class": {
+                  "2": 0.9203314285714286,
+                  "4": 0.9919619047619047
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 25729345.599999998,
+                "telemetry_max_gap_ms": 1101.5,
+                "telemetry_m02": 0.7504373177842566,
+                "worst_by_class": {
+                  "2": 0.6767205000000001,
+                  "4": 0.983828
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 24479612.8,
+                "telemetry_max_gap_ms": 184.75,
+                "telemetry_m02": 0.9580539358600583,
+                "worst_by_class": {
+                  "2": 0.3799693333333334,
+                  "4": 0.9874927407407407
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24281756.8,
+                "telemetry_max_gap_ms": 184.75,
+                "telemetry_m02": 0.9693877551020408,
+                "worst_by_class": {
+                  "2": 0.27668,
+                  "4": 0.9878170666666667
+                }
+              }
+            ]
+          },
+          {
+            "seed": 376383645,
+            "in_range": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.3016,
+                "4": 0.9581
+              },
+              "is_scoreable": false
+            },
+            "full": {
+              "order": [
+                2
+              ],
+              "first_fail_at_index": {
+                "2": 5
+              },
+              "ties": [],
+              "never_failed": [
+                4
+              ],
+              "terminal_fraction": {
+                "2": 0.3016,
+                "4": 0.9581
+              },
+              "is_scoreable": false
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 44767192.0,
+                "telemetry_max_gap_ms": 155.00000000000026,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9684173333333334,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 42001528.0,
+                "telemetry_max_gap_ms": 159.49999999999997,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.968443,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 38961449.6,
+                "telemetry_max_gap_ms": 256.2500000000001,
+                "telemetry_m02": 0.02085714285714286,
+                "worst_by_class": {
+                  "2": 0.968308,
+                  "4": 0.9996927999999999
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 35521998.4,
+                "telemetry_max_gap_ms": 605.75,
+                "telemetry_m02": 0.15464285714285714,
+                "worst_by_class": {
+                  "2": 0.9596926666666666,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 32268875.2,
+                "telemetry_max_gap_ms": 712.2499999999999,
+                "telemetry_m02": 0.27739285714285716,
+                "worst_by_class": {
+                  "2": 0.9684777142857143,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 29081278.4,
+                "telemetry_max_gap_ms": 797.25,
+                "telemetry_m02": 0.46822157434402334,
+                "worst_by_class": {
+                  "2": 0.841842,
+                  "4": 0.9828333333333333
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 25391724.8,
+                "telemetry_max_gap_ms": 1577.0000000000002,
+                "telemetry_m02": 0.8673469387755102,
+                "worst_by_class": {
+                  "2": 0.5916586666666667,
+                  "4": 0.98
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24281043.2,
+                "telemetry_max_gap_ms": 1699.2500000000002,
+                "telemetry_m02": 0.9511661807580175,
+                "worst_by_class": {
+                  "2": 0.3016432,
+                  "4": 0.9581018666666667
+                }
+              }
+            ]
+          },
+          {
+            "seed": 1746484539,
+            "in_range": {
+              "order": [
+                2,
+                4
+              ],
+              "first_fail_at_index": {
+                "2": 3,
+                "4": 7
+              },
+              "ties": [],
+              "never_failed": [],
+              "terminal_fraction": {
+                "2": 0.4768,
+                "4": 0.9319
+              },
+              "is_scoreable": true
+            },
+            "full": {
+              "order": [
+                2,
+                4
+              ],
+              "first_fail_at_index": {
+                "2": 3,
+                "4": 7
+              },
+              "ties": [],
+              "never_failed": [],
+              "terminal_fraction": {
+                "2": 0.4768,
+                "4": 0.9319
+              },
+              "is_scoreable": true
+            },
+            "per_point": [
+              {
+                "mult": 0.3,
+                "bg_bps": 48392510.4,
+                "telemetry_max_gap_ms": 165.2500000000001,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723306666666667,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.4,
+                "bg_bps": 45222707.2,
+                "telemetry_max_gap_ms": 177.0,
+                "telemetry_m02": 0.0,
+                "worst_by_class": {
+                  "2": 0.9723569999999999,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.5,
+                "bg_bps": 41687441.599999994,
+                "telemetry_max_gap_ms": 237.0,
+                "telemetry_m02": 0.03,
+                "worst_by_class": {
+                  "2": 0.9723704,
+                  "4": 0.9996927999999999
+                }
+              },
+              {
+                "mult": 0.6,
+                "bg_bps": 38239228.8,
+                "telemetry_max_gap_ms": 801.5000000000001,
+                "telemetry_m02": 0.15,
+                "worst_by_class": {
+                  "2": 0.9499113333333334,
+                  "4": 0.9991022222222222
+                }
+              },
+              {
+                "mult": 0.7,
+                "bg_bps": 34698657.6,
+                "telemetry_max_gap_ms": 1303.25,
+                "telemetry_m02": 0.23,
+                "worst_by_class": {
+                  "2": 0.9119582857142858,
+                  "4": 0.9998575238095238
+                }
+              },
+              {
+                "mult": 0.8,
+                "bg_bps": 30155756.799999997,
+                "telemetry_max_gap_ms": 2187.5,
+                "telemetry_m02": 0.456,
+                "worst_by_class": {
+                  "2": 0.7851980000000001,
+                  "4": 1.0
+                }
+              },
+              {
+                "mult": 0.9,
+                "bg_bps": 26256041.6,
+                "telemetry_max_gap_ms": 3171.25,
+                "telemetry_m02": 0.7628571428571429,
+                "worst_by_class": {
+                  "2": 0.58862,
+                  "4": 0.987674074074074
+                }
+              },
+              {
+                "mult": 1.0,
+                "bg_bps": 24200856.0,
+                "telemetry_max_gap_ms": 3278.5,
+                "telemetry_m02": 0.9285714285714286,
+                "worst_by_class": {
+                  "2": 0.4767868,
+                  "4": 0.9318512
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "permutation_control": {
+    "PF": {
+      "101": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      },
+      "102": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      },
+      "103": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      },
+      "104": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      }
+    },
+    "Reservation": {
+      "101": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      },
+      "102": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      },
+      "103": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      },
+      "104": {
+        "orders": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "unscoreable": []
+      }
+    },
+    "TwoTier": {
+      "101": {
+        "orders": [
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ]
+        ],
+        "unscoreable": []
+      },
+      "102": {
+        "orders": [
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ]
+        ],
+        "unscoreable": []
+      },
+      "103": {
+        "orders": [
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ]
+        ],
+        "unscoreable": []
+      },
+      "104": {
+        "orders": [
+          [
+            2
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2
+          ]
+        ],
+        "unscoreable": []
+      }
+    }
+  }
+}
