@@ -140,6 +140,10 @@ def run(
         grid.slot_duration_s,
         sr_period_slots=sr_period_slots,
         sr_offset_slots=sr_offset_slots,
+        # M-9: slots per frame DERIVED from the carrier, never a literal, so
+        # the 100 ms horizon survives a numerology change
+        # (10 subframes x 2^mu slots each).
+        slots_per_frame=10 * (2 ** scenario.carrier.numerology),
     )
     # WP7: message identity is purely a scoring-side overlay -- BSR/
     # scheduler code above never reads it. Collected below at the existing
@@ -638,6 +642,8 @@ def run(
         bsr.on_arrivals(per_flow_arrived, buffers)
         bsr.tick_timers(slot_index)
         ul_access.on_arrivals(per_flow_arrived, buffers)
+        # M-9 needs the current slot before any eligibility is read.
+        ul_access.note_slot(slot_index)
         ul_access.tick(slot_index)
 
         # MODEL C AT THE JOIN EDGES: fire any armed re-join seed for a UE

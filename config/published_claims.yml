@@ -71,7 +71,7 @@ claims:
     field: G8_M09_worst_prot
     statistic: count_lt
     statistic_arg: 0.90
-    value: 3
+    value: 2
 
   - id: G1.M01.n10.twotier.median
     doc: docs/verification-2026-09-04.md
@@ -86,7 +86,7 @@ claims:
     # 90.125 pre-scaling; 87.7845 after 0ea02b0. THIS IS THE FIGURE THE
     # staleness check was built for -- it re-derived cleanly from its old
     # artefact for a full day after the code that produced it changed.
-    value: 87.7845
+    value: 91.5
     tolerance: 0.001
     tolerance: 0.01
 

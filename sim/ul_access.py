@@ -84,6 +84,15 @@ DEFAULT_RACH_RECOVERY_MS = 400.0
 # directly. 150 bytes lets many small periodic messages complete in the
 # SR-triggered grant itself, matching what a real static min-grant floor
 # would actually do.
+#: `ulsch_max_frame_inactivity`, in FRAMES. 10 both as the config default
+#: (`MACRLC_nr_paramdef.h:125`) and in two deployment .conf files
+#: (`gnb-vnf.sa.cbrs.aerial.conf:191`, `...273prb.aerial.conf:212`).
+DEFAULT_ULSCH_MAX_FRAME_INACTIVITY = 10
+#: Slots per frame at this repo's numerology. 10 subframes x 2^mu; the driver
+#: passes the real value so a numerology change cannot silently rescale the
+#: 100 ms horizon.
+DEFAULT_SLOTS_PER_FRAME = 20
+
 DEFAULT_SR_REPORT_FLOOR_BYTES = 150
 
 
@@ -115,6 +124,8 @@ class UlAccessModel:
         sr_trans_max: int = DEFAULT_SR_TRANS_MAX,
         rach_recovery_ms: float = DEFAULT_RACH_RECOVERY_MS,
         sr_report_floor_bytes: int = DEFAULT_SR_REPORT_FLOOR_BYTES,
+        ulsch_max_frame_inactivity: int = DEFAULT_ULSCH_MAX_FRAME_INACTIVITY,
+        slots_per_frame: int = DEFAULT_SLOTS_PER_FRAME,
     ) -> None:
         self._ue_flows: dict[int, list[FlowConfig]] = {}
         for f in flows:
@@ -127,6 +138,11 @@ class UlAccessModel:
         self._trans_max = sr_trans_max
         self._rach_recovery_slots = max(1, round((rach_recovery_ms / 1000.0) / slot_duration_s))
         self._report_floor = sr_report_floor_bytes
+        # M-9: the deployed gate's THIRD disjunct. See sr_report_floor().
+        self._inactivity_slots = (ulsch_max_frame_inactivity * slots_per_frame
+                                  if ulsch_max_frame_inactivity > 0 else 0)
+        self._last_ul_grant_slot: dict[int, int] = {}
+        self._slot = -1
         self._state: dict[int, _UeSrState] = {ue_id: _UeSrState() for ue_id in self._ue_flows}
 
     def reset_ue(self, ue_id: int) -> None:
@@ -245,12 +261,23 @@ class UlAccessModel:
             st.prohibit_deadline_slot = slot_index + self._prohibit_slots
             st.gnb_sr_flag = True
 
+    def note_slot(self, slot_index: int) -> None:
+        """The current slot, for the inactivity horizon. Separate from
+        `tick()` because `tick()` runs only the SR occasion logic and a
+        caller may legitimately not tick."""
+        self._slot = slot_index
+
     def on_ul_grant(self, ue_id: int) -> None:
         """Mirrors `sched_ctrl->SR = false` (`gNB_scheduler_ulsch.c:2694`)
         plus the UE-side pending/counter/timer reset on receiving any
         grant -- the request has been served. Call once per UE per slot,
         for the UE's `ue_grant=True` allocation (same call site as
         `BsrModel.on_ul_grant`)."""
+        # M-9: the inactivity horizon runs from the last UL-SCHEDULED slot
+        # (`last_ul_frame * n + last_ul_slot` in the C), recorded here for
+        # every UE regardless of SR state.
+        if self._slot >= 0:
+            self._last_ul_grant_slot[ue_id] = self._slot
         st = self._state.get(ue_id)
         if st is None:
             return
@@ -259,6 +286,48 @@ class UlAccessModel:
         st.counter = 0
         st.prohibit_active = False
 
+    def inactivity_rescue(self, ue_id: int) -> bool:
+        """M-9 -- the deployed UL gate's THIRD disjunct, `high_inactivity`.
+
+        `nr_UE_is_to_be_scheduled` (`gNB_scheduler_ulsch.c:1735-1766`), called
+        by BOTH deployed schedulers, returns
+        `has_data || SR || high_inactivity`, where `high_inactivity` is
+        `diff >= ulsch_max_frame_inactivity * slots_per_frame` measured from
+        the UE's last UL-SCHEDULED slot. **Any connected UE unscheduled for
+        100 ms becomes a candidate unconditionally** -- regardless of BSR
+        estimate, per-LCG array, SR state or deficit.
+
+        This port implemented `has_data` only, and approximated `SR` through a
+        report floor. The third disjunct was absent entirely, which is why a
+        UE could be excluded for a whole run.
+
+        **WHAT THE DEPLOYED SYSTEM THEN GIVES IT, and it is not a rescue
+        there.** `do_sched` routes the UE to the control-plane class, whose
+        grant is *"a hardcoded min_rb crumb (~120 B at fallback MCS -- it
+        cannot carry even one 200 B MAVLink packet, and leaves no padding room
+        for the BSR MAC CE the crumb was supposed to deliver)"*; the same
+        source records *"~275 consecutive min_rb crumbs that failed to restore
+        service"* (`ia_p5g_scheduler.c:580-596`).
+
+        **THIS SIMULATOR WILL DO BETTER, AND THE REASON IS A KNOWN GAP.**
+        `sim/ue_lcp.py::fill` is handed the whole TB and charges nothing for
+        the BSR MAC CE, so a crumb here has all its bytes available and the
+        report rides free. The deployed crumb fails *for want of that padding
+        room*. So M-9's effect here is **optimistic relative to the
+        deployment**, by exactly the BSR-CE cost -- registered in
+        `docs/m9-registration-2026-09-07.md` before the run, and NOT corrected
+        by bundling the CE cost into this commit.
+        """
+        if self._inactivity_slots <= 0 or self._slot < 0:
+            return False
+        last = self._last_ul_grant_slot.get(ue_id)
+        if last is None:
+            # Never granted at all -- the strongest case the gate covers. The
+            # C measures `diff` from `last_ul_frame`, which is 0 for a UE that
+            # has never been scheduled, so the horizon runs from slot 0.
+            return self._slot >= self._inactivity_slots
+        return (self._slot - last) >= self._inactivity_slots
+
     def sr_report_floor(self, ue_id: int) -> int:
         """What `BsrModel.broadcast()` should report in place of WP3's
         probe: the small honest floor once the gNB's SR flag is set
@@ -266,6 +335,14 @@ class UlAccessModel:
         still waiting on an occasion, prohibit-blocked, or in RACH
         recovery."""
         st = self._state.get(ue_id)
-        if st is None or not st.gnb_sr_flag:
-            return 0
-        return self._report_floor
+        if st is not None and st.gnb_sr_flag:
+            return self._report_floor
+        # M-9's candidacy rescue reaches the scheduler the same way the SR
+        # does -- through `bytes_reported` -- so no scheduler file changes.
+        # That is the established pattern (CLAUDE.md: radio-layer gating
+        # composes through the BufferView/report path, never by editing a
+        # comparator), and it is faithful: the deployed rescue's grant is a
+        # min_rb crumb, which is what a report floor produces.
+        if self.inactivity_rescue(ue_id):
+            return self._report_floor
+        return 0

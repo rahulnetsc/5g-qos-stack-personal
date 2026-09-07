@@ -33,8 +33,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 ARMS = ("PF", "Reservation", "TwoTier")
-SEV_DIR = "sweeps/fixed-2026-09-07/plain"   # audit fixes applied, attach OFF
-ATT_DIR = "sweeps/fixed-2026-09-07/attach"  # the same grid WITH the attach path
+SEV_DIR = "sweeps/m9-2026-09-07/plain"   # audit fixes applied, attach OFF
+ATT_DIR = "sweeps/m9-2026-09-07/attach"  # the same grid WITH the attach path
 
 #: `--attach` scores the with-attach column. BOTH are reported: the without
 #: column is what a COLD-STARTING deployment sees before any UE has been
