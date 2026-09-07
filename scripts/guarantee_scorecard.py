@@ -195,6 +195,96 @@ CLAUSES = [
                   "absolute 99 % bound -- a different question, and the only "
                   "row whose threshold is downstream of another clause",
       source="test plan L101 (A's G5 unchanged) + L99's 99 % bound"),
+ # --- STEP 1: clause parts that were stated and never scored. Every one
+ # is read from an artefact that already carried it
+ # (docs/clause-coverage-registration-2026-09-07.md).
+ dict(g="G3", clause="part 2: zero gaps >= T_live",
+      art=f"{SEV_DIR}/core.json", rows="rows",
+      stat=lambda r: r["G3_M03_gaps_over_tlive_prot"],
+      ok=lambda v: v is not None and v == 0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M03's count of gaps exceeding T_live, PROTECTED FLEET",
+      claim_about="the same set",
+      source="test plan L97, second part: 'zero gaps >= T_live over the "
+             "full campaign' -- stated and never scored until today"),
+ dict(g="G3", clause="part 3: p98 <= PDB",
+      art=f"{SEV_DIR}/core.json", rows="rows",
+      stat=lambda r: r["G1_M01_p98_prot"], ok=lambda v: v is not None and v <= 95.0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M01 worst-flow p98, PROTECTED FLEET -- NUMERICALLY G1's OWN "
+                "STATISTIC, scored under G1's name and not G3's until today",
+      claim_about="telemetry's own p98. Same caveat as G1: the worst flow is "
+                  "5QI 1 or 2, never the DL command flow",
+      source="test plan L97, third part: 'p98 <= PDB'"),
+ dict(g="G5", clause="part 2: frame age p95 <= 67 ms",
+      art=f"{SEV_DIR}/core.json", rows="rows",
+      stat=lambda r: r["G5_M06_all_ms"], ok=lambda v: v is not None and v <= 67.0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M06 frame age p95 over ALL FLOWS -- this is the only G5 key "
+                "with no _prot variant. Harmless in fact (PDU sets exist only "
+                "on the framed video flow) but it is an undeclared population",
+      claim_about="the video feed",
+      source="test plan L99, second part: 'frame age at MEC p95 <= 2 frame "
+             "periods (67 ms)'"),
+ dict(g="G2", clause="DOWNLINK STOP p98 <= 100 ms",
+      art=f"{SEV_DIR}/g2_ul_stop.json", rows="rows",
+      stat=lambda r: r["DL_stop_p98_ms"], ok=lambda v: v is not None and v <= 100.0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the DL STOP flow's p98",
+      claim_about="GT-1.2's STOP is a DOWNLINK datagram, so this is the "
+                  "clause's own direction. The UL row scores the mirror image. "
+                  "SUBSTITUTION unchanged: p98 for a stated MAXIMUM",
+      source="test plan L96 + GT-1.2 ('simultaneous STOP datagrams')"),
+ dict(g="G7", clause="c1: victim's camera p98 <= PDB",
+      art=f"{SEV_DIR}/g7.json", rows="rows",
+      stat=lambda r: (r["A_camera_p98_ms"], r["A_camera_pdb_ms"]),
+      ok=lambda v: v[0] is not None and v[0] <= v[1],
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the VICTIM camera's p98 against its own PDB",
+      claim_about="\"A's G1/G3/G5 unchanged within epsilon\" -- the G1 half. "
+                  "epsilon is unspecified, so an absolute bound substitutes",
+      source="test plan L101 + GT-4.3"),
+ dict(g="G7", clause="c1: victim's telemetry p98 <= PDB",
+      art=f"{SEV_DIR}/g7.json", rows="rows",
+      stat=lambda r: (r["A_telemetry_p98_ms"], r["A_telemetry_pdb_ms"]),
+      ok=lambda v: v[0] is not None and v[0] <= v[1],
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the VICTIM's telemetry p98 against its own PDB",
+      claim_about="the same flow", source="test plan L101 + GT-4.3"),
+ dict(g="G7", clause="c3: AGGRESSOR's own telemetry p98 <= PDB",
+      art=f"{SEV_DIR}/g7.json", rows="rows",
+      stat=lambda r: (r["B_telemetry_p98_ms"], r["B_telemetry_pdb_ms"]),
+      ok=lambda v: v[0] is not None and v[0] <= v[1],
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the AGGRESSOR's telemetry p98 against its own PDB",
+      claim_about="GT-4.3's THIRD part, absent from the guarantee-table line: "
+                  "'B's other flows (its own telemetry!) still within SLO -- "
+                  "the containment must also hold INSIDE the misbehaving asset'",
+      source="GT-4.3 KPI line"),
+ dict(g="G8", clause="part 2: zero starvation epochs >= 1 s (parametric)",
+      art=f"{SEV_DIR}/core.json", rows="rows",
+      stat=lambda r: r["G8_M22_epochs_prot"],
+      ok=lambda v: v is not None and v == 0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M22's count of starvation epochs, PROTECTED FLEET",
+      claim_about="the same set",
+      source="test plan L102, second part: 'zero starvation epochs >= 1 s'"),
+ dict(g="G8", clause="part 2: zero starvation epochs (sensor_dense)",
+      art=f"{SEV_DIR}/sensor_dense.json", rows="rows",
+      stat=lambda r: r["G8_M22_epochs"],
+      ok=lambda v: v is not None and v == 0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="M22's epoch count, sensor_dense (one 5QI)",
+      claim_about="the same set", source="test plan L102, second part"),
+ dict(g="G8", clause="part 2b: no UE never granted (sensor_dense)",
+      art=f"{SEV_DIR}/sensor_dense.json", rows="rows",
+      stat=lambda r: r["n_never_granted"],
+      ok=lambda v: v is not None and v == 0,
+      sev=lambda r: r.get("M02_prot"),
+      sums_over="the count of UEs that received no grant all run",
+      claim_about="'zero starvation epochs' in its strongest form -- a UE "
+                  "never granted is starved for the whole run",
+      source="test plan L102, second part"),
  dict(g="G10", clause="every GBR flow meets contract (per fleet size x seed)",
       art=f"{SEV_DIR}/g10_attach.json", rows="rows",
       stat=lambda r: (r["M07_met"], r["M07_total"]),
@@ -265,6 +355,79 @@ def _nested():
                          source="test plan L105 'every 60 s window passes' + "
                                 "L122's 98 % conformance basis -> M02w <= 0.02"),
                     per))
+    # --- G6: the clause is a CONJUNCTION and the paired baseline EXISTS.
+    # The scorecard declared this not-computable on the grounds that the
+    # artefact "stores only the perturbed arm's summary". It does not:
+    # stage6_g6_n40.csv holds 3 arms x 40 seeds x bg in {False, True} with the
+    # full panel in both populations, and bg=False IS the unperturbed paired
+    # baseline the clause requires.
+    import csv as _csv
+    g6p = REPO / "sweeps/rerun-2026-09-06/g6/stage6_g6_n40.csv"
+    if g6p.exists():
+        rows6 = list(_csv.DictReader(g6p.open()))
+        def _f(r, k):
+            v = r.get(k, "")
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        STATS = [("G1 M01 p98 <= 95 ms", "M01.prot.p98", 95.0, "le"),
+                 ("G3 max gap <= 500 ms", "M03.prot.max_gap_ms", 500.0, "le"),
+                 ("G5 M05 >= 0.99", "M05.prot.fraction", 0.99, "ge")]
+        for label, key, bound, sense in STATS:
+            per = {}
+            for arm in ARMS:
+                base = {r["seed"]: _f(r, key) for r in rows6
+                        if r.get("scheduler") == arm and r.get("bg") == "False"}
+                pert = {r["seed"]: _f(r, key) for r in rows6
+                        if r.get("scheduler") == arm and r.get("bg") == "True"}
+                seeds = sorted(set(base) & set(pert))
+                ok = 0
+                for sd in seeds:
+                    b, q = base[sd], pert[sd]
+                    if b is None or q is None:
+                        continue
+                    within = (q <= bound) if sense == "le" else (q >= bound)
+                    # "shifts by <= +20 % relative", in the DIRECTION OF HARM.
+                    # An undefined shift (baseline 0) is counted as failing the
+                    # within-bound half only -- Part 3's caveat, kept.
+                    if b == 0:
+                        shift_ok = True
+                    elif sense == "le":
+                        shift_ok = (q - b) / abs(b) <= 0.20
+                    else:
+                        shift_ok = (b - q) / abs(b) <= 0.20
+                    ok += bool(within and shift_ok)
+                per[arm] = dict(n=len(seeds), passes=ok, sev=None, sev_fail=None)
+            out.append((dict(g="G6", clause=f"conjunction: {label} AND shift <= +20 %",
+                             sums_over="the PROTECTED-FLEET statistic, paired "
+                                       "within seed across bg in {False, True}",
+                             claim_about="the same set. NOTE the cell runs under "
+                                         "wp9_sweep.BASE, i.e. MFBR 0, a DIFFERENT "
+                                         "flag state from core.json's MFBR 8 Mbps",
+                             source="test plan L100: 'every G1/G3/G5 statistic "
+                                    "stays within its bound AND shifts by "
+                                    "<= +20 % relative'"), per))
+
+    c345 = load("sweeps/rerun-2026-09-06/g11_c345.json")
+    if c345 and "C3" in c345:
+        per = {}
+        for arm in ARMS:
+            d = c345["C3"].get(arm) or {}
+            cov = d.get("cov")
+            # ONE value per arm across repeats, not a success rate -- reported
+            # as 1/1 or 0/1 so the denominator says so.
+            per[arm] = dict(n=1, passes=int(cov is not None and cov <= 0.15),
+                            sev=None, sev_fail=None,
+                            note=f"CoV = {cov:.4f}" if cov is not None else "no value")
+        out.append((dict(g="G11", clause="C3: CoV(p98) <= 15 % across repeats",
+                         sums_over="p98 across the 10 repeat runs, per arm",
+                         claim_about="the same set. DENOMINATOR IS 1 BY "
+                                     "CONSTRUCTION -- a CoV is computed across "
+                                     "runs, so there is no per-run verdict",
+                         source="test plan L105: 'across repeats, CoV(p98) "
+                                "<= 15 %'"), per))
+
     g12 = load("sweeps/g12-rescore-2026-09-06/g12.json")
     if g12:
         # THE PREDICATE WAS UNSOUND AND REPORTED 0/20 ON EVERY ARM.
@@ -355,25 +518,46 @@ def selftest() -> int:
         rows = blob[c["rows"]]
         vals = [c["stat"](r) for r in rows]
         verdicts = {c["ok"](v) for v in vals}
-        # observed range, and whether a flip is CONSTRUCTIBLE
-        if isinstance(vals[0], tuple):
-            # "can it produce a pass" and "can it produce a FAIL" -- the
-            # second needs the negation. Getting this wrong flagged G10 as
-            # unfalsifiable while its data plainly contained both verdicts,
-            # which is the self-test failing its own rule.
-            flip_pass = c["ok"]((1, 1)); flip_fail = not c["ok"]((0, 1))
-        else:
-            lo, hi = min(vals), max(vals)
-            flip_pass = c["ok"](lo - 1e9) or c["ok"](hi + 1e9)
-            flip_fail = (not c["ok"](lo - 1e9)) or (not c["ok"](hi + 1e9))
-        if not (flip_pass and flip_fail):
-            bad.append(f"{c['g']} {c['clause']}: predicate cannot flip "
-                       f"(observed verdicts {verdicts})")
-        else:
-            span = ("both" if len(verdicts) == 2 else
-                    f"only {verdicts.pop()} in this data")
+
+        # REAL DATA BEATS A SYNTHETIC FLIP. If both verdicts occur in the
+        # artefact, the predicate is demonstrably falsifiable and no
+        # perturbation is needed -- that is stronger evidence, not weaker.
+        # The first version tested only a synthetic flip and flagged seven
+        # sound predicates, including three whose data plainly contained
+        # both verdicts, because its perturbation assumed an inequality on a
+        # scalar and these are equality tests and (value, bound) pairs.
+        if len(verdicts) == 2:
+            print(f"  OK  {c['g']:4s} {c['clause'][:46]:46s} "
+                  f"BOTH verdicts occur in the artefact")
+            continue
+
+        # One verdict only: the predicate must still be shown able to produce
+        # the other. Candidates are built from the observed shape rather than
+        # assuming one.
+        def candidates(v):
+            if isinstance(v, tuple):
+                lo = tuple([0] + list(v[1:]))
+                hi = tuple([float("inf")] + list(v[1:]))
+                return [lo, hi]
+            if isinstance(v, (int, float)):
+                return [0, 1, -1e9, 1e9]
+            return []
+
+        outs = set()
+        for v in vals:
+            for cand in candidates(v):
+                try:
+                    outs.add(c["ok"](cand))
+                except Exception:
+                    pass
+        if outs >= {True, False}:
+            only = verdicts.pop()
             print(f"  OK  {c['g']:4s} {c['clause'][:46]:46s} flips both ways; "
-                  f"observed: {span}")
+                  f"observed: only {only} in this data -- "
+                  f"NO DISCRIMINATING POWER on this evidence")
+        else:
+            bad.append(f"{c['g']} {c['clause']}: predicate cannot flip "
+                       f"(observed {verdicts}, synthetic {outs})")
     for b in bad:
         print(f"  FAIL {b}")
     return 1 if bad else 0
