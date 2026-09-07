@@ -184,3 +184,33 @@ def cce_aggregation_level(snr_db: float) -> int:
     if snr_db >= 2:
         return 8
     return 16
+
+
+def cap_ues_per_slot(allocations: list, max_ues: int) -> list:
+    """M-6 -- the deployed per-slot UE-count cap, applied to one direction.
+
+    Both deployed schedulers limit how many UEs receive a DCI in a slot,
+    **before any CCE search** (`gNB_scheduler_dlsch.c:1019-1023`,
+    `gNB_scheduler_ulsch.c:3017-3021`), and pass the limit INTO the scheduler
+    (`ia_p5g_pf_dl(mac, ..., max_sched_ues, ...)`), so it is a scheduler input
+    by construction rather than a resource the allocator discovers.
+
+    Each arm emits its allocations in RANK ORDER, so truncating to the first
+    `max_ues` distinct UEs keeps exactly the UEs the comparator chose -- which
+    is what the C does, since it iterates the sorted list and stops.
+
+    **Retransmissions are not exempted.** The C's cap is on DCIs and a retx
+    needs one too; exempting them would let a slot exceed the cap by an
+    unbounded amount, which is the opposite of what the cap is for.
+    """
+    if max_ues <= 0:
+        return allocations
+    seen: set[int] = set()
+    out = []
+    for a in allocations:
+        if a.ue_id not in seen:
+            if len(seen) >= max_ues:
+                continue        # this UE would need a DCI the slot cannot issue
+            seen.add(a.ue_id)
+        out.append(a)
+    return out

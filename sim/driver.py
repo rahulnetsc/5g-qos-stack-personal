@@ -523,6 +523,11 @@ def run(
         # exhaustion changes bytes_queued before eligibility is computed.
         retx_prbs_this_slot = 0
         retx_cce_this_slot = 0
+        # M-6: the deployed per-slot cap is on DCIs, and a retransmission
+        # needs one -- so retx UEs consume cap slots the new-grant
+        # allocator cannot then use. Counted per DIRECTION, because the
+        # cap is per direction.
+        retx_ues_this_slot: dict[str, set] = {"DL": set(), "UL": set()}
         for proc in harq_pool.due_this_slot(slot_index):
             if proc.direction == "DL":
                 pdb_s = pdb_by_flow.get((proc.ue_id, proc.qfi), 1.0)
@@ -536,6 +541,7 @@ def run(
                     continue
                 retx_prbs_this_slot += proc.prbs
                 retx_cce_this_slot += proc.cce_cost
+                retx_ues_this_slot[proc.direction].add(proc.ue_id)
                 true_snr = channel.get_snr_db(proc.ue_id)
                 success = draw_harq_outcome(
                     harq_rng_dl, true_snr, proc.snr_used_db, proc.retx_count,
@@ -591,6 +597,7 @@ def run(
                     continue
                 retx_prbs_this_slot += proc.prbs
                 retx_cce_this_slot += proc.cce_cost
+                retx_ues_this_slot[proc.direction].add(proc.ue_id)
                 true_snr = channel.get_snr_db(proc.ue_id)
                 success = draw_harq_outcome(
                     harq_rng_ul, true_snr, proc.snr_used_db, proc.retx_count,
@@ -688,7 +695,9 @@ def run(
         # pending HARQ process -- zero scheduler-side changes, both
         # wrappers only need the right attributes (structural typing,
         # scheduler/interfaces.py).
-        reduced_slot_grid = ReducedSlotView(slot_grid, retx_prbs_this_slot, retx_cce_this_slot)
+        reduced_slot_grid = ReducedSlotView(
+            slot_grid, retx_prbs_this_slot, retx_cce_this_slot,
+            retx_ues={d: len(v) for d, v in retx_ues_this_slot.items()})
         # WP-Join commit 5: JoinAwareBufferView composed OUTERMOST over
         # HarqAwareBufferView (docs/wp-join-plan.md sec1.4) -- a radio-
         # gated UE's mask strictly subsumes a per-flow HARQ-pending mask,

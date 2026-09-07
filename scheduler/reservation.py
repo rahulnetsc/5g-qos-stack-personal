@@ -416,6 +416,7 @@ from .flow import FlowConfig
 from .rank_trace import RankEntry, RankSnapshot, field as trace_field
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
+    cap_ues_per_slot,
     bits_per_prb,
     bits_per_prb_for_mcs,
     cce_aggregation_level,
@@ -762,10 +763,16 @@ class Reservation:
         # independently observable in output, but getting it right now
         # avoids a silent reorder once one exists.
         out: list[Allocation] = []
+        # M-6: the deployed cap is PER DIRECTION, applied to each direction's
+        # list separately rather than to their concatenation.
         if slot.ul_symbols > 0:
-            out.extend(self._allocate_direction(slot, buffers, channel, "UL"))
+            out.extend(cap_ues_per_slot(
+                self._allocate_direction(slot, buffers, channel, "UL"),
+                slot.max_sched_ues))
         if slot.dl_symbols > 0:
-            out.extend(self._allocate_direction(slot, buffers, channel, "DL"))
+            out.extend(cap_ues_per_slot(
+                self._allocate_direction(slot, buffers, channel, "DL"),
+                slot.max_sched_ues))
         return out
 
     def _allocate_direction(

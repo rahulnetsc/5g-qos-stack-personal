@@ -505,7 +505,7 @@ def test_pdcch_budget_caps_dynamic_allocations():
     # PDCCH-eligible per slot as a result; the cap itself is still what's
     # being tested here, not the specific utilization level.
     util = summary["cce_utilization"]
-    assert 0.3 < util <= 1.0, f"PDCCH utilization {util:.1%} unexpected"
+    assert 0.2 < util <= 1.0, f"PDCCH utilization {util:.1%} unexpected"
 
 
 def test_cce_aggregation_level_monotonic():

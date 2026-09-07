@@ -75,6 +75,22 @@ class _FakeSlot:
     prb_count: int = 50
     pdcch_cce_budget: int = 48
 
+    #: M-6: some fixtures deliberately use a specific `prb_count` because the
+    #: quantity under test (the follower budget) is DERIVED from it. Changing
+    #: the grid to satisfy the cap would change what the test measures, so
+    #: those set the cap explicitly instead.
+    max_sched_ues_override: int | None = None
+
+    @property
+    def max_sched_ues(self) -> int:
+        """M-6: derived exactly as `sim/resource.SlotGrid` does, so a fixture
+        exercises the REAL cap rather than an exemption. A stub that omitted
+        it would make every test here run without the cap the production
+        path applies."""
+        if self.max_sched_ues_override is not None:
+            return self.max_sched_ues_override
+        return max(1, min(self.prb_count // (4 * 6), 8))
+
 
 @dataclass
 class _FakeBufferState:
@@ -228,7 +244,12 @@ def test_pf_coefficient_formula_matches_hand_computation():
     buffers.set(1, 1, bytes_queued=6000)
     channel = _FakeChannel({1: 20.0})
     # Plenty of PRBs -- isolates ranking/coefficient math from grant sizing.
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48)
+  # M-6: prb_count raised so the per-slot UE cap (prb_count // 24, capped at 8)
+    # admits every UE this test constructs. The test targets the FOLLOWER
+    # BUDGET, not the cap -- leaving it at the old value would silently turn
+    # it into a test of M-6 instead.
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48,
+                     max_sched_ues_override=8)
 
     sched.allocate(slot, buffers, channel)
 
@@ -328,7 +349,12 @@ def test_ul_emits_a_single_opaque_ue_grant_allocation():
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=2000)
     channel = _FakeChannel({1: 20.0})
-    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+  # M-6: prb_count raised so the per-slot UE cap (prb_count // 24, capped at 8)
+    # admits every UE this test constructs. The test targets the FOLLOWER
+    # BUDGET, not the cap -- leaving it at the old value would silently turn
+    # it into a test of M-6 instead.
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48,
+                     max_sched_ues_override=8)
 
     out = sched.allocate(slot, buffers, channel)
     assert len(out) == 1
@@ -1323,7 +1349,13 @@ def test_follower_budget_visibly_protects_trailing_ues_from_a_saturating_leader(
     buffers.set(2, 1, bytes_queued=200)    # modest -- needs ~3 PRBs
     buffers.set(3, 1, bytes_queued=200)    # modest -- needs ~3 PRBs
     channel = _FakeChannel({1: 20.0, 2: 20.0, 3: 20.0})
-    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48)
+    # M-6: the cap is set explicitly because this fixture's `prb_count`
+    # is the quantity the FOLLOWER BUDGET is derived from -- changing the
+    # grid to satisfy the cap would change what the test measures, and
+    # leaving the derived cap (50 // 24 = 2) would silently turn a
+    # follower-budget test into an M-6 test.
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=50, pdcch_cce_budget=48,
+                     max_sched_ues_override=8)
 
     out = sched.allocate(slot, buffers, channel)
     by_ue = {a.ue_id: a for a in out}
@@ -1367,7 +1399,13 @@ def test_dl_follower_budget_base_reflects_prbs_already_consumed_this_slot():
     buffers.set(2, 1, bytes_queued=550)    # needs 8 PRBs if unconstrained
     buffers.set(3, 1, bytes_queued=200)    # needs 3 PRBs if unconstrained
     channel = _FakeChannel({1: 20.0, 2: 20.0, 3: 20.0})
-    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48)
+    # M-6: the cap is set explicitly because this fixture's `prb_count`
+    # is the quantity the FOLLOWER BUDGET is derived from -- changing the
+    # grid to satisfy the cap would change what the test measures, and
+    # leaving the derived cap (50 // 24 = 2) would silently turn a
+    # follower-budget test into an M-6 test.
+    slot = _FakeSlot(dl_symbols=14, ul_symbols=0, prb_count=50, pdcch_cce_budget=48,
+                     max_sched_ues_override=8)
 
     out = sched.allocate(slot, buffers, channel)
     by_ue = {a.ue_id: a for a in out}

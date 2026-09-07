@@ -108,6 +108,21 @@ class _FakeSlot:
     prb_count: int = 50
     pdcch_cce_budget: int = 48
 
+    #: M-6: some fixtures deliberately use a tiny `prb_count` to test grant
+    #: sizing, which would derive a cap of 1 and silently turn them into cap
+    #: tests. Those set this explicitly instead.
+    max_sched_ues_override: int | None = None
+
+    @property
+    def max_sched_ues(self) -> int:
+        """M-6: derived exactly as `sim/resource.SlotGrid` does, so a fixture
+        exercises the REAL cap rather than an exemption. A stub that omitted
+        it would make every test here run without the cap the production
+        path applies."""
+        if self.max_sched_ues_override is not None:
+            return self.max_sched_ues_override
+        return max(1, min(self.prb_count // (4 * 6), 8))
+
 
 @dataclass
 class _FakeBufferState:
@@ -1118,7 +1133,12 @@ def test_fix2_reserve_protects_a_downstream_gbr_ue_from_a_saturating_leader():
     buffers.set(1, 1, bytes_queued=100_000, estimated_ul_buffer_per_lcg=100_000)
     buffers.set(2, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
     channel = _FakeChannel({1: 20.0, 2: 20.0})
-    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=10, pdcch_cce_budget=48)
+  # M-6: prb_count raised so the per-slot UE cap (prb_count // 24, capped at 8)
+    # admits every UE this test constructs. The test targets the FOLLOWER
+    # BUDGET, not the cap -- leaving it at the old value would silently turn
+    # it into a test of M-6 instead.
+    slot = _FakeSlot(dl_symbols=0, ul_symbols=14, prb_count=10, pdcch_cce_budget=48,
+                     max_sched_ues_override=8)
 
     out = sched.allocate(slot, buffers, channel)
 

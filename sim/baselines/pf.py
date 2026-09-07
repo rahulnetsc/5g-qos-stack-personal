@@ -1,6 +1,7 @@
 from ..buffer import BufferModel
 from ..channel import ChannelModel
 from scheduler import Allocation, FlowConfig, bits_per_prb, cce_aggregation_level
+from scheduler.link import cap_ues_per_slot
 from scheduler.rank_trace import RankEntry, RankSnapshot
 from ..resource import SlotGrid
 from ._mac import emit_grant
@@ -38,10 +39,16 @@ class ProportionalFair:
             self._r_avg[key] *= decay
 
         out: list[Allocation] = []
+        # M-6: the deployed cap is PER DIRECTION, so it is applied to each
+        # direction's list separately, not to their concatenation.
         if slot.dl_symbols > 0:
-            out.extend(self._allocate(slot, buffers, channel, "DL"))
+            out.extend(cap_ues_per_slot(
+                self._allocate(slot, buffers, channel, "DL"),
+                slot.max_sched_ues))
         if slot.ul_symbols > 0:
-            out.extend(self._allocate(slot, buffers, channel, "UL"))
+            out.extend(cap_ues_per_slot(
+                self._allocate(slot, buffers, channel, "UL"),
+                slot.max_sched_ues))
         return out
 
     def _allocate(

@@ -67,6 +67,11 @@ class SlotView(Protocol):
     ul_symbols: int
     prb_count: int
     pdcch_cce_budget: int
+    #: M-6 -- how many UEs may receive a DCI in this slot, per direction.
+    #: The deployed C computes this OUTSIDE the scheduler and passes it in
+    #: (`ia_p5g_pf_dl(mac, ..., max_sched_ues, ...)`), so it is a scheduler
+    #: INPUT by construction, not a resource the allocator discovers.
+    max_sched_ues: int
 
 
 class GridView(Protocol):

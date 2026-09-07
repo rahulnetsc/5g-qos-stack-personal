@@ -12,6 +12,33 @@ class SlotGrid:
     prb_count: int
     pdcch_cce_budget: int
 
+    @property
+    def max_sched_ues(self) -> int:
+        """M-6 -- the deployed per-slot UE-count cap, DERIVED from the grid.
+
+        Both deployed schedulers cap how many UEs are scheduled per slot per
+        direction **before any CCE search**
+        (`gNB_scheduler_dlsch.c:1019-1023`, `gNB_scheduler_ulsch.c:3017-3021`):
+
+            max_sched_ues = bw / (average_agg_level * NR_NB_REG_PER_CCE)
+            max_sched_ues = min(max_sched_ues, MAX_DCI_CORESET)
+
+        with `average_agg_level = 4` (a fixed literal in the C, not a computed
+        aggregation level), `NR_NB_REG_PER_CCE = 6`, `MAX_DCI_CORESET = 8`, and
+        `bw` the carrier bandwidth **in PRBs**. At the deployment's N_RB 106
+        this is **4**.
+
+        **Derived from `prb_count`, never written as a literal 4**, so a
+        bandwidth change cannot silently invalidate it -- CLAUDE.md's
+        restated-count rule.
+
+        **And this resolves the `average_agg_level` known issue**: the real
+        code does not use the aggregation level to PRICE a grant, it uses a
+        fixed 4 to derive a UE-COUNT CAP. "Model it fixed or SNR-dependent" was
+        the wrong question.
+        """
+        return max(1, min(self.prb_count // (4 * 6), 8))
+
 
 SYMBOLS_PER_SLOT = 14
 

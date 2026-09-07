@@ -440,12 +440,32 @@ class ReducedSlotView:
     already split DL/UL budgets within a slot beyond symbol availability,
     so this doesn't invent new precision beyond that)."""
 
-    __slots__ = ("_inner", "_retx_prbs", "_retx_cce")
+    __slots__ = ("_inner", "_retx_prbs", "_retx_cce", "_retx_ues")
 
-    def __init__(self, inner, retx_prbs: int, retx_cce: int = 0) -> None:
+    def __init__(self, inner, retx_prbs: int, retx_cce: int = 0,
+                 retx_ues: dict | None = None) -> None:
         self._inner = inner
         self._retx_prbs = retx_prbs
         self._retx_cce = retx_cce
+        self._retx_ues = retx_ues or {}
+
+    @property
+    def max_sched_ues(self) -> int:
+        """M-6's cap, forwarded UNREDUCED from the inner grid.
+
+        The deployed cap is on **how many UEs get a DCI in the slot**, and a
+        retransmission needs one too -- but the retx DCIs are already carved
+        out of `pdcch_cce_budget` here, and `cap_ues_per_slot` counts only the
+        NEW allocations the scheduler emits. Reducing this as well would
+        double-charge the same PRB/CCE. But the UE-COUNT cap is a different
+        budget: the deployed cap is on **how many UEs get a DCI**, and a retx
+        needs one, so a retx UE consumes a cap slot the new-grant allocator
+        cannot then use. Reduced by the distinct retx UEs in this slot, per
+        direction -- max over the two, since `cap_ues_per_slot` is applied to
+        each direction's list with this one value."""
+        base = self._inner.max_sched_ues
+        used = max(self._retx_ues.values()) if self._retx_ues else 0
+        return max(0, base - used)
 
     @property
     def slot_index(self) -> int:
