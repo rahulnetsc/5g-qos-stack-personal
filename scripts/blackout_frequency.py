@@ -30,7 +30,7 @@ from sim.driver import run as driver_run            # noqa: E402
 from sim.parametric import sweep_scenario           # noqa: E402
 from sim.run_record import RunRecord                # noqa: E402
 from g11_campaign import _arm                       # noqa: E402
-from regime_sweep import (RunLedger, arm_cost,  # noqa: E402
+from regime_sweep import (RunLedger, invocation_config, arm_cost,  # noqa: E402
                           paired_seeds, run_cells)
 
 
@@ -80,9 +80,7 @@ def main() -> int:
     # pins worker threads and refuses to launch beside an orphaned pool.
     # This wrote its JSON only at the end -- one kill from losing the grid.
     ledger = RunLedger(Path(a.out).with_suffix(".runs.jsonl"),
-                       {"horizon": a.horizon, "mfbr_multiple": a.mfbr_multiple,
-                        "arms": a.arms, "n_ues": a.n_ues, "load": a.load,
-                        "seeds": a.seeds},
+                       invocation_config(a),
                        ("arm", "seed", "n_ues", "load_mult"))
     banked = {(r["arm"], r["seed"], r["n_ues"], r["load_mult"]): r
               for r in ledger.banked()}

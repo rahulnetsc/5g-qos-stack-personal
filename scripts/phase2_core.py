@@ -29,7 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from code_state import stamp                              # noqa: E402
-from regime_sweep import RunLedger, arm_cost, run_cells    # noqa: E402
+from regime_sweep import (RunLedger, arm_cost, invocation_config,  # noqa: E402
+                          run_cells)
 from sim.driver import run as driver_run                   # noqa: E402
 from sim.parametric import sweep_scenario                  # noqa: E402
 from sim.run_record import RunRecord                       # noqa: E402
@@ -167,8 +168,7 @@ def main() -> int:
     # to (docs/phase2-results.md). A resume re-enters the banked rows rather
     # than publishing only this invocation's.
     ledger = RunLedger(Path(a.out).with_suffix(".runs.jsonl"),
-                       {"n_ues": a.n_ues, "horizon": a.horizon,
-                        "load_mult": a.load_mult, "arms": arms},
+                       invocation_config(a),
                        ("arm", "seed"))
     done = ledger.done_keys()
     by_key = {(r["arm"], r["seed"]): r for r in ledger.banked()}

@@ -526,6 +526,57 @@ def _run_one_indexed(packed: tuple) -> tuple[int, Any]:
 #      artefact, over a self-selected subset of a within-seed paired design.
 
 
+#: Argument names that provably cannot change a run's OUTPUT. Everything
+#: else is treated as run-defining, so a new flag is included by default
+#: rather than by remembering to add it.
+#:
+#: `workers` is here on evidence, not assumption: `scripts/verify_parallel.py`
+#: checks serial == parallel per runner, so resuming a banked run at a
+#: different worker count is legitimate. `out`/`json_out` name where the
+#: artefact goes, not what it contains.
+_NON_BEHAVIOURAL_ARGS = frozenset({"out", "json_out", "workers", "artefact"})
+
+
+def invocation_config(args, *, also_ignore=()) -> dict:
+    """The run-defining configuration, DERIVED from the parsed arguments.
+
+    **A HAND-LISTED CACHE KEY IS THE RESTATED-COUNT DEFECT APPLIED TO A
+    RESUME**, and it fails in the worst available direction. `phase2_core.py`
+    listed `{n_ues, horizon, load_mult, arms}` and omitted `attach_seed`, so a
+    run banked with the flag OFF was resumed by an invocation with it ON. The
+    artefact came back **byte-identical to the column it was supposed to
+    differ from**, which is indistinguishable from "the flag did nothing" --
+    and it was read that way twice, once producing a published conclusion that
+    had to be retracted (`docs/guarantee-scorecard-2026-09-07.md` section 4).
+
+    So the key is derived: every parsed argument except those provably unable
+    to change the output. A flag added tomorrow is in the key without anyone
+    remembering it, which is the only version of this that stays correct.
+
+    Verified to bite by `sim/tests/test_ledger_key.py`: bank a run, flip a
+    flag, and the second invocation must NOT resume.
+    """
+    ignore = _NON_BEHAVIOURAL_ARGS | set(also_ignore)
+    cfg = {}
+    for k, v in vars(args).items():
+        if k in ignore:
+            continue
+        if isinstance(v, (set, frozenset)):
+            v = sorted(v)
+        elif isinstance(v, Path):
+            v = str(v)
+        cfg[k] = v
+    try:
+        json.dumps(cfg)
+    except TypeError as exc:
+        raise TypeError(
+            f"invocation_config produced a non-JSON value ({exc}). A ledger "
+            f"config must round-trip through JSON or the comparison on reload "
+            f"silently fails -- name the offending argument in `also_ignore` "
+            f"only if it cannot change the run's output.") from exc
+    return dict(sorted(cfg.items()))
+
+
 class RunLedger:
     """One JSONL line per completed unit of work, written as it completes.
 

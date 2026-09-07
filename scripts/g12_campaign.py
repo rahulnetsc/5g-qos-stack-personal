@@ -50,7 +50,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from regime_sweep import (RunLedger, arm_cost,  # noqa: E402
+from regime_sweep import (RunLedger, invocation_config, arm_cost,  # noqa: E402
                           paired_seeds, run_cells)
 from scheduler import load_two_tier  # noqa: E402
 from scheduler.reservation import Reservation  # noqa: E402
@@ -518,9 +518,11 @@ def main(argv: list[str]) -> int:
     # ledger closes the window the pool opened -- one line per completed
     # ramp, fsynced, re-entered on resume.
     ledger = RunLedger(Path(args.out).with_suffix(".runs.jsonl"),
-                       {"ramp": list(ramp), "seeds": n_seeds,
-                        "horizon": HORIZON_SLOTS, "cells": [list(c) for c in kept],
-                        "arms": arm_names},
+                       # Derived from the invocation, plus the two
+                       # run-defining values that are NOT arguments.
+                       {**invocation_config(args),
+                        "ramp": list(ramp), "horizon": HORIZON_SLOTS,
+                        "cells": [list(c) for c in kept], "arms": arm_names},
                        ("cell", "arm", "seed", "perm"))
     banked = {(r["cell"], r["arm"], r["seed"], r["perm"]): _decode(r["ramped"])
               for r in ledger.banked()}

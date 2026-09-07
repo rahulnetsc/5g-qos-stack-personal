@@ -120,6 +120,12 @@ than the clause.
 **Q4 denominator: 40 = 10 seeds × 4 fleet sizes (2, 4, 8, 16). Confirmed
 mechanically.**
 
+> **CARRY-IN, 2026-09-07 — use the corrected figures.** G10's true
+> **without-attach** column is **PF 30/40, Reservation 23/40, TwoTier 26/40**.
+> The previously published **31/40 and 32/40 were the WITH-attach numbers
+> mislabelled**; PF is 30/40 either way and does not suffer the lock-out. Any
+> part of the audit or any downstream claim citing G10 must use these.
+
 ### 2.11 G11 C1 — NON-DISCRIMINATING, population wider than the clause
 
 `subset = "all"` is the only subset in the artefact, so the windowed M02
@@ -223,6 +229,22 @@ exact shape shipped — they are trailing indicators. **The one check that would
 have caught all three of today's findings — "name the rows that entered the
 sum and the rows the claim is about" — is the one that cannot be automated,
 and it was not applied to these twelve rows until asked for.**
+
+## 5a. CARRY-IN — attach-off is a configuration choice, not the neutral baseline
+
+The attach path is now measured to **clear G5 entirely on both QoS arms**
+(Reservation 3/10 → 10/10, TwoTier 6/10 → 10/10), take G8 to 10/10 on every
+arm and both workloads, restore G10 to 31–32/40, and **degrade nothing** —
+G1/TwoTier *improves*, 7/10 → 9/10. 7 of 8 registered predictions hit.
+
+**So "attach off" must not be treated as the neutral condition.** It is a
+configuration with a known, large, one-directional effect on **6 of 12 rows**,
+and every without-attach number is a statement about a cell where no UE has
+yet been granted. Both columns are legitimate; presenting either alone as
+"the result" is the error.
+
+**The default is still off**, deliberately: the decision deserves a result
+that has not just been retracted (§ the ledger defect, log #31).
 
 ## 6. Nothing was fixed
 

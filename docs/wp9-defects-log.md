@@ -1216,3 +1216,48 @@ zero; re-sweeping properly finds the collision at **four** grid points
 enumerated **nullary** builders and could not reach a parameterised one.
 `sim/tests/test_flow_key_collision_sweep.py` enumerates by reflection and
 **asserts its own coverage**.
+
+---
+
+## #31 — A CACHE KEY THAT OMITS A PARAMETER SILENTLY RETURNS THE WRONG ANSWER (2026-09-07)
+
+**Third bank-related defect in three days, and the only one that reached a
+published conclusion.**
+
+`scripts/phase2_core.py` handed `RunLedger` a **hand-listed** config —
+`{n_ues, horizon, load_mult, arms}` — omitting `attach_seed`. `RunLedger`'s
+own guard (`if row.get("_config") != self.config: continue`) is correct and
+worked; what was wrong was the config given to it.
+
+**The failure mode is what makes this its own class.** A wrong cache key does
+not error and does not produce a suspicious number. It produces **an artefact
+byte-identical to the column it was supposed to differ from** — and *that is
+indistinguishable from "the flag did nothing"*.
+
+**It was read as "the flag did nothing" twice.** The first time it was caught
+by a manipulation check (`docs/attach-path-default-result-2026-09-06.md` §7).
+The second time it was not, and the run that resumed 30 attach-OFF rows was
+scored, written up, and published as *"6 of 8 predictions missed; do not make
+the attach path default"* — a conclusion retracted in full the next day, when
+the true figure was **7 of 8 predictions HIT**.
+
+**The fix is derivation, not a longer list.**
+`regime_sweep.invocation_config(args)` builds the config from **every parsed
+argument** except those provably unable to change the output (`out`,
+`json_out`, `artefact`, and `workers` — the last on evidence, since
+`verify_parallel.py` checks serial == parallel per runner). **A flag added
+tomorrow is in the key without anyone remembering it**, which is the only
+version that stays correct. Applied to all four `RunLedger` callers
+(`phase2_core`, `g12_campaign`, `g10_rerun`, `blackout_frequency`).
+
+**And the check that did not exist** — `sim/tests/test_ledger_key.py`: bank a
+run, flip a flag, require no resume; plus the other direction, since a guard
+that refuses legitimate resumption makes the ledger pointless. Verified
+end-to-end on the real runner as well as in unit form: same flags → *"6 run(s)
+banked; 0 still to run"*; flag flipped → re-runs everything.
+
+**The transferable shape: any memoisation whose key is written by hand is a
+silent-wrong-answer generator, and the symptom is an absence of difference.**
+Ask of any "X made no difference" result whether X reached the code that
+computes the answer — the same question `docs/wp9-plan.md` asks of a mechanism
+that never fired, one layer further out.

@@ -23,7 +23,7 @@ from sim.parametric import sweep_scenario                    # noqa: E402
 from sim.run_record import RunRecord                         # noqa: E402
 from sim.scorecard import Population, Scorecard              # noqa: E402
 from g11_campaign import _arm                                # noqa: E402
-from regime_sweep import RunLedger, arm_cost, paired_seeds, run_cells  # noqa: E402
+from regime_sweep import invocation_config, RunLedger, arm_cost, paired_seeds, run_cells  # noqa: E402
 
 N_UES = (2, 4, 8, 16, 24, 32)
 
@@ -65,8 +65,7 @@ def main() -> int:
     # BANKED PER RUN. This produced G10's re-measured admissible fleet and
     # wrote its CSV only at the end -- one kill from losing the grid.
     ledger = RunLedger(Path(a.out).with_suffix(".runs.jsonl"),
-                       {"horizon": a.horizon, "seeds": a.seeds,
-                        "n_ues": list(N_UES)},
+                       {**invocation_config(a), "n_ues": list(N_UES)},
                        ("scheduler", "seed", "n_ues"))
     banked = {(r["scheduler"], r["seed"], r["n_ues"]): r
               for r in ledger.banked()}
