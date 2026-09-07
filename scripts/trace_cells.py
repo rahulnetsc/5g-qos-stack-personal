@@ -125,10 +125,22 @@ def _grant_reduction(grants, sc, rec):
 def _run(cell, arm, seed, hooked: bool):
     sc, slots = _cell(cell, seed)
     sched = _arm(arm)
-    tally = grants = None
+    tally = tally_dl = grants = None
     if hooked:
+        # BOTH DIRECTIONS. The hook already fires for DL and UL alike -- it is
+        # called from the direction loop in both QoS arms -- and only the SINK
+        # filtered. So every decisive-term number this project has published
+        # was UPLINK ONLY, including the "four dead ranking tiers" result, and
+        # TwoTier's `has_gbr`/`pdb_ms` tiers are DL-only terms that therefore
+        # appeared in no tally at all. G1's clause names a DOWNLINK flow.
         tally = LossPointTally("UL")
-        sched.rank_sink = tally             # declared at construction
+        tally_dl = LossPointTally("DL")
+
+        def _fan_out(snap, _u=tally, _d=tally_dl):
+            _u(snap)
+            _d(snap)
+
+        sched.rank_sink = _fan_out          # declared at construction
         grants = GrantCollector()
     s = driver_run(sc, sched, cqi_delay_slots=8, record_timeseries=False,
                    attach_seed_slots=slots,
@@ -136,19 +148,22 @@ def _run(cell, arm, seed, hooked: bool):
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows,
                                  summary=s, arm={}, meta={})
-    return sc, s, rec, tally, grants
+    return sc, s, rec, tally, tally_dl, grants
 
 
 def one(task) -> dict:
     cell, arm, seed, identity = task
     t0 = time.time()
-    sc, s, rec, tally, grants = _run(cell, arm, seed, hooked=True)
+    sc, s, rec, tally, tally_dl, grants = _run(cell, arm, seed, hooked=True)
     tally.finish()                          # RAISES on an empty stream
+    # DL may legitimately be empty on an uplink-only cell, so it is allowed to
+    # be -- and the row says which, rather than a zero standing for both cases.
+    tally_dl.finish(allow_empty=True)
     gl = grants.finish()                    # RAISES on an empty stream
 
     ident = None
     if identity:
-        _, _, rec2, _, _ = _run(cell, arm, seed, hooked=False)
+        _, _, rec2, _, _, _ = _run(cell, arm, seed, hooked=False)
         ident = (rec.to_dict() == rec2.to_dict())
 
     card = Scorecard()
@@ -160,6 +175,9 @@ def one(task) -> dict:
         "metrics": {k: (v.value if hasattr(v, "value") else None)
                     for k, v in scored.items()
                     if k in ("M01", "M05", "M06", "M09", "M13")},
+        "rank_dl": {"slots_seen": tally_dl.slots_seen,
+                    "term_totals": tally_dl.term_totals(),
+                    "observed": bool(tally_dl.slots_seen)},
         "rank": {"slots_seen": tally.slots_seen,
                  "term_totals": tally.term_totals(),
                  "mean_rank": {str(k): v for k, v in tally.mean_rank().items()},

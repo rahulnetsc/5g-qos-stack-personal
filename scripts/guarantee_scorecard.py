@@ -325,6 +325,16 @@ NOT_COMPUTABLE = [
 ]
 
 
+#: Rows whose artefact path is FIXED, so `--attach`'s path substitution is a
+#: no-op for them. Declaring it is the point: the published table showed G11
+#: and G12 identical in both columns, which reads as "the attach path does not
+#: affect them" -- when the truth is that NO with-attach run of either exists
+#: (neither `g11_campaign.py` nor `g12_campaign.py` takes an attach argument).
+#: That is defect #31's symptom -- an artefact byte-identical to the column it
+#: should differ from -- read for a third time. A row now says so itself.
+_NO_ATTACH_COLUMN = "SINGLE-COLUMN: no with-attach run of this artefact exists"
+
+
 def _nested():
     """G11 C1 and G12 clause 4 -- their artefacts are nested rather than flat
     rows, and BOTH already carry M02 natively (M02w per window; telemetry_m02
@@ -346,6 +356,7 @@ def _nested():
             per[arm] = dict(n=len(R), passes=len(ok), sev=med(sev),
                             sev_fail=None)
         out.append((dict(g="G11", clause="C1: every 60 s window within PDB conformance",
+                         column=_NO_ATTACH_COLUMN,
                          sums_over="M02w per 60 s window, subset 'all' -- the "
                                    "ONLY subset the artefact carries",
                          claim_about="'every 60 s window passes', i.e. the "
@@ -400,6 +411,7 @@ def _nested():
                     ok += bool(within and shift_ok)
                 per[arm] = dict(n=len(seeds), passes=ok, sev=None, sev_fail=None)
             out.append((dict(g="G6", clause=f"conjunction: {label} AND shift <= +20 %",
+                             column=_NO_ATTACH_COLUMN,
                              sums_over="the PROTECTED-FLEET statistic, paired "
                                        "within seed across bg in {False, True}",
                              claim_about="the same set. NOTE the cell runs under "
@@ -421,6 +433,7 @@ def _nested():
                             sev=None, sev_fail=None,
                             note=f"CoV = {cov:.4f}" if cov is not None else "no value")
         out.append((dict(g="G11", clause="C3: CoV(p98) <= 15 % across repeats",
+                         column=_NO_ATTACH_COLUMN,
                          sums_over="p98 across the 10 repeat runs, per arm",
                          claim_about="the same set. DENOMINATOR IS 1 BY "
                                      "CONSTRUCTION -- a CoV is computed across "
@@ -474,6 +487,7 @@ def _nested():
                             sev=med(sev), sev_fail=None,
                             note=f"{viol} violation / {prem} premise-fails / {ok} pass")
         out.append((dict(g="G12", clause="c4: never starve telemetry while a lower class is served",
+                         column=_NO_ATTACH_COLUMN,
                          sums_over="telemetry M02 and background throughput, "
                                    "per ramp point",
                          claim_about="the same two flows -- no mismatch",
@@ -616,6 +630,8 @@ def main(argv) -> int:
             note = f"   {d['note']}" if d.get("note") else ""
             print(f"{c['g']:4s} {c['clause'][:46]:46s} {arm:12s} "
                   f"{d['passes']:>4d}/{d['n']:<4d} {sev:>10s} {sf:>9s}{note}")
+        if c.get("column") and USE_ATTACH:
+            print(f"       COLUMN     : {c['column']}")
         print(f"       sums over : {c.get('sums_over')}")
         print(f"       claim about: {c.get('claim_about')}")
         print()
