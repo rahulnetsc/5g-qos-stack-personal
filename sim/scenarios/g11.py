@@ -37,7 +37,7 @@ import dataclasses
 import math
 from typing import Any, Optional
 
-from scheduler.flow import FlowConfig
+from scheduler.flow import assign_deployed_lcgs, FlowConfig
 from sim.config import ScenarioConfig
 from sim.parametric import sweep_scenario
 
@@ -207,6 +207,10 @@ def build_g11_scenario(
                         "active_windows": stop.windows()},
     ))
 
+    # LCG = DRB ID resolves on the UNROTATED list, so §9's permutation
+    # control stays a declaration-order control and does not silently
+    # reassign a UE's bearers when the cut falls inside its block.
+    assign_deployed_lcgs(flows)
     if permutation:
         k = permutation % len(flows)
         flows = flows[k:] + flows[:k]

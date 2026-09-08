@@ -30,7 +30,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
-from scheduler.flow import FlowConfig
+from scheduler.flow import LCG_UNASSIGNED, FlowConfig
 
 __all__ = ["sweep_scenario", "MIXES"]
 
@@ -67,6 +67,12 @@ _QFI_AGGRESSOR = 8     # GT-4.1/4.2's saturating flood -- distinct from the
                        # 5QI-9 flow, so reusing 9 would collide.
 
 MIXES = ("factory", "telemetry_only", "video_heavy")
+
+# H5's shared-LCG override lands here, NOT on LCG 0. The deployed RRC gives
+# every QoS flow its own DRB (MAX_QOS_FLOWS_PER_DRB_TOTAL = 1) and LCG = DRB
+# ID, so two data flows on one LCG is a state the deployment cannot produce
+# -- a DIVERGENCE axis -- and LCG 0 is the SRB group, which `has_srb` reads.
+_SHARED_LCG = 1
 
 # Per-UE best-effort UL offered rate at load_mult=1.0.
 #
@@ -172,13 +178,13 @@ def sweep_scenario(
       pdb_ms         overrides the DL command flow's PDB only (H4's axis is
                      the PDB-to-Tier-1-period ratio, and the command flow is
                      the one whose deadline that ratio is about).
-      shared_lcg     forces this UE's two UL flows onto one LCG via an
-                     explicit per-flow `lcg`. Deliberately an override rather
-                     than a change to FIVE_QI_LCG, which is an invented
-                     mapping with nothing to validate it (README §8,
-                     [OPEN: HARDWARE/DECISION]) -- WP9 routes around that
-                     open item rather than appearing to settle it, and any
-                     H5 result is conditional on this override.
+      shared_lcg     forces this UE's two UL flows onto one LCG (LCG 1)
+                     via an explicit per-flow `lcg`. A DIVERGENCE axis: the
+                     deployed RRC gives every QoS flow its own DRB and
+                     LCG = DRB ID (scheduler/flow.py::assign_deployed_lcgs),
+                     so it cannot produce this state; any H5 result is
+                     conditional on the override. Never LCG 0 -- that is
+                     the SRB group.
       mfbr_multiple  2.0 by default since 2026-09-04. WAS 0.0, and that
                      zero made BOTH of two-tier's protections unreachable in
                      every sweep this project ever ran: FIX-2's GBR PRB
@@ -242,7 +248,7 @@ def sweep_scenario(
             flows.append(FlowConfig(
                 ue_id=ue_id, qfi=_QFI_TELEMETRY, direction="UL",
                 flow_class="Delay", pdb_ms=100.0,
-                lcg=0 if shared_lcg else -1,
+                lcg=_SHARED_LCG if shared_lcg else LCG_UNASSIGNED,
                 traffic_kind="periodic_control",
                 traffic_params={"period_ms": tp_ms, "bytes_per_period": tp_bytes},
             ))
@@ -271,7 +277,7 @@ def sweep_scenario(
                     ue_id=ue_id, qfi=_QFI_VIDEO + cam, direction="UL",
                     flow_class="GBR", gfbr_bps=gfbr, pdb_ms=150.0,
                     mfbr_bps=mfbr_multiple * gfbr,
-                    lcg=0 if shared_lcg else -1,
+                    lcg=_SHARED_LCG if shared_lcg else LCG_UNASSIGNED,
                     traffic_kind="xr_video",
                     traffic_params={
                         "period_ms": vp_ms, "avg_bytes": vp_bytes,
@@ -310,7 +316,7 @@ def sweep_scenario(
         # this flow rather than to every UE having gained one.
         flows.append(FlowConfig(
             ue_id=n_ues, qfi=_QFI_AGGRESSOR, direction="UL", flow_class="PF",
-            pdb_ms=300.0, lcg=6,
+            pdb_ms=300.0,
             traffic_kind="poisson",
             traffic_params={"rate_bps": 50_000_000.0},
         ))

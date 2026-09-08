@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from scheduler.flow import lcg_for_5qi, priority_for_5qi
+from scheduler.flow import LCG_UNASSIGNED, priority_for_5qi
 
 from .config import (
     CarrierConfig,
@@ -93,7 +93,7 @@ def _flow_from_dict(ue_id: int, flow_dict: dict) -> FlowConfig:
         # Default the LCG from the simulator's 5QI->LCG table, same idiom
         # as priority_level above; an explicit `lcg` in the scenario wins.
         # (FlowConfig.__post_init__ also range-checks it either way.)
-        lcg=int(flow_dict.get("lcg", lcg_for_5qi(flow_dict["qfi"]))),
+        lcg=int(flow_dict.get("lcg", LCG_UNASSIGNED)),
         slice_id=int(flow_dict.get("slice_id", 0)),
         # UE-side LCP config (uplink). pbr_bps unset means "use the GFBR"
         # for a GBR flow and "no prioritised rate" otherwise -- see

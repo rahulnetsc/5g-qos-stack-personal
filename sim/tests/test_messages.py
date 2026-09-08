@@ -15,6 +15,14 @@ from sim.buffer import BufferModel
 from sim.config import FlowConfig
 from sim.messages import FrameLedger, Message, MessageCompletion, MessageLedger
 from sim.traffic import TrafficModel
+from scheduler.flow import assign_deployed_lcgs
+
+def _lcgs(flows):
+    """Tests hand flow lists straight to a consumer, bypassing ScenarioConfig
+    -- the one place LCG = DRB ID is resolved -- so resolve here first."""
+    assign_deployed_lcgs(flows)
+    return flows
+
 
 
 def _msg(ledger: MessageLedger, ue_id: int, qfi: int, size_bytes: int, ts: float,
@@ -142,7 +150,7 @@ def test_traffic_model_without_ledger_enqueues_untagged_chunks():
                        traffic_params={"period_ms": 10.0, "bytes_per_period": 100})
     buffers = BufferModel()
     rng = np.random.default_rng(0)
-    traffic = TrafficModel([flow], buffers, slot_duration_s=0.0005, rng=rng)
+    traffic = TrafficModel(_lcgs([flow]), buffers, slot_duration_s=0.0005, rng=rng)
     traffic.generate(0)
     buffers.drain(1, 9, 100, now_s=0.0005, pdb_s=1.0)
     assert buffers.pop_completions(1, 9) == []
@@ -154,7 +162,7 @@ def test_traffic_model_with_ledger_tags_each_arrival_with_a_message():
     buffers = BufferModel()
     rng = np.random.default_rng(0)
     ledger = MessageLedger()
-    traffic = TrafficModel([flow], buffers, slot_duration_s=0.0005, rng=rng, ledger=ledger)
+    traffic = TrafficModel(_lcgs([flow]), buffers, slot_duration_s=0.0005, rng=rng, ledger=ledger)
     traffic.generate(0)
     buffers.drain(1, 9, 100, now_s=0.0005, pdb_s=1.0)
     for c in buffers.pop_completions(1, 9):

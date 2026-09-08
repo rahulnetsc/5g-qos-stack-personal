@@ -25,8 +25,8 @@ LCG) and every field is marked:
     `FIVE_QI_PRIORITY`. Neither is authored here.
   - **negotiated** -- GFBR, a per-bearer value an operator provisions. It
     is NOT a 5QI property, so it is authored, and said so explicitly.
-  - **simulator default** -- LCG, via `FIVE_QI_LCG`, which that table's own
-    comment already flags as invented and non-standardised.
+  - **deployed rule** -- LCG = DRB ID (`scheduler/flow.py::assign_deployed_lcgs`),
+    a per-UE bearer ordinal ported from the RRC, not a 5QI property.
   - **operational** -- rates, periods and duty cycles from device
     datasheets or factory workflow, cited per profile below.
 
@@ -44,7 +44,7 @@ from typing import Any, Literal, Optional
 from scheduler.flow import (
     DERIVE_PDB_FROM_5QI,
     FlowConfig,
-    lcg_for_5qi,
+    lcg_for_drb,
     pdb_for_5qi,
     priority_for_5qi,
 )
@@ -394,7 +394,7 @@ def profile_qos_table() -> list[dict[str, Any]]:
     """
     rows: list[dict[str, Any]] = []
     for pname, prof in PROFILES.items():
-        for f in prof.flows:
+        for i, f in enumerate(prof.flows):
             rows.append({
                 "profile": pname,
                 "5QI": f.qfi,                                  # standardised
@@ -403,13 +403,13 @@ def profile_qos_table() -> list[dict[str, Any]]:
                 "GFBR_bps": f.gfbr_bps,                        # NEGOTIATED
                 "PDB_ms": pdb_for_5qi(f.qfi),                  # STANDARDISED
                 "priority": priority_for_5qi(f.qfi),           # STANDARDISED
-                "LCG": lcg_for_5qi(f.qfi),                     # SIM DEFAULT
+                "LCG": lcg_for_drb(i + 1),                     # DEPLOYED: LCG = DRB ID
                 "provenance": {
                     "5QI": "standardised (TS 23.501 Table 5.7.4-1)",
                     "GFBR": "negotiated per bearer (scenario-authored)",
                     "PDB": "standardised (derived, TS 23.501 Table 5.7.4-1)",
                     "priority": "standardised (FIVE_QI_PRIORITY)",
-                    "LCG": "simulator default (FIVE_QI_LCG -- invented)",
+                    "LCG": "deployed rule LCG = DRB ID (nr_radio_config.c:3781); DRB = setup ordinal within the profile",
                     "rate/period": f"operational ({prof.source})",
                 },
                 "note": f.note,

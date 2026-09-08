@@ -23,6 +23,14 @@ import pytest
 from scheduler.flow import FlowConfig
 from sim.buffer import BufferModel
 from sim.traffic import TrafficModel
+from scheduler.flow import assign_deployed_lcgs
+
+def _lcgs(flows):
+    """Tests hand flow lists straight to a consumer, bypassing ScenarioConfig
+    -- the one place LCG = DRB ID is resolved -- so resolve here first."""
+    assign_deployed_lcgs(flows)
+    return flows
+
 
 SLOT_S = 0.00025
 
@@ -39,7 +47,7 @@ def _active_slots(flow: FlowConfig, horizon: int) -> list[int]:
     """Slots at which the flow actually produced an arrival."""
     buffers = BufferModel()
     buffers.register(flow.ue_id, flow.qfi, is_ul=True, lcg=flow.lcg)
-    tm = TrafficModel([flow], buffers, SLOT_S, np.random.default_rng(7))
+    tm = TrafficModel(_lcgs([flow]), buffers, SLOT_S, np.random.default_rng(7))
     out = []
     for s in range(horizon):
         before = buffers.state(flow.ue_id, flow.qfi).bytes_queued

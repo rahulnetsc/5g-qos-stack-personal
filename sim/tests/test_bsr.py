@@ -112,12 +112,14 @@ def _flow(ue_id, qfi, lcg, priority_level=100):
     return FlowConfig(ue_id=ue_id, qfi=qfi, direction="UL", lcg=lcg, priority_level=priority_level)
 
 
-def test_flowconfig_defaults_lcg_from_5qi_and_rejects_out_of_range():
-    """FlowConfig.__post_init__ resolves lcg=-1 from the 5QI table and
-    raises on an explicit out-of-range override -- the one new invariant
-    this port introduces (no OAI AssertFatal maps to it directly)."""
+def test_flowconfig_leaves_lcg_unassigned_and_rejects_out_of_range():
+    """Since M-5 (LCG = DRB ID) a lone FlowConfig CANNOT resolve its LCG --
+    the ordinal depends on the UE's other flows -- so __post_init__ leaves
+    LCG_UNASSIGNED and ScenarioConfig resolves it. An explicit
+    out-of-range override still raises."""
+    from scheduler.flow import LCG_UNASSIGNED
     f = FlowConfig(ue_id=1, qfi=2, direction="UL")
-    assert 0 <= f.lcg < 8
+    assert f.lcg == LCG_UNASSIGNED
 
     with pytest.raises(ValueError):
         FlowConfig(ue_id=1, qfi=2, direction="UL", lcg=8)

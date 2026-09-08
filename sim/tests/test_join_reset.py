@@ -22,6 +22,14 @@ from sim.baselines.pf import ProportionalFair
 from sim.baselines.round_robin import RoundRobin
 from scheduler import TwoTier
 from scheduler.flow import FlowConfig
+from scheduler.flow import assign_deployed_lcgs
+
+def _lcgs(flows):
+    """Tests hand flow lists straight to a consumer, bypassing ScenarioConfig
+    -- the one place LCG = DRB ID is resolved -- so resolve here first."""
+    assign_deployed_lcgs(flows)
+    return flows
+
 
 
 # -- TwoTier.reset_ue: restored at commit 7, rewritten against the new ------
@@ -36,7 +44,7 @@ from scheduler.flow import FlowConfig
 def _configured_two_tier(flows):
     tt = TwoTier()
     grid = ResourceGrid(CarrierConfig(bandwidth_hz=20_000_000, numerology=1), TDDConfig())
-    tt.configure(flows, grid.slot_duration_s, grid)
+    tt.configure(_lcgs(flows), grid.slot_duration_s, grid)
     return tt
 
 
@@ -185,7 +193,7 @@ def test_other_schedulers_do_not_implement_reset_ue(scheduler_cls):
 
 def test_bsr_reset_ue_seeds_deadlines_relative_to_the_reset_slot():
     flow = FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")
-    bsr = BsrModel([flow], slot_duration_s=0.0005, periodic_bsr_ms=5.0, retx_bsr_ms=80.0)
+    bsr = BsrModel(_lcgs([flow]), slot_duration_s=0.0005, periodic_bsr_ms=5.0, retx_bsr_ms=80.0)
     st = bsr._state[1]
     st.estimated_ul_buffer = 9999
     st.pending = True
@@ -204,7 +212,7 @@ def test_bsr_reset_ue_seeds_deadlines_relative_to_the_reset_slot():
 
 def test_bsr_reset_ue_is_a_no_op_for_a_ue_with_no_ul_flows():
     flow = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF")
-    bsr = BsrModel([flow], slot_duration_s=0.0005)
+    bsr = BsrModel(_lcgs([flow]), slot_duration_s=0.0005)
     bsr.reset_ue(99, slot_index=0)  # must not raise
 
 
@@ -254,7 +262,7 @@ class _RecordingScheduler:
         self.reset_calls: list[tuple[int, str]] = []
 
     def configure(self, flows, slot_duration_s, grid):
-        self._inner.configure(flows, slot_duration_s, grid)
+        self._inner.configure(_lcgs(flows), slot_duration_s, grid)
 
     def allocate(self, slot, buffers, channel):
         return self._inner.allocate(slot, buffers, channel)

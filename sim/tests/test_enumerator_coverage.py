@@ -49,6 +49,10 @@ ENUMERATORS = {
         "scripts/regression_corpus.py",
         "the simulator has not drifted",
         "_cases"),
+    "LCG census": (
+        "sim/tests/test_lcg_deployed_rule.py",
+        "no built scenario puts data on LCG 0 or shares an LCG",
+        "test_the_census_COVERS_every_builder"),
 }
 
 

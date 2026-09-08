@@ -52,7 +52,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "Reservation: M22 epochs on 7/10 seeds"
     artefact: sweeps/phase2/core_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 40000
     where: {arm: Reservation}
@@ -64,7 +64,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "TwoTier: M09 below 0.90 on 3/10 seeds"
     artefact: sweeps/phase2/core_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 40000
     where: {arm: TwoTier}
@@ -77,7 +77,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "TwoTier M01 p98 protected, median 90.12 ms"
     artefact: sweeps/phase2/core_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 40000
     where: {arm: TwoTier}
@@ -94,7 +94,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "0/10 breach the 100 ms bound on every arm"
     artefact: sweeps/phase2/core_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 40000
     field: G1_M01_p98_prot
@@ -106,7 +106,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "0/10 over the 500 ms bound on every arm"
     artefact: sweeps/phase2/core_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 40000
     field: G3_M20_prot_ms
@@ -118,7 +118,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "Reservation fails the 0.99 completeness bar on 7/10 seeds"
     artefact: sweeps/phase2/core_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 40000
     where: {arm: Reservation}
@@ -131,7 +131,7 @@ claims:
     doc: docs/verification-2026-09-04.md
     text: "PF passes 10/10 seeds at N=8"
     artefact: sweeps/phase2/g5_consol_scaled.json
-    code_state: current
+    code_state: "historical: M-5 LCG renumber (2026-09-08) changed the scoped code without changing this cell -- regression corpus bit-identical on 20 records, and this builder's cell byte-identical before/after on 3 arms x seed 1 x 4000 slots (docs/builds-2026-09-08.md 1.7). Re-stamped by Build 1's full re-run."
     n: 10
     horizon: 20000
     where: {arm: PF, n_ues: 8}

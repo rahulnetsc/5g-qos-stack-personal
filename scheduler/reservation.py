@@ -412,7 +412,7 @@ virtual-queue state in ``ia_p5g_scheduler.c`` is per-LCG, not per-flow).
 
 from dataclasses import dataclass, field
 
-from .flow import FlowConfig
+from .flow import FlowConfig, require_assigned_lcgs
 from .rank_trace import RankEntry, RankSnapshot, field as trace_field
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
@@ -744,6 +744,7 @@ class Reservation:
         # a truthiness fallback here (``min_rb or self.min_rb``) would
         # silently rewrite their 0 back to 5 and quietly delete what
         # those two tests exist to check.
+        require_assigned_lcgs(flows, "Reservation")
         self._flows = list(flows)
         self.slot_duration_s = slot_duration_s
         if min_rb is not None:

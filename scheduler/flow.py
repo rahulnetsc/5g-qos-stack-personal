@@ -8,7 +8,7 @@ profile of each bearer.
 """
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Iterable, Literal
 
 # Standardised 5QI -> scheduling priority level, 3GPP TS 23.501 Table 5.7.4-1.
 # Lower value = higher priority. Only the 5QIs these scenarios use are listed;
@@ -145,9 +145,9 @@ def priority_for_5qi(qfi: int) -> int:
 #
 # PDB is a property of the QoS CLASS, so it is derived here rather than
 # authored per flow. GFBR is NOT: it is a per-bearer negotiated value and
-# stays scenario-authored (see FlowConfig.gfbr_bps). FIVE_QI_LCG remains an
-# invented mapping, as its own comment already says. Those three different
-# provenances are why every device profile states each field's source.
+# stays scenario-authored (see FlowConfig.gfbr_bps). LCG is neither: it is
+# the DEPLOYED rule LCG = DRB ID (assign_deployed_lcgs below). Those three
+# different provenances are why every device profile states each field's source.
 FIVE_QI_PDB_MS: dict[int, float] = {
     1: 100.0,    # GBR, conversational voice
     2: 150.0,    # GBR, conversational video (live)
@@ -168,8 +168,9 @@ FIVE_QI_PDB_MS: dict[int, float] = {
 }
 
 # Sentinel: FlowConfig.pdb_ms == DERIVE_PDB_FROM_5QI resolves from the
-# table above in __post_init__, exactly as lcg == -1 resolves via
-# lcg_for_5qi.
+# table above in __post_init__. (lcg is the one field __post_init__ does
+# NOT resolve: its value depends on the UE's OTHER flows -- see
+# assign_deployed_lcgs.)
 DERIVE_PDB_FROM_5QI = -1.0
 
 # Same convention for priority: -1 means "resolve from the 5QI table in
@@ -193,30 +194,78 @@ def pdb_for_5qi(qfi: int) -> float:
 
 
 LCG_COUNT = 8
+# The deployed LCG rule, ported from the RRC rather than invented here. All
+# three facts are from the full checkout (Oai_Ran_QoS_Supported_MultiDRB,
+# branch twotier), none from the vendored subset:
+#
+#   nr_radio_config.c:3781-3785      long lcg_id = drbId; if (lcg_id > 7) lcg_id = 7;
+#   rrc_gNB_radio_bearers.c:498-505  every MAX_QOS_FLOWS_PER_DRB_* == 1 (one flow per DRB)
+#   rrc_gNB_radio_bearers.c:248-263  drb_id = lowest free integer from 1
+#
+# So LCG is a per-UE BEARER ORDINAL -- the k-th QoS flow a UE sets up is
+# DRB k and sits on LCG min(k, 7) -- and it is NOT a function of 5QI. LCG 0
+# is never a DRB: it is the SRB group (get_SRB_RLC_BearerConfig(...,
+# logicalChannelGroup=0)), which is what both comparators' `has_srb`
+# predicate keys on (gNB_scheduler_ulsch.c:2167-2176). The FIVE_QI_LCG
+# table this replaced put 5QI 1/3 DATA on LCG 0, so wiring that predicate
+# would have read telemetry as control (M-5,
+# docs/mac-fidelity-audit-2026-09-07.md; docs/builds-2026-09-08.md §1).
+LCG_SRB = 0
+LCG_MAX_DRB = 7
+# A FlowConfig whose lcg is still this after construction has not been
+# through assign_deployed_lcgs. Consumers that index a per-LCG array refuse
+# it, because Python would accept [-1] silently -- as [7].
+LCG_UNASSIGNED = -1
 
-# Default 5QI -> logical channel group mapping for uplink flows (WP3, BSR
-# realism). Unlike FIVE_QI_PRIORITY (a 3GPP-standardised table), LCG
-# assignment is NOT standardised as a function of 5QI -- a real deployment
-# configures each logical channel's LCG via RRC, an operator/gNB policy
-# choice. This table is a simulator default only, grouping 5QIs by
-# QoS-class family so that same-class bearers plausibly land on one LCG
-# and different-class bearers don't; an explicit `lcg` in a scenario's flow
-# config always overrides it.
-FIVE_QI_LCG: dict[int, int] = {
-    1: 0, 3: 0,                   # GBR: voice / real-time gaming-V2X
-    2: 1,                         # GBR: conversational video
-    4: 2,                         # GBR: non-conversational buffered video
-    82: 3, 83: 3, 84: 3, 85: 3,   # delay-critical GBR: discrete automation / ITS
-    5: 4, 7: 4,                   # non-GBR: signalling / low-latency voice-video
-    6: 5, 8: 5,                   # non-GBR: buffered video (TCP)
-    9: 6,                         # non-GBR: default bearer / best effort
-}
-DEFAULT_LCG = 7
+
+def lcg_for_drb(drb_id: int) -> int:
+    """nr_radio_config.c:3781-3785 verbatim: LCG = DRB ID, capped at 7. The
+    ONE place the rule is written; assign_deployed_lcgs and sim/fleet.py's
+    provenance table both call it rather than restating min(k, 7)."""
+    if drb_id < 1:
+        raise ValueError(f"DRB IDs start at 1 (rrc_gNB_radio_bearers.c:251); got {drb_id}")
+    return min(drb_id, LCG_MAX_DRB)
 
 
-def lcg_for_5qi(qfi: int) -> int:
-    """Default LCG for a 5QI, or the neutral fallback if unlisted."""
-    return FIVE_QI_LCG.get(int(qfi), DEFAULT_LCG)
+def assign_deployed_lcgs(flows: Iterable["FlowConfig"]) -> None:
+    """Assign LCG = DRB ID to every flow still at LCG_UNASSIGNED, in place.
+
+    DRB IDs are per-UE setup ordinals from 1; the simulator's proxy for
+    setup order is the flow list's order within the UE (a stated
+    assumption, docs/builds-2026-09-08.md §1.3 -- nothing in the repo can
+    verify it). A DL and a UL flow with the same (ue_id, qfi) are one
+    deployed QoS flow and share a DRB. An explicit lcg is kept but still
+    consumes an ordinal, because the deployed RRC creates a DRB for every
+    flow regardless of how the simulator labels it.
+
+    Idempotent: a second call over already-assigned flows changes nothing,
+    which is what lets ScenarioConfig.__post_init__ run again under
+    dataclasses.replace (G12's permute_flows) without re-deriving -- so a
+    permutation control stays a declaration-order control and does not
+    silently become an LCG-assignment control.
+    """
+    next_drb: dict[int, int] = {}
+    drb_of: dict[tuple[int, int], int] = {}
+    for f in flows:
+        key = (f.ue_id, f.qfi)
+        if key not in drb_of:
+            next_drb[f.ue_id] = next_drb.get(f.ue_id, 0) + 1
+            drb_of[key] = next_drb[f.ue_id]
+        if f.lcg == LCG_UNASSIGNED:
+            f.lcg = lcg_for_drb(drb_of[key])
+
+
+def require_assigned_lcgs(flows: Iterable["FlowConfig"], consumer: str) -> None:
+    """Raise if any flow is still LCG_UNASSIGNED. Every consumer that
+    indexes a per-LCG array calls this, so a flow list that bypassed
+    ScenarioConfig fails loudly instead of indexing [-1]."""
+    for f in flows:
+        if f.lcg == LCG_UNASSIGNED:
+            raise ValueError(
+                f"{consumer}: flow (ue={f.ue_id}, qfi={f.qfi}, {f.direction}) has "
+                f"no LCG -- flows must pass through ScenarioConfig (or "
+                f"assign_deployed_lcgs) before reaching a consumer"
+            )
 
 
 @dataclass
@@ -247,8 +296,8 @@ class FlowConfig:
     # uplink LCP sort.
     #
     # DERIVE_PRIORITY_FROM_5QI (-1) means "use priority_for_5qi(qfi)" --
-    # __post_init__ resolves it, exactly as lcg == -1 and
-    # pdb_ms == DERIVE_PDB_FROM_5QI already do, so an explicit priority
+    # __post_init__ resolves it, exactly as
+    # pdb_ms == DERIVE_PDB_FROM_5QI already does, so an explicit priority
     # always wins and every other FlowConfig gets its standardised value
     # regardless of how it was constructed.
     #
@@ -267,10 +316,12 @@ class FlowConfig:
     # next builder from reintroducing it.
     priority_level: int = DERIVE_PRIORITY_FROM_5QI
     # This flow's logical channel group, 0-7 (TS 38.321: BSR aggregates to
-    # 8 LCGs). -1 means "use lcg_for_5qi(qfi)" -- __post_init__ resolves it,
-    # so any explicit lcg always wins and every other FlowConfig still gets
-    # a valid default regardless of how it was constructed.
-    lcg: int = -1
+    # 8 LCGs). LCG_UNASSIGNED until ScenarioConfig resolves it by the
+    # deployed rule LCG = DRB ID (assign_deployed_lcgs). NOT resolved in
+    # __post_init__: the ordinal depends on the UE's other flows, which a
+    # single FlowConfig cannot see. An explicit lcg always wins -- and is a
+    # divergence from the deployment, since the RRC never lets a flow choose.
+    lcg: int = LCG_UNASSIGNED
     # Network-slice id. Tier-1 can give each slice a guaranteed share of PRB
     # capacity; default 0 puts every flow in one slice (no slicing).
     slice_id: int = 0
@@ -359,9 +410,7 @@ class FlowConfig:
             # which does, because inventing a *budget* is a scenario-
             # authoring error while a neutral priority is a real default.
             self.priority_level = priority_for_5qi(self.qfi)
-        if self.lcg == -1:
-            self.lcg = lcg_for_5qi(self.qfi)
-        if not (0 <= self.lcg < LCG_COUNT):
+        if self.lcg != LCG_UNASSIGNED and not (0 <= self.lcg < LCG_COUNT):
             raise ValueError(f"lcg={self.lcg} outside 0..{LCG_COUNT - 1} (qfi={self.qfi})")
 
     def effective_pbr_bps(self) -> float:

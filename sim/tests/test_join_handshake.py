@@ -19,6 +19,14 @@ from sim.scorecard import Population, Scorecard
 from sim.traffic import TrafficModel
 from sim.baselines.round_robin import RoundRobin
 from scheduler.flow import FlowConfig
+from scheduler.flow import assign_deployed_lcgs
+
+def _lcgs(flows):
+    """Tests hand flow lists straight to a consumer, bypassing ScenarioConfig
+    -- the one place LCG = DRB ID is resolved -- so resolve here first."""
+    assign_deployed_lcgs(flows)
+    return flows
+
 
 
 # -- TrafficModel.generate()'s suppressed_ues: the source gate -------------
@@ -27,7 +35,7 @@ from scheduler.flow import FlowConfig
 def _model(flows, slot_duration_s=0.0005, seed=0, ledger=None):
     buffers = BufferModel()
     rng = np.random.default_rng(seed)
-    return TrafficModel(flows, buffers, slot_duration_s=slot_duration_s, rng=rng, ledger=ledger), buffers
+    return TrafficModel(_lcgs(flows), buffers, slot_duration_s=slot_duration_s, rng=rng, ledger=ledger), buffers
 
 
 def test_default_no_suppression_reproduces_existing_behaviour():

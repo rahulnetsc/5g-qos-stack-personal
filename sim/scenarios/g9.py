@@ -161,7 +161,7 @@ def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
         # the neighbours statistic automatically.
         flows.append(FlowConfig(
             ue_id=ues[-1].ue_id, qfi=QFI_AGGRESSOR, direction="UL",
-            flow_class="PF", pdb_ms=300.0, lcg=6, traffic_kind="poisson",
+            flow_class="PF", pdb_ms=300.0, traffic_kind="poisson",
             traffic_params={"rate_bps": 50_000_000.0}))
 
     sc = ScenarioConfig(name=name, horizon_slots=horizon_slots,

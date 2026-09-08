@@ -1337,10 +1337,15 @@ for every WP, not an opportunistic one.
   fix, and needs its own commit. Revisit with WP9's wider sweep for what
   the remaining gap is.
 - H5 (`p5g-sim-plan.md` line 338, two-tier degrades as flows-per-LCG
-  grows) is not demonstrable on any current scenario — WP3's default 5QI→
-  LCG mapping deliberately separates QoS classes into different LCGs, so
-  no scenario's multi-UL-flow UEs share one. Needs a small follow-up
-  scenario (README §8) before H5 can be tested in Phase 3.
+  grows) is not demonstrable on any current scenario — the deployed rule
+  **LCG = DRB ID** (M-5, 2026-09-08, `scheduler/flow.py::assign_deployed_lcgs`)
+  gives every QoS flow its own DRB and LCG, so no scenario's multi-UL-flow
+  UEs share one except through `sim/parametric.py`'s explicit `shared_lcg`
+  override — a **divergence** axis the deployed RRC cannot produce. **LCG 0
+  is the SRB group and never carries data**; resolution happens ONCE, in
+  `ScenarioConfig.__post_init__`, because the ordinal depends on the UE's
+  other flows, and every consumer that indexes a per-LCG array refuses an
+  unresolved flow rather than indexing `[-1]`.
 - `FlowConfig.aggressor_multiplier` scales an `xr_video` flow's fragments
   *after* `sim/traffic.py::_gen_xr_video` has already fragmented the frame
   to fit `fragment_bytes` — a scaled fragment can end up larger than the

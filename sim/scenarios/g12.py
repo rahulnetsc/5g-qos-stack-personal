@@ -287,7 +287,8 @@ def build_g12_scenario(
         flows.append(FlowConfig(
             ue_id=n_ues if bg_ue_id is None else bg_ue_id,
             qfi=QFI_BG_UL, direction="UL", flow_class="PF", pdb_ms=300.0,
-            lcg=6, priority_level=_QFI_BG_PRIORITY,
+            # lcg is NOT pinned: LCG = DRB ID (M-5), derived at ScenarioConfig.
+            priority_level=_QFI_BG_PRIORITY,
             traffic_kind="poisson",
             traffic_params={"rate_bps": bg_offered_bps},
         ))

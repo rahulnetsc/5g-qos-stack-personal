@@ -8,7 +8,7 @@ a single config import surface.
 
 from dataclasses import dataclass, field
 
-from scheduler.flow import FlowConfig
+from scheduler.flow import FlowConfig, assign_deployed_lcgs
 
 from .join import JoinConfig
 
@@ -142,3 +142,10 @@ class ScenarioConfig:
     # existing scenario sets any UE's position, so this default is never
     # read by anything today.
     gnb_position: tuple[float, float, float] = (0.0, 0.0, 8.0)
+
+    def __post_init__(self) -> None:
+        # THE one LCG resolution point. LCG = DRB ID is a per-UE ordinal, so
+        # it can only be assigned where the complete flow list is visible --
+        # here, not in FlowConfig. Idempotent, so dataclasses.replace() on an
+        # already-built scenario keeps the LCGs it had.
+        assign_deployed_lcgs(self.flows)

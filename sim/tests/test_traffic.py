@@ -11,13 +11,21 @@ from sim.buffer import BufferModel
 from sim.config import FlowConfig
 from sim.messages import MessageLedger
 from sim.traffic import TrafficModel, _clipped_gaussian_jitter_ms, _clipped_gaussian_around_mean
+from scheduler.flow import assign_deployed_lcgs
+
+def _lcgs(flows):
+    """Tests hand flow lists straight to a consumer, bypassing ScenarioConfig
+    -- the one place LCG = DRB ID is resolved -- so resolve here first."""
+    assign_deployed_lcgs(flows)
+    return flows
+
 
 
 def _model(flow: FlowConfig, slot_duration_s: float = 0.0005, seed: int = 0,
            ledger: MessageLedger | None = None) -> TrafficModel:
     buffers = BufferModel()
     rng = np.random.default_rng(seed)
-    return TrafficModel([flow], buffers, slot_duration_s=slot_duration_s,
+    return TrafficModel(_lcgs([flow]), buffers, slot_duration_s=slot_duration_s,
                          rng=rng, ledger=ledger)
 
 

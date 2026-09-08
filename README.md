@@ -760,8 +760,14 @@ these five, add a new tag rather than forcing it into an existing one.
   scenario (two same-class UL flows forced onto one `lcg` via an explicit
   override) before H5 can be confirmed, refuted, or ruled inconclusive in
   Phase 3.
-- `[OPEN: HARDWARE/DECISION]` **`FIVE_QI_LCG` (`scheduler/flow.py`) is an invented mapping with
-  nothing to validate it against.** LCG assignment isn't 3GPP-standardised
+- `[CLOSED 2026-09-08 — M-5]` **`FIVE_QI_LCG` no longer exists. LCG is the
+  deployed rule `LCG = DRB ID` (`nr_radio_config.c:3781-3785`; one QoS flow
+  per DRB, `rrc_gNB_radio_bearers.c:498-505`; DRB IDs from 1, `:248-263`),
+  so it is a per-UE bearer ordinal and LCG 0 is the SRB group**
+  (`scheduler/flow.py::assign_deployed_lcgs`, `docs/builds-2026-09-08.md`
+  §1). The entry below is kept as written, for the record.
+  **Original entry:** `FIVE_QI_LCG` (`scheduler/flow.py`) is an invented mapping with
+  nothing to validate it against. LCG assignment isn't 3GPP-standardised
   as a function of 5QI — a real deployment configures it per-logical-channel
   via RRC, an operator/gNB policy choice — and no OAI source or spec table
   exists for it either. The specific groupings (voice/gaming→LCG0,
@@ -1147,11 +1153,11 @@ these five, add a new tag rather than forcing it into an existing one.
   requires `rlc_status[1]`/`[2]` (LCID 1/2, the real SRB1/SRB2 identity)
   to hold data (`gNB_scheduler_dlsch.c:830-831`). `scheduler/flow.py
   ::FlowConfig` has no concept of an SRB flow at all — every `FlowConfig`
-  is a QFI-based DRB; `FIVE_QI_LCG`'s LCG0 mapping (QFI 1/3, voice/
-  gaming) is ordinary GBR *DRB* traffic sharing LCG0, which is exactly
-  the case the C's own `lcg0_is_drb` check excludes from `has_srb` — so
-  even a naive "LCG==0" heuristic would be a wrong port, not a merely
-  degraded one. **This is a different category of gap than the liveness
+  is a QFI-based DRB. (**Since M-5, 2026-09-08, LCG 0 is vacant** — LCG =
+  DRB ID from 1 — so the `lcg0_is_drb` exclusion has no instance here and
+  the C's predicate reduces to `per_lcg[0] > 0`; the paragraph's original
+  point, that `FIVE_QI_LCG` put 5QI 1/3 *data* on LCG 0 and made a naive
+  "LCG==0" heuristic a wrong port, no longer applies.) **This is a different category of gap than the liveness
   one above**: not a missing wire from already-existing simulator state,
   but a missing traffic model entirely — no scenario, `FlowConfig`, or
   generator anywhere represents RRC signaling. Building it is squarely

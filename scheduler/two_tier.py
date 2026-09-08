@@ -696,7 +696,7 @@ not a cosmetic one. Fixed here.
 
 from dataclasses import dataclass, field
 
-from .flow import FlowConfig
+from .flow import FlowConfig, require_assigned_lcgs
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
     cap_ues_per_slot,
@@ -977,6 +977,7 @@ class TwoTier:
         slot_duration_s: float,
         grid: GridView,
     ) -> None:
+        require_assigned_lcgs(flows, "TwoTier")
         self._flows = list(flows)
         self.slot_duration_s = slot_duration_s
         self._grid = grid

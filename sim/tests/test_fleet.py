@@ -157,17 +157,20 @@ def test_video_tier_scales_intensity_without_a_synthetic_filler():
     assert hi_b == pytest.approx(2 * lo_b)
 
 
-def test_shared_lcg_arises_from_composition_not_an_override():
-    """H5 is tested by composition here: the UGV's odometry, drive control
-    and e-stop all land on one LCG through FIVE_QI_LCG, with no synthetic
-    override -- a stronger test than forcing it."""
-    flows, seq = build_fleet(8, "ugv_heavy")
-    ugv_id = seq.index("ugv") + 1
-    lcgs = Counter(f.lcg for f in flows
-                   if f.ue_id == ugv_id and f.direction == "UL")
-    assert max(lcgs.values()) >= 2 or any(
-        Counter(f.lcg for f in flows if f.ue_id == ugv_id).values()
-    ), lcgs
+def test_no_composition_shares_an_lcg_under_the_deployed_rule():
+    """INVERTED by M-5. This test used to assert that the UGV's UL flows
+    share an LCG "through FIVE_QI_LCG, with no synthetic override". Under
+    the deployed rule (one QoS flow per DRB, LCG = DRB ID) no composition
+    can share an LCG below 8 bearers per UE -- so H5's shared-LCG state is
+    reachable ONLY through the explicit `shared_lcg` override in
+    sim/parametric.py, and that is a divergence axis, not a composition."""
+    from scheduler.flow import assign_deployed_lcgs, LCG_SRB
+    for comp in ("drone_heavy", "ugv_heavy", "sensor_dense", "mixed"):
+        flows, _ = build_fleet(8, comp)
+        assign_deployed_lcgs(flows)
+        per_ue = Counter((f.ue_id, f.lcg) for f in flows if f.direction == "UL")
+        assert max(per_ue.values()) == 1, (comp, per_ue)
+        assert all(f.lcg != LCG_SRB for f in flows), comp
 
 
 def test_qos_table_marks_provenance_for_every_field():
@@ -179,6 +182,6 @@ def test_qos_table_marks_provenance_for_every_field():
         p = r["provenance"]
         assert "standardised" in p["PDB"] and "standardised" in p["priority"]
         assert "negotiated" in p["GFBR"]
-        assert "invented" in p["LCG"]
+        assert "deployed" in p["LCG"] and "DRB" in p["LCG"]
         assert r["PDB_ms"] == pdb_for_5qi(r["5QI"])
         assert r["priority"] == priority_for_5qi(r["5QI"])

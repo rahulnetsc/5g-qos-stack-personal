@@ -52,6 +52,7 @@ from scheduler.flow import FlowConfig
 from scheduler.interfaces import Allocation
 from scheduler.reservation import (
     Reservation,
+
     _dl_follower_budget,
     _dl_grant_target,
     _dl_needs_service,
@@ -60,6 +61,21 @@ from scheduler.reservation import (
     _ul_grant_target,
     _ul_needs_service,
 )
+
+from scheduler.flow import assign_deployed_lcgs
+
+def _ul_lcg(sched, ue_id):
+    """The LCG the deployed rule gave this UE's (first) UL flow -- tests read
+    per-LCG state through it rather than through a literal index, which
+    was 0 under the old 5QI table and is the SRB group under the real one."""
+    return next(f.lcg for f in sched._flows if f.ue_id == ue_id and f.direction == "UL")
+
+
+def _lcgs(flows):
+    """Tests hand flow lists straight to a consumer, bypassing ScenarioConfig
+    -- the one place LCG = DRB ID is resolved -- so resolve here first."""
+    assign_deployed_lcgs(flows)
+    return flows
 
 
 # -- lightweight, Protocol-conforming fakes (no sim/ dependency needed --
@@ -170,7 +186,7 @@ def test_configure_then_allocate_runs_end_to_end_and_returns_allocations():
         FlowConfig(ue_id=1, qfi=1, direction="DL"),
         FlowConfig(ue_id=1, qfi=2, direction="UL"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
 
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=1000)
@@ -204,7 +220,7 @@ def test_lower_accumulated_throughput_is_favored_when_prbs_are_scarce():
         FlowConfig(ue_id=1, qfi=1, direction="DL"),
         FlowConfig(ue_id=2, qfi=1, direction="DL"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     # Pre-seed: UE1 has served little (low thr -> high coef -> favored);
     # UE2 has served a lot (high thr -> low coef).
     sched._ue_state[1].dl_thr_bytes_per_slot = 10.0
@@ -237,7 +253,7 @@ def test_pf_coefficient_formula_matches_hand_computation():
 
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL")]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].dl_thr_bytes_per_slot = 100.0
 
     buffers = _FakeBuffers()
@@ -279,7 +295,7 @@ def test_thr_ewma_decays_every_slot_even_when_ue_has_no_backlog():
     decayed through the gap when it becomes a candidate again."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL")]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     channel = _FakeChannel({1: 20.0})
 
@@ -305,7 +321,7 @@ def test_thr_ewma_decays_every_slot_even_when_ue_has_no_backlog():
 def test_single_ue_can_consume_the_whole_slot_with_no_follower_reservation():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL")]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
 
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=10_000_000)  # far more than one slot can carry
@@ -325,7 +341,7 @@ def test_dl_emits_one_allocation_per_filled_flow_with_real_qfi():
         FlowConfig(ue_id=1, qfi=1, direction="DL", priority_level=10),
         FlowConfig(ue_id=1, qfi=2, direction="DL", priority_level=20),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
 
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=500)
@@ -344,7 +360,7 @@ def test_dl_emits_one_allocation_per_filled_flow_with_real_qfi():
 def test_ul_emits_a_single_opaque_ue_grant_allocation():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL")]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
 
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=2000)
@@ -413,7 +429,7 @@ def test_gbr_tier_beats_the_coefficient_tiebreak_ul():
     ]
     # min_rb=0: predates commit 4's follower-budget floor; prb_count=2
     # below is deliberate scarcity for the tier test, not the floor.
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid(), min_rb=0)
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid(), min_rb=0)
     # UE1 (non-GBR) has the BETTER coefficient (low thr -> high coef).
     sched._ue_state[1].ul_thr_bytes_per_slot = 1.0
     sched._ue_state[2].ul_thr_bytes_per_slot = 100000.0
@@ -435,7 +451,7 @@ def test_gbr_tier_beats_the_coefficient_tiebreak_dl():
         FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
         FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1_000_000),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
     sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
 
@@ -465,7 +481,7 @@ def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_ul():
     ]
     # min_rb=0: predates commit 4's follower-budget floor; prb_count=2
     # below is deliberate scarcity for the tier test, not the floor.
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid(), min_rb=0)
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid(), min_rb=0)
     # UE1 (loose PDB) has the BETTER coefficient.
     sched._ue_state[1].ul_thr_bytes_per_slot = 1.0
     sched._ue_state[2].ul_thr_bytes_per_slot = 100000.0
@@ -487,7 +503,7 @@ def test_pdb_beats_the_coefficient_tiebreak_within_the_same_gbr_bucket_dl():
         FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=200.0),
         FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF", pdb_ms=10.0),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
     sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
 
@@ -514,7 +530,7 @@ def test_coefficient_remains_the_final_tiebreak_when_gbr_and_pdb_are_equal_dl():
         FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
         FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].dl_thr_bytes_per_slot = 10.0
     sched._ue_state[2].dl_thr_bytes_per_slot = 1000.0
 
@@ -543,14 +559,17 @@ def test_has_srb_cannot_be_exercised_and_is_recorded_as_such():
     assert "has_srb = False" in source
 
     # Behavioral guard against a future "helpful" LCG==0-means-SRB
-    # heuristic: qfi=1 maps to lcg=0 (scheduler/flow.py::FIVE_QI_LCG) but
-    # must not outrank a plain qfi=9 (lcg=6) flow on tier grounds alone.
+    # heuristic: a flow FORCED onto LCG 0 (the deployed rule never puts a
+    # DRB there -- LCG = DRB ID from 1, M-5) must not outrank a plain qfi=9
+    # flow on tier grounds alone while has_srb is still hardcoded False.
+    # Build 1 (SRB) retires this test: under the C's own predicate
+    # (per_lcg[0] > 0) LCG-0 backlog IS control traffic and DOES outrank.
     sched = Reservation()
     flows = [
-        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF"),  # lcg=6
-        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),  # lcg=0
+        FlowConfig(ue_id=1, qfi=9, direction="DL", flow_class="PF"),
+        FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF", lcg=0),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     # UE2 (lcg=0) has the WORSE coefficient -- if has_srb were wrongly
     # derived from lcg==0, UE2 would win anyway. It must not.
     sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
@@ -606,38 +625,38 @@ def test_ul_and_dl_rank_keys_stay_independently_sourced_not_deduped():
 def test_ul_obligation_floors_at_one_byte():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
     has_gbr, _, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 1  # floored, not 0 (or negative)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)] == 1  # floored, not 0 (or negative)
     assert has_gbr is True
 
 
 def test_ul_deficit_caps_at_one_pdb_window():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
     # obligation=1 (floored); window = 1 * (100ms / 0.5ms) = 200.
     for _ in range(300):
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 200
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)] == 200
 
 
 def test_ul_target_capped_at_2x_obligation_floor_without_mfbr():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
     for _ in range(300):  # saturate deficit at the window (200)
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0
     # 200 slots since the grant -> age 100ms -> remaining PDB 0 ->
     # rem_slots floors to 1 -> uncapped target would be (200+1)/1=201, but
     # no mfbr_bps is set, so max_burst floors at obligation*2=2.
@@ -660,13 +679,13 @@ def test_ul_target_can_exceed_the_floor_when_mfbr_is_configured():
             gfbr_bps=1.0, mfbr_bps=2_000_000.0, pdb_ms=100.0,
         )
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
     for _ in range(300):
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0
     # max_burst from mfbr_bps=2_000_000: (2_000_000/8)/2000 * 2 = 250 --
     # well above the uncapped target (201), so it must NOT clip here,
     # unlike the no-mfbr case above where the same setup clipped to 2.
@@ -684,7 +703,7 @@ def test_ul_target_can_exceed_the_floor_when_mfbr_is_configured():
 def test_ul_overflow_beyond_target_credited_to_be():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     # LCG estimate (6000) far exceeds any obligation/target this slot.
     buffers.set(1, 1, bytes_queued=6000)
@@ -701,7 +720,7 @@ def test_ul_has_gbr_requires_a_real_gfbr_not_just_the_flow_class_label():
     configured GFBR accrues no obligation and must not set has_gbr."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=0.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
@@ -717,7 +736,7 @@ def test_ul_deficit_freezes_when_the_per_lcg_estimate_is_zero():
     gNB_scheduler_ulsch.c:2230's own continue-gate."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=0, estimated_ul_buffer_per_lcg=0)
 
@@ -734,14 +753,14 @@ def test_ul_pdb_ms_uses_time_since_last_grant_not_hol_delay():
     show this shrinking."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
     _, pdb_never_granted, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
     assert pdb_never_granted == pytest.approx(100.0)
 
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0
     _, pdb_after_40_slots, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=40)
     assert pdb_after_40_slots == pytest.approx(80.0)  # 40*0.5ms=20ms elapsed
 
@@ -756,7 +775,7 @@ def test_dl_deficit_accumulates_through_silence_unlike_ul():
     its direct contrast)."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=0)  # empty buffer -- "silence"
 
@@ -773,7 +792,7 @@ def test_dl_target_not_computed_while_buffer_is_empty():
     bytes_queued>0 (gNB_scheduler_dlsch.c:391)."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=0)
 
@@ -785,7 +804,7 @@ def test_dl_target_not_computed_while_buffer_is_empty():
 def test_dl_has_gbr_requires_a_real_gfbr_not_just_the_flow_class_label():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=0.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
@@ -798,7 +817,7 @@ def test_dl_has_gbr_requires_a_real_gfbr_not_just_the_flow_class_label():
 def test_dl_pdb_ms_uses_time_since_last_grant_not_hol_delay():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
@@ -813,7 +832,7 @@ def test_dl_pdb_ms_uses_time_since_last_grant_not_hol_delay():
 def test_dl_overflow_beyond_target_credited_to_be():
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="GBR", gfbr_bps=1.0, pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
 
@@ -839,10 +858,10 @@ def test_ul_remaining_pdb_truncates_grant_age_to_whole_milliseconds():
     and fall through to the PF coefficient."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0
 
     _, remaining, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=3)
     assert remaining == 99
@@ -853,7 +872,7 @@ def test_dl_remaining_pdb_truncates_grant_age_to_whole_milliseconds():
     """gNB_scheduler_dlsch.c:365 -- identical truncation to UL's."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
     sched._ue_state[1].dl_flow_last_grant_slot[1] = 0
@@ -876,12 +895,12 @@ def test_two_flows_inside_one_millisecond_tie_at_the_pdb_tier():
         FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0),
         FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
     buffers.set(2, 1, bytes_queued=6000)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 11  # 9 slots -> 4.5ms
-    sched._ue_state[2].ul_lcg_last_grant_slot[0] = 12  # 8 slots -> 4.0ms
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 11  # 9 slots -> 4.5ms
+    sched._ue_state[2].ul_lcg_last_grant_slot[_ul_lcg(sched, 2)] = 12  # 8 slots -> 4.0ms
 
     _, pdb_ue1, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=20)
     _, pdb_ue2, _, _ = sched._ul_gbr_and_pdb(2, buffers, slot_index=20)
@@ -900,12 +919,12 @@ def test_rem_slots_truncation_shrinks_the_target():
             gfbr_bps=1.0, mfbr_bps=2_000_000.0, pdb_ms=100.0,
         )
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
     for _ in range(300):
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0
 
     _, _, guaranteed, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=199)
     assert guaranteed == 100
@@ -926,13 +945,13 @@ def test_window_truncates_the_ratio_not_the_product():
             gfbr_bps=60_000.0, pdb_ms=100.0,
         )
     ]
-    sched.configure(flows, slot_duration_s=0.0003, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0003, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=999_999)
 
     for _ in range(1000):
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 666
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)] == 666
 
 
 def test_unconfigured_pdb_falls_back_to_300ms_not_zero():
@@ -946,7 +965,7 @@ def test_unconfigured_pdb_falls_back_to_300ms_not_zero():
         FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=0.0),
         FlowConfig(ue_id=2, qfi=2, direction="DL", flow_class="PF", pdb_ms=0.0),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)
     buffers.set(2, 2, bytes_queued=6000)
@@ -963,7 +982,7 @@ def test_no_eligible_flow_reports_the_c_s_own_9999_sentinel():
     PDB, ported as the literal so the sentinel is the C's own."""
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF", pdb_ms=100.0)]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()  # nothing queued -> no eligible LCG
 
     _, remaining, _, _ = sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
@@ -994,7 +1013,7 @@ def test_ul_target_above_backlog_grants_more_prbs_than_backlog_alone():
             gfbr_bps=8_000_000.0, pdb_ms=100.0,
         )
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(
         1, 1, bytes_queued=5000, bytes_reported=100,
@@ -1003,7 +1022,7 @@ def test_ul_target_above_backlog_grants_more_prbs_than_backlog_alone():
 
     for _ in range(300):  # saturate the deficit at its window cap (100000)
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0  # post-grant state
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0  # post-grant state
     # 401 slots since the grant (odd -> non-whole-ms age): remaining PDB
     # floors to 0, rem_slots floors to 1, target caps at max_burst=1000
     # -- deterministic regardless of estimated_ul_buffer_per_lcg's value
@@ -1097,14 +1116,14 @@ def test_ul_gbr_bytes_slot_raises_target_above_guaranteed_plus_be():
         ue_id=1, qfi=2, direction="UL", flow_class="GBR",
         gfbr_bps=8_000_000.0, mfbr_bps=0.0, pdb_ms=100.0, lcg=0,
     )
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
     buffers.set(1, 2, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
 
     for _ in range(300):  # saturate A's deficit (the only flow the dedup sees)
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    sched._ue_state[1].ul_lcg_last_grant_slot[0] = 0
+    sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] = 0
     has_gbr, _, guaranteed, be = sched._ul_gbr_and_pdb(1, buffers, slot_index=401)
     assert guaranteed + be == 50  # A alone, backlog-dominated; B invisible here
 
@@ -1136,7 +1155,7 @@ def test_ul_gbr_bytes_slot_is_zero_without_any_mfbr_configured():
         ue_id=1, qfi=2, direction="UL", flow_class="GBR",
         gfbr_bps=8_000_000.0, mfbr_bps=0.0, pdb_ms=100.0, lcg=0,
     )
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
     buffers.set(1, 2, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
@@ -1203,7 +1222,7 @@ def test_sub_one_byte_gbr_floors_to_one_in_deficit_loop_and_zero_in_gbr_bytes_sl
         ue_id=1, qfi=1, direction="UL", flow_class="GBR",
         gfbr_bps=100.0, mfbr_bps=1.0, pdb_ms=100.0, lcg=0,
     )
-    sched.configure([flow], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=50, estimated_ul_buffer_per_lcg=50)
 
@@ -1275,7 +1294,7 @@ def test_dl_post_budget_skip_when_remaining_capacity_below_min_rbsize():
         FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF"),
         FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
     sched._ue_state[2].dl_thr_bytes_per_slot = 100000.0
 
@@ -1339,7 +1358,7 @@ def test_follower_budget_visibly_protects_trailing_ues_from_a_saturating_leader(
         FlowConfig(ue_id=2, qfi=1, direction="UL", flow_class="PF"),
         FlowConfig(ue_id=3, qfi=1, direction="UL", flow_class="PF"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].ul_thr_bytes_per_slot = 1.0      # leader: best coef
     sched._ue_state[2].ul_thr_bytes_per_slot = 10.0     # 2nd
     sched._ue_state[3].ul_thr_bytes_per_slot = 1000.0   # 3rd: worst coef
@@ -1389,7 +1408,7 @@ def test_dl_follower_budget_base_reflects_prbs_already_consumed_this_slot():
         FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
         FlowConfig(ue_id=3, qfi=1, direction="DL", flow_class="PF"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     sched._ue_state[1].dl_thr_bytes_per_slot = 1.0
     sched._ue_state[2].dl_thr_bytes_per_slot = 10.0
     sched._ue_state[3].dl_thr_bytes_per_slot = 1000.0
@@ -1442,7 +1461,7 @@ def test_ul_deficit_drains_full_tb_size_per_active_lcg_including_crumb_gated_one
         ue_id=1, qfi=2, direction="UL", flow_class="GBR",
         gfbr_bps=8_000_000.0, pdb_ms=100.0, lcg=1,
     )
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=500, estimated_ul_buffer_per_lcg=500)
     buffers.set(
@@ -1452,7 +1471,7 @@ def test_ul_deficit_drains_full_tb_size_per_active_lcg_including_crumb_gated_one
 
     for _ in range(300):  # saturate both LCGs' deficits
         sched._ul_gbr_and_pdb(1, buffers, slot_index=0)
-    deficit_a_before = sched._ue_state[1].ul_lcg_deficit_bytes[0]
+    deficit_a_before = sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)]
     deficit_b_before = sched._ue_state[1].ul_lcg_deficit_bytes[1]
     assert deficit_a_before > 0 and deficit_b_before > 0
 
@@ -1465,12 +1484,12 @@ def test_ul_deficit_drains_full_tb_size_per_active_lcg_including_crumb_gated_one
 
     # Stamped: BOTH LCGs, including flow B's crumb-gated one (absent
     # from the eligible-candidate flow list entirely -- bytes_reported=0).
-    assert sched._ue_state[1].ul_lcg_last_grant_slot[0] == slot.slot_index
+    assert sched._ue_state[1].ul_lcg_last_grant_slot[_ul_lcg(sched, 1)] == slot.slot_index
     assert sched._ue_state[1].ul_lcg_last_grant_slot[1] == slot.slot_index
 
     # Drained: the FULL tb_size credited to EACH active LCG
     # independently -- not split, not skipped for the crumb-gated one.
-    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == max(0, deficit_a_before - tbs_granted)
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)] == max(0, deficit_a_before - tbs_granted)
     assert sched._ue_state[1].ul_lcg_deficit_bytes[1] == max(0, deficit_b_before - tbs_granted)
 
 
@@ -1491,7 +1510,7 @@ def test_dl_deficit_drains_by_the_real_per_flow_delivered_bytes():
         ue_id=1, qfi=2, direction="DL", flow_class="GBR",
         gfbr_bps=8_000_000.0, pdb_ms=100.0, priority_level=20,
     )
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=300)   # higher priority -- filled first, in full
     buffers.set(1, 2, bytes_queued=6000)  # lower priority -- absorbs the remainder
@@ -1533,7 +1552,7 @@ def test_dl_stamp_and_drain_skip_flows_that_got_no_fill_bytes():
         ue_id=1, qfi=2, direction="DL", flow_class="GBR",
         gfbr_bps=8_000_000.0, pdb_ms=100.0, priority_level=20,
     )
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)  # absorbs the entire grant
     buffers.set(1, 2, bytes_queued=6000)  # gets nothing this slot
@@ -1562,22 +1581,22 @@ def test_deficit_drain_floors_at_zero_both_directions():
         ue_id=1, qfi=1, direction="UL", flow_class="GBR",
         gfbr_bps=8_000.0, pdb_ms=100.0, lcg=0,
     )
-    sched.configure([ul_flow], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([ul_flow]), slot_duration_s=0.0005, grid=_grid())
     ul_buffers = _FakeBuffers()
     ul_buffers.set(1, 1, bytes_queued=6000, estimated_ul_buffer_per_lcg=6000)
     sched._ul_gbr_and_pdb(1, ul_buffers, slot_index=0)  # small, first-call obligation
-    ul_deficit_before = sched._ue_state[1].ul_lcg_deficit_bytes[0]
+    ul_deficit_before = sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)]
     assert 0 < ul_deficit_before < 100
 
     sched._ul_drain_and_stamp(1, ul_buffers, slot_index=1, tbs_bytes=999_999)
-    assert sched._ue_state[1].ul_lcg_deficit_bytes[0] == 0
+    assert sched._ue_state[1].ul_lcg_deficit_bytes[_ul_lcg(sched, 1)] == 0
 
     dl_sched = Reservation()
     dl_flow = FlowConfig(
         ue_id=1, qfi=1, direction="DL", flow_class="GBR",
         gfbr_bps=8_000.0, pdb_ms=100.0,
     )
-    dl_sched.configure([dl_flow], slot_duration_s=0.0005, grid=_grid())
+    dl_sched.configure(_lcgs([dl_flow]), slot_duration_s=0.0005, grid=_grid())
     dl_buffers = _FakeBuffers()
     dl_buffers.set(1, 1, bytes_queued=6000)
     dl_sched._dl_gbr_and_pdb(1, dl_buffers, slot_index=0)
@@ -1604,7 +1623,7 @@ def test_dl_fill_uses_declared_order_not_priority_order():
     sched = Reservation()
     flow_a = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF", priority_level=90)
     flow_b = FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="PF", priority_level=10)
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
 
     # Verify, don't assume, that configure() preserves declared order --
     # the fill's faithfulness depends entirely on it.
@@ -1636,7 +1655,7 @@ def test_dl_fill_excludes_flows_that_get_zero_bytes():
     sched = Reservation()
     flow_a = FlowConfig(ue_id=1, qfi=1, direction="DL", flow_class="PF")
     flow_b = FlowConfig(ue_id=1, qfi=2, direction="DL", flow_class="PF")
-    sched.configure([flow_a, flow_b], slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs([flow_a, flow_b]), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=6000)  # absorbs everything
     buffers.set(1, 2, bytes_queued=6000)
@@ -1731,7 +1750,7 @@ def test_ul_and_dl_mcs_index_persisted_at_candidate_build_time():
         FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF"),
         FlowConfig(ue_id=2, qfi=1, direction="DL", flow_class="PF"),
     ]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=2000)
     buffers.set(2, 1, bytes_queued=2000)
@@ -1755,7 +1774,7 @@ def test_mcs_index_recomputed_fresh_every_slot_not_read_then_preserved():
     def make_scheduler():
         sched = Reservation()
         flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
-        sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+        sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
         return sched
 
     buffers = _FakeBuffers()
@@ -1793,7 +1812,7 @@ def test_grant_sizing_now_reads_the_persisted_mcs_index():
 
     sched = Reservation()
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
-    sched.configure(flows, slot_duration_s=0.0005, grid=_grid())
+    sched.configure(_lcgs(flows), slot_duration_s=0.0005, grid=_grid())
     buffers = _FakeBuffers()
     buffers.set(1, 1, bytes_queued=1_000_000)
     channel = _FakeChannel({1: 20.0})
@@ -1827,7 +1846,7 @@ def test_constructor_min_rb_survives_configure():
     assert sched.min_rb == 20
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
     # Exactly the call sim/driver.py:157 makes -- three positional args.
-    sched.configure(flows, 0.0005, _grid())
+    sched.configure(_lcgs(flows), 0.0005, _grid())
     assert sched.min_rb == 20
 
 
@@ -1839,7 +1858,7 @@ def test_configure_min_rb_zero_is_not_treated_as_unset():
     rewrites those two fixtures' 0 back to 5."""
     sched = Reservation(min_rb=5)
     flows = [FlowConfig(ue_id=1, qfi=1, direction="UL", flow_class="PF")]
-    sched.configure(flows, 0.0005, _grid(), min_rb=0)
+    sched.configure(_lcgs(flows), 0.0005, _grid(), min_rb=0)
     assert sched.min_rb == 0
 
 

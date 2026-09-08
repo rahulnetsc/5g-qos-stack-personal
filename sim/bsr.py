@@ -46,7 +46,7 @@ is still not modeled here.
 import bisect
 from dataclasses import dataclass, field
 
-from scheduler.flow import FlowConfig
+from scheduler.flow import require_assigned_lcgs, FlowConfig
 
 LCG_COUNT = 8
 
@@ -206,6 +206,7 @@ class BsrModel:
         # not the obvious reading and is why this is precomputed from the
         # flow list rather than derived from live backlog at report time.
         # Lower value = higher priority (3GPP convention, scheduler/flow.py).
+        require_assigned_lcgs(flows, "BsrModel")
         self._lcg_rank: dict[int, dict[int, int]] = {}
         for ue_id, ue_flows in self._ue_flows.items():
             rank: dict[int, int] = {}

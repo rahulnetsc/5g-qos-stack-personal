@@ -8,6 +8,7 @@ from .buffer import BufferModel
 from .config import FlowConfig
 from .cycle_clock import phase_offset_slots
 from .messages import Message, MessageLedger
+from scheduler.flow import require_assigned_lcgs
 
 
 class _Arrival(NamedTuple):
@@ -89,6 +90,7 @@ class TrafficModel:
         # pre-WP7 behaviour exactly -- every existing caller that doesn't
         # pass a ledger is unaffected.
         self.ledger = ledger
+        require_assigned_lcgs(flows, "TrafficModel")
         for f in flows:
             buffers.register(f.ue_id, f.qfi, is_ul=(f.direction == "UL"), lcg=f.lcg)
 
