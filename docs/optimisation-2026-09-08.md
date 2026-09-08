@@ -120,3 +120,47 @@ not because its numbers deserve improving. Every change in §2 is
 scheduler-agnostic except A3, and A3 is a lookup index, not a policy: PF and
 Reservation gain from A1, A2, A4 and A5 identically. Nothing in this pass
 changes any arm's behaviour, which is what "bit-identical" means.
+
+## 5. The measured speedup — clean, back to back, arms verified distinct
+
+**The last timing comparison in this project was void because `git stash`
+silently failed and both arms ran the same code.** So the arms are a `git
+worktree` at `HEAD~1` and the working tree, and the five changed files were
+**hashed in both trees and confirmed to differ** before either run started:
+
+| file | pre | post |
+|---|---|---|
+| `sim/harq.py` | `b75a6e993d4a` | `7b6f027b371c` |
+| `sim/join.py` | `d8daf644b18e` | `7924b9a9b785` |
+| `sim/buffer.py` | `0b681805da42` | `7a6d08af019f` |
+| `sim/metrics.py` | `d77cb5b4d63c` | `9a375f9ae306` |
+| `scheduler/two_tier.py` | `697274328e1f` | `83565c363a7c` |
+
+Identical grid (1 080 rows = 2 160 driver runs), identical worker count
+(12), run **sequentially with nothing else on the machine** — the earlier
+1 080-row run at 934 s is discarded because profiling ran concurrently with
+it, which is the same class of error as the stash.
+
+| arm | wall | per row |
+|---|---|---|
+| **pre-optimisation** (`HEAD~1`) | **1 165.6 s — 19.4 min** | 1.079 s |
+| **post-optimisation** | **936.0 s — 15.6 min** | 0.867 s |
+| **gain** | **19.7 %, 1.245×** | −0.212 s/row |
+
+**And the two timing arms are bit-identical: 0 result-field differences and
+0 check-field differences across all 1 080 rows.** The speedup measurement
+and the correctness measurement are the same run, so neither can be true of
+a different configuration than the other.
+
+**Why 19.7 % on the grid and 25.3 % on the task.** The profiled task is
+TwoTier / cold attach at 6 UEs ×1.25 — the heaviest arm and case, chosen
+because it bounds the grid's wall clock. The grid averages that against PF
+and Reservation and against the warm and RLF cases, which do less
+scheduler work per slot; and at 12-way parallelism the wall clock is partly
+bound by contention rather than by CPU. **The 25.3 % is the honest measure
+of the code change; the 19.7 % is the honest measure of what it buys.**
+Both are reported rather than the flattering one.
+
+**Not re-timed:** the G10 re-measurement (270 runs, 250 s pre-optimisation).
+It uses the same driver and should gain similarly, but it was not run on
+both arms, so no figure is claimed for it.
