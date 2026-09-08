@@ -160,15 +160,19 @@ class Metrics:
                           "ul_prbs_avail", "cce_used", "cce_budget"):
                     self._ts_system[k].append(0)
                 for key in buffers.keys():
-                    ts = self._ts_per_flow.setdefault(
-                        key, {"delivered_bytes": [], "arrived_bytes": [],
-                              "dropped_bytes": []})
+                    ts = self._ts_per_flow.get(key)
+                    if ts is None:
+                        ts = self._ts_per_flow[key] = {
+                            "delivered_bytes": [], "arrived_bytes": [],
+                            "dropped_bytes": []}
                     for k in ("delivered_bytes", "arrived_bytes", "dropped_bytes"):
                         ts[k].append(0)
             for key in buffers.keys():
-                ts = self._ts_per_flow.setdefault(
-                    key, {"delivered_bytes": [], "arrived_bytes": [],
-                          "dropped_bytes": []})
+                ts = self._ts_per_flow.get(key)
+                if ts is None:
+                    ts = self._ts_per_flow[key] = {
+                        "delivered_bytes": [], "arrived_bytes": [],
+                        "dropped_bytes": []}
                 # a flow first seen mid-second still needs its slot
                 for k in ("delivered_bytes", "arrived_bytes", "dropped_bytes"):
                     if len(ts[k]) < len(self._ts_time_s):
@@ -187,16 +191,19 @@ class Metrics:
         self._ts_slot_index.append(slot_index)
         self._ts_time_s.append(time_s)
         for key in buffers.keys():
-            ts = self._ts_per_flow.setdefault(
-                key,
-                {
+            # `setdefault` evaluates its default EAGERLY: this built a dict
+            # of five empty lists for every flow on every slot and discarded
+            # it -- ~3M throwaway allocations per run. Same contents, same
+            # order, one dict lookup on the hot path (OPT-A4).
+            ts = self._ts_per_flow.get(key)
+            if ts is None:
+                ts = self._ts_per_flow[key] = {
                     "backlog_bytes": [],
                     "hol_delay_s": [],
                     "delivered_bytes": [],
                     "arrived_bytes": [],
                     "dropped_bytes": [],
-                },
-            )
+                }
             ts["backlog_bytes"].append(buffers.state(*key).bytes_queued)
             ts["hol_delay_s"].append(buffers.hol_delay_s(*key, time_s))
             ts["delivered_bytes"].append(per_flow_delivered.get(key, 0))

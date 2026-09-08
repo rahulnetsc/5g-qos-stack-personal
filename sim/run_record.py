@@ -254,6 +254,8 @@ class RunRecord:
     # driver counters did not (CLAUDE.md, the unobservable-mechanism table).
     random_access: Optional[dict] = None
     srb: Optional[dict] = None                 # Build 1.2, same rule
+    #: Sim-only levers off their default, as DATA. Absent = all defaults.
+    levers: Optional[dict] = None
     scheduler_counters: Optional[dict] = None  # a scheduler's own tallies, when it keeps any
 
     def has_timeseries(self) -> bool:
@@ -298,6 +300,8 @@ class RunRecord:
             d["random_access"] = self.random_access
         if self.srb is not None:
             d["srb"] = self.srb
+        if self.levers:
+            d["levers"] = self.levers
         if self.scheduler_counters is not None:
             d["scheduler_counters"] = self.scheduler_counters
         # WP9 G11 commit 2. Emitted ONLY when true, so a non-windowed
@@ -327,6 +331,7 @@ class RunRecord:
             meta=d.get("meta", {}),
             random_access=d.get("random_access"),
             srb=d.get("srb"),
+            levers=d.get("levers"),
             scheduler_counters=d.get("scheduler_counters"),
             join_events=(
                 [JoinEventRecord(**e) for e in d["join_events"]]
@@ -483,6 +488,7 @@ class RunRecord:
             # because driver.py always sets it to at least [] once landed.
             random_access=summary.get("random_access"),
             srb=summary.get("srb"),
+            levers=summary.get("levers"),
             scheduler_counters=summary.get("scheduler_counters"),
             join_events=(
                 [JoinEventRecord(**e) for e in summary["join_events"]]

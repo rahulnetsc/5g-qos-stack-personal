@@ -648,12 +648,37 @@ class JoinAwareBufferView:
     every UE in the scenario with a placeholder ``None``."""
 
     def __init__(self, inner, join_states: dict[int, JoinState],
-                 srb_keys: frozenset = frozenset()) -> None:
+                 srb_keys: frozenset = frozenset(),
+                 cache_within_slot: bool = False) -> None:
+        # OPT-A5. `state()` is the hot path of the whole simulator: 5.86M
+        # calls per run, each walking JoinAware -> HarqAware -> BufferModel.
+        # Within ONE slot the answer cannot change: no scheduler mutates
+        # buffers (verified -- `scheduler/*.py` and `sim/baselines/*.py`
+        # contain no buffers.drain/expire/enqueue call; two-tier's
+        # `_ul_drain`/`_dl_drain` move its OWN virtual queues), and the HARQ
+        # pool is mutated by the driver only AFTER `allocate()` returns.
+        #
+        # OPT-IN, and default OFF, because that reasoning holds only for a
+        # view built fresh for a single `scheduler.allocate()` call -- which
+        # is exactly how `sim/driver.py` builds it, and the only caller that
+        # passes True. Any other construction keeps the uncached behaviour
+        # rather than inheriting an invariant it may not satisfy.
+        self._cache: dict | None = {} if cache_within_slot else None
         self._srb_keys = srb_keys
         self._inner = inner
         self._join_states = join_states
 
     def state(self, ue_id: int, qfi: int):
+        if self._cache is not None:
+            hit = self._cache.get((ue_id, qfi))
+            if hit is not None:
+                return hit
+            out = self._state_uncached(ue_id, qfi)
+            self._cache[(ue_id, qfi)] = out
+            return out
+        return self._state_uncached(ue_id, qfi)
+
+    def _state_uncached(self, ue_id: int, qfi: int):
         real = self._inner.state(ue_id, qfi)
         join_state = self._join_states.get(ue_id)
         if join_state is not None and not rrc_connected(join_state.phase):

@@ -247,6 +247,16 @@ class HarqProcessPool:
         self.dl_capacity = dl_capacity
         self.ul_capacity = ul_capacity
         self._pools: dict[tuple[int, Direction], list[HarqProcess]] = {}
+        # OPT-A1. `is_pending` was `any(p.busy ...)` over the pool, 5.9M
+        # calls x up to 16 slots = 94.3M generator steps, 17.5% of a
+        # profiled run. These two counters answer it in O(1). They are safe
+        # because `busy` is written in EXACTLY two places -- `allocate()`
+        # (True) and `HarqProcess.reset()` (False) -- and `reset()` is
+        # called only from `free()` and `flush_ue()`, both pool methods.
+        # Any new writer of `.busy` outside this class breaks them, which is
+        # what `test_harq_pending_counters_track_the_scan` exists to catch.
+        self._busy_ul: dict[int, int] = {}
+        self._busy_dl: dict[tuple[int, int], int] = {}
 
     def _capacity(self, direction: Direction) -> int:
         return self.dl_capacity if direction == "DL" else self.ul_capacity
@@ -280,6 +290,11 @@ class HarqProcessPool:
             if not proc.busy:
                 proc.busy = True
                 proc.qfi = qfi
+                if direction == "UL":
+                    self._busy_ul[ue_id] = self._busy_ul.get(ue_id, 0) + 1
+                else:
+                    k = (ue_id, qfi)
+                    self._busy_dl[k] = self._busy_dl.get(k, 0) + 1
                 proc.tb_bytes = tb_bytes
                 proc.retx_count = 0
                 proc.due_slot = due_slot
@@ -290,8 +305,21 @@ class HarqProcessPool:
                 return proc
         return None
 
+    def _drop_busy(self, proc: "HarqProcess") -> None:
+        """Counter side of `reset()`. Read the process's OWN direction/qfi,
+        never the caller's -- `flush_ue` frees both directions at once."""
+        if not proc.busy:
+            return
+        if proc.direction == "UL":
+            self._busy_ul[proc.ue_id] = self._busy_ul.get(proc.ue_id, 0) - 1
+        else:
+            k = (proc.ue_id, proc.qfi)
+            self._busy_dl[k] = self._busy_dl.get(k, 0) - 1
+
     def free(self, ue_id: int, direction: Direction, pid: int) -> None:
-        self.get(ue_id, direction, pid).reset()
+        proc = self.get(ue_id, direction, pid)
+        self._drop_busy(proc)
+        proc.reset()
 
     def get(self, ue_id: int, direction: Direction, pid: int) -> HarqProcess:
         for proc in self._pool(ue_id, direction):
@@ -329,6 +357,7 @@ class HarqProcessPool:
         for direction in ("DL", "UL"):
             for proc in self._pool(ue_id, direction):
                 if proc.busy:
+                    self._drop_busy(proc)
                     proc.reset()
                     freed += 1
         return freed
@@ -341,10 +370,15 @@ class HarqProcessPool:
         allocation, in case a scheduler ever grants an already-masked flow
         (it shouldn't, but this makes the invariant load-bearing rather
         than merely hoped-for)."""
-        pool = self._pool(ue_id, direction)
+        # `self._pool(...)` is called for its SIDE EFFECT and must stay:
+        # it lazily creates the (ue, direction) entry, and `_pools`
+        # insertion order is what `due_this_slot()` iterates, which orders
+        # the HARQ RNG draws (CLAUDE.md's cross-direction invariant).
+        # Dropping the call would reorder draws and change results.
+        self._pool(ue_id, direction)
         if direction == "UL":
-            return any(p.busy for p in pool)
-        return any(p.busy and p.qfi == qfi for p in pool)
+            return self._busy_ul.get(ue_id, 0) > 0
+        return self._busy_dl.get((ue_id, qfi), 0) > 0
 
     def due_this_slot(self, slot_index: int) -> list[HarqProcess]:
         """Every busy process across every (ue_id, direction) pool whose

@@ -67,6 +67,9 @@ class BufferModel:
         self._bsr_managed: set[tuple[int, int]] = set()
         # Completed messages not yet collected via pop_completions().
         self._completed: dict[tuple[int, int], list[MessageCompletion]] = {}
+        #: (ue, qfi) -> the single full key, while exactly one exists. See _resolve.
+        self._unique: dict[tuple[int, int], tuple] = {}
+        self._keys_cache: list | None = None
 
     def _resolve(self, ue_id: int, qfi: int):
         """The full key for a (ue_id, qfi), or a LOUD failure if ambiguous.
@@ -76,6 +79,15 @@ class BufferModel:
         (defects log #28/#30). It raises rather than picking one, because
         picking one is exactly what `register()` used to do.
         """
+        # OPT-A2 fast path: one dict hit for the unambiguous case, which is
+        # every flow in every scenario this repo builds. `_unique` holds a
+        # key ONLY while exactly one direction is registered for it, so both
+        # loud failures below stay reachable -- the KeyError for an unknown
+        # flow and the ValueError for an ambiguous one. Maintained in
+        # `register()`, the only writer of `_index`.
+        k = self._unique.get((ue_id, qfi))
+        if k is not None:
+            return k
         keys = self._index.get((ue_id, qfi))
         if not keys:
             raise KeyError((ue_id, qfi))
@@ -114,6 +126,14 @@ class BufferModel:
         self._index.setdefault((ue_id, qfi), [])
         if key not in self._index[(ue_id, qfi)]:
             self._index[(ue_id, qfi)].append(key)
+        entries = self._index[(ue_id, qfi)]
+        if len(entries) == 1:
+            self._unique[(ue_id, qfi)] = entries[0]
+        else:
+            # A second direction appeared: the key is ambiguous again and
+            # must go back through _resolve's ValueError.
+            self._unique.pop((ue_id, qfi), None)
+        self._keys_cache = None
         self._buffers[key] = BufferState(lcg=lcg)
         self._chunks[key] = deque()
         self._arrived_cum[key] = 0
@@ -146,7 +166,12 @@ class BufferModel:
         schedulers. Insertion order is preserved, so a caller that iterates
         gets the same order as before.
         """
-        return [(u, q) for (u, q, _d) in self._buffers]
+        # Rebuilt a fresh list of tuples on every slot (40k calls/run) for a
+        # set that only `register()` changes. Cached and invalidated there;
+        # insertion order is preserved exactly as before.
+        if self._keys_cache is None:
+            self._keys_cache = [(u, q) for (u, q, _d) in self._buffers]
+        return list(self._keys_cache)
 
     def state(self, ue_id: int, qfi: int) -> BufferState:
         return self._buffers[self._resolve(ue_id, qfi)]

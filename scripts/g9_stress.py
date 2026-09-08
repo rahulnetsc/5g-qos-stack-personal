@@ -429,9 +429,21 @@ def main(argv) -> int:
         for case in cases:
             for (ues, mult) in axis:
                 for arm in arms:
-                    group = [r for r in rows
-                             if r["case"] == case and r["arm"] == arm
-                             and r["total_ues"] == ues and r["rejoin_seed"] == col]
+                    # SORTED BY SEED, not left in completion order. The
+                    # neighbours CI is a SEEDED bootstrap, so the order of
+                    # its input is load-bearing: a resumed run and a clean
+                    # run banked these rows in different orders and produced
+                    # different CI bounds from identical per-seed deltas
+                    # (the point estimate matched exactly). g9_campaign.py's
+                    # own `_aggregate` docstring warned about this and this
+                    # runner did not inherit it -- the fix-at-one-site
+                    # pattern again. Sorting makes the artefact a function of
+                    # the runs alone, not of how the campaign was resumed.
+                    group = sorted(
+                        (r for r in rows
+                         if r["case"] == case and r["arm"] == arm
+                         and r["total_ues"] == ues and r["rejoin_seed"] == col),
+                        key=lambda r: r["seed"])
                     if not group:
                         continue
                     key = f"{'seeded' if col else 'unseeded'}/{case}/n{ues}_cm{mult:g}/{arm}"

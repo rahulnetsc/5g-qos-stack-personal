@@ -987,6 +987,16 @@ class TwoTier:
     ) -> None:
         require_assigned_lcgs(flows, "TwoTier")
         self._flows = list(flows)
+        # OPT-A3. Ten hot loops scan `self._flows` filtered by
+        # (ue_id, direction) -- per UE, per direction, per slot. This index
+        # is that filter, computed once. It PRESERVES DECLARATION ORDER,
+        # which is load-bearing here (CLAUDE.md: declaration order is attach
+        # order, and first-flow-found-wins decides several QoS lookups), so
+        # every loop below sees the identical sequence it saw before.
+        self._by_ue_dir: dict[tuple[int, str], tuple] = {}
+        for _f in self._flows:
+            self._by_ue_dir.setdefault((_f.ue_id, _f.direction), []).append(_f)
+        self._by_ue_dir = {k: tuple(v) for k, v in self._by_ue_dir.items()}
         self.slot_duration_s = slot_duration_s
         self._grid = grid
         self._ue_state = {f.ue_id: _UeState() for f in flows}
@@ -1656,8 +1666,8 @@ class TwoTier:
         guaranteed_bytes = 0
         be_bytes = 0
 
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "DL" or f.is_srb:
+        for f in self._by_ue_dir.get((ue_id, "DL"), ()):
+            if f.is_srb:
                 continue
             bytes_queued = buffers.state(f.ue_id, f.qfi).bytes_queued
 
@@ -1800,8 +1810,8 @@ class TwoTier:
         gbr_bytes_slot_max = 0
         ul_total_target_bytes = 0
 
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs or f.is_srb:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen_lcgs or f.is_srb:
                 continue
             lcg_estimate = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
             if lcg_estimate <= 0:
@@ -1972,8 +1982,8 @@ class TwoTier:
         """
         candidates: list[tuple[int, int, int]] = []  # (priority, lcg, available)
         seen_lcgs: set[int] = set()
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen_lcgs:
                 continue
             available = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
             if available <= 0:
@@ -2057,8 +2067,8 @@ class TwoTier:
         """
         state = self._ue_state[ue_id]
         active: dict[int, int] = {}
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in active:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in active:
                 continue
             buf = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
             if buf <= 0:
@@ -2086,8 +2096,8 @@ class TwoTier:
         this function. LCID < 4 (SRBs) skipped.
         """
         state = self._ue_state[ue_id]
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "DL" or f.is_srb:
+        for f in self._by_ue_dir.get((ue_id, "DL"), ()):
+            if f.is_srb:
                 continue
             r_bps = self._targets_bps.get((f.ue_id, f.qfi), 0.0)
             vq = state.vq_dl.get(f.qfi, 0.0) + r_bps * self.slot_duration_s
@@ -2120,8 +2130,8 @@ class TwoTier:
         """
         state = self._ue_state[ue_id]
         seen_lcgs: set[int] = set()
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen_lcgs:
                 continue
             st = buffers.state(f.ue_id, f.qfi)
             if st.estimated_ul_buffer_per_lcg <= 0:
@@ -2166,8 +2176,8 @@ class TwoTier:
         state = self._ue_state[ue_id]
         seen_lcgs: set[int] = set()
         total = 0.0
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen_lcgs:
                 continue
             seen_lcgs.add(f.lcg)
             buf = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
@@ -2190,9 +2200,7 @@ class TwoTier:
         see module docstring and _update_ul_floor's own docstring for
         the flagged, not-resolved consequence.
         """
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL":
-                continue
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
             if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
                 continue
             if f.mfbr_bps > 0:
@@ -2209,8 +2217,8 @@ class TwoTier:
         """
         seen_lcgs: set[int] = set()
         total = 0
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen_lcgs:
                 continue
             seen_lcgs.add(f.lcg)
             total += buffers.delivered_cum(f.ue_id, f.qfi)
@@ -2227,8 +2235,8 @@ class TwoTier:
         """
         best_priority: int | None = None
         best_pdb = 9999
-        for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.is_srb:
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.is_srb:
                 continue
             if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
                 continue

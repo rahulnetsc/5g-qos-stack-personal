@@ -809,6 +809,10 @@ def run(
         masked_buffers = JoinAwareBufferView(
             HarqAwareBufferView(buffers, harq_pool, direction_by_flow), join_states,
             srb_keys=srb_keys,
+            # Built fresh for this slot and used for exactly one
+            # `scheduler.allocate()` call, during which buffers and the HARQ
+            # pool are read-only -- the precondition OPT-A5 documents.
+            cache_within_slot=True,
         )
 
         for alloc in scheduler.allocate(reduced_slot_grid, masked_buffers, channel):
@@ -1078,6 +1082,25 @@ def run(
     # from "never declares because it's genuinely never triggered");
     # rlf_declared_count is asserted, not assumed, in sim/tests/
     # test_smoke.py (docs/wp-join-plan.md sec4.1 point 4).
+    # SIM-ONLY LEVERS, AS DATA ON THE ROW THAT USED THEM. The withdrawn G9
+    # rows are why this is a field and not a note: they were produced with
+    # `rejoin_seed_bsr` ON, the artefact recorded nothing, and the rows read
+    # as if they described the default configuration. Emitted only when a
+    # lever is off its default, so "absent" means "every lever default" --
+    # and so a metadata field cannot move the regression corpus.
+    _levers = {
+        "rejoin_seed_bsr": rejoin_seed_bsr,
+        "attach_seed_slots": (attach_seed_slots if isinstance(attach_seed_slots, str)
+                              else (sorted(attach_seed_slots) if attach_seed_slots else None)),
+        "max_sched_ues_override": max_sched_ues,
+        "random_access": bool(ra is not None),
+        "srb": bool(srb is not None),
+    }
+    _defaults = {"rejoin_seed_bsr": False, "attach_seed_slots": None,
+                 "max_sched_ues_override": None, "random_access": False, "srb": False}
+    _non_default = {k: v for k, v in _levers.items() if v != _defaults[k]}
+    if _non_default:
+        summary["levers"] = _non_default
     summary["rlf_step_calls"] = rlf_step_calls
     summary["rlf_declared_count"] = rlf_declared_count
     # WP-Join commit 5: always present (possibly empty) from this commit
