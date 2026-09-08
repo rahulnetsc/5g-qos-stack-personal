@@ -412,7 +412,7 @@ virtual-queue state in ``ia_p5g_scheduler.c`` is per-LCG, not per-flow).
 
 from dataclasses import dataclass, field
 
-from .flow import FlowConfig, require_assigned_lcgs
+from .flow import LCG_SRB, FlowConfig, require_assigned_lcgs, ul_lcg_bytes
 from .rank_trace import RankEntry, RankSnapshot, field as trace_field
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
@@ -1197,10 +1197,7 @@ class Reservation:
         docstring) -- built for structural/citation completeness only,
         the same treatment the ``has_srb`` sort tier already gets.
         """
-        for f in self._flows:
-            if f.ue_id == ue_id and f.direction == "UL" and f.lcg == 0:
-                return buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
-        return 0
+        return ul_lcg_bytes(self._flows, ue_id, buffers).get(LCG_SRB, 0)
 
     def _ul_drain_and_stamp(
         self, ue_id: int, buffers: BufferView, slot_index: int, tbs_bytes: int,

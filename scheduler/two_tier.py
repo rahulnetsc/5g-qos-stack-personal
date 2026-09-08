@@ -696,7 +696,7 @@ not a cosmetic one. Fixed here.
 
 from dataclasses import dataclass, field
 
-from .flow import FlowConfig, require_assigned_lcgs
+from .flow import LCG_SRB, FlowConfig, require_assigned_lcgs, ul_lcg_bytes
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
     cap_ues_per_slot,
@@ -880,10 +880,10 @@ class _Candidate:
     # gbr_below's own reverse-scan input (module docstring).
     has_gbr: bool = False
     pdb_ms: int = 9999
-    # UL's own top tier (ia_p5g_ul_cmp, :2112-2125) -- structurally
-    # absent (no do_sched-equivalent signal exists), same disposition
-    # reservation.py's own liveness/sched_inactive finding already made.
-    # Unused by DL.
+    # UL's own top tier (ia_p5g_ul_cmp, :2112-2125). LIVE since Build 1.2's
+    # SRBs exist (ia_p5g_scheduler.c:2743-2796): srb_floor OR cp_floor set
+    # it. Unused by DL. FOUR sites read it -- this tier, gbr_below's
+    # exclusion, _finalize_ul_coef's max_q scan, and grant sizing.
     sched_inactive: bool = False
     # Real spectral-efficiency factor both directions' coefficients
     # multiply by -- see module docstring's _PF_COEF_HYPOTHETICAL_SYMBOLS
@@ -949,6 +949,14 @@ class TwoTier:
         # construction (`sched.rank_sink = sink`); None means the sort
         # pays one pointer comparison per slot per direction.
         self.rank_sink = None
+        # Build 1.2 correction: the control-plane floors are live, so they
+        # need the same manipulation check every other mechanism carries --
+        # a COUNT, surfaced by the driver as summary["scheduler_counters"].
+        # A tier that reports zero with SRB traffic present is unwired.
+        self.counters: dict[str, int] = {
+            "sched_inactive_fired": 0, "srb_floor_fired": 0,
+            "cp_floor_fired": 0, "control_plane_grants": 0,
+        }
         # mac->min_grant_prb, ia_p5g_scheduler.c:2210 -- confirmed the
         # SAME deployment-configured field reservation.py's own follower
         # budget reads (CLAUDE.md's existing invariant), new here as a
@@ -1336,6 +1344,35 @@ class TwoTier:
                 candidate.gbr_bytes_slot = gbr_bytes_slot
                 candidate.ul_total_target_bytes = ul_total_target_bytes
                 candidate.urgency01 = urgency01
+                # [IA-P5G] The control-plane floors, ia_p5g_scheduler.c:2743-2796.
+                #   cp_floor  = (B > 0) && data_lcg_bytes == 0   (:2745)
+                #   srb_floor = per_lcg[0] > 0                   (:2778-2779)
+                #   sched_inactive = reconfig_floor || srb_floor
+                #                    || (((B==0 && do_sched) || cp_floor)
+                #                        && !ul_has_unfulfilled_gbr)
+                # Two disjuncts stay structurally absent and are NOT faked:
+                # `reconfig_floor` needs UE->await_reconfig, an RRC state
+                # this simulator does not model; `B == 0 && do_sched` cannot
+                # occur here because M-9's rescue is wired through
+                # `sr_report_floor`, so a rescued UE always reports B > 0.
+                per_lcg = ul_lcg_bytes(self._flows, ue_id, buffers)
+                srb_bytes = per_lcg.get(LCG_SRB, 0)
+                data_lcg_bytes = sum(
+                    v for k, v in per_lcg.items() if k != LCG_SRB
+                )
+                b_total = sum(
+                    buffers.state(f.ue_id, f.qfi).bytes_reported for f in flows
+                )
+                cp_floor = b_total > 0 and data_lcg_bytes == 0
+                candidate.sched_inactive = (
+                    srb_bytes > 0 or (cp_floor and not has_gbr)
+                )
+                if srb_bytes > 0:
+                    self.counters["srb_floor_fired"] += 1
+                if cp_floor:
+                    self.counters["cp_floor_fired"] += 1
+                if candidate.sched_inactive:
+                    self.counters["sched_inactive_fired"] += 1
                 # ia_p5g_ul_metric, :3696-3726 -- base_q only; the
                 # urgency term and the SE multiply happen in
                 # _finalize_ul_coef below, once max_q across this slot's
@@ -1410,8 +1447,15 @@ class TwoTier:
             # always wraps this in min(prbs_left, max_rbSize, ...), so
             # a cap raised above prbs_left is harmless by construction,
             # not merely by this specific corpus's own numbers.
-            max_rbSize = slot.prb_count
-            if direction == "UL":
+            # :3102 -- a control-plane UE takes exactly min_rb ("one min_rb
+            # grant carries the signalling"), and :3118/:3259 exempt it from
+            # both the FIX-2 reserve cap and demand-derived sizing. A
+            # floor-fired UE takes the DATA path even when it is also
+            # control-plane ([FIX C], :3115-3118).
+            control_plane = (direction == "UL" and c.sched_inactive
+                             and not c.floor_fire)
+            max_rbSize = self.min_rb if control_plane else slot.prb_count
+            if direction == "UL" and not control_plane:
                 reserve_rb = gbr_below[i] * self.min_rb
                 cap = prbs_left - reserve_rb
                 cap = max(cap, self.min_rb)
@@ -1433,6 +1477,16 @@ class TwoTier:
                 tbs_bytes = (prbs_used * c.bits_per_rb) // 8
                 if tbs_bytes <= 0:
                     continue
+            elif control_plane:
+                # :3264 -- `sched.rbSize = min_rb`, demand-estimate sizing
+                # bypassed. The TB carries what fits; SRBs fill it first
+                # (ia_p5g_ul_lcp_budget: lcid < 4 pulls unlimited, which
+                # sim/srb.py reproduces with prioritisedBitRate infinity).
+                prbs_used = min(prbs_left, max_rbSize)
+                tbs_bytes = min(ue_backlog, (prbs_used * c.bits_per_rb) // 8)
+                if tbs_bytes <= 0:
+                    continue
+                self.counters["control_plane_grants"] += 1
             else:
                 # [B_eff] UL only -- ia_p5g_scheduler.c:3195-3204.
                 # ul_total_target_bytes is DL-irrelevant (0 by default
@@ -1474,11 +1528,17 @@ class TwoTier:
         finalized, so this can't happen inline during candidate-building
         the way DL's single-pass metric can. Before this runs,
         candidate.coef temporarily holds base_q (this method's own
-        input); overwritten here with the real composite. sched_inactive
-        is always False (module docstring), so "non-sched_inactive
-        candidates" collapses to "all candidates" for the max_q scan.
+        input); overwritten here with the real composite.
+
+        The max_q scan EXCLUDES control-plane candidates (:2901,
+        ``if (!UE_sched[_u].sched_inactive && base_q > max_q)``) -- they sort
+        ahead of every data UE and their coef is irrelevant, so letting one
+        set the normaliser would shrink every data UE's urgency term. Inert
+        until Build 1.2 made ``sched_inactive`` reachable; wired here in the
+        same commit as the tier, not left for the next reader to discover.
         """
-        norm = max((c.coef for c in candidates), default=0.0)
+        norm = max((c.coef for c in candidates if not c.sched_inactive),
+                   default=0.0)
         norm = max(norm, 1.0)
         for c in candidates:
             base_q = c.coef

@@ -257,6 +257,28 @@ def assign_deployed_lcgs(flows: Iterable["FlowConfig"]) -> None:
             f.lcg = lcg_for_drb(drb_of[key])
 
 
+def ul_lcg_bytes(flows, ue_id: int, buffers) -> dict[int, int]:
+    """The gNB's per-LCG UL estimate for one UE, keyed by LCG.
+
+    ONE reader for a value three call sites need (reservation's
+    ``has_srb``/``_ul_lcg0_estimate``, two-tier's ``srb_floor``/``cp_floor``)
+    -- extracted before the second copy existed rather than after the third.
+    ``BsrModel.broadcast`` writes each flow's state with the aggregate for
+    THAT flow's LCG, so the first flow found on an LCG carries the whole LCG
+    (the same first-flow-found-wins rule both schedulers' QoS loops use); a
+    second flow on the same LCG would restate it, not add to it.
+
+    ``buffers`` is duck-typed (any ``BufferView``) so this module keeps its
+    no-simulator-imports rule.
+    """
+    out: dict[int, int] = {}
+    for f in flows:
+        if f.ue_id != ue_id or f.direction != "UL" or f.lcg in out:
+            continue
+        out[f.lcg] = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
+    return out
+
+
 def require_assigned_lcgs(flows: Iterable["FlowConfig"], consumer: str) -> None:
     """Raise if any flow is still LCG_UNASSIGNED. Every consumer that
     indexes a per-LCG array calls this, so a flow list that bypassed
