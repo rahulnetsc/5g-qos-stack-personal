@@ -861,6 +861,48 @@ running before quoting any mechanism as active: `grep -rn <name> --include=*.py 
 If every hit is a test or a comment, the mechanism is not part of any
 result this project has published.
 
+**A CLAIM ABOUT THE DEPLOYED C NAMES THE FILES SEARCHED, NOT ONLY THE LINE
+CITED — a citation proves something was read, never that the right thing
+was read.** Build 1.2 concluded "the two-tier arm has no SRB ranking tier"
+and carried a real, correct citation to `gNB_scheduler_ulsch.c`. The
+conclusion was wrong: **two-tier's UL scheduler is `ia_p5g_scheduler.c`**,
+where the same concept lives under a different identifier —
+`srb_pending_bytes` → `srb_floor` → `sched_inactive` (`:2778-2783`), not
+`has_srb`. The grep was otherwise flawless. **A negative result from the
+wrong file is indistinguishable from a negative result from the right
+one**, and this one shipped as a finding, into a commit message and a
+guarantee-table row.
+
+**This is the enumerator class again** (see the empty-selection family
+above): a search that cannot reach its target reports zero, and the reader
+hears zero over the set they care about. The difference is only that the
+unreachable domain is a *file* rather than a row set.
+
+**So for any "the C does not do X" claim, state three things:**
+
+1. **which files were searched** — named, not "the OAI source";
+2. **which file would contain X if it existed** — and why that is the
+   right file (which build's scheduler is it, which `Makefile`/branch
+   selects it);
+3. **how (2) was established** — a call graph, a config, a log banner, not
+   an assumption from the filename.
+
+**And search by CONCEPT, not by identifier.** The same mechanism is named
+`has_srb` in the reservation branch and `sched_inactive` in two-tier. When
+a grep for a name returns nothing, grep for what the mechanism *reads*
+(here, `estimated_ul_buffer_per_lcg[0]`) before concluding absence.
+
+**WHEN A MECHANISM IS FOUND, COUNT ITS READERS BEFORE PORTING IT.** Fixing
+`sched_inactive` exposed **four** consumers, of which two were already
+ported as no-ops and **two were wrong the moment the tier went live** — the
+`max_q` urgency normaliser (`:2901`, a control-plane candidate must not set
+the scale for every data UE) and grant sizing (`:3102`/`:3118`/`:3264`,
+control plane takes exactly `min_rb` and skips both the FIX-2 reserve and
+demand sizing). **Neither would have shown in a test of the comparator
+alone**, which is the obvious test to write. Enumerate every read site of
+the state before landing the write site — `grep` the field name across the
+C and the port, and account for each hit.
+
 **BEFORE CITING A CHECK AS PASSING, ESTABLISH IT COULD HAVE FAILED.** The
 same shape as the journal's dynamic-range rule (`prediction-journal.md`,
 third form rule) but applied to a **verification step** rather than to an

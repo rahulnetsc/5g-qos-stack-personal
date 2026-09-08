@@ -109,20 +109,33 @@ def _unavailable_spans(fr, time_s):
     return out
 
 
-def _scored_flows(rec, ue_ids):
+def _handshake_qfis(sc) -> set[int]:
+    """The join's own signalling pair, DERIVED from the scenario's JoinConfig
+    rather than listed -- it is what sub-experiment A measures the completion
+    of, not a service whose availability is being judged."""
+    out = set()
+    for ue in sc.ues:
+        if ue.join is not None:
+            out.update(q for q in (ue.join.handshake_ul_qfi, ue.join.handshake_dl_qfi)
+                       if q is not None)
+    return out
+
+
+def _scored_flows(rec, ue_ids, exclude_qfis=frozenset()):
     """Committed flows only: best-effort filler carries no promise, so its
     availability is not what "the cell is working" means. DERIVED from
-    flow_class, and SRBs excluded (signalling, not the fleet's data)."""
+    flow_class; SRBs and the handshake pair excluded (both are signalling)."""
     return [fr for fr in rec.flows.values()
             if fr.ue_id in ue_ids and not getattr(fr, "is_srb", False)
+            and fr.qfi not in exclude_qfis
             and fr.flow_class in ("GBR", "Delay") and fr.ts_delivered_bytes]
 
 
-def _cell_broken_pre_join(rec, neighbours, trigger_s, time_s) -> dict:
+def _cell_broken_pre_join(rec, neighbours, trigger_s, time_s, skip=frozenset()) -> dict:
     """THE BASELINE SANITY GATE. Were the incumbents already failing BEFORE
     the joiner arrived? Measured over the window that ends at the first join
     trigger, skipping a warm-up equal to one availability budget."""
-    flows = _scored_flows(rec, set(neighbours))
+    flows = _scored_flows(rec, set(neighbours), skip)
     if not flows or not time_s:
         return {"broken": None, "reason": "no scoreable incumbent flow"}
     worst = 0.0
@@ -140,10 +153,10 @@ def _cell_broken_pre_join(rec, neighbours, trigger_s, time_s) -> dict:
             "worst_flow": culprit}
 
 
-def _time_to_first_service_s(rec, joiner, trigger_s, time_s):
+def _time_to_first_service_s(rec, joiner, trigger_s, time_s, skip=frozenset()):
     """SUB-EXPERIMENT A. From the join trigger to the first instant at which
     EVERY committed flow of the joiner is available by the spec rule."""
-    flows = _scored_flows(rec, {joiner})
+    flows = _scored_flows(rec, {joiner}, skip)
     if not flows:
         return None, "joiner has no scoreable committed flow"
     per_flow = [_unavailable_spans(fr, time_s) for fr in flows]
@@ -155,11 +168,11 @@ def _time_to_first_service_s(rec, joiner, trigger_s, time_s):
     return None, "never available before the horizon"
 
 
-def _time_to_stable_cell_s(rec, neighbours, trigger_s, time_s):
+def _time_to_stable_cell_s(rec, neighbours, trigger_s, time_s, skip=frozenset()):
     """SUB-EXPERIMENT B. From the join trigger to the last instant at which
     ANY incumbent committed flow was unavailable -- the settling period the
     join imposes on the cell, not on the joiner."""
-    flows = _scored_flows(rec, set(neighbours))
+    flows = _scored_flows(rec, set(neighbours), skip)
     if not flows:
         return None, "no scoreable incumbent flow"
     last_bad_s = None
@@ -174,31 +187,45 @@ def _time_to_stable_cell_s(rec, neighbours, trigger_s, time_s):
 
 
 def _manipulation_checks(summary, want_path, n_events, label) -> dict:
-    """EVERY firing count, asserted BEFORE any number above is read. RA, SRB
-    and sched_inactive each get one; a mechanism that reports zero where the
-    scenario calls for it is unwired, and its numbers are not results."""
+    """EVERY firing count, asserted BEFORE any number above is read.
+
+    THE LINE IS BETWEEN FIRING AND FINISHING, and it is CLAUDE.md's own.
+    A mechanism that never fired where the scenario schedules it is UNWIRED,
+    its numbers are not results, and the campaign aborts. A mechanism that
+    fired and did not finish is a MEASURED STALL -- at occupancy past the
+    admissible boundary that is the answer, not a defect, so it is recorded
+    and feeds the `catastrophic` verdict rather than killing the sweep.
+    (The first draft aborted on both and died at cold/Reservation/n4 --
+    which was the experiment reporting its own finding as a crash.)
+    """
     ra = summary.get("random_access")
     srb = summary.get("srb")
     sc_c = summary.get("scheduler_counters") or {}
     if ra is None or srb is None:
         raise AssertionError(f"{label}: RA/SRB summary missing -- not wired")
     kinds = ra["by_kind"]
-    if want_path == "cold" and kinds["cold"]["completed"] != n_events:
-        raise AssertionError(f"{label}: {kinds['cold']['completed']} cold RAs "
-                             f"for {n_events} scheduled attaches -- {kinds}")
-    if want_path == "reestablish" and (kinds["reestablish"]["completed"]
-                                       + kinds["cold"]["completed"]) < n_events:
-        raise AssertionError(f"{label}: {kinds} RAs for {n_events} RLF events")
+    # --- UNWIRED: abort. The scenario schedules events and nothing fired.
+    if n_events and want_path in ("cold", "reestablish"):
+        fired = (kinds["cold"]["requested"] + kinds["reestablish"]["requested"])
+        if fired == 0:
+            raise AssertionError(
+                f"{label}: {n_events} {want_path} events and ZERO RA procedures "
+                f"requested -- the mechanism is unwired, not merely failing")
     if want_path == "warm" and kinds["cold"]["requested"]:
         raise AssertionError(f"{label}: attach RA on the warm path -- {kinds}")
-    if want_path != "warm" and srb["srb_steps_sent"] == 0:
-        raise AssertionError(f"{label}: zero SRB dialogue steps on {want_path}")
-    if ra["ra_active_at_end"] or srb["srb_active_at_end"]:
-        raise AssertionError(f"{label}: RA/SRB still running at the horizon "
-                             f"-- a stall, not a sample")
+    if want_path != "warm" and n_events and srb["srb_dialogues_started"] == 0:
+        raise AssertionError(
+            f"{label}: zero SRB dialogues STARTED on {want_path} -- unwired")
+    # --- STALLED: record. This is what "the cell is too busy to join" looks
+    # --- like from inside the mechanism, and it is a result.
     return {"ra_completed_by_kind": {k: v["completed"] for k, v in kinds.items()},
+            "ra_requested_by_kind": {k: v["requested"] for k, v in kinds.items()},
             "ra_failed": ra["ra_failed"], "ra_latency_p95_ms": ra["ra_latency_ms"]["p95"],
+            "ra_active_at_end": ra["ra_active_at_end"],
             "srb_steps": srb["srb_steps_sent"],
+            "srb_dialogues_started": srb["srb_dialogues_started"],
+            "srb_dialogues_completed": srb["srb_dialogues_completed"],
+            "srb_active_at_end": srb["srb_active_at_end"],
             "srb_dialogue_p95_ms": srb["srb_dialogue_ms"]["p95"],
             "sched_inactive_fired": sc_c.get("sched_inactive_fired", 0),
             "srb_floor_fired": sc_c.get("srb_floor_fired", 0),
@@ -220,6 +247,7 @@ def one(task: tuple) -> dict:
      intervals, horizon, cap) = task
     sc, want_path = _build(case, total_ues, committed_mult, seed, intervals, horizon)
     joiner, neighbours = joiner_ue_id(sc), neighbour_ue_ids(sc)
+    skip = _handshake_qfis(sc)
     label = f"{case}/{arm}/n{total_ues}/cm{committed_mult:g}/seed{seed}"
     ra_cfg = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
     factory = _arms()[arm]
@@ -243,9 +271,9 @@ def one(task: tuple) -> dict:
         first_reason = "no join event fired"
         stable_reason = first_reason
     else:
-        gate = _cell_broken_pre_join(rec, neighbours, trigger_s, time_s)
-        first_service_s, first_reason = _time_to_first_service_s(rec, joiner, trigger_s, time_s)
-        stable_s, stable_reason = _time_to_stable_cell_s(rec, neighbours, trigger_s, time_s)
+        gate = _cell_broken_pre_join(rec, neighbours, trigger_s, time_s, skip)
+        first_service_s, first_reason = _time_to_first_service_s(rec, joiner, trigger_s, time_s, skip)
+        stable_s, stable_reason = _time_to_stable_cell_s(rec, neighbours, trigger_s, time_s, skip)
 
     # The paired control: same seed, same fleet, NO join schedule -- so the
     # neighbours delta is within-seed, the only form that can attribute.
@@ -260,7 +288,7 @@ def one(task: tuple) -> dict:
                                  flow_configs=ctl_sc.flows, summary=ctl_s, arm={}, meta={})
 
     def worst_p98(r):
-        return max((fr.delay_p98_ms for fr in _scored_flows(r, set(neighbours))), default=0.0)
+        return max((fr.delay_p98_ms for fr in _scored_flows(r, set(neighbours), skip)), default=0.0)
 
     return {
         "case": case, "arm": arm, "seed": seed, "total_ues": total_ues,
@@ -284,8 +312,14 @@ def _verdict(rows: list[dict], epsilon_ms: float) -> dict:
     seed that never completes is a mechanism, and one is enough to fail."""
     n = len(rows)
     broken = [r for r in rows if (r["cell_broken_pre_join"] or {}).get("broken")]
+    # A stalled RA or SRB dialogue at the horizon is a mechanism that never
+    # finished -- the same class as a join event that never completed, and
+    # one is enough to fail the point under the yield rule.
     catastrophic = [r for r in rows
-                    if r["n_never_completed"] > 0 or r["time_to_first_service_s"] is None]
+                    if r["n_never_completed"] > 0
+                    or r["time_to_first_service_s"] is None
+                    or (r["checks"].get("ra_active_at_end") or 0) > 0
+                    or (r["checks"].get("srb_active_at_end") or 0) > 0]
     case = rows[0]["case"]
     if case == "cold":
         passed = [r for r in rows if r["attach_s"] is not None
@@ -323,7 +357,9 @@ def _verdict(rows: list[dict], epsilon_ms: float) -> dict:
         "checks_total": {k: sum(r["checks"].get(k, 0) or 0 for r in rows)
                          for k in ("sched_inactive_fired", "srb_floor_fired",
                                    "cp_floor_fired", "has_srb_decisive",
-                                   "srb_steps", "ra_failed")},
+                                   "srb_steps", "ra_failed", "ra_active_at_end",
+                                   "srb_active_at_end", "srb_dialogues_started",
+                                   "srb_dialogues_completed")},
         "wall_s_total": round(sum(r["wall_s"] for r in rows), 1),
     }
 

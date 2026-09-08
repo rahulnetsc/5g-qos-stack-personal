@@ -158,7 +158,17 @@ def with_survival_times(scenario, intervals: float = 1.0):
     TS 22.261's availability threshold call this; everything else is
     untouched.
     """
-    return dataclasses.replace(scenario, flows=[
-        dataclasses.replace(f, survival_time_ms=survival_time_ms_for(f, intervals))
-        for f in scenario.flows
-    ])
+    # A flow whose transfer interval exceeds the whole run has no anticipated
+    # message WITHIN the run, so the definition does not attach to it. G9's
+    # app-handshake pair uses `period_ms = 1e9` as a fire-once sentinel and
+    # would otherwise derive a 1e9 ms survival time -- a number that makes the
+    # flow unconditionally "available" and would have gone into the report's
+    # own parameter table looking authoritative. Bounded by the SCENARIO's own
+    # horizon, not by a magic constant.
+    horizon_ms = scenario.horizon_slots * (1.0 / (2 ** scenario.carrier.numerology))
+    out = []
+    for f in scenario.flows:
+        st = survival_time_ms_for(f, intervals)
+        out.append(dataclasses.replace(
+            f, survival_time_ms=0.0 if st > horizon_ms else st))
+    return dataclasses.replace(scenario, flows=out)
