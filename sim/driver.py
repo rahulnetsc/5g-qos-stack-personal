@@ -8,6 +8,8 @@ from .buffer import BufferModel
 from .channel import ChannelModel
 from .config import ScenarioConfig
 from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
+from .pre_sched import Occupancy
+from .random_access import RandomAccessConfig, RandomAccessModel
 from .join import JoinAwareBufferView, JoinPhase, init_join_rng_streams, init_join_state, rrc_connected
 from .join import step as join_step
 from .messages import FrameLedger, Message, MessageLedger, message_latency_percentiles_ms
@@ -46,6 +48,7 @@ def run(
     grant_sink: Optional[GrantSink] = None,
     attach_seed_slots: Optional[dict[int, int] | str] = None,
     rejoin_seed_bsr: bool = False,
+    random_access: Optional[RandomAccessConfig | dict] = None,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -151,6 +154,21 @@ def run(
         # (10 subframes x 2^mu slots each).
         slots_per_frame=10 * (2 ** scenario.carrier.numerology),
     )
+    # Build 1: 4-step CBRA (sim/random_access.py). None keeps every path
+    # below byte-identical to pre-Build-1; a dict is accepted so a campaign
+    # can pass the config through JSON-serialisable driver kwargs (the
+    # ledger key derives from them).
+    ra: Optional[RandomAccessModel] = None
+    if random_access is not None:
+        ra_cfg = (random_access if isinstance(random_access, RandomAccessConfig)
+                  else RandomAccessConfig(**random_access))
+        ra = RandomAccessModel(
+            ra_cfg, numerology=scenario.carrier.numerology,
+            tdd_pattern=scenario.tdd.pattern, slot_duration_s=grid.slot_duration_s,
+            seed=scenario.seed, k1_slots=k1_slots, harq_round_max=harq_round_max,
+            harq_combining_mode=harq_combining_mode,
+        )
+        ul_access.ra_requester = lambda ue_id, slot: ra.request(ue_id, "crnti", slot)
     # WP7: message identity is purely a scoring-side overlay -- BSR/
     # scheduler code above never reads it. Collected below at the existing
     # drain()/expire() call sites; not yet consumed by Metrics/RunRecord/
@@ -296,6 +314,18 @@ def run(
             per_flow_arrived[(ue_id, qfi)] += byts
 
         channel.update(slot_index)
+        # Build 1: RA steps BEFORE the join FSM (its completions are this
+        # slot's edges) and before the schedulers (its occupancy is carved
+        # out of their budget, as nr_schedule_RA runs ahead of both).
+        ra_res = None
+        if ra is not None:
+            ra_res = ra.step(slot_index, grid.slot_grid(slot_index), channel)
+            for _ue, _kind in ra_res.completed.items():
+                if _kind == "crnti":
+                    ul_access.on_ra_complete(_ue)
+            for _ue, _kind in ra_res.failed.items():
+                if _kind == "crnti":
+                    ul_access.on_ra_failed(_ue)
         # RLF detection reads the TRUE instantaneous SNR (sim/rlf.py's own
         # convention, matching HARQ's), so it must run after channel.
         # update() -- and before the HARQ resolution block below, which is
@@ -340,7 +370,14 @@ def run(
                 # block after scheduler.allocate() below) -- popped so it
                 # only ever fires the one slot it's meant for.
                 handshake_complete=join_handshake_complete_this_slot.pop(ue.ue_id, False),
+                ra_available=ra is not None,
+                ra_complete_this_slot=(ra_res is not None
+                                       and ra_res.completed.get(ue.ue_id) in ("cold", "reestablish")),
+                ra_failed_this_slot=(ra_res is not None
+                                     and ra_res.failed.get(ue.ue_id) in ("cold", "reestablish")),
             )
+            if ra is not None and jres.ra_request_kind is not None:
+                ra.request(ue.ue_id, jres.ra_request_kind, slot_index)
             if was_connected and not rrc_connected(join_state.phase):
                 # Just entered a radio-gated state this slot -- flush
                 # pending HARQ before it can keep consuming retx PRBs/CCE
@@ -422,6 +459,11 @@ def run(
             # plan.md "Commit 5 -- landed", review point 1).
             active_event = join_active_event.get(ue.ue_id)
             if active_event is not None:
+                if ra_res is not None and ue.ue_id in ra_res.latency_slots:
+                    # preamble -> contention resolved, the log's "19 ms".
+                    active_event["phases"]["ra"] = (
+                        active_event["phases"].get("ra", 0.0)
+                        + ra_res.latency_slots[ue.ue_id] * grid.slot_duration_s * 1000.0)
                 if jres.snr_restored_this_slot and active_event["rf_restore_slot"] is None:
                     active_event["rf_restore_slot"] = slot_index
                     active_event["rf_restore_ts_s"] = slot_index * grid.slot_duration_s
@@ -657,7 +699,9 @@ def run(
         ul_access.on_arrivals(per_flow_arrived, buffers)
         # M-9 needs the current slot before any eligibility is read.
         ul_access.note_slot(slot_index)
-        ul_access.tick(slot_index)
+        ul_access.tick(slot_index, gated_ues=(
+            frozenset(ue_id for ue_id, js in join_states.items() if not rrc_connected(js.phase))
+            if ra is not None else frozenset()))
 
         # MODEL C AT THE JOIN EDGES: fire any armed re-join seed for a UE
         # that now has backlog. Armed at the edge (above), fired here --
@@ -701,9 +745,18 @@ def run(
         # pending HARQ process -- zero scheduler-side changes, both
         # wrappers only need the right attributes (structural typing,
         # scheduler/interfaces.py).
-        reduced_slot_grid = ReducedSlotView(
-            slot_grid, retx_prbs_this_slot, retx_cce_this_slot,
-            retx_ues={d: len(v) for d, v in retx_ues_this_slot.items()})
+        # ONE pre-scheduler occupancy (sim/pre_sched.py): HARQ retx now, RA
+        # when on, CG in Build 2 -- contributors add, the view subtracts once.
+        occupancy = Occupancy(prbs_ul=retx_prbs_this_slot, cce=retx_cce_this_slot,
+                              ue_counts={d: len(v) for d, v in retx_ues_this_slot.items()})
+        if ra_res is not None:
+            occupancy.add(ra_res.occupancy)
+            metrics.record_prb_use("DL", ra_res.occupancy.prbs_dl)
+            metrics.record_prb_use("UL", ra_res.occupancy.prbs_ul)
+            dl_prbs_used_this_slot += ra_res.occupancy.prbs_dl
+            ul_prbs_used_this_slot += ra_res.occupancy.prbs_ul
+            cce_used_this_slot += ra_res.occupancy.cce
+        reduced_slot_grid = ReducedSlotView(slot_grid, occupancy=occupancy)
         # WP-Join commit 5: JoinAwareBufferView composed OUTERMOST over
         # HarqAwareBufferView (docs/wp-join-plan.md sec1.4) -- a radio-
         # gated UE's mask strictly subsumes a per-flow HARQ-pending mask,
@@ -985,6 +1038,8 @@ def run(
     # "WP-Join-aware driver, zero events this run" (key present, []),
     # config/metric_panel.yml's own None-vs-[] convention for M18/M19.
     summary["join_events"] = join_events
+    if ra is not None:
+        summary["random_access"] = ra.summary()
     # WP7: true per-message completion latency, replacing the head-of-line
     # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
     # the message ledger and merged into the same per-flow summary dict the

@@ -1,0 +1,308 @@
+{
+  "GT-6.1_warm": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 16.499999999999957,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.5,
+          "lo": -1.6,
+          "hi": 0.375,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.5,
+        "median": 0.0,
+        "p25": -0.25,
+        "p75": 0.25,
+        "frac_worse": 0.3
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 21.500000000000075,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.725,
+          "lo": -6.0,
+          "hi": 6.201249999999994,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.725,
+        "median": 1.0,
+        "p25": -0.5,
+        "p75": 8.0,
+        "frac_worse": 0.5
+      }
+    }
+  },
+  "GT-6.2_cold": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 50,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 50,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 144.0000000000001,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.175,
+          "lo": -2.525,
+          "hi": 0.125,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.175,
+        "median": -0.25,
+        "p25": -2.5,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 50,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 50,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 148.37500000000006,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.05,
+          "lo": -6.100625,
+          "hi": 3.5506249999999966,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.05,
+        "median": -0.125,
+        "p25": -5.0,
+        "p75": 2.5,
+        "frac_worse": 0.4
+      }
+    }
+  },
+  "GT-6.3_rlf": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 14,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 161,
+        "ra_msg4_failures": 1,
+        "ra_cr_timeouts": 40,
+        "ra_completed": 10,
+        "ra_failed": 4,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1182.375,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 130.12500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.45,
+          "lo": -2.500625,
+          "hi": -0.2993750000000034,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.45,
+        "median": -2.0,
+        "p25": -2.75,
+        "p75": -0.25,
+        "frac_worse": 0.1
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 10,
+        "ra_preambles_tx": 10,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 1,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 10,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1183.7500000000002,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 142.12500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.775,
+          "lo": -1.325,
+          "hi": -0.3,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.775,
+        "median": -0.375,
+        "p25": -1.75,
+        "p75": -0.25,
+        "frac_worse": 0.1
+      }
+    }
+  }
+}

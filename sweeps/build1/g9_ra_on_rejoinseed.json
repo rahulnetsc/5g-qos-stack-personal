@@ -1,0 +1,458 @@
+{
+  "GT-6.1_warm": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 16.499999999999847,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.125,
+          "lo": -2.075625,
+          "hi": -0.3,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.125,
+        "median": -0.375,
+        "p25": -2.0,
+        "p75": 0.0,
+        "frac_worse": 0.1
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 21.500000000000075,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 6.0,
+          "lo": -0.2,
+          "hi": 12.125624999999996,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 6.0,
+        "median": 2.375,
+        "p25": -0.75,
+        "p75": 17.75,
+        "frac_worse": 0.5
+      }
+    },
+    "TwoTier": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 167.375,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": null,
+      "neighbour_dm02": {
+        "ci": {
+          "point": -1.4460983995254802e-05,
+          "lo": -5.3319771968679745e-05,
+          "hi": 2.9507723848639852e-05,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.4460983995254802e-05,
+        "median": -1.745845863572546e-05,
+        "p25": -4.0355423981840687e-05,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 3.6555999999999953,
+          "lo": 1.4536999999999909,
+          "hi": 5.847242499999987,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 3.6555999999999953,
+        "median": 3.8149999999999906,
+        "p25": 0.38299999999999557,
+        "p75": 7.067999999999998,
+        "frac_worse": 0.8
+      }
+    }
+  },
+  "GT-6.2_cold": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 50,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 50,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 144.0000000000001,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.075,
+          "lo": -2.225625,
+          "hi": -0.1,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.075,
+        "median": 0.0,
+        "p25": -2.25,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 50,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 50,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 146.5,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 2.75,
+          "lo": -1.25,
+          "hi": 7.602499999999986,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 2.75,
+        "median": 0.375,
+        "p25": -0.25,
+        "p75": 2.5,
+        "frac_worse": 0.6
+      }
+    },
+    "TwoTier": {
+      "random_access": {
+        "ra_requested": 52,
+        "ra_preambles_tx": 52,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 52,
+        "ra_failed": 0,
+        "ra_crnti_completed": 2,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 281.5,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": null,
+      "neighbour_dm02": {
+        "ci": {
+          "point": -5.3814083449607064e-05,
+          "lo": -7.69050202622675e-05,
+          "hi": -3.0985201983167756e-05,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -5.3814083449607064e-05,
+        "median": -6.093926239121887e-05,
+        "p25": -8.751360034277289e-05,
+        "p75": -1.738135113121906e-05,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 1.5308999999999984,
+          "lo": -0.30088000000000326,
+          "hi": 3.644732499999997,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 1.5308999999999984,
+        "median": 0.7420000000000044,
+        "p25": -0.26599999999999113,
+        "p75": 4.171999999999997,
+        "frac_worse": 0.7
+      }
+    }
+  },
+  "GT-6.3_rlf": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 14,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 161,
+        "ra_msg4_failures": 1,
+        "ra_cr_timeouts": 40,
+        "ra_completed": 10,
+        "ra_failed": 4,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1168.0000000000002,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 130.12500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.2216,
+          "lo": -2.339885,
+          "hi": -0.075,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.2216,
+        "median": -1.125,
+        "p25": -2.716000000000001,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 10,
+        "ra_preambles_tx": 10,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 1,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 10,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1201.25,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 130.12500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.3,
+          "lo": -1.025,
+          "hi": 0.475,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.3,
+        "median": -0.25,
+        "p25": -0.5,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    },
+    "TwoTier": {
+      "random_access": {
+        "ra_requested": 10,
+        "ra_preambles_tx": 10,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 1,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 10,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 2604.2500000000005,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": null,
+      "neighbour_dm02": {
+        "ci": {
+          "point": -0.0008696395543173911,
+          "lo": -0.000904073581299461,
+          "hi": -0.0008314902659038403,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.0008696395543173911,
+        "median": -0.0008871831983918027,
+        "p25": -0.0009107146849445498,
+        "p75": -0.0008261596430555922,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.6545999999999979,
+          "lo": -0.6862050000000042,
+          "hi": 2.2442249999999944,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.6545999999999979,
+        "median": 0.24250000000000682,
+        "p25": -0.916000000000011,
+        "p75": 0.9860000000000042,
+        "frac_worse": 0.7
+      }
+    }
+  }
+}

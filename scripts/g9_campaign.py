@@ -38,6 +38,7 @@ from regime_sweep import (arm_cost, bootstrap_ci,  # noqa: E402
                           paired_seeds, run_cells)
 from sim.baselines.pf import ProportionalFair  # noqa: E402
 from sim.driver import run  # noqa: E402
+from sim.random_access import RandomAccessConfig  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
 from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,  # noqa: E402
                               gt63_rlf_recovery, joiner_ue_id,
@@ -170,7 +171,7 @@ def _neighbour_stats(rec: RunRecord, neighbours: list[int]) -> dict:
 
 
 def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on,
-            rejoin_seed=False):
+            rejoin_seed=False, random_access=False):
     """One run. `joiner_on=False` builds the paired CONTROL -- same seed,
     same fleet, no join schedule -- so the neighbours delta is within-seed."""
     sc = build(seed=seed, n_neighbours=n_neighbours)
@@ -178,8 +179,13 @@ def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on,
         ues = [dataclasses.replace(ue, join=None, scripted_fade=())
                for ue in sc.ues]
         sc = dataclasses.replace(sc, ues=ues, name=sc.name + "_control")
+    # Build 1: the deployed RA config travels as a dict so it is part of the
+    # driver kwargs a ledger key derives from; None keeps the pre-Build-1
+    # path byte-identical (the --random-access off run IS the identity check).
     summary = run(sc, arm_factory(), cqi_delay_slots=CQI_DELAY_SLOTS,
-                  record_timeseries=True, rejoin_seed_bsr=rejoin_seed)
+                  record_timeseries=True, rejoin_seed_bsr=rejoin_seed,
+                  random_access=(RandomAccessConfig.deployed().to_dict()
+                                 if random_access else None))
     return sc, RunRecord.from_summary(
         scenario_name=sc.name, scheduler_name=arm_name, seed=seed,
         flow_configs=sc.flows, summary=summary, arm={}, meta={})
@@ -197,14 +203,17 @@ def _task(task: tuple) -> dict:
     # The re-join-seed flag travels IN THE TASK, not in a module-level
     # cell: `spawn` workers re-import this module and would read the
     # default. Same trap as monkeypatching a pool worker.
-    label, arm_name, seed, n_nb, rejoin_seed = task
+    label, arm_name, seed, n_nb, rejoin_seed, random_access = task
     build, want_path = CASES[label]
     factory = _arms()[arm_name]
     sc, rec = run_one(build, want_path, arm_name, factory, seed, n_nb,
-                      joiner_on=True, rejoin_seed=rejoin_seed)
+                      joiner_on=True, rejoin_seed=rejoin_seed,
+                      random_access=random_access)
     joiner, neighbours = joiner_ue_id(sc), neighbour_ue_ids(sc)
     n_ev = assert_events_fired(rec, want_path, f"{label}/{arm_name}",
                                expected=expected_event_count(sc, want_path))
+    ra = assert_ra_fired(rec, want_path, n_ev, f"{label}/{arm_name}",
+                         expected=expected_event_count(sc, want_path)) if random_access else None
     keys = assert_neighbour_population(rec, joiner, neighbours,
                                        f"{label}/{arm_name}")
     # G9 is about what the FLEET receives across a join -- the neighbours
@@ -215,8 +224,11 @@ def _task(task: tuple) -> dict:
     for key in ("M18", "M19", "M21"):
         v = (scored[key].value or {}).get("by_path", {}).get(want_path)
         out[key] = v["p95_ms"] if v and v.get("p95_ms") is not None else None
+    if ra is not None:
+        out["ra"] = ra
     _, ctl = run_one(build, want_path, arm_name, factory, seed, n_nb,
-                     joiner_on=False, rejoin_seed=rejoin_seed)
+                     joiner_on=False, rejoin_seed=rejoin_seed,
+                     random_access=random_access)
     a, b = _neighbour_stats(rec, neighbours), _neighbour_stats(ctl, neighbours)
     # M02 on the neighbours is SATURATED AT ZERO even with bg at 0.876 UL
     # utilisation -- their protected flows sit at p98 15.5 ms against a
@@ -227,6 +239,47 @@ def _task(task: tuple) -> dict:
     out["nb_dm02"] = a["m02"] - b["m02"]
     out["nb_dp98"] = a["worst_p98_ms"] - b["worst_p98_ms"]
     return out
+
+
+def assert_ra_fired(rec: RunRecord, want_path: str, n_ev: int, label: str,
+                    expected: int | None) -> dict:
+    """Build 1's manipulation check, in the runner rather than in a test:
+    the RA procedure fired AS OFTEN AS THE SCHEDULE SAYS and finished. Per
+    path: cold -> one completed RA per power_on; warm -> ZERO (an app restart
+    never leaves RRC_CONNECTED); reestablish -> at least one per event (a
+    T301 fallback to IDLE adds a cold one). `ra_active_at_end == 0` catches
+    the terminal-stall shape that hid TwoTier's 0-of-50 completions."""
+    ra = rec.random_access
+    if ra is None:
+        raise AssertionError(f"{label}: --random-access was set but the record carries no RA summary")
+    kinds = ra["by_kind"]
+    # Counted BY KIND: a connected UE whose SR hits sr-TransMax runs a C-RNTI
+    # RA on top of the attach's cold one (first smoke: TwoTier, 10 for 5).
+    # That second kind is reported, never folded into the attach count.
+    if want_path == "cold":
+        if expected is None or kinds["cold"]["completed"] != expected:
+            raise AssertionError(f"{label}: {kinds['cold']['completed']} cold RA completions "
+                                 f"against {expected} scheduled cold attaches -- {ra}")
+    elif want_path == "warm":
+        if kinds["cold"]["requested"] or kinds["reestablish"]["requested"]:
+            raise AssertionError(f"{label}: attach/re-establishment RA on the WARM path, "
+                                 f"which never leaves RRC_CONNECTED -- {ra}")
+    elif want_path == "reestablish":
+        if kinds["reestablish"]["completed"] + kinds["cold"]["completed"] < n_ev:
+            raise AssertionError(f"{label}: {kinds['reestablish']['completed']} re-establishment "
+                                 f"RA completions (+{kinds['cold']['completed']} cold fallbacks) "
+                                 f"for {n_ev} events -- {ra}")
+    if ra["ra_active_at_end"] != 0:
+        raise AssertionError(f"{label}: {ra['ra_active_at_end']} RA procedures still running at "
+                             f"the horizon -- a stall, not a sample")
+    return {k: ra[k] for k in ("ra_requested", "ra_preambles_tx", "ra_collisions",
+                               "ra_rar_misses", "ra_msg3_failures", "ra_msg4_failures",
+                               "ra_cr_timeouts", "ra_completed", "ra_failed")} | {
+        "ra_latency_p95_ms": ra["ra_latency_ms"]["p95"],
+        "ra_latency_max_ms": ra["ra_latency_ms"]["max"],
+        "ra_crnti_completed": kinds["crnti"]["completed"],
+        "ra_cold_completed": kinds["cold"]["completed"],
+        "ra_reestablish_completed": kinds["reestablish"]["completed"]}
 
 
 def _aggregate(per_seed: list[dict]) -> dict:
@@ -240,7 +293,15 @@ def _aggregate(per_seed: list[dict]) -> dict:
     nb_p98_deltas = [r["nb_dp98"] for r in per_seed]
     ci = bootstrap_ci(nb_deltas, seed=4242) if nb_deltas else None
     ci_p98 = bootstrap_ci(nb_p98_deltas, seed=4243) if nb_p98_deltas else None
+    ra_rows = [r["ra"] for r in per_seed if r.get("ra") is not None]
+    ra_summary = None
+    if ra_rows:
+        lat = [r["ra_latency_p95_ms"] for r in ra_rows if r["ra_latency_p95_ms"] is not None]
+        ra_summary = {k: sum(r[k] for r in ra_rows) for k in ra_rows[0] if k.startswith("ra_") and not k.startswith("ra_latency")}
+        ra_summary["ra_latency_p95_median_ms"] = statistics.median(lat) if lat else None
+        ra_summary["ra_latency_max_ms"] = max((r["ra_latency_max_ms"] or 0.0) for r in ra_rows)
     return {
+        "random_access": ra_summary,
         "events_per_run": statistics.mean([r["n_ev"] for r in per_seed]),
         "m18_p95_median": statistics.median(m18) if m18 else None,
         "m19_p95_median": statistics.median(m19) if m19 else None,
@@ -256,6 +317,9 @@ def main(argv):
     ap.add_argument("--rejoin-seed", action="store_true",
                     help="MODEL C at the join edges "
                          "(docs/rejoin-seed-and-desync-registration.md)")
+    ap.add_argument("--random-access", action="store_true",
+                    help="Build 1: 4-step CBRA (sim/random_access.py) with the "
+                         "deployed config; off is the pre-Build-1 path")
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--neighbours", type=int, default=7)
@@ -282,7 +346,7 @@ def main(argv):
     # Task order is the serial order -- case, then arm, then seed -- so the
     # per-arm lists the aggregation reads are seed-ordered whatever order the
     # pool returns them in. The seeded bootstrap makes that load-bearing.
-    tasks = [(label, arm_name, seed, n_nb, args.rejoin_seed)
+    tasks = [(label, arm_name, seed, n_nb, args.rejoin_seed, args.random_access)
              for label in CASES for arm_name in arms for seed in seeds]
     results: list[dict | None] = [None] * len(tasks)
     per_group = len(seeds)
@@ -307,7 +371,7 @@ def main(argv):
     for i, res in run_cells(_task, tasks, args.workers,
                             cost=lambda t: arm_cost(t[1])):
         results[i] = res
-        label, arm_name, seed, _, _ = tasks[i]
+        label, arm_name, seed, _, _, _ = tasks[i]
         # PER-RESULT HEARTBEAT. Without it the only progress signal is
         # process liveness: this runner's first launch wrote a ZERO-LINE log
         # for its entire duration, because Python block-buffers a redirected
@@ -319,7 +383,7 @@ def main(argv):
         done_in_group[key] = done_in_group.get(key, 0) + 1
         if done_in_group[key] != per_group:
             continue
-        idx0 = tasks.index((label, arm_name, seeds[0], n_nb, args.rejoin_seed))
+        idx0 = tasks.index((label, arm_name, seeds[0], n_nb, args.rejoin_seed, args.random_access))
         group = [results[idx0 + k] for k in range(per_group)]
         # ASSERTION 2's population is PRINTED, not assumed (§31.6).
         print(f"\n{'=' * 78}\n{label}/{arm_name}\n{'=' * 78}", flush=True)
@@ -328,6 +392,8 @@ def main(argv):
               f"{keys[:4]}{' ...' if len(keys) > 4 else ''}", flush=True)
         summary = _aggregate(group)
         ci, ci_p98 = summary["neighbour_dm02"], summary["neighbour_dp98_ms"]
+        if summary["random_access"] is not None:
+            print(f"  {arm_name:<12} RA: {summary['random_access']}", flush=True)
         print(f"  {arm_name:<12} events/run={summary['events_per_run']:5.1f}  "
               f"M18 p95={summary['m18_p95_median']}  "
               f"M19 p95={summary['m19_p95_median']}  "

@@ -282,6 +282,11 @@ class JoinState:
     trigger_slot: int | None = None
     cycle_index: int = 0
     timer_expiry_counts: dict[str, int] = field(default_factory=dict)
+    # Build 1: True while the RRC_ESTABLISH / REESTABLISH phase is waiting on
+    # sim/random_access.py rather than on a sampled deadline. Never set when
+    # the driver runs without RA, so the pre-Build-1 FSM is byte-identical.
+    ra_pending: bool = False
+    ra_sampled_deadline_slots: float = 0.0
 
 
 def init_join_state(config: JoinConfig) -> JoinState:
@@ -298,6 +303,9 @@ class JoinStepResult:
     app_connected_this_slot: bool  # edge
     timer_expired_this_slot: bool
     snr_restored_this_slot: bool  # edge, meaningful only while state.phase is CELL_SEARCH
+    # Build 1: the FSM asks the driver to start an RA procedure of this
+    # kind ("cold" | "reestablish") this slot; None otherwise.
+    ra_request_kind: str | None = None
 
 
 def _ms_to_slots(ms: float, slot_duration_s: float) -> int:
@@ -332,6 +340,9 @@ def step(
     rlf_declared_this_slot: bool = False,
     snr_db: float = 0.0,
     handshake_complete: bool = False,
+    ra_available: bool = False,
+    ra_complete_this_slot: bool = False,
+    ra_failed_this_slot: bool = False,
 ) -> JoinStepResult:
     """One step for one UE. ``rlf_declared_this_slot`` is ``sim/rlf.py``'s
     ``RlfStepResult.rlf_declared_this_slot`` for this UE, passed as a
@@ -355,6 +366,7 @@ def step(
     prior_rrc_connected = rrc_connected(prior_phase)
     timer_expired_this_slot = False
     snr_restored_this_slot = False
+    ra_request_kind: str | None = None
 
     event_kind = None
     if state.next_event_index < len(config.events):
@@ -403,6 +415,14 @@ def step(
                 state.phase_ceiling_slots,
                 config.p_expiry,
             )
+            if ra_available:
+                # Build 1: the RRC connection setup starts with the RA
+                # procedure, measured, not sampled. The sampled deadline
+                # above is re-drawn for the post-RA remainder when RA completes.
+                state.ra_pending = True
+                state.ra_sampled_deadline_slots = state.deadline_slots
+                state.deadline_slots = math.inf
+                ra_request_kind = "cold"
 
     elif state.phase is JoinPhase.APP_RESTART:
         state.phase_elapsed_slots += 1
@@ -415,7 +435,26 @@ def step(
 
     elif state.phase is JoinPhase.RRC_ESTABLISH:
         state.phase_elapsed_slots += 1
-        if state.phase_elapsed_slots >= state.deadline_slots:
+        if state.ra_pending:
+            if ra_complete_this_slot:
+                # Contention resolved. Until Build 1.2's SRB dialogue lands,
+                # the phase ends at the LATER of the deadline sampled on entry
+                # (the deployment's t300-bounded setup time, which already
+                # spanned the whole procedure) and RA's measured completion --
+                # so the sampled draw is the same one the RA-off run made and
+                # the attach moves by RA's own latency, not by a re-draw
+                # (a re-draw moved the cold p95 by +127 ms, none of it RA's).
+                state.ra_pending = False
+                state.deadline_slots = max(state.ra_sampled_deadline_slots,
+                                           float(state.phase_elapsed_slots))
+            elif ra_failed_this_slot or state.phase_elapsed_slots >= state.phase_ceiling_slots:
+                # preambleTransMax reached, or T300 ran out with RA still
+                # running: the RRC re-initiates access.
+                timer_expired_this_slot = True
+                state.timer_expiry_counts["rrc_establish"] = state.timer_expiry_counts.get("rrc_establish", 0) + 1
+                state.phase_elapsed_slots = 0
+                ra_request_kind = "cold"
+        elif state.phase_elapsed_slots >= state.deadline_slots:
             state.phase = JoinPhase.PDU_SESSION
             state.phase_elapsed_slots = 0
             state.phase_ceiling_slots = _ms_to_slots(config.pdu_session_ceiling_ms, slot_duration_s)
@@ -469,6 +508,11 @@ def step(
                 state.phase_ceiling_slots,
                 config.p_expiry,
             )
+            if ra_available:
+                state.ra_pending = True
+                state.ra_sampled_deadline_slots = state.deadline_slots
+                state.deadline_slots = math.inf
+                ra_request_kind = "reestablish"
         elif state.phase_elapsed_slots >= state.phase_ceiling_slots:
             # t311 expiry: the search window itself is exhausted, whether
             # or not SNR ever recovered -- fall back to a full attach.
@@ -479,7 +523,20 @@ def step(
 
     elif state.phase is JoinPhase.REESTABLISH:
         state.phase_elapsed_slots += 1
-        if state.phase_elapsed_slots >= state.deadline_slots:
+        if state.ra_pending:
+            if ra_complete_this_slot:
+                state.ra_pending = False
+                state.deadline_slots = max(state.ra_sampled_deadline_slots,
+                                           float(state.phase_elapsed_slots))
+            elif ra_failed_this_slot or state.phase_elapsed_slots >= state.phase_ceiling_slots:
+                # T301 expiry (or RA failure) during re-establishment falls
+                # back to a full attach, exactly as the sampled path does.
+                timer_expired_this_slot = True
+                state.timer_expiry_counts["reestablish"] = state.timer_expiry_counts.get("reestablish", 0) + 1
+                state.ra_pending = False
+                state.phase = JoinPhase.IDLE
+                state.phase_elapsed_slots = 0
+        elif state.phase_elapsed_slots >= state.deadline_slots:
             state.phase = JoinPhase.APP_HANDSHAKE
             state.phase_elapsed_slots = 0
         elif state.phase_elapsed_slots >= state.phase_ceiling_slots:
@@ -503,6 +560,14 @@ def step(
             state.phase_ceiling_slots,
             config.p_expiry,
         )
+        if ra_available:
+            # Build 1: the RRC connection setup starts with the RA
+            # procedure, measured, not sampled. The sampled deadline
+            # above is re-drawn for the post-RA remainder when RA completes.
+            state.ra_pending = True
+            state.ra_sampled_deadline_slots = state.deadline_slots
+            state.deadline_slots = math.inf
+            ra_request_kind = "cold"
 
     elif state.phase is JoinPhase.APP_HANDSHAKE:
         state.phase_elapsed_slots += 1
@@ -525,6 +590,7 @@ def step(
         app_connected_this_slot=app_connected_this_slot,
         timer_expired_this_slot=timer_expired_this_slot,
         snr_restored_this_slot=snr_restored_this_slot,
+        ra_request_kind=ra_request_kind,
     )
 
 

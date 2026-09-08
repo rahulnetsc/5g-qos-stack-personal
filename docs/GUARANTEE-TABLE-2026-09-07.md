@@ -63,7 +63,8 @@ Severity = **M02, protected fleet**, one population on every row.
 | | **zero starvation epochs ≥ 1 s** (parametric) | 10/10 | **1/10** | **0/10** (cap 4: 6/10) | **A robot gets no uplink for an entire shift.** The Jain-only row read 9/10 and hid this |
 | | same (`sensor_dense`) | 10/10 | **0/10** | **0/10** | |
 | | no UE never granted (`sensor_dense`) | 10/10 | **0/10** | **0/10** | |
-| **G9** join | warm re-handshake p95 ≤ 1 s | 1/1 · 16.5 ms | 1/1 · 19.1 | **1/1 · 168.4** | Passes on all arms; **TwoTier is 10× the others** |
+| **G9** join | **CORRECTION 2026-09-08 (Build 1.1, `docs/builds-2026-09-08.md` §2.6):** these four rows were computed on the Sep-6 artefact, which (a) was run with the sim-only `--rejoin-seed` lever ON — not stated here — and (b) predates M-9 and M-6. On current code with the seed, TwoTier's post-RLF path **completes at 1958.6 ms (PASS)**, not NO COMPLETION; **without** the seed TwoTier is degenerate on every G9 path (1 of 5 cold events, 9 of 10 warm) and the runner's guard refuses to score it. PF/Reservation move by 1–5 ms. Superseded by §2.7 of the builds document. | | | | |
+| | warm re-handshake p95 ≤ 1 s | 1/1 · 16.5 ms | 1/1 · 19.1 | **1/1 · 168.4** | Passes on all arms; **TwoTier is 10× the others** |
 | | attach-to-streaming ≤ 15 s | 1/1 · 145 ms | 1/1 · 148 | 1/1 · 282 | **Measures the APP handshake — there is no RA procedure**, so it is not attach |
 | | post-RLF time-to-SLO ≤ 10 s | 1/1 · 1.17 s | 1/1 · 1.18 s | **0/1 — NO COMPLETION** | **TwoTier registers its RLF event and completes none.** A robot that loses radio does not come back |
 | | neighbours unaffected | 1/1 | 1/1 | **0/1 · +3.08 ms [+2.22, +4.05]** | **A joining robot degrades its neighbours on TwoTier**, interval excluding zero |

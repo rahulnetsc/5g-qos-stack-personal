@@ -106,6 +106,8 @@ class _UeSrState:
     # Slot index at/after which RACH recovery completes; None when not in
     # recovery.
     rach_recovery_until: int | None = None
+    # Build 1: an RA procedure (C-RNTI variant) is running for this UE.
+    ra_pending: bool = False
 
 
 class UlAccessModel:
@@ -144,6 +146,11 @@ class UlAccessModel:
         self._last_ul_grant_slot: dict[int, int] = {}
         self._slot = -1
         self._state: dict[int, _UeSrState] = {ue_id: _UeSrState() for ue_id in self._ue_flows}
+        # Build 1: when set, sr-TransMax exhaustion starts a REAL RA
+        # procedure (`ra_requester(ue_id, slot_index)`) instead of the fixed
+        # `rach_recovery_ms` wait; `on_ra_complete` re-arms the SR. None
+        # keeps the pre-Build-1 path byte-identical.
+        self.ra_requester = None
 
     def reset_ue(self, ue_id: int) -> None:
         """WP-Join commit 7 (docs/wp-join-plan.md sec1.9): fresh per-UE SR
@@ -200,7 +207,7 @@ class UlAccessModel:
         """
         for ue_id, flows in self._ue_flows.items():
             st = self._state[ue_id]
-            if st.pending or st.gnb_sr_flag or st.rach_recovery_until is not None:
+            if st.pending or st.gnb_sr_flag or st.rach_recovery_until is not None or st.ra_pending:
                 continue
             states = [buffers.state(f.ue_id, f.qfi) for f in flows]
             arrived = sum(per_flow_arrived.get((f.ue_id, f.qfi), 0) for f in flows)
@@ -210,7 +217,7 @@ class UlAccessModel:
             elif total_now > 0 and all(s.bytes_reported <= 0 for s in states):
                 st.pending = True
 
-    def tick(self, slot_index: int) -> None:
+    def tick(self, slot_index: int, gated_ues: frozenset[int] = frozenset()) -> None:
         """Per-UE, per-slot: recurring PUCCH SR occasion
         (`trigger_periodic_scheduling_request`) and the sr-TransMax
         counter / prohibit-timer gate / RA-fallback trigger
@@ -234,10 +241,23 @@ class UlAccessModel:
         hand-forcing state in a test.
         """
         for ue_id, st in self._state.items():
+            if ue_id in gated_ues:
+                # Build 1: a UE with no RRC connection has no SR resource and
+                # no C-RNTI, so nothing here can run for it. The driver passes
+                # the radio-gated set ONLY when RA is on: before Build 1 the
+                # counter ran through a disconnected span and, at worst,
+                # started an inert 400 ms recovery; with a real RA it would
+                # launch a C-RNTI procedure for a UE that cannot own one
+                # (first smoke: 13 such on the cold path). The pre-Build-1
+                # behaviour is kept byte-identical when the set is empty and
+                # recorded as a known off-path defect.
+                continue
             if st.rach_recovery_until is not None:
                 if slot_index >= st.rach_recovery_until:
                     st.rach_recovery_until = None
                     st.pending = True
+                continue
+            if st.ra_pending:
                 continue
             if not st.pending:
                 continue
@@ -254,12 +274,33 @@ class UlAccessModel:
                 st.pending = False
                 st.counter = 0
                 st.gnb_sr_flag = False
-                st.rach_recovery_until = slot_index + self._rach_recovery_slots
+                if self.ra_requester is not None:
+                    st.ra_pending = True
+                    self.ra_requester(ue_id, slot_index)
+                else:
+                    st.rach_recovery_until = slot_index + self._rach_recovery_slots
                 continue
             st.counter += 1
             st.prohibit_active = True
             st.prohibit_deadline_slot = slot_index + self._prohibit_slots
             st.gnb_sr_flag = True
+
+    def on_ra_complete(self, ue_id: int) -> None:
+        """The C-RNTI RA resolved: same re-arm as RACH recovery completing --
+        the backlog is still there, so the SR is pending again."""
+        st = self._state.get(ue_id)
+        if st is not None:
+            st.ra_pending = False
+            st.pending = True
+
+    def on_ra_failed(self, ue_id: int) -> None:
+        """preambleTransMax reached on the SR-fallback RA. The C hands this
+        to RRC as a random-access problem (RLF -> re-establishment); Build 1.1
+        re-arms the SR and counts it -- the RLF coupling is Build 1.2's."""
+        st = self._state.get(ue_id)
+        if st is not None:
+            st.ra_pending = False
+            st.pending = True
 
     def note_slot(self, slot_index: int) -> None:
         """The current slot, for the inactivity horizon. Separate from

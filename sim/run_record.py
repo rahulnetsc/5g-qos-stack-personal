@@ -248,6 +248,10 @@ class RunRecord:
     # convention message_count/completion_ts_by_
     # role_s already establish above.
     join_events: Optional[list[JoinEventRecord]] = None
+    # Build 1: sim/random_access.py's counters and latencies, None when RA
+    # was off. Carried explicitly so it survives from_summary -- five earlier
+    # driver counters did not (CLAUDE.md, the unobservable-mechanism table).
+    random_access: Optional[dict] = None
 
     def has_timeseries(self) -> bool:
         return self.timeseries_time_s is not None
@@ -279,6 +283,12 @@ class RunRecord:
                 [asdict(e) for e in self.join_events] if self.join_events is not None else None
             ),
         }
+        # Build 1: emitted ONLY when RA ran, for the same reason as the
+        # windowed marker below -- a record from an RA-off run must serialise
+        # exactly as it did before Build 1, or the corpus check reads a new
+        # None-valued key as drift.
+        if self.random_access is not None:
+            d["random_access"] = self.random_access
         # WP9 G11 commit 2. Emitted ONLY when true, so a non-windowed
         # record serialises byte-identically to before this commit and the
         # frozen regression corpus is untouched. from_dict defaults to
@@ -304,6 +314,7 @@ class RunRecord:
             message_ledger_windowed=bool(d.get("message_ledger_windowed", False)),
             timeseries_resolution=d.get("timeseries_resolution", "slot"),
             meta=d.get("meta", {}),
+            random_access=d.get("random_access"),
             join_events=(
                 [JoinEventRecord(**e) for e in d["join_events"]]
                 if d.get("join_events") is not None else None
@@ -456,6 +467,7 @@ class RunRecord:
             # already applies via .get() defaults elsewhere, just phrased
             # as key-presence rather than a None-vs-real-value field
             # because driver.py always sets it to at least [] once landed.
+            random_access=summary.get("random_access"),
             join_events=(
                 [JoinEventRecord(**e) for e in summary["join_events"]]
                 if "join_events" in summary else None

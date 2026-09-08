@@ -118,6 +118,14 @@ def bits_per_prb_for_mcs(mcs_index: int, symbols: int = 14) -> tuple[int, float]
     return int(se * 12 * symbols), bler
 
 
+def snr_threshold_for_mcs(mcs_index: int) -> float:
+    """The SNR at which ``_MCS_TABLE[mcs_index]`` becomes pickable -- what a
+    gNB that sizes a transmission at a FIXED MCS (Msg3 at MCS 0,
+    ``nr_get_Msg3alloc``) has 'used' as far as HARQ is concerned."""
+    idx = max(0, min(len(_MCS_TABLE) - 1, mcs_index))
+    return float(_MCS_TABLE[idx][0])
+
+
 def mcs_threshold_for_snr(snr_db: float) -> float:
     """Return the SNR threshold of the MCS that ``bits_per_prb`` would pick
     for ``snr_db``. This is the "picked MCS's operating point": at this SNR

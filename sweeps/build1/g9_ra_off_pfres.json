@@ -1,0 +1,218 @@
+{
+  "GT-6.1_warm": {
+    "PF": {
+      "random_access": null,
+      "events_per_run": 10,
+      "m18_p95_median": 17.749999999999986,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.3428000000000001,
+          "lo": -1.4606000000000001,
+          "hi": 0.8326449999999975,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.3428000000000001,
+        "median": -0.5,
+        "p25": -2.25,
+        "p75": 2.0,
+        "frac_worse": 0.3
+      }
+    },
+    "Reservation": {
+      "random_access": null,
+      "events_per_run": 10,
+      "m18_p95_median": 22.124999999999893,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.3,
+          "lo": -8.35,
+          "hi": 7.851874999999989,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.3,
+        "median": -1.125,
+        "p25": -2.75,
+        "p75": 10.0,
+        "frac_worse": 0.3
+      }
+    }
+  },
+  "GT-6.2_cold": {
+    "PF": {
+      "random_access": null,
+      "events_per_run": 5,
+      "m18_p95_median": 144.0000000000001,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.15,
+          "lo": -0.875,
+          "hi": 1.45,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.15,
+        "median": -0.375,
+        "p25": -0.5,
+        "p75": 0.25,
+        "frac_worse": 0.3
+      }
+    },
+    "Reservation": {
+      "random_access": null,
+      "events_per_run": 5,
+      "m18_p95_median": 149.25000000000006,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.2,
+          "lo": -7.925,
+          "hi": 4.725,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.2,
+        "median": 0.0,
+        "p25": -4.5,
+        "p75": 6.25,
+        "frac_worse": 0.3
+      }
+    }
+  },
+  "GT-6.3_rlf": {
+    "PF": {
+      "random_access": null,
+      "events_per_run": 1,
+      "m18_p95_median": 1170.125,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 130.12500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -1.4484000000000001,
+          "lo": -2.39844,
+          "hi": -0.29840000000000017,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -1.4484000000000001,
+        "median": -2.0,
+        "p25": -2.25,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    },
+    "Reservation": {
+      "random_access": null,
+      "events_per_run": 1,
+      "m18_p95_median": 1183.7500000000005,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 142.12500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.175,
+          "lo": -0.95,
+          "hi": 0.65,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.175,
+        "median": -0.25,
+        "p25": -0.5,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    }
+  }
+}

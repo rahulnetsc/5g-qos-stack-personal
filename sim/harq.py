@@ -30,6 +30,7 @@ from typing import Literal
 import numpy as np
 
 from scheduler.link import bler_for_mcs, bits_per_prb, mcs_threshold_for_snr
+from .pre_sched import Occupancy
 
 Direction = Literal["DL", "UL"]
 
@@ -440,14 +441,24 @@ class ReducedSlotView:
     already split DL/UL budgets within a slot beyond symbol availability,
     so this doesn't invent new precision beyond that)."""
 
-    __slots__ = ("_inner", "_retx_prbs", "_retx_cce", "_retx_ues")
+    __slots__ = ("_inner", "_occ")
 
-    def __init__(self, inner, retx_prbs: int, retx_cce: int = 0,
-                 retx_ues: dict | None = None) -> None:
+    def __init__(self, inner, retx_prbs: int = 0, retx_cce: int = 0,
+                 retx_ues: dict | None = None,
+                 occupancy: "Occupancy | None" = None) -> None:
+        # Build 1: ONE Occupancy backs the view (sim/pre_sched.py). The
+        # legacy retx kwargs are folded into it so every existing caller
+        # reads byte-identically; new contributors (RA, CG) add to the
+        # Occupancy the driver passes rather than growing this signature.
+        occ = Occupancy()
+        if occupancy is not None:
+            occ.add(occupancy)
+        occ.prbs_ul += retx_prbs
+        occ.cce += retx_cce
+        for d, n in (retx_ues or {}).items():
+            occ.ue_counts[d] = occ.ue_counts.get(d, 0) + n
         self._inner = inner
-        self._retx_prbs = retx_prbs
-        self._retx_cce = retx_cce
-        self._retx_ues = retx_ues or {}
+        self._occ = occ
 
     @property
     def max_sched_ues(self) -> int:
@@ -464,7 +475,7 @@ class ReducedSlotView:
         direction -- max over the two, since `cap_ues_per_slot` is applied to
         each direction's list with this one value."""
         base = self._inner.max_sched_ues
-        used = max(self._retx_ues.values()) if self._retx_ues else 0
+        used = self._occ.ue_count_max()
         return max(0, base - used)
 
     @property
@@ -481,8 +492,8 @@ class ReducedSlotView:
 
     @property
     def pdcch_cce_budget(self) -> int:
-        return max(0, self._inner.pdcch_cce_budget - self._retx_cce)
+        return max(0, self._inner.pdcch_cce_budget - self._occ.cce)
 
     @property
     def prb_count(self) -> int:
-        return max(0, self._inner.prb_count - self._retx_prbs)
+        return max(0, self._inner.prb_count - self._occ.prbs)

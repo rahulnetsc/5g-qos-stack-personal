@@ -56,6 +56,20 @@ bare `python` invocation that works.
   blockage. Both opt-in via `UEConfig.position`/`inf_scenario`/`blockage`
   (default `None` preserves pre-WP6 behaviour exactly); wired into
   `sim/channel.py`, not `driver.py`.
+- `sim/random_access.py` — Build 1 (2026-09-08). 4-step CBRA ported from
+  `gNB_scheduler_RA.c` / `nr_ra_procedures.c` with the deployed RACH config
+  (`docs/builds-2026-09-08.md` §2.1 names every value's provenance — PORT /
+  MEASURED / CHOSEN). **Off by default** (`driver.run(random_access=None)`);
+  when on it drives `sim/join.py`'s `RRC_ESTABLISH`/`REESTABLISH` and
+  `sim/ul_access.py`'s sr-TransMax fallback, and reserves the PRACH
+  occasion on every RO whether or not anyone transmits. Every counter is
+  per KIND (`cold` / `reestablish` / `crnti`) because a connected UE can run
+  a C-RNTI RA on top of its attach's cold one — the first smoke folded them
+  and read 10 completions for 5 attaches.
+- `sim/pre_sched.py` — Build 1. `Occupancy`, the ONE pre-scheduler
+  resource map HARQ retx, RA and (Build 2) CG all add to; `ReducedSlotView`
+  subtracts it once. Contributors add, nothing else touches the view — so a
+  second grant-injection path cannot diverge from the first.
 - `sim/rlf.py` — WP6. Sync-loss (RLF) *detection* only (`n310`-armed
   `t310` dwell, `n311`-gated cancel). The module's own code is still pure
   (no simulator/scheduler imports) and detection-only, but it is **no
