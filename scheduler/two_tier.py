@@ -1145,7 +1145,9 @@ class TwoTier:
         else:
             elapsed_s = (slot_index - self._last_solve_slot) * self.slot_duration_s
         demand_bps = self._compute_demand_bps(buffers, elapsed_s)
-        targets = solve_tier1(self._flows, self._snr_avg, self._grid, demand_bps)
+        # Build 1.2: SRBs are not QoS flows; Tier-1 never sees them.
+        targets = solve_tier1([f for f in self._flows if not f.is_srb],
+                              self._snr_avg, self._grid, demand_bps)
         if targets:
             self._targets_bps = targets
 
@@ -1595,7 +1597,7 @@ class TwoTier:
         be_bytes = 0
 
         for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "DL":
+            if f.ue_id != ue_id or f.direction != "DL" or f.is_srb:
                 continue
             bytes_queued = buffers.state(f.ue_id, f.qfi).bytes_queued
 
@@ -1739,7 +1741,7 @@ class TwoTier:
         ul_total_target_bytes = 0
 
         for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs or f.is_srb:
                 continue
             lcg_estimate = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
             if lcg_estimate <= 0:
@@ -2025,7 +2027,7 @@ class TwoTier:
         """
         state = self._ue_state[ue_id]
         for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "DL":
+            if f.ue_id != ue_id or f.direction != "DL" or f.is_srb:
                 continue
             r_bps = self._targets_bps.get((f.ue_id, f.qfi), 0.0)
             vq = state.vq_dl.get(f.qfi, 0.0) + r_bps * self.slot_duration_s
@@ -2166,7 +2168,7 @@ class TwoTier:
         best_priority: int | None = None
         best_pdb = 9999
         for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL":
+            if f.ue_id != ue_id or f.direction != "UL" or f.is_srb:
                 continue
             if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
                 continue

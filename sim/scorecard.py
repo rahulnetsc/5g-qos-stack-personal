@@ -77,10 +77,14 @@ class Population:
         return Population("protected_fleet", Scorecard.NON_PROTECTED_5QI)
 
     def restrict(self, record: "RunRecord") -> "RunRecord":
-        if not self.excluded_5qi:
-            return record
+        # Build 1.2: SRB flows are signalling, not the fleet's data -- out of
+        # EVERY population, all_flows included. Both filter sites in this
+        # file carry the clause (the decompose fix was once applied at one
+        # of five sites in the file built to apply it).
         keep = {k: fr for k, fr in record.flows.items()
-                if fr.qfi not in self.excluded_5qi}
+                if fr.qfi not in self.excluded_5qi and not getattr(fr, "is_srb", False)}
+        if len(keep) == len(record.flows):
+            return record
         return dataclasses.replace(record, flows=keep)
 
 
@@ -583,7 +587,7 @@ class Scorecard:
         excluded_5qi = (self.NON_PROTECTED_5QI if non_protected_5qi is None
                         else non_protected_5qi)
         keep = {k: fr for k, fr in record.flows.items()
-                if fr.qfi not in excluded_5qi}
+                if fr.qfi not in excluded_5qi and not getattr(fr, "is_srb", False)}
         if not keep:
             return MetricResult(
                 "M20", "protected_fleet_liveness_gap", None, "ok", "ms",

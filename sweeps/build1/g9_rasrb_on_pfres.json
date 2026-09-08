@@ -1,0 +1,326 @@
+{
+  "GT-6.1_warm": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "srb_dialogue_p95_median_ms": null,
+        "srb_steps_sent": 0,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 16.499999999999957,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.5,
+          "lo": -1.6,
+          "hi": 0.375,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.5,
+        "median": 0.0,
+        "p25": -0.25,
+        "p75": 0.25,
+        "frac_worse": 0.3
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "srb_dialogue_p95_median_ms": null,
+        "srb_steps_sent": 0,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 21.500000000000075,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.725,
+          "lo": -6.0,
+          "hi": 6.201249999999994,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.725,
+        "median": 1.0,
+        "p25": -0.5,
+        "p75": 8.0,
+        "frac_worse": 0.5
+      }
+    }
+  },
+  "GT-6.2_cold": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 50,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 50,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "srb_dialogue_p95_median_ms": 21.25,
+        "srb_steps_sent": 700,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 56.49999999999977,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.825,
+          "lo": -2.200625,
+          "hi": 0.7256249999999965,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.825,
+        "median": -0.25,
+        "p25": -2.5,
+        "p75": 0.0,
+        "frac_worse": 0.1
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 50,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 3,
+        "ra_msg4_failures": 5,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 50,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 50,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "srb_dialogue_p95_median_ms": 43.0,
+        "srb_steps_sent": 700,
+        "has_srb_decisive": 727,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 79.37499999999991,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2948.8749999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.975,
+          "lo": -4.2,
+          "hi": 6.075,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.975,
+        "median": 0.0,
+        "p25": -2.75,
+        "p75": 5.0,
+        "frac_worse": 0.4
+      }
+    }
+  },
+  "GT-6.3_rlf": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 14,
+        "ra_preambles_tx": 50,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 161,
+        "ra_msg4_failures": 1,
+        "ra_cr_timeouts": 40,
+        "ra_completed": 10,
+        "ra_failed": 4,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "srb_dialogue_p95_median_ms": 0.75,
+        "srb_steps_sent": 30,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1085.0,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 11.875000000000302,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.725,
+          "lo": -1.7,
+          "hi": 0.4,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.725,
+        "median": -1.375,
+        "p25": -2.25,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 10,
+        "ra_preambles_tx": 10,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 1,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 10,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 10,
+        "ra_latency_p95_median_ms": 10.25,
+        "srb_dialogue_p95_median_ms": 116.75,
+        "srb_steps_sent": 30,
+        "has_srb_decisive": 155,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1190.125,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 144.00000000000014,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 10
+        },
+        "n": 10,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.475,
+          "lo": -1.175625,
+          "hi": 0.125,
+          "n": 10
+        },
+        "n": 10,
+        "mean": -0.475,
+        "median": -0.125,
+        "p25": -0.75,
+        "p75": 0.0,
+        "frac_worse": 0.2
+      }
+    }
+  }
+}

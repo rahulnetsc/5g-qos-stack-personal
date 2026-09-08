@@ -10,7 +10,8 @@ from .config import ScenarioConfig
 from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
 from .pre_sched import Occupancy
 from .random_access import RandomAccessConfig, RandomAccessModel
-from .join import JoinAwareBufferView, JoinPhase, init_join_rng_streams, init_join_state, rrc_connected
+from .join import JoinAwareBufferView, JoinPhase, init_join_rng_streams, init_join_state, rrc_connected, srb_active
+from .srb import SrbDialogues, srb_flow_keys
 from .join import step as join_step
 from .messages import FrameLedger, Message, MessageLedger, message_latency_percentiles_ms
 from .metrics import Metrics
@@ -174,6 +175,27 @@ def run(
     # drain()/expire() call sites; not yet consumed by Metrics/RunRecord/
     # scorecard (that lands in a later WP7 commit).
     message_ledger = MessageLedger()
+    # Build 1.2: SRB dialogues (sim/srb.py). Only with RA on AND srb on; the
+    # scenario must already carry SRB flows (sim.srb.with_srb) so every flow
+    # consumer saw them from the start.
+    srb: Optional[SrbDialogues] = None
+    srb_keys: frozenset = frozenset()
+    srb_complete_pending: dict[int, str] = {}
+    if ra is not None and ra_cfg.srb:
+        srb_keys = srb_flow_keys(scenario.flows)
+        if not srb_keys:
+            raise ValueError("random_access.srb=True but the scenario has no SRB flows -- "
+                             "apply sim.srb.with_srb(scenario) before running")
+        _srb_ctx: dict = {"now_s": 0.0, "arrived": None}
+
+        def _srb_enqueue(ue_id: int, qfi: int, nbytes: int, name: str) -> None:
+            msg = Message(id=message_ledger.new_id(), ue_id=ue_id, qfi=qfi, size_bytes=nbytes,
+                          generation_ts_s=_srb_ctx["now_s"], role="srb")
+            buffers.enqueue(ue_id, qfi, nbytes, _srb_ctx["now_s"], message=msg)
+            metrics.record_arrival(ue_id, qfi, nbytes)
+            if _srb_ctx["arrived"] is not None:
+                _srb_ctx["arrived"][(ue_id, qfi)] += nbytes
+        srb = SrbDialogues(enqueue=_srb_enqueue, delivered_cum=lambda u, q: buffers.delivered_cum(u, q))
     traffic = TrafficModel(
         scenario.flows, buffers, grid.slot_duration_s, rng, ledger=message_ledger
     )
@@ -309,6 +331,9 @@ def run(
             ue_id for ue_id, js in join_states.items() if not js.app_running
         )
         per_flow_arrived: dict[tuple[int, int], int] = defaultdict(int)
+        if srb is not None:
+            _srb_ctx["now_s"] = now_s
+            _srb_ctx["arrived"] = per_flow_arrived
         for ue_id, qfi, byts in traffic.generate(slot_index, suppressed_ues=suppressed_ues):
             metrics.record_arrival(ue_id, qfi, byts)
             per_flow_arrived[(ue_id, qfi)] += byts
@@ -326,6 +351,10 @@ def run(
             for _ue, _kind in ra_res.failed.items():
                 if _kind == "crnti":
                     ul_access.on_ra_failed(_ue)
+            if srb is not None:
+                for _ue, _kind in ra_res.completed.items():
+                    if _kind in ("cold", "reestablish"):
+                        srb.start(_ue, _kind, slot_index)
         # RLF detection reads the TRUE instantaneous SNR (sim/rlf.py's own
         # convention, matching HARQ's), so it must run after channel.
         # update() -- and before the HARQ resolution block below, which is
@@ -373,10 +402,23 @@ def run(
                 ra_available=ra is not None,
                 ra_complete_this_slot=(ra_res is not None
                                        and ra_res.completed.get(ue.ue_id) in ("cold", "reestablish")),
+                ra_complete_is_full_setup=srb is not None,
+                setup_complete_this_slot=(srb is not None
+                                          and srb_complete_pending.pop(ue.ue_id, None) is not None),
                 ra_failed_this_slot=(ra_res is not None
                                      and ra_res.failed.get(ue.ue_id) in ("cold", "reestablish")),
             )
             if ra is not None and jres.ra_request_kind is not None:
+                if srb is not None:
+                    srb.cancel(ue.ue_id)
+                # A new connection attempt resets the UE MAC (TS 38.331
+                # sec5.3.7 / sec5.3.5.5): SR and BSR state from before the
+                # RLF -- including an SR-fallback RA that the new attempt
+                # cancels -- must not survive it. Found by the smoke: a UE
+                # frozen with ra_pending never sent its SR again and its
+                # re-establishment dialogue stalled at the first UL step.
+                ul_access.reset_ue(ue.ue_id)
+                bsr.reset_ue(ue.ue_id, slot_index)
                 ra.request(ue.ue_id, jres.ra_request_kind, slot_index)
             if was_connected and not rrc_connected(join_state.phase):
                 # Just entered a radio-gated state this slot -- flush
@@ -700,7 +742,8 @@ def run(
         # M-9 needs the current slot before any eligibility is read.
         ul_access.note_slot(slot_index)
         ul_access.tick(slot_index, gated_ues=(
-            frozenset(ue_id for ue_id, js in join_states.items() if not rrc_connected(js.phase))
+            frozenset(ue_id for ue_id, js in join_states.items()
+                      if not rrc_connected(js.phase) and not srb_active(js))
             if ra is not None else frozenset()))
 
         # MODEL C AT THE JOIN EDGES: fire any armed re-join seed for a UE
@@ -764,7 +807,8 @@ def run(
         # docstring a future reader meets first. A no-op wrapper (join_
         # states is empty) for every scenario with no UEConfig.join set.
         masked_buffers = JoinAwareBufferView(
-            HarqAwareBufferView(buffers, harq_pool, direction_by_flow), join_states
+            HarqAwareBufferView(buffers, harq_pool, direction_by_flow), join_states,
+            srb_keys=srb_keys,
         )
 
         for alloc in scheduler.allocate(reduced_slot_grid, masked_buffers, channel):
@@ -925,6 +969,11 @@ def run(
         # complete_this_slot here means it's consumed by join.step() on
         # the NEXT slot, not this one -- the same one-slot lag as the
         # source gate, for the same reason (sec1.8).
+        if srb is not None:
+            # Deliveries are known: advance every dialogue, and hand the ones
+            # that finished to NEXT slot's join.step() as the setup edge.
+            for _ue, _kind in srb.step(slot_index).items():
+                srb_complete_pending[_ue] = _kind
         for hs_ue_id, hs_state in list(join_handshake_state.items()):
             hs_cfg = join_configs[hs_ue_id]
             if hs_state == "awaiting_ul" and per_flow_delivered.get((hs_ue_id, hs_cfg.handshake_ul_qfi), 0) > 0:
@@ -1040,6 +1089,13 @@ def run(
     summary["join_events"] = join_events
     if ra is not None:
         summary["random_access"] = ra.summary()
+    if srb is not None:
+        summary["srb"] = srb.summary(grid.slot_duration_s)
+    # Emitted only when something was counted: a scheduler that keeps a
+    # tally must serialise exactly as before on a run where it never fired.
+    _sc_counters = getattr(scheduler, "counters", None)
+    if _sc_counters and any(_sc_counters.values()):
+        summary["scheduler_counters"] = dict(_sc_counters)
     # WP7: true per-message completion latency, replacing the head-of-line
     # proxy for M01/M15 (config/metric_panel.yml). Computed per flow from
     # the message ledger and merged into the same per-flow summary dict the

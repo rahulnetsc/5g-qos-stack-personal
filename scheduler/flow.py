@@ -247,6 +247,8 @@ def assign_deployed_lcgs(flows: Iterable["FlowConfig"]) -> None:
     next_drb: dict[int, int] = {}
     drb_of: dict[tuple[int, int], int] = {}
     for f in flows:
+        if getattr(f, "is_srb", False):
+            continue          # an SRB is not a DRB: no ordinal, LCG 0 already
         key = (f.ue_id, f.qfi)
         if key not in drb_of:
             next_drb[f.ue_id] = next_drb.get(f.ue_id, 0) + 1
@@ -325,6 +327,10 @@ class FlowConfig:
     # Network-slice id. Tier-1 can give each slice a guaranteed share of PRB
     # capacity; default 0 puts every flow in one slice (no slicing).
     slice_id: int = 0
+    # Build 1.2: SRB1/SRB2 (sim/srb.py). Not a DRB -- no ordinal, LCG 0 by
+    # construction, excluded from every QoS tier, from Tier-1 and from every
+    # scorecard population. Validated in __post_init__.
+    is_srb: bool = False
     # --- UE-side logical-channel prioritisation (uplink only) -------------
     # In the uplink the gNB grants a transport block and the *UE* decides how
     # to fill it (TS 38.321 sec 5.4.3.1), using the prioritised bit rate and
@@ -412,6 +418,8 @@ class FlowConfig:
             self.priority_level = priority_for_5qi(self.qfi)
         if self.lcg != LCG_UNASSIGNED and not (0 <= self.lcg < LCG_COUNT):
             raise ValueError(f"lcg={self.lcg} outside 0..{LCG_COUNT - 1} (qfi={self.qfi})")
+        if self.is_srb and (self.lcg != LCG_SRB or self.qfi >= 0):
+            raise ValueError("an SRB flow sits on LCG_SRB with a negative qfi (sim/srb.py)")
 
     def effective_pbr_bps(self) -> float:
         """Configured prioritised bit rate, defaulting a GBR flow to its GFBR."""

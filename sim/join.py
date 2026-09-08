@@ -118,6 +118,14 @@ _RADIO_CONNECTED_PHASES = frozenset(
 )
 
 
+def srb_active(state: "JoinState") -> bool:
+    """Build 1.2: the UE has a C-RNTI and SRB1 (contention resolved) but its
+    DRBs do not exist yet -- RRCSetupComplete .. RRCReconfiguration. Only SRB
+    flows are schedulable; everything else stays masked."""
+    return (state.phase in (JoinPhase.RRC_ESTABLISH, JoinPhase.PDU_SESSION, JoinPhase.REESTABLISH)
+            and not state.ra_pending)
+
+
 def rrc_connected(phase: JoinPhase) -> bool:
     """Pure read, no draws, no mutation -- the radio gate (sec1.4/1.8 of
     docs/wp-join-plan.md). Called every slot by the wiring commit (5),
@@ -343,6 +351,8 @@ def step(
     ra_available: bool = False,
     ra_complete_this_slot: bool = False,
     ra_failed_this_slot: bool = False,
+    ra_complete_is_full_setup: bool = False,
+    setup_complete_this_slot: bool = False,
 ) -> JoinStepResult:
     """One step for one UE. ``rlf_declared_this_slot`` is ``sim/rlf.py``'s
     ``RlfStepResult.rlf_declared_this_slot`` for this UE, passed as a
@@ -435,6 +445,8 @@ def step(
 
     elif state.phase is JoinPhase.RRC_ESTABLISH:
         state.phase_elapsed_slots += 1
+        if setup_complete_this_slot and not state.ra_pending:
+            state.deadline_slots = float(state.phase_elapsed_slots)
         if state.ra_pending:
             if ra_complete_this_slot:
                 # Contention resolved. Until Build 1.2's SRB dialogue lands,
@@ -445,8 +457,14 @@ def step(
                 # the attach moves by RA's own latency, not by a re-draw
                 # (a re-draw moved the cold p95 by +127 ms, none of it RA's).
                 state.ra_pending = False
-                state.deadline_slots = max(state.ra_sampled_deadline_slots,
-                                           float(state.phase_elapsed_slots))
+                # Build 1.2: with the SRB dialogue live the rest of the setup
+                # is measured too -- wait for setup_complete_this_slot, with no
+                # sampled deadline and no T300 ceiling (T300 covers only
+                # RRCSetupRequest -> RRCSetup; the later steps run under the
+                # NAS timers, and a stall is counted as srb_active_at_end).
+                state.deadline_slots = (math.inf if ra_complete_is_full_setup
+                                        else max(state.ra_sampled_deadline_slots,
+                                                 float(state.phase_elapsed_slots)))
             elif ra_failed_this_slot or state.phase_elapsed_slots >= state.phase_ceiling_slots:
                 # preambleTransMax reached, or T300 ran out with RA still
                 # running: the RRC re-initiates access.
@@ -464,7 +482,8 @@ def step(
                 state.phase_ceiling_slots,
                 config.p_expiry,
             )
-        elif state.phase_elapsed_slots >= state.phase_ceiling_slots:
+        elif (state.phase_elapsed_slots >= state.phase_ceiling_slots
+              and state.deadline_slots != math.inf):
             timer_expired_this_slot = True
             state.timer_expiry_counts["rrc_establish"] = state.timer_expiry_counts.get("rrc_establish", 0) + 1
             state.phase_elapsed_slots = 0  # t300 expiry: retry, stay in RRC_ESTABLISH
@@ -523,11 +542,19 @@ def step(
 
     elif state.phase is JoinPhase.REESTABLISH:
         state.phase_elapsed_slots += 1
+        if setup_complete_this_slot and not state.ra_pending:
+            state.deadline_slots = float(state.phase_elapsed_slots)
         if state.ra_pending:
             if ra_complete_this_slot:
                 state.ra_pending = False
-                state.deadline_slots = max(state.ra_sampled_deadline_slots,
-                                           float(state.phase_elapsed_slots))
+                # Build 1.2: with the SRB dialogue live the rest of the setup
+                # is measured too -- wait for setup_complete_this_slot, with no
+                # sampled deadline and no T300 ceiling (T300 covers only
+                # RRCSetupRequest -> RRCSetup; the later steps run under the
+                # NAS timers, and a stall is counted as srb_active_at_end).
+                state.deadline_slots = (math.inf if ra_complete_is_full_setup
+                                        else max(state.ra_sampled_deadline_slots,
+                                                 float(state.phase_elapsed_slots)))
             elif ra_failed_this_slot or state.phase_elapsed_slots >= state.phase_ceiling_slots:
                 # T301 expiry (or RA failure) during re-establishment falls
                 # back to a full attach, exactly as the sampled path does.
@@ -539,7 +566,8 @@ def step(
         elif state.phase_elapsed_slots >= state.deadline_slots:
             state.phase = JoinPhase.APP_HANDSHAKE
             state.phase_elapsed_slots = 0
-        elif state.phase_elapsed_slots >= state.phase_ceiling_slots:
+        elif (state.phase_elapsed_slots >= state.phase_ceiling_slots
+              and state.deadline_slots != math.inf):
             timer_expired_this_slot = True
             state.timer_expiry_counts["reestablish"] = state.timer_expiry_counts.get("reestablish", 0) + 1
             state.phase = JoinPhase.IDLE  # t301 expiry: fall back to a full attach
@@ -619,7 +647,9 @@ class JoinAwareBufferView:
     also why ``join_states`` should hold only UEs that opted in, not
     every UE in the scenario with a placeholder ``None``."""
 
-    def __init__(self, inner, join_states: dict[int, JoinState]) -> None:
+    def __init__(self, inner, join_states: dict[int, JoinState],
+                 srb_keys: frozenset = frozenset()) -> None:
+        self._srb_keys = srb_keys
         self._inner = inner
         self._join_states = join_states
 
@@ -627,6 +657,8 @@ class JoinAwareBufferView:
         real = self._inner.state(ue_id, qfi)
         join_state = self._join_states.get(ue_id)
         if join_state is not None and not rrc_connected(join_state.phase):
+            if (ue_id, qfi) in self._srb_keys and srb_active(join_state):
+                return real
             masked = copy.copy(real)
             masked.bytes_queued = 0
             masked.bytes_reported = 0

@@ -1143,7 +1143,8 @@ these five, add a new tag rather than forcing it into an existing one.
   therefore its own fidelity change in its own commit if taken up, not
   folded into a sort-tier commit. Revisit if a future scenario ever needs
   a zero-backlog UE to be schedulable, or TA to be modeled, at all.
-- `[OPEN: PHASE2]` **Reservation's `has_srb` tier — the TOP tier in
+- `[CLOSED 2026-09-08 — Build 1.2]` **`has_srb` is live** (`sim/srb.py`, `docs/builds-2026-09-08.md` §2.8): SRB1/SRB2 flows on LCG 0 and the attach/re-establishment dialogues drive the reservation branch's predicate exactly as the C reads it (`per_lcg[0] > 0` with the `lcg0_is_drb` exclusion; `rlc_status[1|2]`). **And the premise below was wrong on one point: the tier exists in the RESERVATION branch only** — the two-tier branch's C never keys a ranking tier on SRB backlog. Original entry kept for the record.
+  **Original entry:** `[OPEN: PHASE2]` **Reservation's `has_srb` tier — the TOP tier in
   BOTH comparators — has no data source at all, for a more fundamental
   reason than the liveness gap above: this simulator has no SRB/
   RRC-signaling traffic model whatsoever, found in the same scoping

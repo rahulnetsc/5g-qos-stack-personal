@@ -39,6 +39,7 @@ from regime_sweep import (arm_cost, bootstrap_ci,  # noqa: E402
 from sim.baselines.pf import ProportionalFair  # noqa: E402
 from sim.driver import run  # noqa: E402
 from sim.random_access import RandomAccessConfig  # noqa: E402
+from sim.srb import with_srb  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
 from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,  # noqa: E402
                               gt63_rlf_recovery, joiner_ue_id,
@@ -163,7 +164,7 @@ def _neighbour_stats(rec: RunRecord, neighbours: list[int]) -> dict:
     """Protected-bearer aggregates over the neighbours only."""
     excl = Scorecard.NON_PROTECTED_5QI
     flows = [fr for fr in rec.flows.values()
-             if fr.ue_id in neighbours and fr.qfi not in excl]
+             if fr.ue_id in neighbours and fr.qfi not in excl and not fr.is_srb]
     arr = sum(fr.bytes_arrived for fr in flows)
     bad = sum(fr.bytes_dropped_pdb + fr.bytes_delivered_late_pdb for fr in flows)
     return {"m02": (bad / arr) if arr else 0.0,
@@ -182,9 +183,11 @@ def run_one(build, path, arm_name, arm_factory, seed, n_neighbours, joiner_on,
     # Build 1: the deployed RA config travels as a dict so it is part of the
     # driver kwargs a ledger key derives from; None keeps the pre-Build-1
     # path byte-identical (the --random-access off run IS the identity check).
+    if random_access:
+        sc = with_srb(sc)          # Build 1.2: SRBs for every UE, joiner and control alike
     summary = run(sc, arm_factory(), cqi_delay_slots=CQI_DELAY_SLOTS,
                   record_timeseries=True, rejoin_seed_bsr=rejoin_seed,
-                  random_access=(RandomAccessConfig.deployed().to_dict()
+                  random_access=({**RandomAccessConfig.deployed().to_dict(), "srb": True}
                                  if random_access else None))
     return sc, RunRecord.from_summary(
         scenario_name=sc.name, scheduler_name=arm_name, seed=seed,
@@ -272,11 +275,30 @@ def assert_ra_fired(rec: RunRecord, want_path: str, n_ev: int, label: str,
     if ra["ra_active_at_end"] != 0:
         raise AssertionError(f"{label}: {ra['ra_active_at_end']} RA procedures still running at "
                              f"the horizon -- a stall, not a sample")
+    # Build 1.2: the dialogues completed as often as the RAs that started
+    # them, and on Reservation the has_srb tier was DECISIVE somewhere.
+    srb = rec.srb
+    if srb is None:
+        raise AssertionError(f"{label}: RA on but no SRB summary -- was with_srb applied?")
+    sk = srb["by_kind"]
+    if want_path == "cold" and sk["cold"]["completed"] != kinds["cold"]["completed"]:
+        raise AssertionError(f"{label}: {sk['cold']['completed']} attach dialogues completed for "
+                             f"{kinds['cold']['completed']} cold RAs -- {srb}")
+    if srb["srb_active_at_end"] != 0:
+        raise AssertionError(f"{label}: {srb['srb_active_at_end']} SRB dialogues still running at the horizon")
+    sc_c = rec.scheduler_counters or {}
+    if rec.scheduler_name == "Reservation" and want_path != "warm" and sc_c.get("has_srb_decisive", 0) == 0:
+        raise AssertionError(f"{label}: Reservation's has_srb tier was never decisive on a path with "
+                             f"{srb['srb_steps_sent']} SRB steps -- the tier is not live")
     return {k: ra[k] for k in ("ra_requested", "ra_preambles_tx", "ra_collisions",
                                "ra_rar_misses", "ra_msg3_failures", "ra_msg4_failures",
                                "ra_cr_timeouts", "ra_completed", "ra_failed")} | {
         "ra_latency_p95_ms": ra["ra_latency_ms"]["p95"],
         "ra_latency_max_ms": ra["ra_latency_ms"]["max"],
+        "srb_dialogues_completed": srb["srb_dialogues_completed"],
+        "srb_steps_sent": srb["srb_steps_sent"],
+        "srb_dialogue_p95_ms": srb["srb_dialogue_ms"]["p95"],
+        "has_srb_decisive": sc_c.get("has_srb_decisive", 0),
         "ra_crnti_completed": kinds["crnti"]["completed"],
         "ra_cold_completed": kinds["cold"]["completed"],
         "ra_reestablish_completed": kinds["reestablish"]["completed"]}
@@ -299,6 +321,10 @@ def _aggregate(per_seed: list[dict]) -> dict:
         lat = [r["ra_latency_p95_ms"] for r in ra_rows if r["ra_latency_p95_ms"] is not None]
         ra_summary = {k: sum(r[k] for r in ra_rows) for k in ra_rows[0] if k.startswith("ra_") and not k.startswith("ra_latency")}
         ra_summary["ra_latency_p95_median_ms"] = statistics.median(lat) if lat else None
+        dlg = [r["srb_dialogue_p95_ms"] for r in ra_rows if r.get("srb_dialogue_p95_ms") is not None]
+        ra_summary["srb_dialogue_p95_median_ms"] = statistics.median(dlg) if dlg else None
+        ra_summary["srb_steps_sent"] = sum(r.get("srb_steps_sent", 0) for r in ra_rows)
+        ra_summary["has_srb_decisive"] = sum(r.get("has_srb_decisive", 0) for r in ra_rows)
         ra_summary["ra_latency_max_ms"] = max((r["ra_latency_max_ms"] or 0.0) for r in ra_rows)
     return {
         "random_access": ra_summary,

@@ -66,6 +66,26 @@ bare `python` invocation that works.
   per KIND (`cold` / `reestablish` / `crnti`) because a connected UE can run
   a C-RNTI RA on top of its attach's cold one — the first smoke folded them
   and read 10 completions for 5 attaches.
+- `sim/srb.py` — Build 1.2. SRB1/SRB2 as flows (`FlowConfig.is_srb`, LCG 0,
+  one qfi PER DIRECTION because `sim/buffer.py` keys a queue by `(ue, qfi)`
+  with no direction) and the attach / re-establishment **dialogues**:
+  request–response chains through the ordinary buffer→scheduler→HARQ path,
+  sizes MEASURED from the calibration log where it prints them and CHOSEN
+  otherwise, +8 B L2 headers, 0 ms core turnarounds (a lower bound). Applied
+  at the SCENARIO level by `with_srb(scenario)` so every flow consumer sees
+  the same list; `driver.run(random_access={..., "srb": True})` refuses a
+  scenario without them. **`has_srb` is reservation-only** — the two-tier
+  branch's C has no such tier (`update_ul_qos_priority` matches
+  `lcid = lcg + 3`, never LCG 0; `update_dlsch_buffer` gates on
+  `lcid >= 4`), so there SRB bytes are eligibility and sizing only. The
+  deployed RRC configures no measurements, so after attach the SRBs carry
+  nothing — on the pre-connected guarantee workloads the tier stays inert.
+  **SRBs carry `prioritisedBitRate = infinity`** (`sim/srb.py::SRB_PBR_INFINITY_BPS`,
+  from `get_SRB_RLC_BearerConfig(1, 1, bucketSizeDuration_ms1000, …)`): with
+  PBR 0 the UE-side LCP's first round hands the whole TB to a GBR bearer's
+  tokens and an RRC message starves behind it — measured as 10,085 grants
+  and zero SRB bytes delivered on the re-establishment path. Do not "fix" a
+  slow SRB by touching the LCP; check the bucket first.
 - `sim/pre_sched.py` — Build 1. `Occupancy`, the ONE pre-scheduler
   resource map HARQ retx, RA and (Build 2) CG all add to; `ReducedSlotView`
   subtracts it once. Contributors add, nothing else touches the view — so a

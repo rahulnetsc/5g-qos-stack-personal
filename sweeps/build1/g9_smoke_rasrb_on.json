@@ -1,0 +1,326 @@
+{
+  "GT-6.1_warm": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "srb_dialogue_p95_median_ms": null,
+        "srb_steps_sent": 0,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 12.87499999999997,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 0.125,
+          "lo": 0.0,
+          "hi": 0.25,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.125,
+        "median": 0.125,
+        "p25": 0.0,
+        "p75": 0.25,
+        "frac_worse": 0.5
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 0,
+        "ra_preambles_tx": 0,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 0,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 0,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": null,
+        "srb_dialogue_p95_median_ms": null,
+        "srb_steps_sent": 0,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 0.0
+      },
+      "events_per_run": 10,
+      "m18_p95_median": 14.749999999999819,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 0.0,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 1.125,
+          "lo": 0.0,
+          "hi": 2.25,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 1.125,
+        "median": 1.125,
+        "p25": 0.0,
+        "p75": 2.25,
+        "frac_worse": 0.5
+      }
+    }
+  },
+  "GT-6.2_cold": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 10,
+        "ra_preambles_tx": 10,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 1,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 10,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 10,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "srb_dialogue_p95_median_ms": 21.875,
+        "srb_steps_sent": 140,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 55.37499999999973,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2947.9999999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 1.375,
+          "lo": 0.0,
+          "hi": 2.75,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 1.375,
+        "median": 1.375,
+        "p25": 0.0,
+        "p75": 2.75,
+        "frac_worse": 0.5
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 10,
+        "ra_preambles_tx": 10,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 1,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 0,
+        "ra_completed": 10,
+        "ra_failed": 0,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 10,
+        "ra_reestablish_completed": 0,
+        "ra_latency_p95_median_ms": 11.5,
+        "srb_dialogue_p95_median_ms": 31.75,
+        "srb_steps_sent": 140,
+        "has_srb_decisive": 127,
+        "ra_latency_max_ms": 12.750000000000002
+      },
+      "events_per_run": 5,
+      "m18_p95_median": 67.24999999999997,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 2947.9999999999995,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": 1.125,
+          "lo": 0.25,
+          "hi": 2.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 1.125,
+        "median": 1.125,
+        "p25": 0.25,
+        "p75": 2.0,
+        "frac_worse": 1.0
+      }
+    }
+  },
+  "GT-6.3_rlf": {
+    "PF": {
+      "random_access": {
+        "ra_requested": 6,
+        "ra_preambles_tx": 42,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 160,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 40,
+        "ra_completed": 2,
+        "ra_failed": 4,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 2,
+        "ra_latency_p95_median_ms": 10.25,
+        "srb_dialogue_p95_median_ms": 0.5,
+        "srb_steps_sent": 6,
+        "has_srb_decisive": 0,
+        "ra_latency_max_ms": 10.25
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1052.5000000000002,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 10.250000000000092,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -2.0,
+          "lo": -4.25,
+          "hi": 0.25,
+          "n": 2
+        },
+        "n": 2,
+        "mean": -2.0,
+        "median": -2.0,
+        "p25": -4.25,
+        "p75": 0.25,
+        "frac_worse": 0.5
+      }
+    },
+    "Reservation": {
+      "random_access": {
+        "ra_requested": 6,
+        "ra_preambles_tx": 42,
+        "ra_collisions": 0,
+        "ra_rar_misses": 0,
+        "ra_msg3_failures": 160,
+        "ra_msg4_failures": 0,
+        "ra_cr_timeouts": 40,
+        "ra_completed": 2,
+        "ra_failed": 4,
+        "ra_crnti_completed": 0,
+        "ra_cold_completed": 0,
+        "ra_reestablish_completed": 2,
+        "ra_latency_p95_median_ms": 10.25,
+        "srb_dialogue_p95_median_ms": 107.875,
+        "srb_steps_sent": 6,
+        "has_srb_decisive": 30,
+        "ra_latency_max_ms": 10.25
+      },
+      "events_per_run": 1,
+      "m18_p95_median": 1175.5,
+      "m19_p95_median": 0.0,
+      "m21_p95_median": 110.87500000000006,
+      "neighbour_dm02": {
+        "ci": {
+          "point": 0.0,
+          "lo": 0.0,
+          "hi": 0.0,
+          "n": 2
+        },
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "frac_worse": 0.0
+      },
+      "neighbour_dp98_ms": {
+        "ci": {
+          "point": -0.375,
+          "lo": -0.5,
+          "hi": -0.25,
+          "n": 2
+        },
+        "n": 2,
+        "mean": -0.375,
+        "median": -0.375,
+        "p25": -0.5,
+        "p75": -0.25,
+        "frac_worse": 0.0
+      }
+    }
+  }
+}

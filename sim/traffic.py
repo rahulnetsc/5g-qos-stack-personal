@@ -300,6 +300,10 @@ class TrafficModel:
             # (tight-PDB small burst vs. large burst).
             return self._gen_poisson_triggered_burst(cfg, slot_index, now_s)
 
+        if kind == "none":
+            # Build 1.2: SRB flows -- nothing arrives by itself; only a
+            # dialogue (sim/srb.py) enqueues on them.
+            return []
         raise ValueError(f"Unknown traffic kind: {kind}")
 
     def _gen_periodic_control(

@@ -712,6 +712,10 @@ class Reservation:
         # docs/g5-ranking-map.md's candidate-set hook -- see two_tier.py's
         # own attribute for the contract. None by default.
         self.rank_sink = None
+        # Build 1.2: the manipulation check for the has_srb tier -- how many
+        # adjacent sorted candidates the tier separated. Surfaced by the
+        # driver as summary["scheduler_counters"].
+        self.counters: dict[str, int] = {"has_srb_decisive": 0, "has_srb_candidates": 0}
         # min_rb: UL's follower-budget floor (nrmac->min_grant_prb) --
         # a deliberate operator/experimenter choice for the calibration
         # campaign, not a physical constant. See module docstring's
@@ -868,11 +872,17 @@ class Reservation:
             )
             coef = hyp_tbs_bytes / max(thr, 1.0)
 
-            # has_srb: hardcoded False -- no SRB/RRC-signaling traffic
-            # model exists in this simulator (README.md sec8
-            # [OPEN: PHASE2], module docstring above). Not a heuristic;
-            # a documented permanent no-op.
-            has_srb = False
+            # Build 1.2: the C's own predicates, live once SRB flows exist.
+            # UL (gNB_scheduler_ulsch.c:2167-2176): LCG 0 has an estimate AND
+            # no DRB sits on LCG 0 (`lcg0_is_drb`). DL (_dlsch.c:830-831):
+            # SRB1/SRB2 RLC buffers non-empty. False, as before, in every
+            # scenario without SRB flows.
+            if direction == "UL":
+                has_srb = (self._ul_lcg0_estimate(ue_id, buffers) > 0
+                           and not any(f.lcg == 0 and not f.is_srb for f in flows))
+            else:
+                has_srb = any(f.is_srb and buffers.state(f.ue_id, f.qfi).bytes_queued > 0
+                              for f in flows)
 
             # has_gbr / pdb_ms: real GBR deficit accumulate/cap/target-
             # spread/overflow-to-BE (gNB_scheduler_ulsch.c:2251-2278 /
@@ -925,6 +935,9 @@ class Reservation:
             return []
 
         candidates.sort(key=lambda c: self._rank_key(c, direction))
+        self.counters["has_srb_candidates"] += sum(1 for c in candidates if c.has_srb)
+        self.counters["has_srb_decisive"] += sum(
+            1 for a, b in zip(candidates, candidates[1:]) if a.has_srb != b.has_srb)
 
         if self.rank_sink is not None:
             self._emit_rank_snapshot(slot.slot_index, direction, candidates)
@@ -1067,7 +1080,7 @@ class Reservation:
         be_bytes = 0
 
         for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs:
+            if f.ue_id != ue_id or f.direction != "UL" or f.lcg in seen_lcgs or f.is_srb:
                 continue
             lcg_estimate = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
             if lcg_estimate <= 0:
@@ -1301,7 +1314,7 @@ class Reservation:
         be_bytes = 0
 
         for f in self._flows:
-            if f.ue_id != ue_id or f.direction != "DL":
+            if f.ue_id != ue_id or f.direction != "DL" or f.is_srb:
                 continue
             bytes_queued = buffers.state(f.ue_id, f.qfi).bytes_queued
 

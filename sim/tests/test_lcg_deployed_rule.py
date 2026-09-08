@@ -134,12 +134,13 @@ def test_no_built_scenario_puts_data_on_lcg0_or_shares_an_lcg(label, sc):
     flows = list(sc.flows)
     assert flows, label
     assert sum(f.lcg != LCG_UNASSIGNED for f in flows) == len(flows), label
-    assert all(f.lcg != LCG_SRB for f in flows), label
+    assert all(f.lcg != LCG_SRB for f in flows if not f.is_srb), label
     per_ue: dict[int, list[int]] = {}
     for f in flows:
-        per_ue.setdefault(f.ue_id, []).append(f.lcg)
+        if not f.is_srb:
+            per_ue.setdefault(f.ue_id, []).append(f.lcg)
     for ue, lcgs in per_ue.items():
-        n = len({(f.ue_id, f.qfi) for f in flows if f.ue_id == ue})
+        n = len({(f.ue_id, f.qfi) for f in flows if f.ue_id == ue and not f.is_srb})
         expected = sorted({lcg_for_drb(k) for k in range(1, n + 1)})
         assert sorted(set(lcgs)) == expected, (label, ue, lcgs)
     ul = Counter((f.ue_id, f.lcg) for f in flows if f.direction == "UL")

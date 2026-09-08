@@ -113,6 +113,7 @@ class FlowRecord:
     # field exists at all, not a "predates WP7" sentinel; M14's own
     # pending/ok gate reuses M03's completion_ts_by_role_s check instead.
     survival_time_ms: float = 0.0
+    is_srb: bool = False
     # The source's CONFIGURED inter-arrival period, from
     # FlowConfig.traffic_params["period_ms"]. None for a flow whose kind has
     # no period (poisson, xr_video's frame model, aperiodic_event).
@@ -252,6 +253,8 @@ class RunRecord:
     # was off. Carried explicitly so it survives from_summary -- five earlier
     # driver counters did not (CLAUDE.md, the unobservable-mechanism table).
     random_access: Optional[dict] = None
+    srb: Optional[dict] = None                 # Build 1.2, same rule
+    scheduler_counters: Optional[dict] = None  # a scheduler's own tallies, when it keeps any
 
     def has_timeseries(self) -> bool:
         return self.timeseries_time_s is not None
@@ -274,7 +277,11 @@ class RunRecord:
             "scheduler_name": self.scheduler_name,
             "seed": self.seed,
             "arm": self.arm,
-            "flows": {k: asdict(v) for k, v in self.flows.items()},
+            # Build 1.2: `is_srb` is emitted ONLY when True -- a record from a
+            # run without SRBs must serialise exactly as before, or the corpus
+            # check reads 462 new False-valued keys as drift.
+            "flows": {k: {kk: vv for kk, vv in asdict(v).items() if kk != "is_srb" or vv}
+                      for k, v in self.flows.items()},
             "system": asdict(self.system),
             "timeseries_time_s": self.timeseries_time_s,
             "timeseries_slot_index": self.timeseries_slot_index,
@@ -289,6 +296,10 @@ class RunRecord:
         # None-valued key as drift.
         if self.random_access is not None:
             d["random_access"] = self.random_access
+        if self.srb is not None:
+            d["srb"] = self.srb
+        if self.scheduler_counters is not None:
+            d["scheduler_counters"] = self.scheduler_counters
         # WP9 G11 commit 2. Emitted ONLY when true, so a non-windowed
         # record serialises byte-identically to before this commit and the
         # frozen regression corpus is untouched. from_dict defaults to
@@ -315,6 +326,8 @@ class RunRecord:
             timeseries_resolution=d.get("timeseries_resolution", "slot"),
             meta=d.get("meta", {}),
             random_access=d.get("random_access"),
+            srb=d.get("srb"),
+            scheduler_counters=d.get("scheduler_counters"),
             join_events=(
                 [JoinEventRecord(**e) for e in d["join_events"]]
                 if d.get("join_events") is not None else None
@@ -399,6 +412,7 @@ class RunRecord:
                 pdb_ms=fc.pdb_ms,
                 priority_level=fc.priority_level,
                 survival_time_ms=fc.survival_time_ms,
+                is_srb=getattr(fc, "is_srb", False),
                 configured_period_ms=(fc.traffic_params or {}).get("period_ms"),
                 bytes_arrived=m["bytes_arrived"],
                 bytes_delivered=m["bytes_delivered"],
@@ -468,6 +482,8 @@ class RunRecord:
             # as key-presence rather than a None-vs-real-value field
             # because driver.py always sets it to at least [] once landed.
             random_access=summary.get("random_access"),
+            srb=summary.get("srb"),
+            scheduler_counters=summary.get("scheduler_counters"),
             join_events=(
                 [JoinEventRecord(**e) for e in summary["join_events"]]
                 if "join_events" in summary else None

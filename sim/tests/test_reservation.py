@@ -556,7 +556,7 @@ def test_has_srb_cannot_be_exercised_and_is_recorded_as_such():
     check that an LCG0 flow (which a naive "LCG==0 means SRB" heuristic
     would wrongly flag) is ranked purely by GBR/PDB/coef, never boosted."""
     source = inspect.getsource(Reservation._allocate_direction)
-    assert "has_srb = False" in source
+    assert "_ul_lcg0_estimate(ue_id, buffers) > 0" in source   # Build 1.2: the C's predicate, live
 
     # Behavioral guard against a future "helpful" LCG==0-means-SRB
     # heuristic: a flow FORCED onto LCG 0 (the deployed rule never puts a
