@@ -1,0 +1,8 @@
+start 1788855524 Tue Sep  8 01:48:44 PM IST 2026
+1080 runs = 2 seed-columns x 3 cases x 6 occupancy levels x 3 arms x 10 seeds (each run also builds its paired control)
+  0 banked, 1080 to run
+    ... 25/1080 (38s)
+    ... 50/1080 (75s)
+    ... 75/1080 (105s)
+    ... 100/1080 (139s)
+    ... 125/1080 (183s)

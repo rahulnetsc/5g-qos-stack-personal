@@ -35,6 +35,8 @@ from code_state import stamp                              # noqa: E402
 from regime_sweep import arm_cost, paired_seeds, run_cells   # noqa: E402
 from sim.driver import run as driver_run                     # noqa: E402
 from sim.parametric import sweep_scenario                    # noqa: E402
+from sim.random_access import RandomAccessConfig       # noqa: E402
+from sim.srb import with_srb                            # noqa: E402
 from sim.run_record import RunRecord                         # noqa: E402
 from sim.scorecard import Population, Scorecard              # noqa: E402
 from sim.trace import GrantCollector                         # noqa: E402
@@ -42,21 +44,29 @@ from g11_campaign import _arm                                # noqa: E402
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int,
-        attach_seed: bool = False, max_sched_ues: int | None = None) -> dict:
+        attach_seed: bool = False, max_sched_ues: int | None = None,
+        random_access: bool = False, committed_mult: float = 1.0) -> dict:
     # `attach_seed` supplies the attach BSR at slot 0 with NO stagger, so the
     # ONLY difference from the control is the seed. The staggered arm in
     # docs/attach-path-result depresses M07/M08 through pre-attach time
     # (defects-log #27), which is why that data cannot answer whether the
     # lock-out sets G10's boundary and this can.
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
-                        load_mult=1.0)
+                        load_mult=1.0, committed_mult=committed_mult)
+    # A boundary is only usable as an axis range for an experiment run in the
+    # SAME configuration (CLAUDE.md's measurement-carries-its-configuration
+    # rule), so RA and SRB are switchable here rather than assumed negligible.
+    ra_cfg = None
+    if random_access:
+        sc = with_srb(sc)
+        ra_cfg = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
     seed_slots = ({f.ue_id: 0 for f in sc.flows if f.direction == "UL"}
                   if attach_seed else None)
     grants = GrantCollector()
     t0 = time.time()
     s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
                    grant_sink=grants, attach_seed_slots=seed_slots,
-                         max_sched_ues=max_sched_ues)
+                         max_sched_ues=max_sched_ues, random_access=ra_cfg)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,
                                  seed=seed, flow_configs=sc.flows, summary=s,
                                  arm={}, meta={})
@@ -108,13 +118,17 @@ def main() -> int:
                     help="M-6: force the per-slot UE cap")
     ap.add_argument("--attach-seed", action="store_true",
                     help="seed the attach BSR at slot 0, no stagger")
+    ap.add_argument("--random-access", action="store_true",
+                    help="Build 1: RA + SRB on, the configuration the G9 "
+                         "stress experiment runs in")
+    ap.add_argument("--committed-mult", type=float, default=1.0)
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
 
     arms = [x for x in a.arms.split(",") if x]
     ns = [int(x) for x in a.n_ues.split(",")]
     seeds = paired_seeds(a.seeds)
-    tasks = [(arm, s, n, a.horizon, a.attach_seed, a.max_sched_ues)
+    tasks = [(arm, s, n, a.horizon, a.attach_seed, a.max_sched_ues, a.random_access, a.committed_mult)
              for arm in arms for n in ns for s in seeds]
     print(f"{len(tasks)} runs = {len(arms)} arms x {len(ns)} fleet sizes "
           f"x {len(seeds)} seeds @ horizon {a.horizon}")

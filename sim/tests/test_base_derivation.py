@@ -94,7 +94,13 @@ def test_driver_kwargs_are_listed_separately_and_are_NOT_scenario_params():
 def test_BASE_is_unchanged_by_the_derivation():
     """The derivation must reproduce what the campaigns actually ran, or this
     'config fix' is a silent re-measurement of every WP9 artefact."""
-    expected = {"n_ues": 8, "load_mult": 1.0, "mix": "factory", "duty_cycle": 1.0,
+    # `committed_mult` was added to sweep_scenario on 2026-09-08 (the G9
+    # stress experiment's load axis, sim/workload.py). Its base value is the
+    # identity, so every WP9 artefact's configuration is unchanged -- which
+    # is exactly what this test exists to establish, and why the new key is
+    # declared here rather than the assertion being loosened.
+    expected = {"n_ues": 8, "load_mult": 1.0, "committed_mult": 1.0,
+                "mix": "factory", "duty_cycle": 1.0,
                 "snr_spread_db": 0.0, "pdb_ms": None, "shared_lcg": False,
                 "mfbr_multiple": 0.0, "bg": False, "inf_scenario": None,
                 "min_rb": 5, "sr_period_slots": 10, "k2_slots": 2}

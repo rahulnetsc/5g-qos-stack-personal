@@ -31,6 +31,7 @@ from typing import Any, Optional
 
 from .config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
 from scheduler.flow import LCG_UNASSIGNED, FlowConfig
+from .workload import scale_committed_load
 
 __all__ = ["sweep_scenario", "MIXES"]
 
@@ -148,6 +149,7 @@ def sweep_scenario(
     seed: int,
     n_ues: int = 8,
     load_mult: float = 1.0,
+    committed_mult: float = 1.0,
     mix: str = "factory",
     duty_cycle: float = 1.0,
     snr_spread_db: float = 0.0,
@@ -170,6 +172,15 @@ def sweep_scenario(
     every axis needing a hand-written split at every call site.
 
     Args worth stating precisely:
+      committed_mult scales the COMMITTED load -- every GBR/Delay flow's
+                     offered bytes AND its contract (gfbr/mfbr/pbr) together,
+                     via sim/workload.py. This is the axis an operator feels
+                     as "the cell is busier": more work promised. It is NOT
+                     load_mult, which moves the best-effort filler only, and
+                     the parametric cell is already ~1.5x oversubscribed at
+                     x1.0 -- so load_mult cannot reach the committed plane at
+                     all. Built here once, for G9's occupancy axis and for
+                     G1/G3/G5/G8's missing load axes.
       load_mult      scales OFFERED BYTES, not carrier bandwidth. WP9 excludes
                      capacity scaling as the load axis (docs/wp9-plan.md §3):
                      changing prb_count moves H1's own predicted boundary,
@@ -321,7 +332,7 @@ def sweep_scenario(
             traffic_params={"rate_bps": 50_000_000.0},
         ))
 
-    return ScenarioConfig(
+    sc = ScenarioConfig(
         name=(
             f"wp9_n{n_ues}_load{load_mult}_{mix}"
             f"{'_sharedlcg' if shared_lcg else ''}{'_bg' if bg else ''}"
@@ -335,3 +346,4 @@ def sweep_scenario(
         flows=flows,
         seed=seed,
     )
+    return scale_committed_load(sc, committed_mult)
