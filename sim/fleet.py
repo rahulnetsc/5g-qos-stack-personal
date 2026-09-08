@@ -48,6 +48,7 @@ from scheduler.flow import (
     pdb_for_5qi,
     priority_for_5qi,
 )
+from .workload import min_bytes_per_period_for_gfbr
 
 __all__ = [
     "DeviceProfile", "PROFILES", "COMPOSITIONS", "LIDAR",
@@ -356,6 +357,18 @@ def build_fleet(
                 gfbr = lidar.rate_bps
             elif f.kind == "xr_video":
                 gfbr = f.gfbr_bps * video_tier
+            # OFFERED >= GFBR, enforced in ONE place for every device
+            # profile rather than corrected per profile. A GBR flow offering
+            # less than its own contract can never meet it at any load, so
+            # every contract-reading metric measures the generator
+            # (docs/gbr-offered-shortfall-2026-09-08.md). `max` leaves a
+            # profile that already offers enough untouched.
+            if f.flow_class == "GBR" and gfbr > 0 and "period_ms" in params:
+                _k = "avg_bytes" if "avg_bytes" in params else "bytes_per_period"
+                if _k in params:
+                    params[_k] = max(
+                        params[_k],
+                        min_bytes_per_period_for_gfbr(gfbr, params["period_ms"]))
             flows.append(FlowConfig(
                 ue_id=ue_id, qfi=f.qfi, direction=f.direction,
                 flow_class=f.flow_class, gfbr_bps=gfbr,

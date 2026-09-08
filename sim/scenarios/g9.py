@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from sim.config import (CarrierConfig, FlowConfig, ScenarioConfig,
                         ScriptedFadeWindow, TDDConfig, UEConfig)
-from sim.workload import scale_committed_load
+from sim.workload import min_bytes_per_period_for_gfbr, scale_committed_load
 from sim.join import JoinConfig, JoinEvent
 from sim.scenarios.schedule_guard import require_horizon
 
@@ -34,6 +34,8 @@ from sim.scenarios.schedule_guard import require_horizon
 # joiner, per JoinConfig's own contract.
 QFI_TELEMETRY = 1
 QFI_VIDEO = 2
+_VIDEO_GFBR_BPS = 4_000_000.0
+_VIDEO_PERIOD_MS = 33.0
 QFI_COMMAND = 82
 QFI_AGGRESSOR = 8      # GT-6's "bg saturation"; in NON_PROTECTED_5QI
 QFI_HANDSHAKE_UL = 70
@@ -109,8 +111,14 @@ def _traffic_flows(ue_id: int, *, video: bool = True) -> list[FlowConfig]:
     if video:
         flows.append(FlowConfig(
             ue_id=ue_id, qfi=QFI_VIDEO, direction="UL", flow_class="GBR",
-            gfbr_bps=4_000_000.0, pdb_ms=150.0, traffic_kind="xr_video",
-            traffic_params={"period_ms": 33.0, "avg_bytes": 16_000,
+            gfbr_bps=_VIDEO_GFBR_BPS, pdb_ms=150.0, traffic_kind="xr_video",
+            # OFFERED >= GFBR, derived. 16 000 B at 33 ms is 3.8788 Mbps
+            # against a 4.0000 Mbps contract; the shortfall was found HERE by
+            # test_no_gbr_flow_offers_below_its_own_contract, which is what
+            # that test exists for (docs/gbr-offered-shortfall-2026-09-08.md).
+            traffic_params={"period_ms": _VIDEO_PERIOD_MS,
+                            "avg_bytes": min_bytes_per_period_for_gfbr(
+                                _VIDEO_GFBR_BPS, _VIDEO_PERIOD_MS),
                             "fragment_bytes": 1500}))
     return flows
 

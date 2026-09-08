@@ -31,7 +31,7 @@ from typing import Any, Optional
 
 from .config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
 from scheduler.flow import LCG_UNASSIGNED, FlowConfig
-from .workload import scale_committed_load
+from .workload import min_bytes_per_period_for_gfbr, scale_committed_load
 
 __all__ = ["sweep_scenario", "MIXES"]
 
@@ -282,8 +282,17 @@ def sweep_scenario(
                 # G10) and the G12 ramp. Recorded, not fixed: changing
                 # avg_bytes moves the regression corpus (docs/wp9-plan.md
                 # §36.3).
-                vp_ms, vp_bytes = _burstify(33.0, 16_000.0, duty_cycle)
                 gfbr = 4_000_000.0
+                # OFFERED >= GFBR, derived rather than authored. 16 000 B at
+                # 33 ms is 3.8788 Mbps against a 4.0000 Mbps contract -- a
+                # 0.9697 ceiling on gfbr_fraction that no scheduler can lift,
+                # which made every contract-reading metric (M07, M13 -> G10,
+                # G12) measure this arithmetic instead. `max` so a flow that
+                # already offers enough is untouched.
+                # docs/gbr-offered-shortfall-2026-09-08.md
+                _base_bytes = max(16_000.0,
+                                  float(min_bytes_per_period_for_gfbr(gfbr, 33.0)))
+                vp_ms, vp_bytes = _burstify(33.0, _base_bytes, duty_cycle)
                 flows.append(FlowConfig(
                     ue_id=ue_id, qfi=_QFI_VIDEO + cam, direction="UL",
                     flow_class="GBR", gfbr_bps=gfbr, pdb_ms=150.0,

@@ -13,6 +13,7 @@ Must not import the driver or any scheduler.
 from __future__ import annotations
 
 import dataclasses
+import math
 from typing import Any, Iterable
 
 from scheduler.flow import FlowConfig
@@ -110,6 +111,24 @@ def scale_committed_load(scenario, mult: float):
     # (regime_sweep.RunLedger) silently merges them.
     name = f"{scenario.name}_cm{mult:g}"
     return dataclasses.replace(scenario, flows=flows, name=name)
+
+
+def min_bytes_per_period_for_gfbr(gfbr_bps: float, period_ms: float) -> int:
+    """Bytes a periodic GBR flow must carry per period so that its OFFERED
+    load is at least its own GFBR.
+
+    A flow that offers less than it was promised can never meet its contract
+    at any load, on any scheduler -- `gfbr_fraction` has an arithmetic
+    ceiling below 1.0 -- so every metric that reads contract attainment (M07,
+    M13, and therefore G10 and G12) is measuring the traffic generator rather
+    than the scheduler. Six flow definitions across five builders had this
+    shape; `docs/gbr-offered-shortfall-2026-09-08.md` has the census.
+
+    `ceil`, so the offered load is never a rounding error short.
+    """
+    if gfbr_bps <= 0 or period_ms <= 0:
+        raise ValueError(f"need a positive GFBR and period, got {gfbr_bps}, {period_ms}")
+    return math.ceil(gfbr_bps * period_ms / 8000.0)
 
 
 def survival_time_ms_for(flow: FlowConfig, intervals: float) -> float:

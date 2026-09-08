@@ -22,6 +22,7 @@ from pathlib import Path
 import yaml
 
 from scheduler.flow import LCG_UNASSIGNED, priority_for_5qi
+from .workload import min_bytes_per_period_for_gfbr
 
 from .config import (
     CarrierConfig,
@@ -76,6 +77,20 @@ def _flow_from_dict(ue_id: int, flow_dict: dict) -> FlowConfig:
     traffic = flow_dict.get("traffic", {})
     traffic_kind = traffic.get("kind", "poisson")
     traffic_params = {k: v for k, v in traffic.items() if k != "kind"}
+    # OFFERED >= GFBR, enforced here so EVERY scenario_config_*.yml gets it
+    # from one place. A GBR flow offering less than its own contract can
+    # never meet it at any load, so M07/M13 -- and therefore G10 and G12 --
+    # would be measuring the traffic generator
+    # (docs/gbr-offered-shortfall-2026-09-08.md). `max` leaves a flow that
+    # already offers enough untouched.
+    _gfbr = float(flow_dict.get("min_data_rate_bps", 0.0))
+    if (flow_dict.get("flow_class") == "GBR" and _gfbr > 0
+            and "period_ms" in traffic_params):
+        _k = "avg_bytes" if "avg_bytes" in traffic_params else "bytes_per_period"
+        if _k in traffic_params:
+            traffic_params[_k] = max(
+                int(traffic_params[_k]),
+                min_bytes_per_period_for_gfbr(_gfbr, float(traffic_params["period_ms"])))
     return FlowConfig(
         ue_id=ue_id,
         qfi=int(flow_dict["qfi"]),

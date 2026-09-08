@@ -1,0 +1,1299 @@
+{
+  "_ramp": [
+    0.5,
+    0.75,
+    1.0,
+    1.1,
+    1.2,
+    1.3,
+    1.4,
+    1.5,
+    1.6,
+    1.8,
+    2.0
+  ],
+  "_cells": [
+    [
+      "mixed",
+      6
+    ],
+    [
+      "mixed",
+      4
+    ]
+  ],
+  "_seeds": 10,
+  "_specified_order": [
+    9,
+    4,
+    2
+  ],
+  "_tie_break_seeds": [
+    "None",
+    "4243"
+  ],
+  "_cap": 4,
+  "_wall_s": 368.3,
+  "_n_sweeps": 120,
+  "_n_driver_runs": 1320,
+  "tiebreak-off/mixedN6/PF": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.74
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 47.842
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 44.198
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.61
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 41.163
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 39.53
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 38.058
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.331
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 34.746
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 31.46
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 28.325
+      }
+    ],
+    "wall_s_total": 236.7
+  },
+  "tiebreak-off/mixedN6/Reservation": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 48.17
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 44.366
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.644
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 39.094
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 37.465
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.023
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 34.509
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 32.892
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 31.512
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 28.341
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 25.194
+      }
+    ],
+    "wall_s_total": 281.6
+  },
+  "tiebreak-off/mixedN6/TwoTier": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.896
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 48.466
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 45.15
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 43.647
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.142
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.706
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 39.314
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 37.65
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.077
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.038535714285714284,
+        "bg_mbps_median": 33.066
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.26153571428571426,
+        "bg_mbps_median": 29.891
+      }
+    ],
+    "wall_s_total": 591.8
+  },
+  "tiebreak-off/mixedN4/PF": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 50.227
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 48.553
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 45.638
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 43.753
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.381
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.612
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 38.955
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 37.269
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 35.566
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 32.222
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 29.272
+      }
+    ],
+    "wall_s_total": 205.9
+  },
+  "tiebreak-off/mixedN4/Reservation": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.044
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 46.108
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.11
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.446
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 38.706
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.98
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 35.565
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 33.692
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 32.128
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 29.133
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 25.943
+      }
+    ],
+    "wall_s_total": 246.6
+  },
+  "tiebreak-off/mixedN4/TwoTier": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 50.401
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.24
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 47.32
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.007678571428571429,
+        "bg_mbps_median": 46.289
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.04851850905000511,
+        "bg_mbps_median": 44.815
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.19595952401248146,
+        "bg_mbps_median": 43.191
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.41135714285714287,
+        "bg_mbps_median": 41.189
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.5116799269725056,
+        "bg_mbps_median": 39.743
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.6911078717201167,
+        "bg_mbps_median": 37.963
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.8209912536443149,
+        "bg_mbps_median": 34.569
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.9081632653061225,
+        "bg_mbps_median": 31.465
+      }
+    ],
+    "wall_s_total": 575.1
+  },
+  "tiebreak-4243/mixedN6/PF": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.74
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 47.842
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 44.198
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.61
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 41.163
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 39.53
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 38.058
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.331
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 34.746
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 31.46
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 28.325
+      }
+    ],
+    "wall_s_total": 237.6
+  },
+  "tiebreak-4243/mixedN6/Reservation": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 48.159
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 44.368
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.647
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 39.085
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 37.597
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.101
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 34.503
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 32.832
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 31.465
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 28.374
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 25.303
+      }
+    ],
+    "wall_s_total": 281.4
+  },
+  "tiebreak-4243/mixedN6/TwoTier": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.911
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 48.594
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 44.976
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 43.696
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.154
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.775
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 39.221
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 37.655
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.00425,
+        "bg_mbps_median": 35.939
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.1104748152400086,
+        "bg_mbps_median": 32.961
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.38595481049562685,
+        "bg_mbps_median": 29.959
+      }
+    ],
+    "wall_s_total": 595.6
+  },
+  "tiebreak-4243/mixedN4/PF": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 50.227
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 48.553
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 45.638
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 43.753
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.381
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.612
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 38.955
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 37.269
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 35.566
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 32.222
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 29.272
+      }
+    ],
+    "wall_s_total": 200.8
+  },
+  "tiebreak-4243/mixedN4/Reservation": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.044
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 46.108
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 42.11
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 40.446
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 38.706
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 36.98
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 35.565
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 33.692
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 32.127
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 29.166
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 26.016
+      }
+    ],
+    "wall_s_total": 246.7
+  },
+  "tiebreak-4243/mixedN4/TwoTier": {
+    "n_seeds": 10,
+    "clause4": {
+      "PASS": 10,
+      "VIOLATION": 0,
+      "PREMISE FAILS": 0
+    },
+    "orders_seen": [
+      []
+    ],
+    "order_agreement": "10/10",
+    "n_unscoreable_orders": 0,
+    "matches_specified": 0,
+    "per_point": [
+      {
+        "mult": 0.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 50.394
+      },
+      {
+        "mult": 0.75,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0,
+        "bg_mbps_median": 49.249
+      },
+      {
+        "mult": 1.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.0020357142857142857,
+        "bg_mbps_median": 47.405
+      },
+      {
+        "mult": 1.1,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.022035714285714283,
+        "bg_mbps_median": 46.334
+      },
+      {
+        "mult": 1.2,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.12766606070509418,
+        "bg_mbps_median": 44.745
+      },
+      {
+        "mult": 1.3,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.22452625097225823,
+        "bg_mbps_median": 43.099
+      },
+      {
+        "mult": 1.4,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.4350925655976676,
+        "bg_mbps_median": 41.458
+      },
+      {
+        "mult": 1.5,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.5521501457725948,
+        "bg_mbps_median": 39.694
+      },
+      {
+        "mult": 1.6,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.6826530612244899,
+        "bg_mbps_median": 37.938
+      },
+      {
+        "mult": 1.8,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.8408163265306123,
+        "bg_mbps_median": 34.539
+      },
+      {
+        "mult": 2.0,
+        "scoreable_seeds": 10,
+        "broken_seeds": 0,
+        "starved_seeds": 0,
+        "telemetry_m02_median": 0.8877551020408163,
+        "bg_mbps_median": 31.353
+      }
+    ],
+    "wall_s_total": 573.3
+  }
+}
