@@ -108,3 +108,26 @@ def test_control_plane_candidate_sorts_first_and_takes_exactly_min_rb():
     assert tt._ul_rank_key(ctrl) < tt._ul_rank_key(data)
     s = _run(lambda: load_two_tier("scheduler/scheduler_config.yaml", min_rb=5))
     assert s["scheduler_counters"]["control_plane_grants"] > 0
+
+
+def test_tie_break_control_is_inert_when_unset_and_reorders_when_set():
+    """G12's tie-break-only control. Off by default and contributing 0 to
+    every key, so no existing result moves; on, it changes ONLY the order of
+    candidates that were already tied -- the flow list is untouched, which is
+    what `permute_flows` cannot say (it moves the tie-break AND every
+    first-flow-found-wins lookup at once)."""
+    from scheduler import load_two_tier
+    from scheduler.flow import tie_break_term
+    tt = load_two_tier("scheduler/scheduler_config.yaml", min_rb=5)
+    assert tt.tie_break_seed is None
+    a = _Candidate(3, [], 100.0, 0.1, 20.0, coef=5.0, hyp_tbs_bytes=100)
+    b = _Candidate(7, [], 100.0, 0.1, 20.0, coef=5.0, hyp_tbs_bytes=100)
+    assert tt._ul_rank_key(a) == tt._ul_rank_key(b), "these must tie with the control off"
+    tt.tie_break_seed = 11
+    ka, kb = tt._ul_rank_key(a), tt._ul_rank_key(b)
+    assert ka != kb, "the control must separate a tie"
+    assert ka[:-1] == kb[:-1], "and it must separate it ONLY on the appended term"
+    # deterministic across processes: crc32, never Python's randomised hash()
+    assert tie_break_term(11, 3) == tie_break_term(11, 3)
+    tt.tie_break_seed = None
+    assert tt._ul_rank_key(a) == tt._ul_rank_key(b)

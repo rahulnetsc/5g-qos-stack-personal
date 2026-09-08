@@ -419,9 +419,14 @@ def test_ul_sched_inactive_never_fires_ranking_stays_coefficient_only():
     sched.configure(_lcgs([flow]), slot_duration_s=0.0005, grid=_grid())
 
     c = _Candidate(ue_id=1, flows=[flow], bits_per_rb=100, bler=0.1, snr_db=20.0, coef=5.0)
-    assert sched._ul_rank_key(c) == (1, 1, 0, -5.0)
+    # The trailing 0 is the tie-break-only control's term
+    # (scheduler/flow.py::tie_break_term), which is 0 for every UE while
+    # `tie_break_seed is None` -- so the key is unchanged in every ordinary
+    # run and this assertion still pins the four real terms.
+    assert sched._ul_rank_key(c) == (1, 1, 0, -5.0, 0)
     c.sched_inactive = True  # never actually set by this scheduler, but
-    assert sched._ul_rank_key(c) == (0, 1, 0, -5.0)  # the key itself is real
+    assert sched._ul_rank_key(c) == (0, 1, 0, -5.0, 0)  # the key itself is real
+    # trailing 0 = the tie-break control's inert term (see above)
 
 
 # -- 6. commit 3: _dl_rank_key/_ul_rank_key stay independently sourced -----

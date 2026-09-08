@@ -1,0 +1,19 @@
+start 1788865970 Tue Sep  8 04:42:50 PM IST 2026
+120 ramp sweeps x 11 points = 1320 driver runs (2 tie-break arms x 2 cells x 3 arms x 10 seeds)
+  0 banked, 120 to run
+    ... 10/120 (60s)
+    ... 20/120 (117s)
+    ... 30/120 (175s)
+    ... 40/120 (204s)
+    ... 50/120 (230s)
+    ... 60/120 (253s)
+    ... 70/120 (278s)
+    ... 80/120 (285s)
+    ... 90/120 (306s)
+    ... 100/120 (326s)
+    ... 110/120 (348s)
+    ... 120/120 (367s)
+
+wrote sweeps/g12-stress/g12_stress.json  (367s, 120 sweeps)
+WALL 367.52 s
+done 1788866338 exit=0

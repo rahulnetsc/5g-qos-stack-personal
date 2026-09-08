@@ -71,7 +71,8 @@ Severity = **M02, protected fleet**, one population on every row.
 | **G10** fleet | GBR contract met, per fleet size | **boundary 6** | **6** | **5** | §2 below |
 | **G11** shift | every 60 s window conformant | 10/10 | 10/10 | 10/10 | Holds over 7.2 M slots, ×112 margin |
 | | CoV(p98) ≤ 15 % across repeats | 1/1 · 0.014 | 1/1 · 0.052 | 1/1 · 0.015 | Reproduces run to run |
-| **G12** safety order | **c4 never starve telemetry** | 10/10 | 10/10 | **10/10 — severity 0.98** | **TwoTier passes while 98 % of telemetry bytes are PDB-violated.** The predicate treats "starved" as M02 ≥ 0.99 and TwoTier sits at 0.98 — **a threshold artefact, not a clean pass** |
+| **G12** safety order | **WITHDRAWN AND REPLACED 2026-09-08** by `docs/g12-stress-experiment-2026-09-08.md`. Clause 4 now scores **PASS 10/10 on every arm** across 240 ramp sweeps at both caps. **The first-violation row is NOT SCOREABLE**: the 5QI-2 camera flows offer 3.8788 Mbps against a 4.0000 Mbps GFBR, an arithmetic ceiling of 0.9697, so that class is pinned below contract at every ramp point independent of scheduling while 5QI 4 sits at 1.000 — the `[2,4]` inversion was reading the traffic generator. Do not quote the rows below. | | | |
+| | c4 never starve telemetry (superseded) | 10/10 | 10/10 | **10/10 — severity 0.98** | **TwoTier passes while 98 % of telemetry bytes are PDB-violated.** The predicate treats "starved" as M02 ≥ 0.99 and TwoTier sits at 0.98 — **a threshold artefact, not a clean pass** |
 | | **first-violation order** | `[4]`×8 — **matches** | `[]`×10 — nothing breaches | **`[2,4]`×10 — INVERTED** | Specified order is 9 → 4 → 2. **TwoTier degrades camera before lidar**, the wrong way round |
 
 ## 2. G10's axis — the row that changed most

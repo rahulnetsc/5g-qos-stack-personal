@@ -412,7 +412,7 @@ virtual-queue state in ``ia_p5g_scheduler.c`` is per-LCG, not per-flow).
 
 from dataclasses import dataclass, field
 
-from .flow import LCG_SRB, FlowConfig, require_assigned_lcgs, ul_lcg_bytes
+from .flow import LCG_SRB, FlowConfig, require_assigned_lcgs, tie_break_term, ul_lcg_bytes
 from .rank_trace import RankEntry, RankSnapshot, field as trace_field
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
@@ -663,8 +663,13 @@ class _UeState:
 # DL are two independently-sourced comparators here (5 tiers vs 4 in ground
 # truth) that currently coincide in width -- kept as two names, never one
 # shared tuple, for the same reason the methods themselves are not merged.
-_UL_TERMS = ("has_srb", "has_gbr", "pdb_ms", "-coef")
-_DL_TERMS = ("has_srb", "has_gbr", "pdb_ms", "-coef")
+# "tie_break" is the LAST term and is 0 for every candidate unless
+# G12's tie-break-only control is armed (scheduler/flow.py::
+# tie_break_term). Declared here because scheduler/rank_trace.py
+# asserts key width against these names -- it caught the undeclared
+# term immediately, which is what it exists to do.
+_UL_TERMS = ("has_srb", "has_gbr", "pdb_ms", "-coef", "tie_break")
+_DL_TERMS = ("has_srb", "has_gbr", "pdb_ms", "-coef", "tie_break")
 # Factors of a term rather than tiers of the key -- see rank_trace.RankEntry.
 _FACTORS = ("coef", "bits_per_rb", "snr_db", "bler", "pdb_ms", "has_gbr")
 
@@ -715,6 +720,8 @@ class Reservation:
         # Build 1.2: the manipulation check for the has_srb tier -- how many
         # adjacent sorted candidates the tier separated. Surfaced by the
         # driver as summary["scheduler_counters"].
+        #: G12's tie-break-only control -- see scheduler/flow.py.
+        self.tie_break_seed: int | None = None
         self.counters: dict[str, int] = {"has_srb_decisive": 0, "has_srb_candidates": 0}
         # min_rb: UL's follower-budget floor (nrmac->min_grant_prb) --
         # a deliberate operator/experimenter choice for the calibration
@@ -1424,6 +1431,7 @@ class Reservation:
             0 if c.has_gbr else 1,
             c.pdb_ms,
             -c.coef,
+            tie_break_term(self.tie_break_seed, c.ue_id),
         )
 
     def _dl_rank_key(self, c: _Candidate) -> tuple:
@@ -1446,6 +1454,7 @@ class Reservation:
             0 if c.has_gbr else 1,
             c.pdb_ms,
             -c.coef,
+            tie_break_term(self.tie_break_seed, c.ue_id),
         )
 
     def _emit_grant(

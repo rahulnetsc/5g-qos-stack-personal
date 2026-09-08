@@ -7,6 +7,7 @@ offered load. In an OAI deployment this is populated from the 5QI / QoS
 profile of each bearer.
 """
 
+import zlib
 from dataclasses import dataclass, field
 from typing import Iterable, Literal
 
@@ -277,6 +278,30 @@ def ul_lcg_bytes(flows, ue_id: int, buffers) -> dict[int, int]:
             continue
         out[f.lcg] = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
     return out
+
+
+def tie_break_term(seed: "int | None", ue_id: int) -> int:
+    """G12's TIE-BREAK-ONLY control: a deterministic per-UE term appended as
+    the LAST element of a scheduler's rank key.
+
+    When two candidates tie on every real term, the winner is currently
+    decided by list position, because Python's `list.sort` is stable. This
+    replaces that with a seeded pseudo-random order WITHOUT touching the flow
+    list -- which is what makes it a clean control. `permute_flows` moves the
+    tie-break AND every first-flow-found-wins lookup at once
+    (`has_gbr`/`pdb_ms`/the LCG-0 estimate all scan `self._flows`), so an
+    order that shifts under it does not say which caused it.
+
+    `seed is None` returns 0 for every UE, so the key is unchanged and every
+    existing result is byte-identical -- the control is off by default.
+
+    `zlib.crc32`, not `hash()`: Python's string hash is randomised per
+    process (PYTHONHASHSEED), which would make the control unreproducible
+    across workers -- the exact failure a seeded control exists to avoid.
+    """
+    if seed is None:
+        return 0
+    return zlib.crc32(f"{seed}:{ue_id}".encode())
 
 
 def require_assigned_lcgs(flows: Iterable["FlowConfig"], consumer: str) -> None:

@@ -696,7 +696,7 @@ not a cosmetic one. Fixed here.
 
 from dataclasses import dataclass, field
 
-from .flow import LCG_SRB, FlowConfig, require_assigned_lcgs, ul_lcg_bytes
+from .flow import LCG_SRB, FlowConfig, require_assigned_lcgs, tie_break_term, ul_lcg_bytes
 from .interfaces import Allocation, BufferView, ChannelView, GridView, SlotView
 from .link import (
     cap_ues_per_slot,
@@ -853,8 +853,13 @@ class _UeState:
 # Names for the elements of _ul_rank_key/_dl_rank_key, in the SAME order.
 # Declared here rather than in the analysis so a key whose width changes is
 # caught by RankSnapshot.__post_init__ instead of being silently re-indexed.
-_UL_TERMS = ("sched_inactive", "floor_fire", "-floor_sil", "-coef")
-_DL_TERMS = ("has_gbr", "pdb_ms", "-coef")
+# "tie_break" is the LAST term and is 0 for every candidate unless
+# G12's tie-break-only control is armed (scheduler/flow.py::
+# tie_break_term). Declared here because scheduler/rank_trace.py
+# asserts key width against these names -- it caught the undeclared
+# term immediately, which is what it exists to do.
+_UL_TERMS = ("sched_inactive", "floor_fire", "-floor_sil", "-coef", "tie_break")
+_DL_TERMS = ("has_gbr", "pdb_ms", "-coef", "tie_break")
 # Diagnostic quantities that are FACTORS of a term rather than tiers of the
 # key -- the first-difference rule cannot separate these, so they are carried
 # alongside. Every name is read through `trace_field`, which raises on a name
@@ -953,6 +958,9 @@ class TwoTier:
         # need the same manipulation check every other mechanism carries --
         # a COUNT, surfaced by the driver as summary["scheduler_counters"].
         # A tier that reports zero with SRB traffic present is unwired.
+        #: G12's tie-break-only control (scheduler/flow.py::tie_break_term).
+        #: None keeps the key, and therefore every result, unchanged.
+        self.tie_break_seed: int | None = None
         self.counters: dict[str, int] = {
             "sched_inactive_fired": 0, "srb_floor_fired": 0,
             "cp_floor_fired": 0, "control_plane_grants": 0,
@@ -1578,7 +1586,8 @@ class TwoTier:
         precedent of never merging its _ul_rank_key/_dl_rank_key even
         when their shapes coincide.
         """
-        return (0 if candidate.has_gbr else 1, candidate.pdb_ms, -candidate.coef)
+        return (0 if candidate.has_gbr else 1, candidate.pdb_ms, -candidate.coef,
+                tie_break_term(self.tie_break_seed, candidate.ue_id))
 
     def _emit_rank_snapshot(self, slot_index, direction, candidates,
                             rank_key) -> None:
@@ -1638,6 +1647,7 @@ class TwoTier:
             0 if candidate.floor_fire else 1,
             -candidate.floor_sil if candidate.floor_fire else 0,
             -candidate.coef,
+            tie_break_term(self.tie_break_seed, candidate.ue_id),
         )
 
     def _dl_gbr_and_pdb(
