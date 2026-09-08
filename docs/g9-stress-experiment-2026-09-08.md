@@ -177,3 +177,277 @@ this experiment's occupancy axis is set to span it:
 
 Levels 3-4 straddle every arm's boundary; 5-6 are past it, where the
 baseline sanity gate is expected to start reporting CELL ALREADY BROKEN.
+
+---
+
+## 2. The experiment — parameters, complete
+
+**Question, in the operator's terms:** *if the cell is already busy, will a
+newly connecting robot start working correctly and immediately?*
+
+**Runner:** `scripts/g9_stress.py`. **Artefact:**
+`sweeps/g9-stress/g9_stress.json` (+ `.runs.jsonl`, one fsynced line per
+completed run, so a kill loses nothing).
+
+### 2.1 Axis, scenarios, arms
+
+| | |
+|---|---|
+| **axis** | cell occupancy — **UE count and committed load move together**, one knob, because an operator does not experience them separately |
+| **levels** | (3 UEs, ×0.50), (4, ×0.75), (5, ×1.00), (6, ×1.25), (7, ×1.50), (8, ×2.00) — total UEs incl. the joiner |
+| **range set by** | G10's re-measured boundary, PF 6 / Reservation 6 / TwoTier 5 (§1.3). Levels 3-4 straddle it; 5-6 are past it |
+| **scenarios** | `warm` (GT-6.1 app restart), `cold` (GT-6.2 power cycle), `rlf` (GT-6.3 deep fade) — scored separately |
+| **arms** | PF, Reservation, TwoTier |
+| **seeds** | 10, paired (`regime_sweep.paired_seeds`) |
+| **each run** | also builds its **paired control** — same seed, same fleet, no join schedule — so the neighbours delta is within-seed |
+| **join rate** | **deferred, deliberately.** One joiner per run: this experiment is contention against incumbents, not between joiners |
+
+### 2.2 Cell, flags, every state declared
+
+| | |
+|---|---|
+| carrier | 40 MHz, numerology 2, TDD `DSUUU`, slot 0.25 ms |
+| horizon | 20 000 slots (5.0 s) warm/cold; 30 000 (7.5 s) rlf |
+| **M-6 cap** | **`max_sched_ues = 4`** — the deployment's value. The carrier caveat stands: this is 55 PRB against the deployment's 106 |
+| **RA** | **ON**, deployed config (`RandomAccessConfig.deployed()`) |
+| **SRB** | **ON** (`with_srb`, `srb: True`) — attach and re-establishment dialogues live |
+| **`--rejoin-seed`** | **BOTH columns run and both reported**, each labelled |
+| `cqi_delay_slots` | 8 |
+| `attach_seed_slots` | **off** (the sim-only slot-0 lever; distinct from `--rejoin-seed`) |
+| `committed_mult` | the axis (see above) |
+| `survival_time` | **1 transfer interval** (`--intervals 1.0`), CHOSEN, swept |
+
+### 2.3 Thresholds — where each one comes from
+
+| clause | threshold | source |
+|---|---|---|
+| **warm re-handshake** | every committed flow available again, i.e. a delivery within **PDB + survival_time** | **TS 122 261 V17.11.0 §3.1**, transcribed |
+| **post-RLF time-to-SLO** | same | same |
+| **cold attach-to-streaming** | **≤ 15 s** | the test plan (L103), kept as the plan states it |
+| **neighbours** | \|Δp98\| ≤ ε, **ε ∈ {0.5, 1, 2, 5} ms** | **CHOSEN — no spec basis. The test plan says "neighbours unaffected" and never states an ε**, so it is swept and reported at every value rather than fixed |
+
+**PDB and survival time per 5QI, as actually built** (`intervals = 1.0`;
+survival time is `n × transfer_interval`, derived from each flow's own
+configured period per TS 122 261 §3.1's definition):
+
+| 5QI | dir | class | traffic | PDB (ms) | survival (ms) | **budget (ms)** | GFBR | period (ms) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | UL | Delay | periodic_control | 100 | 100 | **200** | — | 100 |
+| 2 | UL | GBR | xr_video | 150 | 33 | **183** | 4 Mbps | 33 |
+| 82 | DL | Delay | periodic_control | 100 | 50 | **150** | — | 50 |
+| 8 | UL | PF | poisson (aggressor) | 300 | 0 | — | — | — |
+| 70 / 71 | UL / DL | Delay | handshake pair | 1000 | 0 | — | — | fire-once |
+| −11…−14 | UL / DL | — | SRB1/SRB2 | — | — | — | — | — |
+
+**Scored population:** committed flows only — `flow_class ∈ {GBR, Delay}`,
+**derived**, never a QFI list. Best-effort (5QI 8/9) carries no promise;
+SRBs and the handshake pair are signalling, not services, and the handshake
+pair is what sub-experiment A measures the *completion* of. **The fire-once
+handshake period (1e9 ms) would have derived a 1e9 ms survival time**, a
+number that reads as authoritative and makes a flow unconditionally
+available — `with_survival_times` now bounds survival time by the
+scenario's own horizon, and the campaign restarted clean rather than ship an
+artefact whose rows spanned two code versions.
+
+### 2.4 Scoring
+
+**Baseline sanity gate, first.** Over the window ending at the first join
+trigger (skipping one availability budget of warm-up), what fraction of the
+time was any incumbent committed flow *unavailable* by the spec rule? Three
+outcomes, all reported:
+
+- **CELL ALREADY BROKEN** — the incumbents were failing before the joiner
+  arrived, on more than half the seeds. A result an operator needs, not a
+  skipped cell.
+- **JOIN FAILURE** — the cell was fine, and the join clause failed.
+- **PASS** — both.
+
+**Yield rule, applied uniformly rather than per clause:** **9 of 10 seeds
+pass AND no failing seed is catastrophic.** One seed slightly over a bound
+is tail variance; one seed that never completes is a mechanism, and a single
+one fails the point.
+
+**Manipulation checks, asserted BEFORE any number above is read** — RA
+completions by kind against the scenario's own scheduled count, SRB dialogue
+steps non-zero on every path that has signalling, nothing still running at
+the horizon, and the `sched_inactive` / `srb_floor` / `cp_floor` /
+`has_srb_decisive` firing counts carried onto every row.
+
+---
+
+## 3. Manipulation checks — all four mechanisms fired, with counts
+
+Read **before** any number below. Summed over all 540 unseeded runs
+(the seeded column is comparable and in the artefact):
+
+| mechanism | firings | reading |
+|---|---|---|
+| RA procedures | 670 dialogues started, **669 completed**, 140 preamble failures | fires and finishes; the 140 failures are all at the RLF fade floor, where Msg3 at MCS 0 cannot decode |
+| SRB dialogue steps | **13 136** | signalling really flows |
+| `sched_inactive` (TwoTier) | **7 147** | the tier that was hardcoded off is now decisive traffic |
+| `srb_floor` | **3 734** | SRB backlog promoting a UE |
+| `cp_floor` | **7 008** | the BSR-desync rescue |
+| `has_srb_decisive` (Reservation) | **4 736** | its top tier separating adjacent candidates |
+| still running at the horizon | RA 0, SRB **1** | one stalled dialogue in 670, recorded as catastrophic, not hidden |
+
+**None of these read zero.** Had `sched_inactive` still read zero with SRB
+traffic present, everything below would be uninterpretable — which is why
+the check runs first.
+
+## 4. Results
+
+**How to read "B: time to a stable cell".** The horizon minus the first
+trigger is **4.5 s** (warm/cold) and **4.5 s** (rlf). A value at that
+ceiling means **the cell never settled before the run ended** — it is a
+saturated counter, not a measurement, and is written as *never* below.
+
+### 4.1 Warm re-handshake (GT-6.1) — unseeded
+
+| occupancy | PF | Reservation | TwoTier |
+|---|---|---|---|
+| 3 UEs ×0.50 | PASS · 0.000 s | PASS · 0.000 s | PASS · 0.000 s |
+| 4 UEs ×0.75 | PASS · 0.000 s | PASS · 0.000 s | PASS · 0.000 s |
+| 5 UEs ×1.00 | PASS · 0.000 s | PASS · 0.000 s | PASS · 0.000 s · *cell never settles* |
+| 6 UEs ×1.25 | PASS · 0.000 s | PASS · 0.000 s | PASS · 0.000 s · 3 broken seeds · *never settles* |
+| 7 UEs ×1.50 | PASS · 0.000 s | PASS · 0.000 s | **CELL ALREADY BROKEN** · 10/10 seeds |
+| 8 UEs ×2.00 | **CELL ALREADY BROKEN** · 7/10 | PASS · 0.000 s | **CELL ALREADY BROKEN** · 10/10 |
+
+**A warm re-join is free on every arm, at every occupancy.** First service
+is 0.000 s — the app restart never drops the radio, so the robot is served
+in the first slot it has data. **The warm clause is not where the risk is**,
+and no failure at 7-8 UEs is a join failure: the cell was already broken.
+
+### 4.2 Cold attach-to-streaming (GT-6.2) — unseeded
+
+| occupancy | PF | Reservation | TwoTier |
+|---|---|---|---|
+| 3 UEs ×0.50 | PASS · 0.100 s | PASS · 0.100 s | PASS · 0.102 s |
+| 4 UEs ×0.75 | PASS · 0.100 s | **JOIN FAILURE** · 1 catastrophic seed | PASS · 0.106 s |
+| 5 UEs ×1.00 | PASS · 0.100 s | PASS · 0.113 s | PASS · 0.119 s · *never settles* |
+| 6 UEs ×1.25 | PASS · 0.100 s | PASS · 0.116 s | **JOIN FAILURE** · **5/10 seeds never complete** · 3.23 s |
+| 7 UEs ×1.50 | PASS · 0.104 s | PASS · 0.126 s | **CELL ALREADY BROKEN** · 10/10 · 8 catastrophic |
+| 8 UEs ×2.00 | **CELL ALREADY BROKEN** · 8/10 | PASS · 0.152 s | **CELL ALREADY BROKEN** · 10/10 |
+
+**Attach-to-streaming is ~100 ms and essentially flat across the whole
+axis** on PF and Reservation — against the test plan's 15 s bound, a **~150×
+margin that occupancy does not erode**. Reservation drifts 0.100 → 0.152 s
+from the lightest to the heaviest point; PF does not move at all.
+
+**TwoTier is the arm that fails, and it fails *before* the cell is full.**
+At 6 UEs — its own G10 boundary is 5 — **half the seeds never complete the
+attach**, and first service jumps 0.119 → 3.23 s.
+
+### 4.3 Post-RLF time-to-SLO (GT-6.3) — unseeded
+
+| occupancy | PF | Reservation | TwoTier |
+|---|---|---|---|
+| 3 UEs ×0.50 | PASS · 1.031 s | PASS · 1.136 s | PASS · 1.031 s |
+| 4 UEs ×0.75 | PASS · 1.031 s | PASS · 1.136 s | PASS · 1.048 s |
+| 5 UEs ×1.00 | PASS · 1.031 s | PASS · 1.140 s | **CELL ALREADY BROKEN** · 7/10 · 5 catastrophic |
+| 6 UEs ×1.25 | PASS · 1.031 s | PASS · 1.143 s | **CELL ALREADY BROKEN** · 10/10 · **10 catastrophic, no attach completes** |
+| 7 UEs ×1.50 | PASS · 1.031 s | PASS · 1.148 s | **CELL ALREADY BROKEN** · 10/10 · 9 catastrophic |
+| 8 UEs ×2.00 | **CELL ALREADY BROKEN** · 10/10 | **JOIN FAILURE** · 4 catastrophic | **CELL ALREADY BROKEN** · 10/10 |
+
+**Recovery is ~1.03 s (PF) / ~1.14 s (Reservation) and flat**, against the
+plan's 10 s bound — a **~9× margin**, and occupancy does not erode it up to
+7 UEs. **TwoTier is broken from 5 UEs**, and at 6 and 8 UEs **not one seed
+completes the recovery**.
+
+### 4.4 The neighbours clause — the plan's missing ε is doing the work
+
+Pooled over all 540 unseeded runs, the fraction whose worst incumbent p98
+moved by no more than ε:
+
+| ε | seed-runs within |
+|---|---|
+| **0.5 ms** | 184 / 540 (34 %) |
+| **1.0 ms** | 217 / 540 (40 %) |
+| **2.0 ms** | 266 / 540 (49 %) |
+| **5.0 ms** | 408 / 540 (76 %) |
+
+**"Neighbours unaffected" is not a testable clause as written.** At 1 ms it
+fails on 60 % of runs; at 5 ms it passes on 76 %. **The verdict is chosen by
+the ε, and the test plan does not state one** — so no neighbours result
+should be quoted without its ε beside it. Signs are mixed rather than
+uniformly bad: TwoTier's deltas are positive (up to +7.8 ms at 5 UEs, CI
+excluding zero), while at 8 UEs ×2.0 every arm goes strongly *negative*
+(PF −12.9 ms) because the cell is saturated and the paired control is
+degraded too.
+
+## 5. The `--rejoin-seed` lever — and whether RA retired it
+
+**Both columns were run in full. Outcomes are identical on 53 of 54
+(scenario × occupancy × arm) cells.** The single difference:
+
+| cell | unseeded | seeded |
+|---|---|---|
+| cold, 6 UEs ×1.25, TwoTier | **JOIN FAILURE** (5/10 never complete) | **PASS** (0 never complete) |
+
+Residual differences in catastrophic-seed counts, all TwoTier:
+cold n=6 **5→0**, n=7 **8→3**; rlf n=5 **5→3**. PF and Reservation are
+unchanged everywhere.
+
+**The finding, and it is the one asked for.** Before Build 1, TwoTier could
+not be scored on G9 without the seed at all — the runner's guard refused a
+degenerate arm (1 of 5 cold events registering). **With RA and SRB live,
+the unseeded column runs and scores on every cell.** The real RACH grant
+plus the SRB dialogue supply what the sim-only BSR seed was standing in for.
+
+**So: nearly redundant, not yet deletable.** It still rescues TwoTier at
+exactly its boundary. The honest disposition is to keep the lever, **declare
+it on every row that uses it** (which the withdrawn G9 rows did not), and
+default it **off** — the unseeded column is the one that describes the
+deployment, and it is now scoreable.
+
+## 6. What an operator should take from this
+
+1. **A robot rejoining after an app restart is served immediately, on every
+   arm, at every occupancy tested.** Warm re-join is not a risk.
+2. **A robot cold-attaching to a busy cell is streaming in ~100 ms** on PF
+   and Reservation — 150× inside the 15 s bound, and flat across a 4× range
+   of committed load.
+3. **After a radio outage a robot is back inside ~1.1 s**, ~9× inside the
+   10 s bound.
+4. **On TwoTier, none of that holds once the cell reaches 5-6 robots.** At
+   6 UEs half the cold attaches never complete; after an RLF at 6 or 8 UEs,
+   **none** do. Its G10 admissible boundary is 5, and the join clauses fail
+   at or just past it — the two agree.
+5. **PF's cell breaks at 8 UEs ×2.0 while its joins keep working.** The
+   distinction the gate exists to draw: the joiner is fine, the incumbents
+   are not. An operator seeing "joins are fine" there would be looking at
+   the wrong thing.
+6. **Reservation is the most robust arm in this experiment** — PASS to
+   8 UEs ×2.0 on warm and cold, failing only post-RLF at the top point.
+7. **Do not quote a neighbours verdict without its ε.**
+
+## 7. Run times
+
+| campaign | runs | wall | per run |
+|---|---|---|---|
+| G10 re-measurement (Step 0a) | 270 | **250 s** | 0.93 s |
+| G9 stress, leg 1 (aborted at 430) | 430 | ~300 s | 0.70 s |
+| G9 stress, leg 2 (resumed) | 650 | **513 s** | 0.79 s |
+| **G9 stress total** | **1 080 rows = 2 160 driver runs** | **~813 s** | **0.75 s/row** |
+| **all campaigns** | | **~1 063 s (17.7 min)** | |
+
+12 workers, `OMP_NUM_THREADS=1`. Mean CPU per row (joiner + paired control)
+**12.72 s**. The resumed leg re-ran only the 650 unbanked rows: the ledger
+banks one fsynced line per completed run, and only the *guard* changed
+between legs, not any run's behaviour.
+
+## 8. Caveats, stated on the result rather than buried
+
+- **`survival_time` is 1 transfer interval, CHOSEN.** TS 22.104's table
+  could not be obtained (§1.2); the derivation rule is TS 122 261's, the
+  count of intervals is ours and is swept.
+- **The neighbours ε is chosen and unspecified by the plan** (§4.4).
+- **This carrier is 55 PRB against the deployment's 106**, so cap 4 is the
+  deployment's value on half its bandwidth. Neither cap is the deployment's
+  system.
+- **`stable cell` saturates at 4.5 s** = horizon − trigger; at that value
+  the cell never settled within the run, and no larger number exists to
+  measure.
+- **TwoTier's `sched_inactive` went live in this same pass** (§1.0). Its
+  numbers here are the first measured with the control-plane floors ported;
+  they are not comparable to any TwoTier G9 figure published before
+  2026-09-08.

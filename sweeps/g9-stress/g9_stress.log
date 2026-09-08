@@ -1,8 +1,82 @@
-start 1788855524 Tue Sep  8 01:48:44 PM IST 2026
+start 1788855860 Tue Sep  8 01:54:20 PM IST 2026  [restarted on post-fix code]
 1080 runs = 2 seed-columns x 3 cases x 6 occupancy levels x 3 arms x 10 seeds (each run also builds its paired control)
   0 banked, 1080 to run
-    ... 25/1080 (38s)
+    ... 25/1080 (37s)
     ... 50/1080 (75s)
     ... 75/1080 (105s)
     ... 100/1080 (139s)
-    ... 125/1080 (183s)
+    ... 125/1080 (182s)
+    ... 150/1080 (229s)
+    ... 175/1080 (296s)
+    ... 200/1080 (325s)
+    ... 225/1080 (366s)
+    ... 250/1080 (397s)
+    ... 275/1080 (434s)
+    ... 300/1080 (477s)
+    ... 325/1080 (521s)
+    ... 350/1080 (579s)
+    ... 375/1080 (608s)
+    ... 400/1080 (627s)
+    ... 425/1080 (650s)
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/regime_sweep.py", line 500, in _run_one_indexed
+    return idx, fn(task)
+                ^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g9_stress.py", line 248, in one
+    checks = _manipulation_checks(s, want_path, len(events), label)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g9_stress.py", line 210, in _manipulation_checks
+    raise AssertionError(f"{label}: RA/SRB still running at the horizon "
+AssertionError: cold/Reservation/n4/cm0.75/seed376383645: RA/SRB still running at the horizon -- a stall, not a sample
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g9_stress.py", line 425, in <module>
+    raise SystemExit(main(sys.argv))
+                     ^^^^^^^^^^^^^^
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/g9_stress.py", line 392, in main
+    for i, r in run_cells(one, todo, a.workers, cost=lambda t: arm_cost(t[1])):
+  File "/home/smart/projects/5g-qos-stack-personal/scripts/regime_sweep.py", line 491, in run_cells
+    for idx, result in pool.imap_unordered(
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 873, in next
+    raise value
+AssertionError: cold/Reservation/n4/cm0.75/seed376383645: RA/SRB still running at the horizon -- a stall, not a sample
+resume 1788857283 Tue Sep  8 02:18:03 PM IST 2026  [guard split: firing aborts, finishing records]
+1080 runs = 2 seed-columns x 3 cases x 6 occupancy levels x 3 arms x 10 seeds (each run also builds its paired control)
+  430 banked, 650 to run
+    ... 450/1080 (15s)
+    ... 475/1080 (41s)
+    ... 500/1080 (59s)
+    ... 525/1080 (92s)
+    ... 550/1080 (117s)
+    ... 575/1080 (135s)
+    ... 600/1080 (157s)
+    ... 625/1080 (172s)
+    ... 650/1080 (193s)
+    ... 675/1080 (216s)
+    ... 700/1080 (242s)
+    ... 725/1080 (272s)
+    ... 750/1080 (284s)
+    ... 775/1080 (302s)
+    ... 800/1080 (312s)
+    ... 825/1080 (329s)
+    ... 850/1080 (345s)
+    ... 875/1080 (367s)
+    ... 900/1080 (389s)
+    ... 925/1080 (401s)
+    ... 950/1080 (417s)
+    ... 975/1080 (430s)
+    ... 1000/1080 (443s)
+    ... 1025/1080 (460s)
+    ... 1050/1080 (478s)
+    ... 1075/1080 (505s)
+
+wrote sweeps/g9-stress/g9_stress.json  (513s wall, 1080 runs)
+done 1788858319 Tue Sep  8 02:35:19 PM IST 2026 exit=0
