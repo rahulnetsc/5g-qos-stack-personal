@@ -206,6 +206,67 @@ only in G2's cell.
 
 ---
 
+## 4b. Reservation's deadline tier is PRESENT and never reached — and it is diagnosed
+
+**The row above says Reservation "HAS a deadline tier and it is never
+reached". That is now diagnosed rather than observed**, and it is the first
+entry on the Reservation edit list with a plausible, bounded fix
+(`docs/reservation-edits.md` R4).
+
+**Reservation's downlink key already puts the deadline above the channel
+term** — `(has_srb, has_gbr, pdb_ms, -coef, tie_break)`. Unlike the other
+edit-list items this is **not a missing mechanism.** It decides **0.6 %** of
+adjacencies against two-tier's **8.1 %**.
+
+**Three candidate causes, settled by the rank trace without building
+anything** — counting distinct `pdb_ms` values among the candidates in the
+windows where an urgent packet is pending:
+
+| candidate cause | verdict |
+|---|---|
+| it reads a **sentinel** | **NO** — the 9999 seed **never appears** in any observed value, either arm, any cell |
+| the **coefficient's dynamic range** swamps it | **NO, and this is the intuitive reading**: the key is **lexicographic**, so `-coef` is consulted only when `pdb_ms` is *exactly* equal. A tier above it cannot be swamped from below. *"`-coef` decides 98.4 %"* is a **restatement** of *"`pdb_ms` ties on 98.4 %"* |
+| the **values** | **YES — in two distinct ways** |
+
+**They are COARSE.** Thirteen distinct levels across both arms and every cell
+— `{0, 2, 3, 4, 5, 7, 8, 9, 10, 297, 298, 299, 300}` — because
+`max(0, pdb_ms − int(age_ms))` truncates to **whole milliseconds against a
+0.25 ms slot.** **The tier's resolution is 4× coarser than the scheduler's own
+decision granularity.**
+
+**They SATURATE AT ZERO.** Age is measured from the flow's **last grant**, not
+from the queued packet's arrival, so a flow granted less often than its own
+PDB pins to 0 — and every such robot reads the same 0. The share at exactly
+zero rises **7.9 % → 24.4 %** as the fleet is stopped together. Reservation's
+candidates share one value in **71.6–88.4 %** of snapshots, against TwoTier's
+**32.2–39.1 %**.
+
+### And one finding cuts against the easy fix
+
+**The two arms compute `remaining_pdb` with BYTE-IDENTICAL code** — same seed,
+same truncation, same branches, read side by side. **So the 0.6 % vs 8.1 % gap
+is not in how the deadline is computed**; it is in which robots are candidates
+together, and **why those sets differ is measured but not yet explained.**
+
+### What it means for "is Reservation with edits sufficient"
+
+**The resolution half is genuinely tunable** — compute the remaining PDB in
+**slots** rather than truncated milliseconds. One expression, one function, 4×
+the resolution.
+
+**The saturation half is not tuning** — measuring grant recency rather than
+queued-packet age is a semantic change, a different mechanism, and should not
+be bundled with it.
+
+**And neither is established to close the gap.** Breaking ties does not
+establish they break the *right* way, and the byte-identical formula is the
+reason for that caution: **Reservation already computes the deadline exactly
+as the arm that does 13× better does.** If the gap is eligibility rather than
+the tier, the resolution change is not the edit that matters — which is why
+that question has to be answered before a "Reservation + edits" arm is built.
+
+---
+
 ## 5. Deployment consequence
 
 **The master disconnects. On the deployment's cap, up to four robots stop
@@ -220,10 +281,23 @@ together cleanly. Beyond that, some do not stop at all.**
   count; §4 shows every lost STOP would have arrived within 12.25 ms had its
   own bearer not discarded it at 5 ms.
 
-**In order of leverage:** widen the STOP bearer's PDB toward the guarantee's
-own 100 ms; or raise the per-slot UE cap (the deployment's 106-PRB carrier
-gives 4 against this carrier's 2); or stop robots in groups no larger than
-the cap. **Adding bandwidth or shedding fleet load does close to nothing.**
+**The levers, measured against each other** (21 600 STOP events per cell):
+
+| | cap 2 | cap 4 | **cap 8** |
+|---|---|---|---|
+| **5 ms PDB** (today) | 1.78 × 10⁻² | 1.25 × 10⁻³ | 2.78 × 10⁻⁴ |
+| **100 ms PDB** | 1.39 × 10⁻⁴ | 9.26 × 10⁻⁵ | **4.63 × 10⁻⁵** |
+
+- **Widen the STOP bearer's PDB toward the guarantee's own 100 ms — a 128×
+  lever**, and the one that addresses the cause.
+- **Raise the per-slot UE cap — a 64× lever** (2 → 8). The deployment's
+  106-PRB carrier already gives 4 against this carrier's 2. **But 8 is a HARD
+  CEILING** (`MAX_DCI_CORESET`), so above 8 robots one slot can never address
+  the fleet, at any bandwidth.
+- **Or stop robots in groups no larger than the cap.**
+- **They compose, and NEITHER REACHES ZERO** — the best measured combination
+  is 4.63 × 10⁻⁵.
+- **Adding bandwidth or shedding fleet load does close to nothing.**
 
 ## 5a. Runtimes
 
