@@ -1069,6 +1069,26 @@ any `watch`/monitor whose own command line contains the pattern, and will
 match the *shell running the check itself* — which killed a relaunch
 mid-session when a cleanup loop matched its own command line.
 
+**AND THE SELF-MATCH HALF BIT THREE TIMES IN ONE SESSION, 2026-09-09, ALL
+WHILE THIS RULE WAS WRITTEN DOWN.** Knowing it is not enough; the shape is
+too convenient to type. Every instance was an `until`/`while` wait-loop whose
+own command line contained the pattern it greps for:
+
+```bash
+until ! pgrep -f "g1_stress" >/dev/null; do sleep 10; done   # never exits
+```
+
+It matches the shell running it, so the guard **deadlocks instead of firing**
+— and it fails SILENTLY, looking exactly like a long-running job. Twice it
+left a queued campaign unlaunched (found only by `ls`-ing for an artefact that
+should have appeared), and once it made a finished pool look alive.
+
+**The fix is to match on something the wait-loop itself cannot contain.**
+Wait on the ARTEFACT (`until [ -f out.json ]`), or on a PID captured at launch
+(`while kill -0 $PID 2>/dev/null`), or grep the interpreter path
+(`ps -ef | grep "[p]ython3 scripts/foo.py"`) rather than a bare script name.
+**Never `pgrep -f <script>` from a script whose command line names it.**
+
 **A THIRD instance, and it generalises the family past liveness: a NAMED
 ALIAS IS A CLAIM ABOUT TOPOLOGY, and claims about topology get verified
 against `ip addr`, not against the config that makes them.** Moving to the
@@ -1273,6 +1293,47 @@ exclusion** — `sim/scorecard.py`'s M01/M03 exclude such a flow from their
 worst contests, which is right for a worst-of-fleet statistic and wrong for
 an instrument (measured: at -6 dB the worst-flow p98 reads a comfortable
 56.25 ms for a pair of robots one of which received ZERO commands).
+
+**AND G2's CLAUSE IS A MAXIMUM ON A BEARER THAT CANNOT EXPRESS ITS OWN
+FAILURE — the sharpest could-have-failed instance in the project.** L96 /
+GT-1.2: *"100 % of STOP events <= 100 ms across all trials; demonstrated
+miss-rate bound per §5.3"*. **5QI 85's standardised PDB is 5 ms**, and
+`sim/buffer.py::expire()` discards past it, recording `complete=False` — so a
+late STOP never enters a latency statistic. **Measured: the largest DELIVERED
+STOP latency is 5.25 ms in every arm and load, while Reservation silently
+discarded 87 of 1 607.** A p98 scored against 100 ms therefore **cannot
+fail**, and the arm losing a robot and the arm losing none score identically.
+**A miss is NON-DELIVERY, not late delivery** — score completions, never a
+percentile. And **§5.3's rule of three (`eps <= 3/n`) is the k=0 case only**;
+with misses observed the honest statement is a Clopper–Pearson upper limit.
+G2's scenario is `sim/scenarios/g2.py`, its runner `scripts/g2_stress.py`.
+
+**AND GT-1.2's OWN MECHANISM IS SIMULTANEITY, WHICH `aperiodic_event` CANNOT
+PRODUCE.** That kind draws an independent per-slot Bernoulli PER FLOW, so two
+robots stopping together is a coincidence: **at the real 0.2 Hz cadence, 17
+STOP events landed in 17 distinct slots and no slot ever held two.** The
+same-slot DL contention the test exists to exercise had never occurred.
+`sim/traffic.py`'s `scripted_burst` fires at an explicit SHARED slot list, so
+simultaneity is structural — a shared list cannot drift apart when someone
+later adds jitter to one flow. **What decides G2 is how many robots are
+stopped AT ONCE** (`ceil(n_stop / max_sched_ues)` downlink opportunities, each
+a TDD period against a 5 ms budget); fleet size, offered load and the
+within-frame trigger phase are all second-order — the phase spans 0.91–1.24 %
+against the cap's 24–37x.
+
+**AND WHEN TWO COUNTERS DISAGREE, FOLLOW THE DIFF — IT CORRECTED AN
+ATTRIBUTION TWICE IN ONE HOUR.** G2's runner records a miss (no completion in
+the trial's window) and, independently, `bytes_dropped_pdb`. They disagreed on
+27 of 1 320 rows. **I hypothesised HARQ retry exhaustion, wrote it into a
+document, and measured it at ZERO.** The real cause: `dropped_bytes // 40`
+assumes a STOP is lost WHOLE, and 17 rows have counts that are not multiples
+of 40 — STOPs that got a **partial grant**, part delivered before the deadline
+and the rest expired. **A fragment of a STOP is not a STOP**, so they are
+correctly misses. `never enqueued` was also checked and is **0 of 120 runs**,
+which CLOSES the decomposition — and that is what makes "every lost STOP would
+have arrived within 12.25 ms had the bearer not discarded it" quotable over
+all 513 rather than most. **Record a second observable for the same event and
+diff it; do not trust one counter's name.**
 
 **Spec/hardware-derived numeric tables get transcribed from the actual
 source text, never reconstructed from memory or re-derived by formula —

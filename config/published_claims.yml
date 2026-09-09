@@ -252,3 +252,66 @@ claims:
     statistic: count_lt
     statistic_arg: 0.95
     value: 0
+
+  # --- G2 rebuilt as a stress experiment, 2026-09-09 -------------------------
+  # The withdrawn G2 row scored `*_stop_p98_ms`, a PERCENTILE substituted for
+  # the clause's MAXIMUM, on a bearer that discards at 5 ms against a 100 ms
+  # bound -- it could not have failed. These score the clause itself: a miss
+  # is non-delivery within 100 ms.
+  - id: G2.GT12.misses
+    doc: docs/g2-stress-experiment-2026-09-09.md
+    text: "513 STOPs missed across the campaign"
+    artefact: sweeps/g2-stress/g2_stress.json
+    code_state: "current"
+    n: 440
+    horizon: 40000
+    field: n_missed
+    statistic: sum
+    value: 513
+
+  - id: G2.GT12.events
+    doc: docs/g2-stress-experiment-2026-09-09.md
+    text: "109 800 STOP events, the denominator the miss-rate bound is stated over"
+    artefact: sweeps/g2-stress/g2_stress.json
+    code_state: "current"
+    n: 440
+    horizon: 40000
+    field: n_events
+    statistic: sum
+    value: 109800
+
+  - id: G2.GT12.worst.latency
+    doc: docs/g2-stress-experiment-2026-09-09.md
+    text: "the largest DELIVERED STOP latency anywhere is 5.25 ms -- the 5 ms PDB plus one slot"
+    artefact: sweeps/g2-stress/g2_stress.json
+    code_state: "current"
+    n: 440
+    horizon: 40000
+    field: worst_ms
+    statistic: max
+    value: 5.25
+    tolerance: 0.01
+
+  - id: G2.GT12.reservation.cap2.stop12
+    doc: docs/g2-stress-experiment-2026-09-09.md
+    text: "Reservation misses 162 STOPs at cap 2 stopping 12 robots at once -- the worst cell"
+    artefact: sweeps/g2-stress/g2_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: Reservation, cap: 2, n_stop: 12, n_ues: 12}
+    field: n_missed
+    statistic: sum
+    value: 162
+
+  - id: G2.GT12.twotier.cap4.stop4
+    doc: docs/g2-stress-experiment-2026-09-09.md
+    text: "TwoTier loses nothing stopping 4 robots at once on the deployment's cap"
+    artefact: sweeps/g2-stress/g2_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: TwoTier, cap: 4, n_stop: 4, n_ues: 12}
+    field: n_missed
+    statistic: sum
+    value: 0

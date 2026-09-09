@@ -85,6 +85,8 @@ class TrafficModel:
         self.buffers = buffers
         self.slot_duration_s = slot_duration_s
         self.rng = rng
+        #: `scripted_burst`'s trigger slots, memoised per flow config.
+        self._scripted_slots: dict[tuple[int, int], frozenset] = {}
         # Optional (WP7): tags each enqueued chunk with message identity so
         # sim/messages.py can track true per-message completion. None keeps
         # pre-WP7 behaviour exactly -- every existing caller that doesn't
@@ -300,6 +302,9 @@ class TrafficModel:
             # (tight-PDB small burst vs. large burst).
             return self._gen_poisson_triggered_burst(cfg, slot_index, now_s)
 
+        if kind == "scripted_burst":
+            return self._gen_scripted_burst(cfg, slot_index, now_s)
+
         if kind == "none":
             # Build 1.2: SRB flows -- nothing arrives by itself; only a
             # dialogue (sim/srb.py) enqueues on them.
@@ -381,6 +386,51 @@ class TrafficModel:
         p = cfg.traffic_params
         trigger_prob = float(p["rate_hz"]) * self.slot_duration_s
         if self.rng.random() >= trigger_prob:
+            return []
+        return [_Arrival(now_s, int(p["burst_bytes"]))]
+
+    def _gen_scripted_burst(
+        self, cfg: FlowConfig, slot_index: int, now_s: float
+    ) -> list[_Arrival]:
+        """A burst at each slot in an EXPLICIT list -- the only kind here
+        whose firing instants are given rather than drawn.
+
+        WHY THIS EXISTS AND `aperiodic_event` DOES NOT SUFFICE. GT-1.2's
+        whole mechanism is that a master disconnect delivers a STOP to every
+        ground robot **in the same slot**, so the test exercises same-slot DL
+        contention between the highest-priority packets in the cell.
+        `aperiodic_event` draws an independent per-slot Bernoulli per flow, so
+        two robots firing together is a coincidence: measured at the real
+        0.2 Hz cadence, **17 STOP events landed in 17 distinct slots and no
+        slot ever held two** (`docs/g2-step0-2026-09-09.md`). Simultaneity has
+        to be structural, not lucky -- an explicit shared list cannot drift
+        apart when someone later adds jitter to one flow.
+
+        WHAT IT DUPLICATES, STATED. `sim/scenarios/g11.py::StopDrill` fires
+        ONE burst by gating a periodic flow to a one-period activation window;
+        this is the general form of that, with `n` instants instead of one.
+        G11 is deliberately NOT refactored onto it -- doing so would move a
+        published 7.2 M-slot artefact for no measurement gain.
+
+        `trigger_slots` is a sorted tuple of slot indices. A trial count is
+        then `len(trigger_slots)`, DERIVED and assertable, rather than
+        `horizon / period` -- which is the quantity a short horizon silently
+        truncates (defects-log #23, and G11's own C1 history).
+        """
+        p = cfg.traffic_params
+        slots = p["trigger_slots"]
+        # Membership on a set built once per flow, not a scan per slot: a
+        # 30-entry list scanned every slot of a 40,000-slot run is 1.2 M
+        # comparisons for nothing.
+        # Keyed by (ue, qfi) rather than id(cfg): a config's id is only
+        # stable while something holds a reference, and relying on that is
+        # a lifetime argument where a value key needs none.
+        key = (cfg.ue_id, cfg.qfi)
+        cached = self._scripted_slots.get(key)
+        if cached is None:
+            cached = frozenset(int(x) for x in slots)
+            self._scripted_slots[key] = cached
+        if slot_index not in cached:
             return []
         return [_Arrival(now_s, int(p["burst_bytes"]))]
 

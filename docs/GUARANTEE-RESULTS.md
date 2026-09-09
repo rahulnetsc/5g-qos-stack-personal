@@ -1,0 +1,138 @@
+# Guarantee results — the current answer for each
+
+**2026-09-09.** One row per guarantee, **current only**. Where a figure was
+withdrawn this says so and points at what replaced it; it does not reproduce
+the withdrawn number.
+
+**This supersedes `docs/GUARANTEE-TABLE-2026-09-07.md` as the place to read a
+verdict.** That file is kept: it holds the 90-row clause-part scoring and the
+supersession trail, and several of its rows are struck through in place.
+
+---
+
+## The two carrier caveats — stated once, governing every row
+
+**M-6 is the deployed per-slot UE cap**, `min(prb_count // 24, 8)`, ported
+from `gNB_scheduler_dlsch.c:1019-1023`. **The formula is faithful; the value
+depends on the carrier, and this repo's carrier is not the deployment's.**
+
+| | PRB | cap |
+|---|---|---|
+| this repo's parametric cell (40 MHz, μ=2) | 55 | **2** |
+| the deployment (N_RB 106, μ=1) | 106 | **4** |
+
+1. **cap 2 is this carrier's faithful derivation.**
+2. **cap 4 is the deployment's value on half its bandwidth.**
+3. **Neither is the deployment's system.** Both are run; **cap 4 is the number
+   to quote**, and for **G2 the cap is not a detail — it is the dominant
+   term.**
+
+---
+
+## The guarantees that have been rebuilt as stress experiments
+
+Four so far. Each has a slide source, a Step-0 record of what had to be
+corrected first, and a full record.
+
+| G | question | current answer | slide source |
+|---|---|---|---|
+| **G1** | driving a robot feels immediate while the fleet works | **PASSES both criteria, 0 breaches of 960 runs.** Worst p98 **9.00 ms** against 95 (10.6× inside); worst command gap **103 ms** against 200 (1.9× inside); p99.9 **4.50 ms**. The QoS arms are **flat in fleet size**, PF degrades mildly. **TwoTier is the best arm, not the worst** | `docs/g1-slide-source.md` |
+| **G2** | the master disconnects — does every robot stop in time | **FAILS its clause. 513 misses in 109 800 STOP trials → miss-rate ≤ 5.0 × 10⁻³ at 95 %.** Nothing is late — every delivered STOP arrived under **5.25 ms**, median 0.75 — **things are missing.** The axis that decides is how many robots stop AT ONCE, not load or fleet size | `docs/g2-slide-source.md` |
+| **G9** | does a robot joining a busy cell start working immediately | **warm re-join free on every arm; cold attach ~100 ms, post-RLF ~1.1 s on PF/Reservation, flat across a 4× load range. TwoTier fails at 5–6 UEs** — half the cold attaches and **all** post-RLF recoveries never complete | `docs/g9-slide-source.md` |
+| **G12** | what breaks first under overload, and does safety telemetry survive | **clause 4 PASSES 10/10 on every arm**, both caps, both tie-break settings. **The first-violation order is NOT SCOREABLE** — nothing breaks in the range swept, so the ramp must extend past ×2.0 | `docs/g12-slide-source.md` |
+
+**All four withdrew a published figure**, and in three of the four the reason
+was that **the statistic could not express the clause's own failure**:
+
+| G | what was withdrawn | why |
+|---|---|---|
+| G1 | *"TwoTier 87.78 ms vs 100"* and *"teleop feels sticky on 7 shifts in 10"* | M01 is a worst-flow maximum landing on **uplink** on 9 runs of 9, against a **downlink** guarantee |
+| G2 | *"PASS 10/10 at ×19 margin"* | **p98 substituted for a maximum**, on a bearer that discards at 5 ms against a 100 ms bound — the check could not have failed |
+| G9 | the four join rows | run with a sim-only lever **on and undeclared**, on artefacts predating M-9 and M-6 |
+| G12 | the `[2,4]` first-violation order | the 5QI-2 camera was pinned 3.5 % below its own contract, so the class that appeared to break first was the only one that **could not pass by construction** |
+
+---
+
+## G2 — the safety-critical row, in full
+
+**The clause: "100 % of STOP events ≤ 100 ms across all trials; demonstrated
+miss-rate bound per §5.3."** The statistic is a **maximum** over assets and
+trials, and the answer is a **rate with a confidence**, not a pass/fail.
+
+| | |
+|---|---|
+| **demonstrated bound** | **miss-rate ≤ 5.0 × 10⁻³ at 95 %** (513 of 109 800; Clopper–Pearson, since the rule of three is the zero-miss case) |
+| delivered STOP latency | p50 **0.75 ms**, p99 4.75, **max 5.25** |
+| **what decides** | **how many robots stop AT ONCE** |
+| what barely matters | fleet size, offered load, within-frame trigger phase |
+
+**Boundary — the largest simultaneous-STOP count that loses nothing:**
+
+| | PF | Reservation | TwoTier |
+|---|---|---|---|
+| **cap 4** (deployment's) | **4** | **1** · non-monotone | **4** |
+| **cap 2** (this carrier) | **1** | **none — fails at 1** | **2** |
+
+**Withdrawn: the previous "PASS 10/10 at ×19 margin".** It substituted a
+**percentile for a maximum** on a bearer that discards at 5 ms against a
+100 ms bound — **the check could not have failed**, and Reservation was
+discarding 87 of 1 607 STOPs while reading a clean pass.
+
+---
+
+## G10 — the fleet size everything else is ranged against
+
+**PF 12 / Reservation 6 / TwoTier 7**, cap 4, RA + SRB, 10 seeds per point,
+`n_ues ∈ {2,4,5,6,7,8,10,12,16}`. Re-measured 2026-09-09 and reproducing the
+2026-09-08 figure cell for cell; **no arm is non-monotone**.
+`sweeps/g1-stress/g10_remeasure_cap4.json`.
+
+**Withdrawn twice before reaching this**: `8 / 4 / 4` (a 2× gap in the sweep
+left every boundary unresolved) and `6 / 6 / 5` (measured while the camera
+offered below its own GFBR, so the **camera's contract** rather than the
+cell's capacity bound the boundary). Reservation's 6 never moved, which is the
+confirmation — it was capacity-bound and therefore real.
+
+---
+
+## The guarantees not yet rebuilt
+
+Their rows are **pre-GBR-fix** and are flagged as such in
+`docs/gbr-offered-shortfall-2026-09-08.md` §4.5. Read them as stale numbers on
+a workload whose camera offered load changed by 0.6–3.1 %.
+
+| G | last verdict | why it is stale, and what it would take |
+|---|---|---|
+| **G3** | max gap ≤ 500 ms: PF 10/10, Res 10/10, **TwoTier 4/10** (cap 4: 2/10) | pre-fix workload; the clause has parts nobody scored |
+| **G4** | **not scoreable** — three independently fatal reasons: the artefact records p98 not p99; the axis is duty cycle, not silence length; and the gap buckets cannot resolve 1 s from 60 s | needs its own scenario, like G1's and G2's |
+| **G5** | ≥ 99 % PDU sets: PF 10/10, **Res 1/10, TwoTier 0/10** | pre-fix; the attach path recovers Reservation to 10/10 |
+| **G6** | 24/40, 25/40, 20/40 | pre-fix, **and the DL half (GT-4.2, marked P0) has never run** — no DL background flow existed until G1 built one |
+| **G7** | fails clause 2; both QoS arms deliver 2.0–2.1× MFBR | pre-fix; the finding itself is a product one and survives |
+| **G8** | Jain ≥ 0.90: PF 10/10, **Res 2/10, TwoTier 0/10** (cap 4: 7/10, 5/10) | pre-fix |
+| **G11** | C1 and C3 PASS over 7.2 M slots; C2/C4/C5 not scoreable | C4 is **satisfied by construction** and cannot fail; C2 needs counters that have no C counterpart |
+
+---
+
+## The findings that are the product's, not the port's
+
+Each is read from the deployed C and merely reproduced here. **No simulator
+caveat touches any of them.** Full text: `docs/hardware-findings.md`.
+
+1. **Tier-1.5's UL floor cannot arm in the fault it exists for** — its gate
+   reads state set only inside the loop that skips the fault's own condition.
+   **0 firings in 32,000 evaluations per starved UE.**
+2. **Reservation has no floor at all** — the same fault, no remedy even in
+   principle.
+3. **MFBR bounds entitlement, not throughput** — 2.0–2.1× MFBR delivered on
+   both QoS arms.
+4. **The cold-start lock-out** — one mechanism behind four separate
+   observations.
+5. **NEW, from G2: the emergency-stop bearer's own PDB is 20× tighter than
+   the guarantee written on it, and it wins.** 5QI 85's standardised PDB is
+   **5 ms**; G2's clause bound is **100 ms**; a STOP older than its PDB is
+   discarded. **With the discard lifted to the clause's own bound, ZERO STOPs
+   are lost in 5 760 events and the worst arrives at 12.25 ms** — 8× inside
+   the guarantee. So the lost STOPs are not lost to congestion; they are
+   thrown away by their own bearer while the network would have delivered
+   them in time. **A specification finding, not a defect**: the PDB is
+   TS 23.501's and the discard is what a delay-critical GBR bearer does.

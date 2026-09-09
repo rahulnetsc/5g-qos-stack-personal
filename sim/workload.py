@@ -33,6 +33,7 @@ LOAD_PARAMS: dict[str, tuple[str, ...]] = {
     "periodic_control": ("bytes_per_period",),
     "condition_monitor": ("bytes_per_period",),
     "aperiodic_event": ("burst_bytes",),
+    "scripted_burst": ("burst_bytes",),
     "machine_vision": ("burst_bytes",),
     "none": (),
 }

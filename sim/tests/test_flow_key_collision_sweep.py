@@ -62,6 +62,7 @@ def _cases():
     three to coincide."""
     from sim.parametric import sweep_scenario
     from sim.scenarios.g1 import build_gt11_scenario
+    from sim.scenarios.g2 import build_gt12_scenario
     from sim.scenarios.g11 import build_g11_scenario
     from sim.scenarios.g12 import BG_OFFERED_BPS, COMPOSITIONS, build_g12_scenario
     from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,
@@ -100,6 +101,13 @@ def _cases():
             cases.append((f"gt11(n={n},cm={cm:g})",
                           build_gt11_scenario(seed=1, n_ues=n, horizon_slots=2000,
                                               committed_mult=cm)))
+    # GT-1.2 saturates BOTH directions, so it is the shape #30 was about in
+    # its sharpest form: 5QI 9 on DL and 5QI 8 on UL, both on the LAST UE,
+    # beside a 5QI-85 STOP and the committed profile.
+    for n, ns in ((4, 1), (8, 2), (8, 8), (16, 4)):
+        cases.append((f"gt12(n={n},stop={ns})",
+                      build_gt12_scenario(seed=1, n_ues=n, n_stop=ns,
+                                          horizon_slots=40000)))
     for fn in (gt61_warm_rejoin, gt62_cold_attach, gt63_rlf_recovery):
         cases.append((f"g9.{fn.__name__}",
                       fn(seed=1, n_neighbours=3, horizon_slots=40000)))
@@ -143,6 +151,7 @@ def test_the_sweep_COVERS_every_builder_rather_than_the_easy_ones():
             continue                       # reached via scenario(<id>)
         key = {"build_g12_scenario": "g12(", "build_g11_scenario": "g11(",
                "build_gt11_scenario": "gt11(",
+               "build_gt12_scenario": "gt12(",
                "scenario": "scenario("}.get(stem, stem)
         if key not in exercised:
             missing.append(full)

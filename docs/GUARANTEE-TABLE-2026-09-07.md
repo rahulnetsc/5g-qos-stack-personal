@@ -43,7 +43,7 @@ Severity = **M02, protected fleet**, one population on every row.
 |---|---|---|---|---|---|
 | **G1** commands | **WITHDRAWN AND REPLACED 2026-09-09** by `docs/g1-slide-source.md`. The row below scored **M01**, a worst-flow maximum that lands on **uplink** on 9 runs of 9, against a **downlink** guarantee's bound — no 5QI-1 downlink flow existed anywhere in this repository, and no scenario had a loaded downlink at all. On the flow the clause actually names, **every arm passes both criteria at every point measured**, out to 64 robots and 16x committed load. Do not quote the row below. | ~~10/10~~ | ~~9/10~~ | ~~3/10~~ | ~~Teleop feels sticky on 7 shifts in 10 on TwoTier~~ |
 | | p98 ≤ 15 ms (`sensor_dense`) | 10/10 | 10/10 | 10/10 | Dense sensors hold on every arm |
-| **G2** STOP | UL STOP p98 ≤ 100 ms | 10/10 | 10/10 | 10/10 | **×19 margin — but on a scenario the plan does not specify.** See §"not built" |
+| **G2** STOP | **WITHDRAWN AND REPLACED 2026-09-09** by `docs/g2-slide-source.md`. The row below scored **`p98` substituted for the clause's MAXIMUM**, on an UPLINK flow, on a bearer that discards at 5 ms against a 100 ms bound — **it could not have failed**, and Reservation was discarding 87 of 1 607 STOPs while reading this clean pass. Scored properly, **G2 FAILS: 513 misses in 109 800 trials → miss-rate ≤ 5.0 × 10⁻³ at 95 %.** Do not quote the row below. | ~~10/10~~ | ~~10/10~~ | ~~10/10~~ | ~~×19 margin~~ |
 | | **DL** STOP p98 ≤ 100 ms | 10/10 | 10/10 | 10/10 | GT-1.2's STOP is downlink; this is the clause's own direction |
 | **G3** liveness | max gap ≤ 500 ms | 10/10 | 10/10 | **4/10** (cap 4: **2/10**) | Robots start looking dead on TwoTier under the cap |
 | | zero gaps ≥ T_live | 10/10 | 10/10 | **6/10** (cap 4: 10/10) | |
@@ -118,7 +118,7 @@ breaks. New ramp **×0.5 → ×2.0**. Every breach at every point is TwoTier's.
 | **G11** | C2 drift | counters never wired; **6 of the C's 9 skip-reasons cannot exist here** |
 | **G11** | C4 PASS/FAIL consistency | **satisfied by construction** — every run reports 0 failing windows, so it cannot fail |
 | **G1** | p99.9 reported | a **reporting** obligation, not a bound; the artefact carries p98 only |
-| **G2** | 100 % of STOPs (the **maximum**) and the §5.3 miss-rate bound | the artefact carries p98; p98 is weaker than the clause and is labelled, not equated |
+| **G2** | 100 % of STOPs (the **maximum**) and the §5.3 miss-rate bound | ~~the artefact carries p98~~ — **CLOSED 2026-09-09**: both are now scored. The maximum is a max over assets and trials, and the bound is Clopper–Pearson (§5.3's rule of three covers only the zero-miss case). `docs/g2-stress-experiment-2026-09-09.md` |
 | **G5** | per-2 s-window goodput ≥ GFBR | no windowed goodput recorded |
 | **G10** | 7 of its 8 sub-clauses | only M07 is emitted per fleet size |
 | **G6** | the **DL** half (GT-4.2, **P0**) | no DL background flow exists in any scenario |

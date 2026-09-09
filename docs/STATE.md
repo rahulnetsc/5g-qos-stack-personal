@@ -3,9 +3,11 @@
 **2026-09-06, revised 2026-09-09.** A cold-start document. Everything below is current; where a
 number is superseded it says so and says by what.
 
-**Count, as of 2026-09-06: ELEVEN guarantees carry a verdict. One of those is
+**Count, as of 2026-09-09: TWELVE guarantees carry a verdict (G2 answered 2026-09-09).**
+
+**Superseded wording, kept for the trail: as of 2026-09-06, ELEVEN carried one. One of those is
 partial (G11 — two clauses of five). G6's is "fails clause 1" rather than a
-clean result. G2 alone has none.**
+clean result. G2 alone had none.**
 
 **G12 lost its verdict and got it back the same day.** Its published artefact
 had a flow collision — two flows sharing one buffer, not merely one record
@@ -30,7 +32,7 @@ measured on earlier code and its numbers are indicative, not current.
 | G | verdict | artefact | n | horizon | workload | code state |
 |---|---|---|---|---|---|---|
 | **G1** | **WITHDRAWN 2026-09-09 and REPLACED BY AN EXPERIMENT.** The row scored **M01**, a worst-flow maximum landing on **uplink** on 9 runs of 9, against a **downlink** guarantee's bound — and no workload any guarantee is scored on carried a 5QI-1 DL flow, nor did any scenario in the repo have a loaded downlink. Slide source: `docs/g1-slide-source.md`; Step 0 `docs/g1-step0-2026-09-09.md`; full record `docs/g1-stress-experiment-2026-09-09.md`. **Headline: on the cmd_vel flow the clause names, BOTH criteria pass — 0 breaches of 960 runs on each, worst p98 9.00 ms against 95 (10.6x inside), worst gap 103.0 ms against 200 (1.9x inside), p99.9 4.50 ms (21x inside) from a separate 250 s pass over 30,000 commands per cell. The QoS arms are FLAT in fleet size (3.00 ms from 4 robots to 24) while PF rises to 9.00; six-fold load moves nothing on any arm. The arm order INVERTS the withdrawn row — TwoTier best, PF worst.** **`has_gbr`, dead on every scenario this repo had, now decides 12-13 % of downlink adjacencies at N=6 and NEVER demotes a driven robot** — confirmed not to be declaration order by a tie-break control. **Nothing breaks out to N=64 and x16 committed load**; the instrument's failure is reachable only through link quality (positive control: at 0 dB the p98 criterion PASSES while commands go missing for 699 ms). **HORIZON: 10.0 s per graded run against GT-1.1's specified 10 min — one sixtieth per run, but 1.9x the plan's AGGREGATE, and every statistic is flat across a 25x horizon span (10 s to 250 s).** | `sweeps/g1-stress/g1_stress.json` | 10 | **40k (10.0 s, 200 cmd_vel/robot); tail passes at 200k (50 s) and 1M (250 s)** | GT-1.1 × fleet × load | current |
-| **G2** | **NO VERDICT** — see §5 | `postscaling/g2_ul_stop.json` | 10 | 20k | fleet + UL STOP | stale |
+| **G2** | **ANSWERED 2026-09-09 as a stress experiment, and it FAILS its clause.** Slide source: `docs/g2-slide-source.md`; Step 0 `docs/g2-step0-2026-09-09.md`; full record `docs/g2-stress-experiment-2026-09-09.md`. **513 misses in 109,800 STOP trials -> miss-rate <= 5.0e-3 at 95 % (Clopper-Pearson; the rule of three is the zero-miss case).** **Nothing is late -- every delivered STOP arrives under 5.25 ms, median 0.75 -- THINGS ARE MISSING**, which is how the previous row read a x19 margin. **The axis that decides is how many robots stop AT ONCE**; fleet size, offered load and within-frame trigger phase barely move it. Boundary (largest simultaneous-STOP count losing nothing): **cap 4 PF 4 / Res 1 (non-monotone) / TT 4; cap 2 PF 1 / Res none / TT 2.** **With the STOP bearer's 5 ms PDB lifted to the clause's own 100 ms, ZERO are lost and the worst arrives at 12.25 ms** -- the losses are the bearer's deadline, not congestion. | `sweeps/g2-stress/g2_stress.json` | 10 | 40k | GT-1.2 x simultaneity x ambient | current |
 | **G3** | **INCONCLUSIVE.** M20 TwoTier +21.34 % [−2.81, +50.02] | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
 | **G4** | **PASS.** Separation only at duty 0.1; TwoTier−PF +6.76 [+5.52, +7.93] | `postscaling/g4.json` | 10 | 20k | parametric | stale |
 | **G5** | **RE-SCORED — the published rate is an artefact**, and its residual is now **CLOSED** (§3a: M05 0.993–0.997 on all arms post-attach). Was Res 30/40, TT 34/40; under an attach path **Res 1/10 marginal, TT 0/10** | `phase2/core_scaled.json` + `g5_rank_attach_scaled.json` | 10 | 40k | parametric | **current** |
@@ -169,7 +171,7 @@ the study credits for the 30/30-vs-2/30 win, are deleted from this branch —
 
 | item | state | what it needs |
 |---|---|---|
-| **G2** | no verdict | Its named failure mode — the BSR/SR desync — **is shown not to occur**. A UL STOP flow was built and measures a different cost: the access chain takes **35–40 % of a 5 ms budget**, failing 1–3 of 10 seeds. **A specification decision, not a build.** |
+| **G2** | **ANSWERED 2026-09-09** — see the table above. The earlier "no verdict" reasoning stands as history: its named failure mode (the BSR/SR desync) really does not occur, and the UL STOP flow really did measure the access chain. **What was missing was that G2's own clause is a DOWNLINK maximum, not an uplink percentile**, and that GT-1.2's simultaneity had never been built. |
 | **G6** | "fails clause 1" | The clause **names no estimator**; we chose the median and documented it. Not verdict-determining here, but it would be on data where clause 1 passes. **Test-plan owner's call.** |
 | **G11 C2** | not scoreable | **6 of the C's 9 skip-reason counters cannot exist** — no beam model, no `do_sched`, no `transm_interrupt`. Plus a scheduler edit, a windowed emission path, and a trend statistic with no C counterpart. **Stopped at the scope check.** |
 | **G11 C5** | not scoreable | p98 is quantised to the 0.25 ms slot; 3–6 distinct levels over 10 seeds. Needs ≥30 seeds or a finer instrument. |
