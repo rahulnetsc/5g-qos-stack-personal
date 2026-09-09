@@ -91,6 +91,11 @@ arms pass it for the reason they were built.**
 
 ## 5. What this does and does not license
 
+> **⚠ SUPERSEDED 2026-09-08 — clause 4 PASSES 10/10 on every arm** in the
+> stress experiment that replaced this one (`docs/g12-slide-source.md` §3),
+> on a workload whose GBR offered-load shortfall has been fixed. Kept for
+> the record.
+
 **Does not license "TwoTier passes G12".** The ordering clause (first-violation
 order 9 → 4 → 2) remains **not established** — the permutation control still
 flips it, and it is not observable inside the ramp G12 specifies.

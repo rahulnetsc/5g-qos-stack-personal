@@ -53,7 +53,7 @@ pre-measured value as a prediction hit would be scoring my own answer key.
 |---|---|---|
 | **G11 C4** | *"PASS/FAIL is consistent across repeats"* | **satisfied by construction** — every run reports 0 failing windows, so it cannot fail. CLAUDE.md's own third fault shape |
 | **G11 C2** | drift | counters never wired; **6 of the C's 9 skip-reasons cannot exist here** |
-| **G12** | **first-violation ordering** | **untestable inside GT-7.3's own ramp** — below ×3.3 only 5QI 2 breaches, so the order is a one-element list. A specification decision, not a run |
+| **G12** | **first-violation ordering** | **untestable inside GT-7.3's own ramp** — below ×3.3 only 5QI 2 breaches, so the order is a one-element list. A specification decision, not a run. **UPDATED 2026-09-08: the one-element list was the traffic generator** — 5QI 2 was pinned 3.5 % below its own contract. Fixed; now **nothing breaches on ×0.5–×2.0 at the deployment's cap**, so the ramp must extend past ×2.0 (`docs/g12-slide-source.md` §4) |
 | **G1** | p99.9 | a *reporting* requirement; there is no bound to pass or fail |
 
 ---

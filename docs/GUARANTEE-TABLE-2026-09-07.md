@@ -41,16 +41,16 @@ Severity = **M02, protected fleet**, one population on every row.
 
 | guarantee | clause part | PF | Res | **TwoTier** | deployment consequence |
 |---|---|---|---|---|---|
-| **G1** commands | p98 ≤ 95 ms (parametric) | 10/10 | 9/10 | **3/10** | Teleop feels sticky on 7 shifts in 10 on TwoTier. At **cap 4** unchanged at 3/10 |
+| **G1** commands | **WITHDRAWN AND REPLACED 2026-09-09** by `docs/g1-slide-source.md`. The row below scored **M01**, a worst-flow maximum that lands on **uplink** on 9 runs of 9, against a **downlink** guarantee's bound — no 5QI-1 downlink flow existed anywhere in this repository, and no scenario had a loaded downlink at all. On the flow the clause actually names, **every arm passes both criteria at every point measured**, out to 64 robots and 16x committed load. Do not quote the row below. | ~~10/10~~ | ~~9/10~~ | ~~3/10~~ | ~~Teleop feels sticky on 7 shifts in 10 on TwoTier~~ |
 | | p98 ≤ 15 ms (`sensor_dense`) | 10/10 | 10/10 | 10/10 | Dense sensors hold on every arm |
 | **G2** STOP | UL STOP p98 ≤ 100 ms | 10/10 | 10/10 | 10/10 | **×19 margin — but on a scenario the plan does not specify.** See §"not built" |
 | | **DL** STOP p98 ≤ 100 ms | 10/10 | 10/10 | 10/10 | GT-1.2's STOP is downlink; this is the clause's own direction |
 | **G3** liveness | max gap ≤ 500 ms | 10/10 | 10/10 | **4/10** (cap 4: **2/10**) | Robots start looking dead on TwoTier under the cap |
 | | zero gaps ≥ T_live | 10/10 | 10/10 | **6/10** (cap 4: 10/10) | |
-| | p98 ≤ PDB *(= G1's statistic)* | 10/10 | 9/10 | **3/10** | The same number scored under two guarantees' names |
+| | p98 ≤ PDB *(= M01, previously called G1's statistic)* | 10/10 | 9/10 | **3/10** | The same number scored under two guarantees' names — **and it is not G1's statistic**: see the G1 row above |
 | **G5** video | ≥ 99 % PDU sets complete | 10/10 | **1/10** | **0/10** (cap 4: 2/10) | **Neither QoS arm delivers usable video.** Attach recovers Res to 10/10 |
 | | frame age p95 ≤ 67 ms | 10/10 | 10/10 | **4/10** (cap 4: **0/10**) | |
-| **G6** background | G1 stat within bound **and** shift ≤ +20 % | 24/40 | 25/40 | 20/40 | |
+| **G6** background | M01 within bound **and** shift ≤ +20 % (was called "the G1 stat"; it is M01) | 24/40 | 25/40 | 20/40 | |
 | | G3 stat, same | 37/40 | 38/40 | 33/40 | |
 | | **G5 stat, same** | 36/40 | **0/40** | **0/40** | **With background present, neither QoS arm delivers complete video on any seed** |
 | **G7** isolation | c1 victim PDU sets ≥ 99 % | 10/10 | 10/10 | 9/10 (cap 4: 6/10) | The victim is protected |
@@ -87,6 +87,16 @@ Severity = **M02, protected fleet**, one population on every row.
 
 At **cap 4** the boundaries are identical (6 / 6 / 5) but TwoTier's decline is a
 **slope** (10 → 9 → 6 → 2) rather than a cliff.
+
+> **THE WHOLE TABLE ABOVE IS SUPERSEDED, 2026-09-08 and re-confirmed 2026-09-09.**
+> Every cell in it was measured while the 5QI-2 camera offered 3.8788 Mbps
+> against its own 4.0000 Mbps GFBR, so the camera's CONTRACT rather than the
+> cell's capacity set each arm's first failure. The boundary is **PF 12 /
+> Reservation 6 / TwoTier 7**, and **no arm is non-monotone** -- PF's
+> 9/10-at-N=7 disappears with the shortfall removed, which is what it was.
+> Row 71 of this file already carries the corrected figure; this block is
+> kept for the record. `sweeps/g1-stress/g10_remeasure_cap4.json`,
+> `docs/g1-stress-experiment-2026-09-09.md` §2.
 
 > **The cell hosts 5-6 robots, not the 8 previously published.** The arms are
 > **near-identical, not 2× apart.** **A fleet sized on 8 is over-provisioned by

@@ -153,3 +153,102 @@ claims:
   # because the 7.2M-slot soak that would stamp it is a 72-minute campaign
   # and re-running it solely to acquire a stamp is not justified. It gets a
   # claim the next time C1 is run for a reason of its own.
+
+  # --- G1 rebuilt as a stress experiment, 2026-09-09 -------------------------
+  # The G1 rows above (G1.M01.*) read `G1_M01_p98_prot`, a worst-flow maximum
+  # that lands on UPLINK on 9 runs of 9 while G1's clause names a DOWNLINK
+  # command (docs/g1-step0-2026-09-09.md (b)). They are kept as the historical
+  # figures they are; these are the clause's own two criteria.
+  - id: G1.GT11.p98.breaches
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "0 of 960 runs breach the 95 ms RAN PDB on the cmd_vel flow"
+    # n is the per-arm row count this grid produces (16 axis points x 10 seeds
+    # x 2 caps), not the seed count -- the checker multiplies by the arms it
+    # finds, and a claim over the WHOLE grid ranges over all of them.
+    artefact: sweeps/g1-stress/g1_stress.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only, corpus re-baselined with zero numbers moved)"
+    n: 320
+    horizon: 40000
+    field: p98_worst_ms
+    statistic: count_gt
+    statistic_arg: 95.0
+    value: 0
+
+  - id: G1.GT11.gaps.breaches
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "zero command gaps >= 200 ms, across every run"
+    artefact: sweeps/g1-stress/g1_stress.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
+    n: 320
+    horizon: 40000
+    field: n_gaps_over
+    statistic: sum
+    value: 0
+
+  - id: G1.GT11.p98.worst.twotier
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "TwoTier's worst cmd_vel p98 anywhere in the grid"
+    artefact: sweeps/g1-stress/g1_stress.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
+    n: 320
+    horizon: 40000
+    where: {arm: TwoTier}
+    field: p98_worst_ms
+    statistic: max
+    value: 3.25
+
+  - id: G1.GT11.p98.worst.pf
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "PF's worst cmd_vel p98 anywhere in the grid"
+    artefact: sweeps/g1-stress/g1_stress.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
+    n: 320
+    horizon: 40000
+    where: {arm: PF}
+    field: p98_worst_ms
+    statistic: max
+    value: 9.0
+
+  # --- G10's boundary, re-measured 2026-09-09 -------------------------------
+  # The BOUNDARY itself is derived (largest N passing on every seed) and is
+  # computed from the artefact rather than restated; what is registered here
+  # is the per-cell seed count the boundary is read off, at each arm's own
+  # boundary and at the point past it.
+  - id: G10.2026-09-09.PF.at12
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "PF meets the GBR contract on 10/10 seeds at N=12"
+    artefact: sweeps/g1-stress/g10_remeasure_cap4.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only); boundary identical to the 2026-09-08 measurement in every cell"
+    n: 10
+    horizon: 20000
+    where: {arm: PF, n_ues: 12}
+    field: M08_fraction
+    statistic: count_lt
+    statistic_arg: 0.95
+    value: 0
+
+  - id: G10.2026-09-09.reservation.at7
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "Reservation fails the contract on 3/10 seeds at N=7, the first point past its boundary"
+    artefact: sweeps/g1-stress/g10_remeasure_cap4.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
+    n: 10
+    horizon: 20000
+    where: {arm: Reservation, n_ues: 7}
+    field: M08_fraction
+    statistic: count_lt
+    statistic_arg: 0.95
+    value: 3
+
+  - id: G10.2026-09-09.twotier.at7
+    doc: docs/g1-stress-experiment-2026-09-09.md
+    text: "TwoTier meets the contract on 10/10 seeds at N=7, its boundary"
+    artefact: sweeps/g1-stress/g10_remeasure_cap4.json
+    code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
+    n: 10
+    horizon: 20000
+    where: {arm: TwoTier, n_ues: 7}
+    field: M08_fraction
+    statistic: count_lt
+    statistic_arg: 0.95
+    value: 0

@@ -226,3 +226,32 @@ def test_frame_ledger_ignores_completions_with_no_frame_id():
     m = _msg(ledger, 1, 9, 100, ts=0.0)  # frame_id=None -- ordinary traffic
     completions = [_completion(m, complete=True, completion_ts_s=0.01)]
     assert FrameLedger.group(completions) == []
+
+
+def test_latency_percentiles_carry_the_reported_tail_figures():
+    """GT-1.1's KPI row is "p98 <= RAN PDB; p99.9 and max reported", so the
+    record carries both rather than a runner recomputing them from a private
+    hook. p999 degenerates to max below 1000 delivered messages -- a property
+    of the sample, and the campaign that quotes it states its own size."""
+    from sim.messages import Message, MessageCompletion, message_latency_percentiles_ms
+
+    def done(i, delay_ms):
+        m = Message(id=i, ue_id=1, qfi=1, size_bytes=100,
+                    generation_ts_s=0.0, role="cmd")
+        return MessageCompletion(message=m, complete=True, late=False,
+                                 completion_ts_s=delay_ms / 1000.0,
+                                 delivered_bytes=100, dropped_bytes=0)
+
+    empty = message_latency_percentiles_ms([])
+    assert empty["p999"] == 0.0 and empty["max"] == 0.0 and empty["count"] == 0
+
+    # 100 samples: the p99.9 INDEX is the last one, i.e. the maximum.
+    small = message_latency_percentiles_ms([done(i, float(i)) for i in range(100)])
+    assert small["max"] == 99.0
+    assert small["p999"] == small["max"], "at n=100 p99.9 cannot be a percentile"
+
+    # 2000 samples: p99.9 is a real percentile and is strictly below the max.
+    big = message_latency_percentiles_ms([done(i, float(i)) for i in range(2000)])
+    assert big["max"] == 1999.0
+    assert big["p999"] < big["max"]
+    assert big["p98"] < big["p99"] < big["p999"]

@@ -34,6 +34,16 @@ SCEN_DIR = pathlib.Path(g9.__file__).parent
 #: "no schedule" is fine, "no schedule silently" is the finding.
 NO_SCHEDULE = {
     "g12": "the ramp is one load per run; no mid-run schedule (defects-log #23)",
+    # GT-1.1 is steady state: every flow runs from slot 0 to the end
+    # (periodic_control, xr_video, poisson) and nothing is scripted to fire
+    # at a slot, so there is no schedule a short horizon could truncate.
+    # THE HORIZON STILL MATTERS, for a different reason the runner owns and
+    # states: at 20 Hz it sets how many commands a percentile is computed
+    # over, and `scripts/g1_stress.py::HORIZON_SLOTS` records why 40,000 and
+    # not G9/G12's 20,000. That is a SAMPLE-SIZE constraint, not a
+    # truncation one, and this guard is the wrong instrument for it.
+    "g1": "steady state, no scripted mid-run event; horizon governs sample "
+          "size instead, and scripts/g1_stress.py states that choice",
 }
 
 

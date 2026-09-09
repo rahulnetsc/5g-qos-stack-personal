@@ -154,7 +154,8 @@ def message_latency_percentiles_ms(completions: list[MessageCompletion]) -> dict
         for c in completions if c.complete
     )
     if not delays_ms:
-        return {"p50": 0.0, "p95": 0.0, "p98": 0.0, "p99": 0.0, "count": 0}
+        return {"p50": 0.0, "p95": 0.0, "p98": 0.0, "p99": 0.0,
+                "p999": 0.0, "max": 0.0, "count": 0}
 
     def pct(p: float) -> float:
         k = min(len(delays_ms) - 1, int(len(delays_ms) * p))
@@ -162,6 +163,13 @@ def message_latency_percentiles_ms(completions: list[MessageCompletion]) -> dict
 
     return {
         "p50": pct(0.50), "p95": pct(0.95), "p98": pct(0.98), "p99": pct(0.99),
+        # p99.9 and max are REPORTED figures, not bounds: the test plan's
+        # GT-1.1 row is "cmd_vel one-way p98 <= RAN PDB; p99.9 and max
+        # reported". `pct` is the same index convention as every percentile
+        # above, so p999 degenerates to the max on any sample smaller than
+        # 1000 -- which is a property of the sample, not of this function,
+        # and the campaign that quotes it states its own sample size.
+        "p999": pct(0.999), "max": delays_ms[-1],
         "count": len(delays_ms),
     }
 

@@ -215,6 +215,8 @@ horizon 20,000, scored on G10's own pre-registered criterion
 
 **Admissible fleet: PF 8 / Reservation 4 / TwoTier 4 — unchanged.**
 
+> **SUPERSEDED AGAIN 2026-09-09 — G10's boundary is PF 12 / Reservation 6 / TwoTier 7.** The banner below (6 / 6 / 5, itself a correction of 8 / 4 / 4) is ALSO withdrawn: it was measured while the 5QI-2 camera offered 3.8788 Mbps against its own 4.0000 Mbps GFBR, so the camera's CONTRACT bound the boundary rather than the cell's capacity (`docs/gbr-offered-shortfall-2026-09-08.md`). **Re-measured on current code 2026-09-09** — `n_ues ∈ {2,4,5,6,7,8,10,12,16}`, 10 seeds per point, cap 4, RA + SRB, `sweeps/g1-stress/g10_remeasure_cap4.json` — **PF 12 / Reservation 6 / TwoTier 7, reproducing the 2026-09-08 figure cell for cell, and NO arm is non-monotone.** Reservation did not move because its boundary was capacity-bound and therefore real. `docs/g1-stress-experiment-2026-09-09.md` §2.
+>
 > **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 
 **Per-seed all-pass counts, which the admissible number discards:**
@@ -224,6 +226,14 @@ horizon 20,000, scored on G10's own pre-registered criterion
 | PF | 10/10 | 10/10 | **10/10** | 0/10 | 0/10 | 0/10 |
 | **TwoTier** | 10/10 | 10/10 | **6/10** *(was 1/10)* | 0/10 | 0/10 | 0/10 |
 | Reservation | 10/10 | 10/10 | **3/10** | 0/10 | 0/10 | 0/10 |
+
+> **SUPERSEDED 2026-09-09 on the admissible numbers only.** `8 / 4 / 4`
+> below, and the `6 / 6 / 5` that replaced it, are both withdrawn: the
+> boundary is **PF 12 / Reservation 6 / TwoTier 7**
+> (`sweeps/g1-stress/g10_remeasure_cap4.json`). **The argument of this
+> section survives unchanged** -- it is about the 1 → 6 seed-count jump at a
+> FIXED N=8, not about where the boundary sits, and both sides of that
+> comparison carried the same GBR shortfall.
 
 **At N=8 the arms separate 10 / 6 / 3.** The admissible numbers 8 / 4 / 4
 report TwoTier and Reservation as equal; the seed counts show TwoTier passing

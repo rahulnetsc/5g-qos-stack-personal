@@ -12,6 +12,9 @@ TwoTier's M01 p98 over protected flows:
 | workload | PF | Reservation | **TwoTier** | PDB | TwoTier as fraction of budget |
 |---|---|---|---|---|---|
 | parametric mix | 25.25 | 23.00 | **87.78 ms** | 100 ms | **0.878 — worst** |
+<!-- 2026-09-09: these are M01 (worst protected flow, uplink on 9/9 runs), not
+     G1's downlink clause. U1's comparison is unaffected; the label is.
+     See docs/g1-slide-source.md. -->
 | `sensor_dense` | 13.50 | 14.25 | **11.00 ms** | 15 ms | **0.733 — best** |
 
 **The inversion survives normalisation**, which is the first thing to check

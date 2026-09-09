@@ -1,6 +1,6 @@
 # State of the guarantee evaluation — start here
 
-**2026-09-06.** A cold-start document. Everything below is current; where a
+**2026-09-06, revised 2026-09-09.** A cold-start document. Everything below is current; where a
 number is superseded it says so and says by what.
 
 **Count, as of 2026-09-06: ELEVEN guarantees carry a verdict. One of those is
@@ -29,7 +29,7 @@ measured on earlier code and its numbers are indicative, not current.
 
 | G | verdict | artefact | n | horizon | workload | code state |
 |---|---|---|---|---|---|---|
-| **G1** | **PASS all arms.** M01 p98 protected: PF 25.25 / Res 23.00 / **TwoTier 87.78 ms** vs 100 ms | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
+| **G1** | **WITHDRAWN 2026-09-09 and REPLACED BY AN EXPERIMENT.** The row scored **M01**, a worst-flow maximum landing on **uplink** on 9 runs of 9, against a **downlink** guarantee's bound — and no workload any guarantee is scored on carried a 5QI-1 DL flow, nor did any scenario in the repo have a loaded downlink. Slide source: `docs/g1-slide-source.md`; Step 0 `docs/g1-step0-2026-09-09.md`; full record `docs/g1-stress-experiment-2026-09-09.md`. **Headline: on the cmd_vel flow the clause names, BOTH criteria pass — 0 breaches of 960 runs on each, worst p98 9.00 ms against 95 (10.6x inside), worst gap 103.0 ms against 200 (1.9x inside), p99.9 4.50 ms (21x inside) from a separate 250 s pass over 30,000 commands per cell. The QoS arms are FLAT in fleet size (3.00 ms from 4 robots to 24) while PF rises to 9.00; six-fold load moves nothing on any arm. The arm order INVERTS the withdrawn row — TwoTier best, PF worst.** **`has_gbr`, dead on every scenario this repo had, now decides 12-13 % of downlink adjacencies at N=6 and NEVER demotes a driven robot** — confirmed not to be declaration order by a tie-break control. **Nothing breaks out to N=64 and x16 committed load**; the instrument's failure is reachable only through link quality (positive control: at 0 dB the p98 criterion PASSES while commands go missing for 699 ms). | `sweeps/g1-stress/g1_stress.json` | 10 | 40k | GT-1.1 × fleet × load | current |
 | **G2** | **NO VERDICT** — see §5 | `postscaling/g2_ul_stop.json` | 10 | 20k | fleet + UL STOP | stale |
 | **G3** | **INCONCLUSIVE.** M20 TwoTier +21.34 % [−2.81, +50.02] | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
 | **G4** | **PASS.** Separation only at duty 0.1; TwoTier−PF +6.76 [+5.52, +7.93] | `postscaling/g4.json` | 10 | 20k | parametric | stale |
@@ -37,16 +37,20 @@ measured on earlier code and its numbers are indicative, not current.
 | **G6** | **FAILS clause 1, every arm.** Not a clean result — see §5 | `postscaling/g6seeded/` | 40 | 20k | parametric + aggressor | stale |
 | **G7** | **FAILS clause 2.** Both QoS arms deliver **2.0–2.1× MFBR**; PF (no MFBR concept) contains better at 1.05×. **PF's containment is now EXPLAINED and is not a fairness property — it grants ~5.8× less** (§3a) | `rerun-2026-09-06/g7.json` | 10 | 20k | fleet + aggressor | **current** |
 | **G8** | **FAILS.** M09 protected: Res 1/10, **TT 3/10** below 0.90 | `phase2/core_scaled.json` | 10 | 40k | parametric | **current** |
-| **G9** | **WITHDRAWN 2026-09-08 and REPLACED BY AN EXPERIMENT.** The row was produced with `--rejoin-seed` ON and UNDECLARED, on artefacts predating M-9 and M-6. G9 is now a stress experiment with an occupancy axis: `docs/g9-stress-experiment-2026-09-08.md`. **Headline: warm re-join is free on every arm; cold attach ~100 ms and post-RLF ~1.1 s on PF/Reservation, flat across a 4x load range; TwoTier fails at 5-6 UEs, where half the cold attaches and ALL post-RLF recoveries never complete.** | `sweeps/g9-stress/g9_stress.json` | 10 | 20-30k | G9 x occupancy | current |
-| **G10** | **RE-MEASURED 2026-09-08 — the published 6/6/5 was an artefact.** The camera offered 3.8788 Mbps against a 4.0000 GFBR, pinning it at 0.9697 against a 0.95 threshold, so the camera's contract bound the boundary rather than capacity. Corrected: **PF 12 / Reservation 6 / TwoTier 7** (cap 4, RA+SRB). `docs/gbr-offered-shortfall-2026-09-08.md` | `sweeps/gbr-fix-2026-09-08/g10_cap4_rasrb.json` | 10 | 20k | n_ues 2..16 | current |
+| **G9** | **WITHDRAWN 2026-09-08 and REPLACED BY AN EXPERIMENT.** The row was produced with `--rejoin-seed` ON and UNDECLARED, on artefacts predating M-9 and M-6. G9 is now a stress experiment with an occupancy axis. Slide source: `docs/g9-slide-source.md`; full record `docs/g9-stress-experiment-2026-09-08.md`. **Headline: warm re-join is free on every arm; cold attach ~100 ms and post-RLF ~1.1 s on PF/Reservation, flat across a 4x load range; TwoTier fails at 5-6 UEs, where half the cold attaches and ALL post-RLF recoveries never complete.** | `sweeps/g9-stress/g9_stress.json` | 10 | 20-30k | G9 x occupancy | current |
+| **G10** | **RE-MEASURED 2026-09-08 and CONFIRMED BY RE-MEASUREMENT 2026-09-09 — the published 6/6/5 was an artefact.** The camera offered 3.8788 Mbps against a 4.0000 GFBR, pinning it at 0.9697 against a 0.95 threshold, so the camera's contract bound the boundary rather than capacity. Corrected: **PF 12 / Reservation 6 / TwoTier 7** (cap 4, RA+SRB). `docs/gbr-offered-shortfall-2026-09-08.md` | `sweeps/g1-stress/g10_remeasure_cap4.json` (2026-09-09, reproduces `sweeps/gbr-fix-2026-09-08/g10_cap4_rasrb.json` cell for cell; **no arm is non-monotone**) | 10 | 20k | n_ues 2..16 | current |
 
+> **SUPERSEDED AGAIN 2026-09-09 — G10's boundary is PF 12 / Reservation 6 / TwoTier 7.** The banner below (6 / 6 / 5, itself a correction of 8 / 4 / 4) is ALSO withdrawn: it was measured while the 5QI-2 camera offered 3.8788 Mbps against its own 4.0000 Mbps GFBR, so the camera's CONTRACT bound the boundary rather than the cell's capacity (`docs/gbr-offered-shortfall-2026-09-08.md`). **Re-measured on current code 2026-09-09** — `n_ues ∈ {2,4,5,6,7,8,10,12,16}`, 10 seeds per point, cap 4, RA + SRB, `sweeps/g1-stress/g10_remeasure_cap4.json` — **PF 12 / Reservation 6 / TwoTier 7, reproducing the 2026-09-08 figure cell for cell, and NO arm is non-monotone.** Reservation did not move because its boundary was capacity-bound and therefore real. `docs/g1-stress-experiment-2026-09-09.md` §2.
+>
 > **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 | **G11** | **TWO CLAUSES OF FIVE.** C1 PASS (900 windows, 0 failing); C3 PASS. C4 not independent; C5 not scoreable; C2 not scoreable | `postscaling/g11_c1_soak.json` | 10 | **7.2M** | G11 scripted | stale |
-| **G12** | **REPLACED 2026-09-08 by a stress experiment** (`docs/g12-stress-experiment-2026-09-08.md`). **Clause 4 PASSES 10/10 on every arm**, both caps, both tie-break settings, 240 ramp sweeps. **The first-violation order is NOT SCOREABLE** — 5QI 2 is pinned 3.5 % below contract by an offered-load shortfall in the generator, so the published `[2,4]` was an artefact and is withdrawn. | `sweeps/g12-stress/g12_stress_cap4.json` | 10 | 20k | ramp x0.5-x2.0, N=6 and 4 | current |
+| **G12** | **REPLACED 2026-09-08 by a stress experiment.** Slide source: `docs/g12-slide-source.md`; full record `docs/g12-stress-experiment-2026-09-08.md`. **Clause 4 PASSES 10/10 on every arm**, both caps, both tie-break settings, 240 ramp sweeps — but the margin is the CARRIER'S, not the scheduler's (TwoTier's telemetry violation rate reaches 0.969 at cap 2 ×2.0 against a 0.99 starvation threshold; 0.236 at cap 4; PF and Reservation 0.000 throughout). **The first-violation order is NOT SCOREABLE, and the reason CHANGED ONCE.** First it was the traffic generator — 5QI 2 pinned 3.5 % below its own contract, so the published `[2,4]` was reading the generator and is **WITHDRAWN**. With that fixed (5QI 2 now 0.965 → 0.995, 5QI 4 at 1.000), the reason is **nothing breaks in the range swept** — a statement about the system rather than the generator. The ramp must extend past ×2.0. | `sweeps/g12-stress/g12_stress_cap4.json` | 10 | 20k | ramp x0.5-x2.0, N=6 and 4 | current |
 
 **Also measured on sensor_dense** (30 UL sensors, **15 ms PDB**, n=10, 20k):
-G1 **PASS all arms** (PF 13.50 / Res 14.25 / **TwoTier 11.00 ms**), G3, G8
-(**Res M09 0.7205, failing 10/10**).
+M01 (PF 13.50 / Res 14.25 / **TwoTier 11.00 ms**), G3, G8
+(**Res M09 0.7205, failing 10/10**). **The M01 row is NOT a G1 verdict** —
+`sensor_dense` has no downlink command flow at all, so G1's clause is not
+scoreable on it (see the G1 row above).
 
 ---
 
@@ -87,7 +91,7 @@ and **cannot earn the grant that would repopulate the array**.
 | observation | cleared by supplying the attach BSR? |
 |---|---|
 | G5's completeness (Res 7/10, TT 4/10 failing) | **yes** — Res 1/10 marginal, TT 0/10 |
-| G10's admissible fleet (superseded: **PF 6 / Res 6 / TT 5**) | **yes** — all three arms near-identical |
+| G10's admissible fleet (superseded twice; current **PF 12 / Res 6 / TT 7**, `docs/g1-stress-experiment-2026-09-09.md` §2) | **yes** — all three arms near-identical |
 | the UL blackout rate | **yes** — same count, renamed |
 | G9's join counts (4 of 10 warm events) | **yes** — 10/10, 5/5, 1/1 |
 

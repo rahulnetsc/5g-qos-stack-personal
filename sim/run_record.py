@@ -72,6 +72,13 @@ class FlowRecord:
     delay_p95_ms: Optional[float] = None
     delay_p98_ms: Optional[float] = None
     delay_p99_ms: Optional[float] = None
+    # REPORTED tail figures, not bounds. GT-1.1's KPI row is "cmd_vel
+    # one-way p98 <= RAN PDB; p99.9 and max reported" -- so the record
+    # carries them for every flow rather than a runner recomputing them
+    # from a private hook. p999 degenerates to max below 1000 delivered
+    # messages; the quoting campaign states its own sample size.
+    delay_p999_ms: Optional[float] = None
+    delay_max_ms: Optional[float] = None
     # Count of fully-delivered messages the percentiles above were computed
     # over. 0 is a real "no message completed," distinct from None ("this
     # record predates WP7 and was never given true-latency fields at all").
@@ -435,6 +442,8 @@ class RunRecord:
                 delay_p95_ms=m.get("delay_p95_ms"),
                 delay_p98_ms=m.get("delay_p98_ms"),
                 delay_p99_ms=m.get("delay_p99_ms"),
+                delay_p999_ms=m.get("delay_p999_ms"),
+                delay_max_ms=m.get("delay_max_ms"),
                 message_count=m.get("message_count"),
                 completion_ts_by_role_s=m.get("completion_ts_by_role_s"),
                 frame_completions=m.get("frame_completions"),

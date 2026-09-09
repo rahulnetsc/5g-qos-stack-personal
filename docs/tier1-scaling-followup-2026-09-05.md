@@ -15,7 +15,7 @@ cannot reach `spawn` workers) and once at 1e4.
 
 | G | metric | before (K=1) | after (K=1e4) | verdict |
 |---|---|---|---|---|
-| **G1** | M01 p98 protected ≤ 100 ms | TwoTier **0/10**, med 90.12 | TwoTier **0/10**, med **87.78** | **HELD** — moved *away* from the bound |
+| **G1** (⚠ this is M01, not G1's clause — see `docs/g1-slide-source.md`) | M01 p98 protected ≤ 100 ms | TwoTier **0/10**, med 90.12 | TwoTier **0/10**, med **87.78** | **HELD** — moved *away* from the bound |
 | **G3** | M20 liveness gap | TwoTier med 266.2 ms | TwoTier med **257.1 ms** | **HELD** (still inconclusive) |
 | **G5** | M05 ≥ 0.99, no attach path | TwoTier **4/10**, med 0.9918 | TwoTier **4/10**, med **0.9934** | **HELD** |
 | **G5** | M05, *with* attach path | TwoTier **0/10**, min 0.993174 | TwoTier **0/10**, min **0.993333** | **HELD** |
@@ -23,6 +23,8 @@ cannot reach `spawn` workers) and once at 1e4.
 | **G8** | M22 starvation epochs | TwoTier med 0 | TwoTier med 0 | **HELD** (identical) |
 | **G10** | admissible fleet | PF 8 / Res 4 / **TT 4** | PF 8 / Res 4 / **TT 4** | **HELD** |
 
+> **SUPERSEDED AGAIN 2026-09-09 — G10's boundary is PF 12 / Reservation 6 / TwoTier 7.** The banner below (6 / 6 / 5, itself a correction of 8 / 4 / 4) is ALSO withdrawn: it was measured while the 5QI-2 camera offered 3.8788 Mbps against its own 4.0000 Mbps GFBR, so the camera's CONTRACT bound the boundary rather than the cell's capacity (`docs/gbr-offered-shortfall-2026-09-08.md`). **Re-measured on current code 2026-09-09** — `n_ues ∈ {2,4,5,6,7,8,10,12,16}`, 10 seeds per point, cap 4, RA + SRB, `sweeps/g1-stress/g10_remeasure_cap4.json` — **PF 12 / Reservation 6 / TwoTier 7, reproducing the 2026-09-08 figure cell for cell, and NO arm is non-monotone.** Reservation did not move because its boundary was capacity-bound and therefore real. `docs/g1-stress-experiment-2026-09-09.md` §2.
+>
 > **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 
 **THE CONTROL HELD EVERYWHERE, and it is the load-bearing result:** PF and

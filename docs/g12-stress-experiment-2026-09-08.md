@@ -93,7 +93,7 @@ result — is unchanged; the corpus confirms it.
 | **question** | end of shift, everything running hard: what breaks first, and does the safety telemetry survive? |
 | **axis** | the committed ramp, **×0.5 → ×2.0**, points at 0.5, 0.75, **1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6**, 1.8, 2.0 — resolution at the knee, where the arms separate |
 | **what the ramp scales** | the **whole committed workload** (every GBR/Delay flow's offered bytes and its contract together), not one aggressor. Everyone busy at once is G12's question; a single aggressor is G7's |
-| **occupancy** | **FIXED, not a second axis. N = 6** — G10's admissible boundary is PF 6 / Reservation 6 / TwoTier 5, so 6 is the realistic worst case and where the arms separate. **N = 4** as a comfortable control |
+| **occupancy** | **FIXED, not a second axis. N = 6** — G10's admissible boundary is PF 6 / Reservation 6 / TwoTier 5, so 6 is the realistic worst case and where the arms separate. **N = 4** as a comfortable control. **NOTE 2026-09-09: G10's boundary is now PF 12 / Reservation 6 / TwoTier 7** (§7 of this file's own slide source records the correction). N=6 remains the right choice — it is still Reservation's exact boundary and one below TwoTier's — but it is now *comfortable* for PF rather than at its limit |
 | **arms** | PF, Reservation, TwoTier |
 | **seeds** | 10, paired |
 | **horizon** | 20 000 slots, μ=2, DSUUU, 40 MHz |

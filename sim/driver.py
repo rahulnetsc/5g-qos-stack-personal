@@ -1148,7 +1148,8 @@ def run(
         if windowed_ledger:
             fl = summary["flows"][key]
             for fld in ("delay_p50_ms", "delay_p95_ms", "delay_p98_ms",
-                        "delay_p99_ms", "message_count"):
+                        "delay_p99_ms", "delay_p999_ms", "delay_max_ms",
+                        "message_count"):
                 fl[fld] = None
             fl["completion_ts_by_role_s"] = None
             fl["frame_completions"] = None
@@ -1164,6 +1165,10 @@ def run(
         summary["flows"][key]["delay_p95_ms"] = round(stats["p95"], 3)
         summary["flows"][key]["delay_p98_ms"] = round(stats["p98"], 3)
         summary["flows"][key]["delay_p99_ms"] = round(stats["p99"], 3)
+        # Reported, never a bound -- the test plan's GT-1.1 asks for p99.9
+        # and max beside the p98 it scores.
+        summary["flows"][key]["delay_p999_ms"] = round(stats["p999"], 3)
+        summary["flows"][key]["delay_max_ms"] = round(stats["max"], 3)
         summary["flows"][key]["message_count"] = stats["count"]
         # WP7 commit 4 (M03 liveness_gap_distribution): completion
         # timestamps of fully-delivered messages, grouped by Message.role --

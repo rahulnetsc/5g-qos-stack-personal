@@ -495,6 +495,8 @@ Reservation 7/10 -> 1/10 marginal and TwoTier 4/10 -> 0/10. **So every
 blackout rate and admissible-fleet figure measured WITHOUT an attach path
 is an upper bound, G10's PF 8 / Reservation 4 / TwoTier 4 included.** The
 
+> **SUPERSEDED AGAIN 2026-09-09 — G10's boundary is PF 12 / Reservation 6 / TwoTier 7.** The banner below (6 / 6 / 5, itself a correction of 8 / 4 / 4) is ALSO withdrawn: it was measured while the 5QI-2 camera offered 3.8788 Mbps against its own 4.0000 Mbps GFBR, so the camera's CONTRACT bound the boundary rather than the cell's capacity (`docs/gbr-offered-shortfall-2026-09-08.md`). **Re-measured on current code 2026-09-09** — `n_ues ∈ {2,4,5,6,7,8,10,12,16}`, 10 seeds per point, cap 4, RA + SRB, `sweeps/g1-stress/g10_remeasure_cap4.json` — **PF 12 / Reservation 6 / TwoTier 7, reproducing the 2026-09-08 figure cell for cell, and NO arm is non-monotone.** Reservation did not move because its boundary was capacity-bound and therefore real. `docs/g1-stress-experiment-2026-09-09.md` §2.
+>
 > **SUPERSEDED 2026-09-07 — G10's boundary is PF 6 / Reservation 6 / TwoTier 5, not 8 / 4 / 4.** The old figure came from a sweep of `n_ues ∈ {2, 4, 8, 16}`, which put every arm's boundary inside an unresolved 2× gap. Re-swept on `{2, 4, 5, 6, 7, 8, 10, 12, 16}` with 10 seeds inside each point, at BOTH cap values, the boundaries are **6 / 6 / 5** — the arms are **near-identical, not 2× apart**. **PF is NON-MONOTONE** (9/10 at N=7, back to 10/10 at N=8, 9/10 at N=12); per the standing rule its boundary is the last passing point before the first failure, **6**, and the non-monotonicity is reported rather than smoothed. **A fleet sized on 8 is over-provisioned by ~30 %.** `docs/axis-table-2026-09-07.md` §2.
 `stagger_only` control matters: staggering alone makes it strictly WORSE
 (Reservation N=16, 4,1,3 -> 7,7,8), so the seed is the lever and a UE
@@ -1227,6 +1229,38 @@ they differ, the aggregate does not support the claim no matter how large
 the effect or how tight the interval. **Asking it in advance is cheap;
 instance (4) was predicted before the data arrived and cost nothing, while
 instances (1)–(3) each cost a wrong published conclusion.**
+
+**A PERCENTILE IS ONLY A PERCENTILE ABOVE `1/(1-p)` SAMPLES — and this
+repo's own index convention makes the degenerate case silent.**
+`sim/messages.py::message_latency_percentiles_ms` and
+`sim/metrics.py::Metrics._percentile` both use `k = min(len-1, int(len*p))`,
+so **at any `n <= 1/(1-p)` the percentile index IS the last index** and the
+"percentile" is the maximum. Measured: p99.9 needs `n > 1000`, p99 needs
+`n > 100`, p98 needs `n > 50`. G1's campaign hit this twice — its 200-command
+grid runs, then a 50 s pass built specifically to fix it that delivered
+exactly 1,000 commands per flow and therefore did not
+(`docs/g1-stress-experiment-2026-09-09.md` §7/§7a). **Nothing warns**: the two
+columns just carry the same number and read as independent measurements.
+Before quoting a percentile, divide: `1/(1-p)` against the sample size the
+statistic is computed over — **which is PER FLOW here, not the pooled
+campaign total.**
+
+**AND G1's CLAUSE HAS TWO PASS CRITERIA, of which `M01` is neither.**
+`docs/IA_P5G_Factory_Guarantee_Test_Plan.md` GT-1.1: *"cmd_vel one-way p98 <=
+RAN PDB; p99.9 and max reported; zero command gaps >= 200 ms"*. Two bounds.
+They fail in OPPOSITE directions — a percentile ranges over DELIVERED
+commands, so dropping commands improves it, while a receiver-side gap widens
+around a command that never came. **Measured at 0 dB: every arm PASSES the
+p98 criterion while 15 of 200 commands vanish and the robot goes 699 ms
+silent.** And **M01 is not G1's statistic**: it is a worst-flow maximum that
+lands on UPLINK on 9 runs of 9, while G1 names a DOWNLINK command on 5QI 1.
+Every G1 row before 2026-09-09 reported M01; they are withdrawn. G1's own
+scenario is `sim/scenarios/g1.py`, its runner `scripts/g1_stress.py`.
+**A cmd_vel flow with fewer than two completions is a FAILURE there, not an
+exclusion** — `sim/scorecard.py`'s M01/M03 exclude such a flow from their
+worst contests, which is right for a worst-of-fleet statistic and wrong for
+an instrument (measured: at -6 dB the worst-flow p98 reads a comfortable
+56.25 ms for a pair of robots one of which received ZERO commands).
 
 **Spec/hardware-derived numeric tables get transcribed from the actual
 source text, never reconstructed from memory or re-derived by formula —

@@ -36,6 +36,12 @@ reproducible here, and it is not a disagreement with the study.**
 | Reservation | 23.00 ms | 14.25 ms |
 | **TwoTier** | **87.78 ms — worst by 3.5×** | **11.00 ms — best** |
 
+> **These are M01 figures, not G1 verdicts (2026-09-09).** M01's winner is an
+> UPLINK flow on 9 runs of 9; G1's clause names a downlink command. The
+> workload-inversion finding this table supports is unaffected — it is a
+> comparison of the same statistic across two workloads — but the rows must
+> not be quoted as G1. `docs/g1-slide-source.md`.
+
 **On the parametric mix TwoTier has the worst latency of the three arms. On
 sensor_dense it has the best.** `docs/wp9-regime-map.md` §0.1 says the ranking
 does not generalise across regimes; **this is the first direct test of that

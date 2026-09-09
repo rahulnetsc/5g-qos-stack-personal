@@ -147,7 +147,8 @@ horizon 20 000. **Wall clock: 250 s at 12 workers, 0.93 s/run.**
 not a boolean, and truthiness-testing it made every arm pass to N=16. The
 criterion is `M07_met == M07_total`, and it is verified by re-scoring the
 **old** artefact with the same code: it reproduces the published table
-exactly (PF 6 / Reservation 6 / TwoTier 5), so the comparison below is
+exactly (PF 6 / Reservation 6 / TwoTier 5 -- **SUPERSEDED 2026-09-09: PF 12 /
+Reservation 6 / TwoTier 7**, see this file's head note), so the comparison below is
 like-for-like rather than two different questions.
 
 | arm | 2 | 4 | 5 | 6 | 7 | 8 | 10 | 12 | 16 | boundary |
@@ -159,7 +160,14 @@ like-for-like rather than two different questions.
 | TwoTier — old | 10/10 | 10/10 | 10/10 | 9/10 | 6/10 | 2/10 | 0/10 | 0/10 | 0/10 | **5** |
 | TwoTier — new | 10/10 | 10/10 | 10/10 | 9/10 | **9/10** | 3/10 | 0/10 | 0/10 | 0/10 | **5** |
 
-**The boundary is unchanged: PF 6 / Reservation 6 / TwoTier 5.** RA's PRACH
+**The boundary is unchanged: PF 6 / Reservation 6 / TwoTier 5.**
+**SUPERSEDED 2026-09-09 -- PF 12 / Reservation 6 / TwoTier 7.** The figure
+above was measured before the GBR offered-shortfall fix; the camera's own
+contract, not the cell's capacity, was binding it
+(`docs/gbr-offered-shortfall-2026-09-08.md`, re-measured
+`sweeps/g1-stress/g10_remeasure_cap4.json`). **The conclusion of this
+section -- that RA and SRB do not move the boundary -- is unaffected**, since
+both arms of that comparison carried the same shortfall. RA's PRACH
 reservation (12 PRB in one slot per 20 ms) and SRB traffic (zero, with no
 join events) do not move it, and the control-plane floor does not move it
 either — it improves TwoTier *past* the boundary (N=7: 6/10 → 9/10) without
@@ -195,7 +203,7 @@ completed run, so a kill loses nothing).
 |---|---|
 | **axis** | cell occupancy — **UE count and committed load move together**, one knob, because an operator does not experience them separately |
 | **levels** | (3 UEs, ×0.50), (4, ×0.75), (5, ×1.00), (6, ×1.25), (7, ×1.50), (8, ×2.00) — total UEs incl. the joiner |
-| **range set by** | G10's re-measured boundary, PF 6 / Reservation 6 / TwoTier 5 (§1.3). Levels 3-4 straddle it; 5-6 are past it |
+| **range set by** | G10's re-measured boundary, PF 6 / Reservation 6 / TwoTier 5 (§1.3). Levels 3-4 straddle it; 5-6 are past it. **SUPERSEDED 2026-09-09: the boundary is PF 12 / Reservation 6 / TwoTier 7**, so this occupancy axis straddles Reservation's and TwoTier's boundaries and sits well inside PF's -- the levels are unchanged, their position relative to PF's boundary is |
 | **scenarios** | `warm` (GT-6.1 app restart), `cold` (GT-6.2 power cycle), `rlf` (GT-6.3 deep fade) — scored separately |
 | **arms** | PF, Reservation, TwoTier |
 | **seeds** | 10, paired (`regime_sweep.paired_seeds`) |

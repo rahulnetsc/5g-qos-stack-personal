@@ -148,7 +148,7 @@ that the number is certifiable — certifiable numbers still require real RF.
 
 | G | Guarantee | Needs (beyond baseline scheduling) | WP | Sim-answerable? |
 |---|---|---|---|---|
-| G1 | Drive command p98 ≤ PDB | T1/T2 shared-bearer modeling, DL LCP | WP7, Phase 2 | Yes |
+| G1 | Drive command p98 ≤ PDB **and zero command gaps ≥ 200 ms** | T1/T2 shared-bearer modeling, DL LCP, **and a 5QI-1 DOWNLINK flow in a loaded downlink** — neither existed until 2026-09-09 (`sim/scenarios/g1.py`) | WP7, Phase 2, GT-1.1 rebuild | **Yes — answered, both criteria** (`docs/g1-slide-source.md`). Note the clause has TWO pass criteria and every G1 row before 2026-09-09 reported neither: they scored M01, a worst-flow maximum landing on **uplink** |
 | G2 | STOP always lands fast | Rule-of-three sample sizing (already in panel), DL priority | WP0, Phase 2 | Yes |
 | G3 | No false-failsafe | Real BSR/grant chain, liveness gap distribution | WP3, WP4, WP7 | Yes |
 | G4 | Prompt resume after silence | SR-path fidelity, floor arming window | WP4 | Yes |
