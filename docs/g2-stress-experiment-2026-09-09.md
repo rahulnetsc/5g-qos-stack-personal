@@ -221,12 +221,12 @@ instrument.
 counters. What the cross-check corrected was the attribution, twice. See
 `docs/g2-step0-2026-09-09.md` §2.
 
-**And the decomposition is CLOSED, which is what makes §5.1 quotable over the
-whole population.** Both mechanisms I went looking for measure zero, so the
-5 ms deadline is the only thing losing STOPs in this cell — and therefore
-"every lost STOP would have arrived within 12.25 ms" covers **all 513**, not
-merely most of them. A residual of unknown cause would have made that
-sentence a statement about 484.
+**And the decomposition is CLOSED over the loss MECHANISM**, which is what
+lets §5.1 speak for the whole population: both alternatives measure zero, so
+the 5 ms deadline is what loses these STOPs. **What is NOT closed is the
+residual after lifting it** — §5a measures 1.4 × 10⁻⁴ still missing at a
+100 ms PDB, so "the deadline is the cause" is right and "removing it removes
+every miss" is not.
 
 ---
 
@@ -258,11 +258,22 @@ grants per period. **This falsified the registered prediction that 1 and 2
 would miss zero everywhere**, and it is why the cap explains the slope but not
 the floor.
 
-### 5.1 THE FINDING: every lost STOP would have arrived in time
+### 5.1 THE FINDING: lifting the deadline removes almost all of the loss
 
-**With the STOP bearer's PDB lifted to the clause's own 100 ms, there are ZERO
-misses in 5 760 STOP events** — every arm, both caps, 1 to 16 simultaneous
-stops. Worst delivery anywhere:
+> **CORRECTED, and the correction is a sample-size one.** This section first
+> read *"there are ZERO misses in 5 760 STOP events"*. A larger sweep (§5a,
+> **21 600 events per cell**) measures **3**, not 0, at cap 2. **The earlier
+> result was not wrong — a rule-of-three bound on 5 760 zero-miss events is
+> ≤ 5.2 × 10⁻⁴ and the newly measured 1.39 × 10⁻⁴ sits inside it — but the
+> WORD "zero" claimed more than that sample could support.** It is the same
+> discipline this project applies to percentiles (`1/(1-p)` samples), applied
+> to a rate: **a zero is only a zero down to `3/n`.** Kept visible rather than
+> silently rewritten.
+
+**With the STOP bearer's PDB lifted to the clause's own 100 ms, misses fall by
+roughly 100×.** Over the original 5 760-event probe — every arm, both caps, 1
+to 16 simultaneous stops — **none were observed**, i.e. a rate below
+5.2 × 10⁻⁴. Worst delivery anywhere:
 
 | | cap 4 | cap 2 |
 |---|---|---|
@@ -273,9 +284,11 @@ stops. Worst delivery anywhere:
 **12.25 ms is the worst STOP latency in the entire probe, against a 100 ms
 bound — 8× inside it.**
 
-**So the STOPs are not lost to congestion. They are discarded by their own
-bearer's 5 ms budget while the network would have delivered every one of them
-well inside the guarantee.** The 5 ms PDB and the 100 ms clause differ by 20×,
+**So the STOPs are overwhelmingly not lost to congestion. They are discarded
+by their own bearer's 5 ms budget while the network would have delivered
+essentially all of them well inside the guarantee** — the residual after
+lifting the deadline is 1.4 × 10⁻⁴ against 1.78 × 10⁻² before it, a 128×
+reduction, not an elimination. The 5 ms PDB and the 100 ms clause differ by 20×,
 and the bearer wins.
 
 **In an operator's terms: a robot that would have stopped 12 ms late instead
@@ -343,6 +356,30 @@ with the guarantee written on it removes the loss entirely.
 **Both are configuration, neither is a code change**, and they are not
 alternatives — the cap reduces how long the fleet takes to stop, the deadline
 decides whether a robot that waits that long is stopped at all.
+
+
+## 5b. The download-carrying robot — stated once, elsewhere
+
+**G2's campaign produced the sharpest scheduler-differentiating result in this
+evaluation, and it is NOT a G2 finding** — it is a property of each arm's
+downlink ranking key, visible here because G2 is the clause that puts an
+urgent packet on a robot that is also receiving a large transfer.
+
+**It has its own document: `docs/flood-robot-demotion-2026-09-09.md`.** In one
+line: **the robot receiving the download holds 55.9 % of PF's missed STOPs and
+45.1 % of Reservation's, against 9.8 % on TwoTier and 8.3 % if uniform** —
+controlled by moving the download to a different robot, at which point the
+burden moves with it.
+
+**Why it is not written out here.** It generalises past G2: the precondition —
+a robot carrying both a large transfer and a delay-critical flow — occurs in
+**19 of 42 built scenarios**, including the regression corpus's own. Stating
+it inside G2's record would make a cross-cutting ranking property look like a
+STOP-specific one.
+
+**What it changes about G2's own conclusion:** §5.1's deadline finding stands
+and is no longer the whole story. **G2 has two findings — a bearer
+configuration one and a scheduler ranking one — and the second is the sharper.**
 
 
 ## 6. Runtimes

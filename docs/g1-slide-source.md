@@ -295,6 +295,23 @@ factor is 2.4× and closing it is a run, not an argument.
   narrowed it** — 960 runs, derived. Estimated 18 min at 16 workers; actual
   17.2.
 
+## 8a. One configuration G1 structurally avoids, stated because it is realistic
+
+**G1's driven robots are never the robot pulling firmware** —
+`build_gt11_scenario` puts cmd_vel on robots 1..n_driven and the pull on robot
+n_ues, and refuses `n_ues <= n_driven`, so they cannot coincide at any
+parameter value.
+
+**That matters because of a result G2 found**
+(`docs/flood-robot-demotion-2026-09-09.md`): **a robot receiving a large
+download is systematically demoted on PF and Reservation, and every flow on it
+inherits the demotion.** G1's own fleet control loop (5QI 82) *does* sit on the
+download robot; its scored instrument does not.
+
+**So G1's numbers are unaffected — and are measured in a configuration that
+avoids this effect.** Teleoperating the robot that is currently pulling
+firmware is a realistic operation and is **not** what G1 measured.
+
 ## 9. Open external inputs
 
 - **The 95 ms RAN PDB is a PROPOSED default** (the test plan marks it ▷),

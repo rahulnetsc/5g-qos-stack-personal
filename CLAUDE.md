@@ -1321,6 +1321,46 @@ a TDD period against a 5 ms budget); fleet size, offered load and the
 within-frame trigger phase are all second-order — the phase spans 0.91–1.24 %
 against the cap's 24–37x.
 
+**AND A ROBOT THAT RECENTLY MOVED A LARGE VOLUME IS DEMOTED, AND EVERY FLOW
+ON IT INHERITS THAT — THE SHARPEST ARM-DIFFERENTIATING RESULT IN THIS
+EVALUATION.** `sim/baselines/pf.py`'s key is `(-metric,)` with `metric =
+bits_per_rb / _r_avg[ue_id]` — **ONE TERM, nothing above it** — and `_r_avg`
+is one EWMA per UE **shared across directions**. So a robot that just received
+(or sent) a lot sorts last, and its emergency STOP inherits the penalty
+because it rides the same robot. **Measured in G2: the download-carrying robot
+holds 55.9 % of PF's missed STOPs and 45.1 % of Reservation's, against 9.8 %
+on TwoTier and 8.3 % if uniform** — and moving the download to another robot
+**moves the burden with it**, so it is the transfer, not position or
+declaration order.
+
+**The three arms differ because of where the deadline sits in the key.**
+Reservation's `_DL_TERMS` HAS `pdb_ms` above `-coef` and it does not help:
+**`-coef` decides 98.4 % of its DL adjacencies and `pdb_ms` 0.6 %** — a tier
+that is never reached is not a protection, the same shape as Tier-1.5's dead
+UL floor. TwoTier's `pdb_ms` decides **8.1 %, 13× more often**, and its
+demotion collapses to 0.55 rank-places against PF's 1.74 and Reservation's
+2.54. **This is DOWNLINK, so no BSR/SR estimation pathology qualifies it.**
+`docs/flood-robot-demotion-2026-09-09.md`.
+
+**THE PRECONDITION IS WIDESPREAD AND ITS HARM IS NOT MEASURED.** A census over
+every builder finds **19 of 42 scenarios** put a large transfer (≥10 Mbps) on a
+robot that also carries a delay-critical flow (PDB ≤20 ms) — including
+`scenario(6)`, the regression corpus's own. **The effect is measured only in
+G2's cell**; everything else is a flagged precondition. And **G1's driven robot
+never coincides with its flood by construction** (`build_gt11_scenario` refuses
+`n_ues <= n_driven`), so G1's result is unaffected **and is measured in a
+configuration that structurally avoids the effect** — teleoperating the robot
+that is pulling firmware is realistic and untested.
+
+**AND I GOT THIS MECHANISM WRONG TWICE BEFORE MEASURING IT RIGHT.** First
+asserted from the key without running it; then REFUTED by mean DL rank over
+ALL slots (download robot 0.63 vs fleet 3.50, "ranked first"), which ranges
+over the wrong rows — that robot is backlogged in nearly every slot and is
+often the only candidate. **Re-measured inside the trial windows, where a STOP
+is actually pending, the demotion is real.** Decompose-before-attributing
+applies to a REFUTATION as much as to a claim: name the rows the statistic
+sums over and the rows the question is about.
+
 **AND WHEN TWO COUNTERS DISAGREE, FOLLOW THE DIFF — IT CORRECTED AN
 ATTRIBUTION TWICE IN ONE HOUR.** G2's runner records a miss (no completion in
 the trial's window) and, independently, `bytes_dropped_pdb`. They disagreed on

@@ -127,7 +127,22 @@ caveat touches any of them.** Full text: `docs/hardware-findings.md`.
    both QoS arms.
 4. **The cold-start lock-out** — one mechanism behind four separate
    observations.
-5. **NEW, from G2: the emergency-stop bearer's own PDB is 20× tighter than
+5. **NEW, from G2 — a SCHEDULER RANKING finding, and the sharpest
+   arm-differentiating result in this evaluation.** **The robot receiving a
+   large download is the robot that does not stop.** It holds **55.9 % of
+   PF's missed STOPs and 45.1 % of Reservation's**, against **9.8 % on
+   TwoTier** and 8.3 % if uniform; controlled by moving the download, at which
+   point the burden moves with it. The mechanism is each arm's downlink key:
+   PF ranks on `bits_per_rb / _r_avg` with **nothing above it**, Reservation
+   has a deadline tier that **`-coef` pre-empts on 98.4 % of adjacencies**,
+   and TwoTier's `pdb_ms` **decides 8.1 %, 13× more often**. **This is the
+   first unconfounded case where a QoS ranking protects a safety packet that a
+   fairness ranking demotes — and it is DOWNLINK, so no uplink estimation
+   pathology is involved.** It does not settle "is two-tier needed"; it is the
+   strongest evidence on that side so far.
+   `docs/flood-robot-demotion-2026-09-09.md`.
+
+6. **From G2: the emergency-stop bearer's own PDB is 20× tighter than
    the guarantee written on it, and it wins.** 5QI 85's standardised PDB is
    **5 ms**; G2's clause bound is **100 ms**; a STOP older than its PDB is
    discarded. **With the discard lifted to the clause's own bound, ZERO STOPs

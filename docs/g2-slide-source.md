@@ -97,16 +97,35 @@ spread against the cap's 24–37×. A control that comes back flat is a result.
 
 ---
 
-## 4. THE FINDING — every lost STOP would have arrived in time
+## 4. THE FINDING — the loss is the bearer's deadline, not the network
 
-**With the STOP bearer's PDB lifted to the clause's own 100 ms, there are ZERO
-misses in 5 760 STOP events** — every arm, both caps, 1 to 16 robots stopped
-at once. The worst delivery anywhere is **12.25 ms**, **8× inside the 100 ms
-bound**.
+**Two levers were measured against each other, 21 600 STOP events per cell:**
 
-**So the STOPs are not lost to congestion. They are discarded by their own
-bearer's 5 ms budget while the network would have delivered every one of them
-well inside the guarantee.**
+| STOP bearer PDB | cap 2 | cap 4 | **cap 8** (the C's hard ceiling) |
+|---|---|---|---|
+| **5 ms** (5QI 85's own) | 1.78 × 10⁻² | 1.25 × 10⁻³ | **2.78 × 10⁻⁴** |
+| **100 ms** (the clause's) | 1.39 × 10⁻⁴ | 9.26 × 10⁻⁵ | **4.63 × 10⁻⁵** |
+
+**Widening the per-slot UE cap is a 64× lever (2 → 8). Aligning the bearer's
+deadline with the guarantee written on it is a 128× lever at cap 2. Neither
+reaches zero, and they compose.** Every delivered STOP under the lifted
+deadline arrives by **12.25 ms**, 8× inside the bound.
+
+**So the STOPs are overwhelmingly not lost to congestion — they are discarded
+by their own bearer's 5 ms budget while the network would have delivered
+essentially all of them in time.**
+
+**THE BEARER IS ONE OF TWO FINDINGS, NOT THE ONLY ONE — CORRECTED.** An
+earlier version of this slide said G2 was a *bearer configuration* finding
+and not a *scheduler ranking* one. **That was right about the deadline and
+wrong about the ranking.** §4a is the correction, and it is the sharper of
+the two.
+
+> **A correction worth keeping visible.** This section first read *"ZERO
+> misses in 5 760 events"*. At 21 600 events the rate is 1.4 × 10⁻⁴, not 0.
+> The earlier figure was consistent (rule of three on 5 760 gives ≤ 5.2 × 10⁻⁴)
+> but **"zero" claimed more than the sample could support — a zero is only a
+> zero down to 3/n.**
 
 **In an operator's terms: a robot that would have stopped 12 ms late instead
 does not stop at all.**
@@ -117,6 +136,73 @@ delay-critical GBR bearer does. **The inconsistency is between the guarantee's
 own 100 ms bound and the bearer chosen to carry it** — they differ by 20×, and
 the bearer wins. It is the kind of finding that can only appear once the
 statistic is able to express a failure.
+
+---
+
+## 4a. AND A SCHEDULER RANKING FINDING — the sharpest in the campaign
+
+**The robot receiving a large download is the robot that does not stop.**
+Full record: `docs/flood-robot-demotion-2026-09-09.md`.
+
+| arm | that robot's share of all missed STOPs | uniform would be |
+|---|---|---|
+| **PF** | **55.9 %** | 8.3 % |
+| **Reservation** | **45.1 %** | 8.3 % |
+| **TwoTier** | **9.8 %** | 8.3 % |
+
+Its mean STOP latency doubles on the fairness-ranked arms (3.99 and 4.40 ms
+against ~2.0 for peers); on TwoTier it is **1.69 ms, the best of the twelve**.
+
+**Controlled:** move the download to a different robot and **the burden moves
+with it** — the previously-worst robot falls to 2–3 %. It is the transfer, not
+the robot's position or declaration order.
+
+**The mechanism is each arm's ranking key**, confirmed at the slots where a
+STOP is actually pending:
+
+| arm | demoted by | why |
+|---|---|---|
+| **PF** | **1.74 places** | `metric = bits_per_rb / _r_avg`, **one term, nothing above it**. A robot that just received a lot sorts last; the STOP has no tier to appeal to |
+| **Reservation** | **2.54 places** | it HAS a deadline tier above the channel term — but **`-coef` decides 98.4 % of adjacencies and `pdb_ms` only 0.6 %.** A tier that is never reached is not a protection |
+| **TwoTier** | **0.55 places** | **`pdb_ms` decides 8.1 %, 13× more often** — the 5 ms deadline is actually consulted |
+
+### What it means for "is two-tier needed"
+
+**This is the first unconfounded case in this evaluation where a QoS ranking
+demonstrably protects a safety packet that a fairness ranking demotes.**
+
+- **It is DOWNLINK** — no BSR, no SR, no grant round-trip. **The uplink
+  estimation pathology that qualifies most of this project's findings is
+  structurally absent.**
+- **It is controlled** — the effect follows the download.
+- **It is mechanistic** — the key predicts it and the trace confirms the
+  predicted term decides.
+
+**It does not settle the question.** One clause, one cell, in simulation, and
+TwoTier still fails G2 in absolute terms with 82 misses of its own. **What it
+settles is narrower and real: the QoS ranking does work that proportional
+fairness cannot, on the packet where it matters most.**
+
+**And it is the counterweight to this project's strongest sceptical result** —
+the workload inversion that turned out to be an intra-UE effect identical
+across all three arms, which no scheduler change could reach. This is the
+opposite shape.
+
+### Where else the precondition appears
+
+**PF's `_r_avg` is one EWMA per UE, shared across directions**, so the
+precondition is any robot that recently moved a large volume either way.
+**Measured over every builder: 19 of 42 scenarios** put a large transfer on a
+robot that also carries a delay-critical flow — including the regression
+corpus's own `scenario(6)`, every G12 fleet cell, and G1's cell.
+
+**G1's driven robot never coincides with the flood, by construction** — so
+G1's published result is unaffected, **and is therefore measured in a
+configuration that structurally avoids this effect.** Teleoperating the robot
+that is pulling firmware is realistic and currently untested.
+
+**The census establishes the precondition, not harm.** The effect is measured
+only in G2's cell.
 
 ---
 
