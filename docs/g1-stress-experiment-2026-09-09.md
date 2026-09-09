@@ -88,7 +88,7 @@ should do and is stronger evidence than the corpus diff alone.
 | **the load** | Asset B's full committed profile UL **plus a saturating 5QI-9 DL firmware pull** — 50 Mbps offered against a downlink that delivers ~17 |
 | **arms** | PF, Reservation, TwoTier |
 | **seeds** | 10, paired |
-| **horizon** | 40,000 slots, μ=2, DSUUU, 40 MHz — 10.0 s, **200 commands per driven robot per run** |
+| **horizon** | **40,000 slots = 10.0 s** at μ=2 (0.25 ms slots), DSUUU, 40 MHz — **200 cmd_vel messages per driven robot per run** at 20 Hz. GT-1.1 specifies 10 min; §3b states every pass's horizon and what each supports |
 | **caps** | both (§7) |
 
 **Two sub-experiments, both reported.**
@@ -136,6 +136,124 @@ one, which is the standing scope rule.
 
 ---
 
+## 3b. Horizons, stated per pass, and what each one supports
+
+**Every pass, explicitly.** Slot duration is **0.25 ms** throughout (μ=2), and
+cmd_vel runs at **20 Hz**, so commands per robot is `seconds × 20`.
+
+| pass | slots | seconds | runs | **commands per robot** | total commands | aggregate cell time |
+|---|---|---|---|---|---|---|
+| **the grid** (§4) | **40 000** | **10.0** | 960 | **200** | 383 959 | **9 600 s (160 min)** |
+| extension probe (§6) | 40 000 | 10.0 | 30 | 200 | 12 000 | 300 s |
+| **positive control** (§5) | **40 000** | **10.0** | 18 | **200** (185 / 46–49 / **0** as the radio degrades) | 4 998 | 180 s |
+| tie-break control (§4.5) | 40 000 | 10.0 | 80 | 200 | 32 000 | 800 s |
+| tail pass A (§7) | 200 000 | 50.0 | 36 | 1 000 | 71 992 | 1 800 s |
+| **tail pass B** (§7a) | **1 000 000** | **250.0** | 18 | **5 000** | 179 977 | 4 500 s |
+| **all cmd_vel passes** | | | **1 142** | | **684 926** | **17 180 s (4.77 h)** |
+
+Command totals are **measured** for the grid, the positive control and the two
+tail passes (from their own `message_count`s) and **derived** as
+`runs × 2 robots × 200` for the extension and tie-break probes, which recorded
+pass/fail rather than counts; the extension probe's log shows `msgs=200` on all
+30 runs. **The positive control's 4 998 is far below `18 × 2 × 200 = 7 200`
+because that is the point of it** — the radio degrades until commands stop
+arriving, and at −6 dB none do.
+
+**G10's re-measurement (§2) is 20 000 slots = 5.0 s over 270 runs**, and it
+carries **no cmd_vel flow at all** — it runs the parametric workload and
+supports no G1 statistic. It sets the UE axis range and nothing else.
+
+### 3b.1 Which statistic each horizon supports
+
+**p98 over 200 commands is the 4th-largest sample** (`k = min(n-1, int(n·0.98))
+= 196`, 0-based, so 3 samples sit above it). That is **adequate for a bound
+check and thin for a distribution**: it says whether four commands in ten
+seconds exceeded 95 ms, and it does not describe the shape of the tail. The
+per-seed yield rule over 10 seeds is what carries it, not the single run.
+
+**And the short horizon does not flatter the bound — it is conservative.**
+Like-for-like at N=6, worst p98 over the seeds in each pass:
+
+| | 10 s (grid, 10 seeds) | 250 s (tail B, 3 seeds) |
+|---|---|---|
+| PF | **3.00 ms** | 1.50 ms |
+| Reservation | **3.00 ms** | 1.50–1.75 ms |
+| TwoTier | 1.50–3.00 ms | 1.50–1.75 ms |
+
+The 4th-largest of 200 lands on a higher quantised level than the 100th-largest
+of 5 000 does, so **the 10 s runs report the same or a worse p98 than the 250 s
+runs at the same fleet size.** A longer horizon would not have found a p98 the
+grid missed.
+
+### 3b.2 The gap criterion is the one where horizon genuinely matters — and it was checked
+
+**"Zero gaps ≥ 200 ms" over 10 s IS a weaker per-run statement than over
+250 s**, and unlike p98 the statistic *grows* with observation time. Measured:
+the grid's largest gap anywhere is **103.0 ms** and tail pass B's is also
+**103.0 ms** — but the grid needed 960 runs to reach it while tail B reached it
+in 18.
+
+**Can a 10 s run contain a 699 ms gap? Yes, and it is not an argument —
+it is measured at the grid's own horizon.** The positive control (§5) runs
+**the same 40 000 slots** and records gaps of **698.8 ms** and **2 935.0 ms**.
+So the grid's horizon is not structurally unable to hold a breach; a 200 ms gap
+is 2 % of a 10 s run, and gaps 14× the bound fit inside one comfortably. **The
+criterion is not passing because the window is too short to contain a failure.**
+
+**What the grid actually observed**, over 382 039 inter-arrival gaps. The
+cadence is 50 ms, so a gap is counted in command periods, not milliseconds:
+
+| worst gap in a run | meaning | runs of 960 |
+|---|---|---|
+| 51.5 – 61.8 ms (~1 period) | ordinary jitter, nothing missed | 923 |
+| **≥ 90 ms (2 periods)** | **one command missed** | **37** |
+| ≥ 140 ms (3 periods) | two consecutive missed | **0** |
+| **≥ 200 ms (4 periods)** | **THE BOUND** | **0** |
+
+**The largest run of consecutive losses anywhere in 960 runs is ONE, and the
+bound needs three.** Per flow: 38 of 1 920 show a ≥ 90 ms gap, and 41 of 1 920
+delivered 199 rather than 200 — the three-flow difference is losses at a run's
+first or last command, which leave no interior gap.
+
+That is a more useful margin statement than "1.9× inside", and it is why
+§4.1 says to size headroom in commands rather than milliseconds.
+
+### 3b.3 Against GT-1.1's specified 10 minutes — and whether it matters
+
+**GT-1.1 specifies 10 min of steady state, 3 arms, 5 runs — 150 min of
+observation. The grid alone is 160 min, and all cmd_vel passes together are
+286 min, so the AGGREGATE exceeds the specification by 1.9×.** What is short is
+the **per-run duration: 10 s against 600 s, one sixtieth**, and the longest run
+here is 250 s, five twelfths.
+
+**This is the shape that caught G11** — a clause passing at a fraction of its
+specified duration, unnoticed until the scenario was audited
+(`docs/wp9-g11-plan.md`) — so it is stated rather than left to be found.
+
+**Where the difference does NOT matter.** Both criteria are evaluated inside a
+window, not across one, and 960 independent seeds sample 960 different 10 s
+windows. For a **stationary** process, aggregate coverage substitutes for run
+length, and the aggregate here exceeds the plan's.
+
+**Where it could matter, and what bounds it.** Aggregate coverage does *not*
+substitute for run length against a **non-stationary** effect — something that
+only appears after minutes, such as a slowly-filling queue or a drifting
+fairness ledger. **This cell has such an element**: the firmware pull offers
+50 Mbps into a downlink that delivers ~17, so its backlog grows without bound
+for the whole run. At 250 s that backlog is 25× what it is at 10 s.
+
+**The check is that the numbers are flat across a 25× horizon span.** Tail
+pass B's p98, p99, p99.9 and worst gap at N=6 are indistinguishable from the
+grid's at the same point. **That is evidence of stationarity out to 250 s, and
+it is not proof out to 600 s** — the remaining factor is 2.4×, and closing it
+is a run, not an argument.
+
+**Neither criterion's verdict is at risk from the shortfall**: p98 is
+10.6× inside its bound and reported *conservatively* by the short horizon, and
+the gap criterion demonstrably fires at this horizon while the worst observed
+gap used one of the three misses the bound allows.
+
+
 ## 4. The result — 0 failures of 960, on both criteria
 
 | | |
@@ -160,10 +278,11 @@ criterion is not decoration — it is the binding one, by a factor of five.
 
 **And the mechanism is arithmetic.** The command cadence is 50 ms and the
 worst run delivered **199 of 200**, so a 103 ms gap is exactly *one missed
-command*: two nominal periods back to back. The 200 ms bound therefore
-tolerates **three consecutive losses**, and the worst point in 960 runs used
-one of them. A reader sizing headroom should size it in commands, not
-milliseconds.
+command*: two nominal periods back to back. **The 200 ms bound tolerates three
+consecutive losses; the largest run of consecutive losses anywhere in 960 runs
+is one** (§3b.2 has the distribution: 37 runs of 960 lost a single command,
+none lost two in a row). A reader sizing headroom should size it in commands,
+not milliseconds.
 
 ### 4.2 Sub-experiment A — the QoS arms are flat in fleet size and PF is not
 
@@ -390,12 +509,16 @@ not contention** — and 1.25 ms against 95 ms is not close.
 
 ---
 
-## 7. p99.9 and max — measured where p99.9 is actually a percentile
+## 7. p99.9 and max — the pass that was SUPPOSED to separate them, and did not
 
 **At the grid's 10 s horizon a driven robot delivers 200 commands, so the
 99.9th-percentile INDEX IS THE MAXIMUM.** Reporting both from the grid would
-be two names for one number. A separate pass runs **200,000 slots (50 s,
-1,000 commands per robot)**, where the 99.9th is the 999th of 1,000.
+be two names for one number, so a separate pass ran **200,000 slots (50 s,
+1,000 commands per robot)**.
+
+**It did not fix it, and the correction below is the point of this section.**
+1,000 is exactly the boundary: read §7a for the pass that actually separates
+them.
 
 36 runs, 3 seeds × 2 driven robots per cell — **6,000 delivered commands per
 cell** — at N=6 (sub-experiment B's fleet) and N=12 (PF's boundary, the
@@ -416,8 +539,8 @@ largest any arm admits):
 | 12 | 2 | Reservation | 6 000 | 2.75 | 3.00 | **4.50** | 4.50 | 54.5 | 0 |
 | 12 | 2 | TwoTier | 6 000 | 1.75 | 3.00 | **4.50** | 4.50 | 54.5 | 0 |
 
-**p99.9 is 4.50–5.25 ms — 18–21× inside the 95 ms bound — and zero gaps
-reach 200 ms in 72,000 delivered commands.**
+**The tail is 4.50–5.25 ms — 18–21× inside the 95 ms bound — and zero gaps
+reach 200 ms in 71,992 delivered commands.**
 
 **CORRECTION, and it is the same discipline this document applies
 everywhere else.** I first wrote that p99.9 equalling the max was *"a
@@ -533,9 +656,9 @@ fleet sizes well past the point the cell stops meeting its other guarantees.
 3. **The thing to watch is missed commands, not slow ones.** The gap
    criterion is 1.9× inside its bound where the latency criterion is 10.6×
    inside its. At a 20 Hz cadence the 200 ms bound is three consecutive
-   losses; the worst of 960 runs used one. **Under a genuinely bad radio the
-   two come apart** — §5's 0 dB point is responsive by the latency measure
-   and silent for 699 ms.
+   losses; **37 of 960 runs lost a single command and none lost two in a
+   row.** **Under a genuinely bad radio the two come apart** — §5's 0 dB
+   point is responsive by the latency measure and silent for 699 ms.
 
 **What this does NOT say.** It is not evidence that the drive path is safe on
 a degraded radio: §5 breaks both criteria at 0 dB and −3 dB. The clause is
@@ -617,6 +740,14 @@ consumers, what becomes live, and what it duplicates:
   which reads as a measurement of nothing. Fixed at the runner —
   `_wall_s_this_invocation`, `_ran_this_invocation` and `_cpu_s_total` are
   now separate, and the campaign's cost survives a resume.
+- **A strict `>` where the data sits exactly on the threshold.** The first
+  version of §3b.2's table counted runs with a worst gap `> 100 ms` and found
+  **7**; 25 runs sit at exactly 100.0 ms, so the real count of runs that lost a
+  command is **37**. The fix was to stop thresholding in milliseconds at all
+  and count in **command periods** — a 50 ms cadence makes 2 periods the
+  physically meaningful line, and it falls at 90 ms where no data sits. **A
+  threshold placed on a quantised value's own level is a coin flip;** put it in
+  the gap between levels, in the units the mechanism works in.
 - **I claimed a percentile I had not established was one.** The 50 s pass was
   built to make p99.9 a real percentile and reported as having done so. It had
   not: the index convention is `min(n-1, int(n·p))`, so at any n ≤ 1000 the

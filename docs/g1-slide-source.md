@@ -107,7 +107,8 @@ Zero gaps reach 200 ms in 179,977 delivered commands.**
 **The gap criterion is the tight one, by a factor of five** — and its
 mechanism is arithmetic: at a 50 ms cadence, 103 ms is exactly one missed
 command, and the worst run delivered 199 of 200. **The bound tolerates three
-consecutive losses and the worst point used one.**
+consecutive losses; the largest run of consecutive losses anywhere in 960 runs
+is one** — 37 runs lost a single command, none lost two in a row (§7).
 
 **And the arm order INVERTS the withdrawn row.**
 
@@ -177,8 +178,9 @@ past the point the cell stops meeting its other guarantees.
 - **Working the robots harder changes nothing** — six-fold load moves the
   latency by one 0.25 ms slot.
 - **Watch missed commands, not slow ones.** The gap criterion sits 1.9×
-  inside its bound where latency sits 10.6× inside its, and §6 shows the two
-  coming apart entirely on a bad radio.
+  inside its bound where latency sits 10.6× inside its. 37 runs of 960 lost a
+  single command; none lost two in a row, and the bound needs three. §6 shows
+  the two criteria coming apart entirely on a bad radio.
 
 **Not established:** robustness to link quality. The clause is robust to load
 and fleet size *on this carrier*, which is what GT-1.1 asks; §6 breaks it at
@@ -219,10 +221,54 @@ robot is how a total outage scores as the best possible value.
 deployment's value on half its bandwidth. Neither is the deployment's
 system.** Both are run in full.
 
-**And the horizon is 10 s, not GT-1.1's 10 minutes** — 200 commands per
-driven robot per run, so a per-run p99.9 IS the maximum. The p99.9 reported
-here comes from a separate 50 s pass where it is a percentile in its own
-right.
+### The horizons, per pass
+
+Slot 0.25 ms (μ=2) throughout; cmd_vel 20 Hz, so commands per robot is
+`seconds × 20`.
+
+| pass | slots | seconds | runs | **commands / robot** | aggregate cell time |
+|---|---|---|---|---|---|
+| **the grid** | **40 000** | **10.0** | 960 | **200** | **9 600 s (160 min)** |
+| positive control | 40 000 | 10.0 | 18 | 200 → 0 as the radio degrades | 180 s |
+| extension probe | 40 000 | 10.0 | 30 | 200 | 300 s |
+| tie-break control | 40 000 | 10.0 | 80 | 200 | 800 s |
+| tail pass A | 200 000 | 50.0 | 36 | 1 000 | 1 800 s |
+| **tail pass B** | **1 000 000** | **250.0** | 18 | **5 000** | 4 500 s |
+| **all** | | | **1 142** | | **17 180 s (4.77 h)** |
+
+(G10's re-measurement is 20 000 slots = 5.0 s over 270 runs and carries **no
+cmd_vel flow** — it sets the UE axis and supports no G1 statistic.)
+
+**What each supports.** **p98 over 200 commands is the 4th-largest sample** —
+adequate for a bound, thin for a distribution — and it is **conservative**:
+at N=6 the 10 s runs report the same or a worse p98 (3.00 ms) than the 250 s
+runs (1.50–1.75 ms), because the 4th-largest of 200 lands higher than the
+100th-largest of 5 000. **A longer horizon would not have found a p98 the
+grid missed.**
+
+**The gap criterion is the one where horizon matters**, and it was checked
+rather than assumed. **A 10 s run can hold a 699 ms gap — measured, at the
+grid's own 40 000 slots**: the positive control records 698.8 ms and
+2 935 ms there. So the criterion is not passing because the window is too
+short to contain a failure. Over 382 039 gaps, counted in command periods
+rather than milliseconds: **one command missed in 37 runs of 960, TWO
+consecutive missed in zero, and the 200 ms bound needs three.** The largest
+run of consecutive losses anywhere is one.
+
+**Against GT-1.1's specified 10 minutes.** The plan asks 10 min × 3 arms ×
+5 runs = **150 min**; the grid alone is **160 min** and all cmd_vel passes
+are **286 min**, so the **aggregate exceeds the specification by 1.9×**.
+What is short is the **per-run duration — 10 s against 600 s, one sixtieth**,
+with the longest run at 250 s. **This is the shape that caught G11**, so it
+is stated rather than left to be found.
+
+**Does it matter?** Not for a stationary process: both criteria are scored
+inside a window and 960 seeds sample 960 different windows. It *would* matter
+for a non-stationary one, and this cell has such an element — the firmware
+pull's backlog grows without bound all run. **The check is that every
+statistic is flat across a 25× horizon span** (10 s to 250 s, same N).
+**That is evidence out to 250 s, not proof out to 600 s**; the remaining
+factor is 2.4× and closing it is a run, not an argument.
 
 ---
 
@@ -235,6 +281,11 @@ right.
   instrument.** The rank-hook identity check reported every arm as
   differing, including PF, because the digest was hashing two live object
   handles whose `repr()` carries a memory address.
+- **A threshold placed on a quantised value's own level is a coin flip.**
+  Counting runs whose worst gap was `> 100 ms` found 7; **25 runs sit at
+  exactly 100.0 ms**, and the real count of runs that lost a command is **37**.
+  Fixed by counting in **command periods** rather than milliseconds, which puts
+  the line at 90 ms where no data sits.
 - **Two spawn-pool traps hit in one session, both from CLAUDE.md's own
   list:** a scratchpad probe with no `__main__` guard re-entered its own
   pool for six minutes, and `pgrep -f <script>` matched the shell running
@@ -251,6 +302,9 @@ right.
 - **The 200 ms gap bound is likewise proposed.** It is the tighter of the
   two criteria by a factor of five, so it is the one whose ratification
   actually matters.
-- **GT-1.1 specifies 10 minutes of steady state**; this runs 10 s per graded
-  run with a separate 50 s pass for the tail. The full duration is a
-  hardware-campaign question, not a simulator one.
+- **GT-1.1 specifies 10 minutes of steady state per run.** This runs **10 s**
+  per graded run (960 of them) with **50 s** and **250 s** tail passes. The
+  aggregate exceeds the plan's 150 min by 1.9×; the **per-run** duration is
+  one sixtieth of it, and the longest run is five twelfths. §7 states what
+  that does and does not put at risk. Closing the last 2.4× is a run, and it
+  is a hardware-campaign question as much as a simulator one.

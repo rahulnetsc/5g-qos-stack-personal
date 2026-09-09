@@ -1245,6 +1245,18 @@ Before quoting a percentile, divide: `1/(1-p)` against the sample size the
 statistic is computed over — **which is PER FLOW here, not the pooled
 campaign total.**
 
+**AND A THRESHOLD PLACED ON A QUANTISED VALUE'S OWN LEVEL IS A COIN FLIP.**
+Latency and inter-arrival gaps here are quantised to the slot (0.25 ms) and
+to the source's period, so a `>` or `>=` chosen without looking at where the
+levels fall decides the answer. Measured in G1: counting runs whose worst
+command gap was `> 100 ms` found **7**; **25 runs sit at exactly 100.0 ms**
+and the real count was **37**, a 5x error. **The fix is not to pick the other
+operator — it is to threshold in the units the MECHANISM works in.** A 20 Hz
+command stream makes "two command periods" the meaningful line, which lands at
+90 ms where no data sits and is insensitive to the operator. Same shape as the
+denominator rule above: the arithmetic was right and the boundary was the
+modelling judgement.
+
 **AND G1's CLAUSE HAS TWO PASS CRITERIA, of which `M01` is neither.**
 `docs/IA_P5G_Factory_Guarantee_Test_Plan.md` GT-1.1: *"cmd_vel one-way p98 <=
 RAN PDB; p99.9 and max reported; zero command gaps >= 200 ms"*. Two bounds.

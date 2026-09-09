@@ -66,13 +66,25 @@ from g11_campaign import _arm                                    # noqa: E402
 #: driver's bare 0 (CLAUDE.md's cqi_delay_slots invariant).
 CQI_DELAY_SLOTS = 8
 
-#: 40,000 slots at mu=2 is 10.0 s -- 200 cmd_vel messages per driven robot
-#: per run. DELIBERATELY LONGER than G9/G12's 20,000: at 20,000 a p98 over
-#: 100 delivered commands is the 3rd-worst value and the statistic would be
-#: shaped by its own quantisation. GT-1.1 asks for 10 MINUTES of steady
-#: state, which this is not; the deviation is stated in the result document
-#: and is why p99.9 is reported from a separate long-horizon pass rather
-#: than from the grid (at 200 samples the p99.9 INDEX IS THE MAXIMUM).
+#: 40,000 slots at mu=2 (0.25 ms) is 10.0 s -- **200 cmd_vel messages per
+#: driven robot per run** at 20 Hz.
+#:
+#: DELIBERATELY LONGER than G9/G12's 20,000. The percentile index convention
+#: is `k = min(n-1, int(n*p))`, so p98 is the 3rd-largest sample at n=100
+#: (a 20,000-slot run) and the 4th-largest at n=200. The statistic is thin
+#: either way and the 10-seed yield rule is what carries it; 20,000 makes it
+#: thin enough to be shaped by its own quantisation.
+#:
+#: GT-1.1 ASKS FOR 10 MINUTES of steady state, which this is not: 10 s is
+#: one sixtieth of it per run, though 960 runs give 1.9x the plan's
+#: AGGREGATE observation. `docs/g1-stress-experiment-2026-09-09.md` §3b
+#: states every pass's horizon and which statistic each one supports --
+#: including that a 10 s window demonstrably CAN hold a 200 ms gap (the
+#: positive control records 698.8 ms at this same horizon), so the gap
+#: criterion is not passing for want of a window to fail in.
+#:
+#: The same convention is why p99.9 comes from a separate long-horizon pass
+#: and not from this grid: at n <= 1000 the p99.9 INDEX IS THE MAXIMUM.
 HORIZON_SLOTS = 40_000
 
 #: Sub-experiment A. Brackets every arm's re-measured G10 boundary so each
