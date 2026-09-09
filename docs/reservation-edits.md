@@ -184,6 +184,121 @@ has been repeatedly caught by.
 
 ---
 
+## R4 — the DL deadline tier is present and unreached — **AND UNLIKE R1 THIS IS DIAGNOSED, NOT STRUCTURAL**
+
+**The mechanism Reservation HAS.** Its downlink key is
+`(has_srb, has_gbr, pdb_ms, -coef, tie_break)` (`scheduler/reservation.py:672`)
+— **the deadline tier already sits ABOVE the channel/throughput term.** So
+unlike R1, R2 and R3 this is not a missing mechanism. On paper an urgent
+packet outranks a bulk one before the coefficient is ever consulted.
+
+**Evidence it does not fire.** Measured over G2's downlink rank trace,
+`docs/flood-robot-demotion-2026-09-09.md`:
+
+| arm | `-coef` decides | **`pdb_ms` decides** |
+|---|---|---|
+| **Reservation** | **98.4 %** | **0.6 %** |
+| TwoTier | 3.9 % | **8.1 % — 13× more often** |
+
+**The tier is present and unreached, which is the same shape as Tier-1.5's UL
+floor in R1** — a protection that exists, is correctly ported, and cannot arm
+in the fault it was written for.
+
+**And it has a measured consequence, which R1's dead floor also has.** A robot
+receiving a large download holds **45.1 % of Reservation's missed emergency
+STOPs** (uniform would be 8.3 %), against **9.8 % on TwoTier**, and is demoted
+**2.54 rank-places** at the slots where its STOP is pending, against TwoTier's
+**0.55**. Controlled: moving the download to a different robot moves the
+burden with it.
+
+### R4.1 The diagnosis — three candidates, and the trace settles it without a build
+
+**Measured**: distinct `pdb_ms` values among the candidates in each downlink
+snapshot, inside the windows where an urgent packet is actually pending.
+
+| arm | n_stop | candidate values | **distinct levels** | **at exactly 0** | **all candidates share ONE value** |
+|---|---|---|---|---|---|
+| **Reservation** | 1 | 6 285 | 10 | 7.9 % | **77.8 %** |
+| | 2 | 6 470 | 8 | 9.9 % | **71.6 %** |
+| | 12 | 8 482 | 10 | 24.4 % | **88.4 %** |
+| TwoTier | 1 | 6 127 | 9 | 11.3 % | 37.2 % |
+| | 2 | 6 975 | 9 | 11.4 % | 39.1 % |
+| | 12 | 7 997 | 8 | 38.8 % | 32.2 % |
+
+**(c) IT IS NOT A SENTINEL.** `best_remaining_pdb` seeds at **9999**
+(`reservation.py:1316`) and **9999 never appears** in any observed candidate
+value, at either arm, in any cell. The seed is always displaced.
+
+**(b) IT IS NOT THE COEFFICIENT'S DYNAMIC RANGE.** The key is **lexicographic**:
+`-coef` is consulted *only* when `pdb_ms` is exactly equal. However wide the
+coefficient's range, it cannot swamp a tier above it. **`-coef` deciding
+98.4 % is a restatement of `pdb_ms` tying on 98.4 %, not a competing
+explanation** — this is worth stating because it is the intuitive reading and
+it is wrong.
+
+**(a) IT IS THE VALUES, and in two distinct ways.**
+
+1. **They are COARSE.** The whole observed range across both arms and every
+   cell is **13 distinct values** — `{0, 2, 3, 4, 5, 7, 8, 9, 10, 297, 298,
+   299, 300}` — and any one snapshot shows **8 to 10**. The cause is in the
+   port: `remaining_pdb = max(0, pdb_ms - int(age_ms))` truncates to **whole
+   milliseconds**, against a **0.25 ms slot**. **The tier's resolution is 4×
+   coarser than the scheduler's own decision granularity.**
+2. **They SATURATE AT ZERO.** `age_ms` is measured from the flow's **last
+   grant**, not from the queued packet's arrival, so a flow granted less often
+   than its own PDB pins to 0 — and every such UE reads the same 0. The share
+   at exactly zero rises with load: **7.9 % → 24.4 %** on Reservation as the
+   fleet is stopped together. **A saturated tier cannot separate anything.**
+
+### R4.2 THE PART THAT CHANGES THE PROPOSAL — the formula is already identical to two-tier's
+
+**`reservation.py::_dl_gbr_and_pdb` and `two_tier.py::_dl_gbr_and_pdb` compute
+`remaining_pdb` with byte-identical code** — same 9999 seed, same
+`int(f.pdb_ms)`, same `last_grant is None → pdb_ms`, same
+`max(0, pdb_ms - int(age_ms))`, same `if bytes_queued > 0` gate on the
+minimum. Read side by side, line for line.
+
+**So the 0.6 % vs 8.1 % gap is NOT in how the deadline is computed.** It is in
+**which UEs are candidates together**: Reservation's candidate sets are far
+more homogeneous (ties on 71.6–88.4 % of snapshots against TwoTier's
+32.2–39.1 %), and TwoTier's snapshots additionally contain 297–300 ms
+candidates that Reservation's almost never show.
+
+**That is measured; WHY the candidate sets differ is NOT yet established**, and
+it is the one open question in this entry. It is a difference in eligibility,
+not in the deadline tier, and it is answerable the same way — by tracing which
+UEs enter each arm's candidate list and why.
+
+### R4.3 What the edit would be, and its honest status
+
+**A resolution change is the tunable half and is small and local**: compute
+`remaining_pdb` in **slots** rather than truncated whole milliseconds. It is a
+one-expression change in one function, it raises the tier's resolution 4×, and
+it would break a large share of the exact-equality ties that currently fall
+through to `-coef`.
+
+**The saturation half is NOT tuning.** Measuring grant recency rather than the
+queued head's age is a **semantic** choice inherited from the C, and changing
+it is a different mechanism, not a tighter one. It should not be bundled with
+the resolution change.
+
+**AND NEITHER IS ESTABLISHED TO CLOSE THE GAP.** The resolution change would
+break ties; whether the tie-breaks then fall the *right* way — toward the
+urgent packet rather than merely differently — is not measured and cannot be
+inferred from the tie rate. **R4.2's finding is the reason for the caution:
+the formula is already identical to the arm that does 13× better, so the
+formula is demonstrably not the whole story.**
+
+**Status: the first item on this list with a plausible, bounded fix** — and
+the first where the mechanism is present rather than absent, so "Reservation
+with edits" here means tuning a tier rather than porting one. **That bears
+directly on whether Reservation-with-edits is sufficient**, and it is exactly
+why R4.2's open question has to be answered before the divergence arm is
+built: if the gap is eligibility rather than the deadline tier, the resolution
+change is not the edit that matters.
+
+---
+
 ## Not yet on this list
 
 Entries are added only with measured evidence. Candidates seen but not

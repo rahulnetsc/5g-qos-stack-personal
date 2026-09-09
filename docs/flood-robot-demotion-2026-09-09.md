@@ -73,7 +73,13 @@ robot. Measured: `-metric` decides **99.7 %** of PF's downlink adjacencies.
 
 **Reservation** — `_DL_TERMS = (has_srb, has_gbr, pdb_ms, -coef, tie_break)`.
 **The deadline tier exists and sits above the channel term**, so on paper the
-STOP should be rescued. In practice **`-coef` decides 98.4 % of adjacencies
+STOP should be rescued. **This measurement is the evidence for
+`docs/reservation-edits.md` R4**, where it is diagnosed: the tier ties because
+its values are coarse (13 distinct levels across every cell, whole-ms
+truncation against a 0.25 ms slot) and saturate at zero (7.9 % → 24.4 % of
+candidates as the fleet is stopped together) — **not** because of a sentinel
+(9999 never appears) and **not** because the coefficient's range swamps it (a
+lexicographic tier cannot be swamped from below). In practice **`-coef` decides 98.4 % of adjacencies
 and `pdb_ms` only 0.6 %** — the tiers above `-coef` almost never separate two
 candidates, so the throughput/channel term is effectively the whole key. **A
 tier that exists but is never reached is not a protection**, which is the
