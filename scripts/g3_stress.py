@@ -774,6 +774,13 @@ def main(argv) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", default="PF,Reservation,TwoTier")
     ap.add_argument("--seeds", type=int, default=10)
+    ap.add_argument("--seed-base", type=int, default=0,
+                    help="base_seed for paired_seeds -- a DISJOINT seed set "
+                         "for held-out validation. Default 0 reproduces every "
+                         "published G3 figure exactly; any other value is a "
+                         "fresh sample, which is what a winner selected over "
+                         "several variants on one seed set needs before it is "
+                         "believed.")
     # CAP 4 ONLY BY DEFAULT -- the deployment's value (106 PRB), and the one
     # to quote. Cap 2 (this carrier's faithful derivation at 55 PRB) is a
     # second full grid and is added only if a verdict comes out close enough
@@ -818,7 +825,7 @@ def main(argv) -> int:
     arms = [x for x in a.arms.split(",") if x]
     caps = [int(x) for x in a.caps.split(",") if x]
     parts = {x for x in a.parts.split(",") if x}
-    seeds = paired_seeds(a.seeds)
+    seeds = paired_seeds(a.seeds, base_seed=a.seed_base)
     N = a.fixed_n
 
     tasks: list[tuple] = []
@@ -999,6 +1006,7 @@ def main(argv) -> int:
         "_ue_axis": list(UE_AXIS), "_load_axis": list(LOAD_AXIS),
         "_cam_axis": list(CAM_AXIS), "_silence_axis": list(SILENCE_AXIS),
         "_snr_axis": list(SNR_AXIS), "_caps": caps, "_seeds": a.seeds,
+        "_seed_base": a.seed_base,
         "_cycles": SILENCE_CYCLES,
         "_wall_s_this_invocation": round(wall, 1),
         "_ran_this_invocation": len(todo),

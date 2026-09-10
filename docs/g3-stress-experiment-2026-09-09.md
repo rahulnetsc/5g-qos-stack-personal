@@ -1187,3 +1187,56 @@ registered here so a one-sided win cannot be reported as a win:**
 
 **Neither E1 nor E2 meets it.** A candidate that satisfies (1) and fails (2) is
 the same trade already measured twice, not a new result.
+
+## 19. THE BOUNDARY IS A SINGLE-SEED STATISTIC — report it beside the aggregate, never alone
+
+**2026-09-10, and it caught me after five variants had been ranked on it.**
+
+The standing boundary rule is *"the last passing fleet size before the first
+failure"*. That makes it a **maximum over rare events**, and its variance
+depends on how often the arm fails at all:
+
+- **the faithful arm fails often**, so its first failure is not a rare event and
+  its boundary is stable — **7 on both seed sets**, part 1;
+- **a good arm passes nearly everywhere**, so its boundary is decided by
+  whichever single seed happens to fail earliest — and G-kpi's part-1 boundary
+  read **14 on the seeds it was selected on and 8 on ten held-out seeds**, on
+  one seed failing at N = 10 instead of N = 16.
+
+**The underlying effect is stable to within four cells in a hundred.** Paired,
+same builder, same scoring code, `--seed-base 1` giving a provably disjoint
+sample:
+
+| statistic, 100 paired cells | selection seeds | held-out seeds |
+|---|---|---|
+| part-1 passes, faithful → G-kpi | 85 → **98** | 85 → **94** |
+| part-1s passes, faithful → G-kpi | 73 → **98** | 72 → **94** |
+| part-2 passes | 77 → **100** | 78 → **100** |
+| part-3 passes | 63 → **77** | 59 → **78** |
+| campaign silences ≥ 2 s | 26 → **0** | 23 → **0** |
+| telemetry short | 2 356 → 860 | 2 309 → 914 |
+| **part-1 BOUNDARY** | 7 → **14** | 7 → **8** |
+
+**Every aggregate reproduces. Only the boundary moves, and it moves by six.**
+
+**So the boundary is fine as a DEPLOYMENT figure and wrong as a RANKING
+statistic.** An operator sizing a fleet wants the last size that passed; a
+comparison between two candidates that both pass nearly everywhere cannot use
+it, because the difference between them is one seed's worth of noise. **The
+ranking I reported between G-per-deadline (12), G-denial (12) and G-kpi (14) is
+inside that noise and is withdrawn**; what survives is that all three are large
+improvements on the faithful arm and that G-slack is genuinely worse.
+
+**This is the same class as the two errors this campaign already recorded** — a
+threshold placed on a quantised value's own level, and a percentile quoted below
+`1/(1-p)` samples. In all three the arithmetic was right and the statistic could
+not carry the weight put on it. **Mechanically: never quote a boundary without
+the pass count over the same cells beside it, and never rank two candidates on a
+boundary alone.**
+
+**`scripts/g3_stress.py --seed-base` exists for this.** Default 0 reproduces
+every published G3 figure exactly; any other value draws a disjoint sample from
+`regime_sweep.paired_seeds`, confirmed non-overlapping. **A candidate selected
+over several variants on one seed set is not believed until it is re-scored on a
+fresh one** — and that check cost 10 minutes against five variants' worth of
+ranking it corrected.

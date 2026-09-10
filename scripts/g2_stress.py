@@ -62,6 +62,7 @@ from sim.scenarios.g2 import (N_TRIALS, QFI_STOP, STOP_BOUND_MS,   # noqa: E402
 from sim.srb import with_srb                                      # noqa: E402
 from scheduler.flow import DERIVE_PDB_FROM_5QI                    # noqa: E402
 from g11_campaign import _arm                                     # noqa: E402
+from proto_arms import resolve_arm                              # noqa: E402
 
 CQI_DELAY_SLOTS = 8
 #: Set by the schedule, not chosen: 30 trials 250 ms apart after a 1 s settle
@@ -117,7 +118,7 @@ def one(task: tuple) -> dict[str, Any]:
 
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
     t0 = time.time()
-    summ = driver_run(sc, _arm(arm_name), cqi_delay_slots=CQI_DELAY_SLOTS,
+    summ = driver_run(sc, resolve_arm(arm_name), cqi_delay_slots=CQI_DELAY_SLOTS,
                       max_sched_ues=cap, random_access=ra)
     wall = time.time() - t0
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm_name,

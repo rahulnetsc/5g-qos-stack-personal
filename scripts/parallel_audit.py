@@ -81,6 +81,17 @@ ALLOW_SERIAL = {
                          "question is which RESOURCE binds, which needs no "
                          "seed replication, and each cell prints as it "
                          "completes so ordering is the readable form",
+    "g3_gate_population_probe.py": "answers a POPULATION question before any "
+                                   "gate is built -- does each candidate gate's "
+                                   "precondition occur at all, and where. One "
+                                   "arm, one seed, one run per fleet size, with "
+                                   "read-only tallies on a TwoTier subclass; "
+                                   "there is nothing to replicate across seeds "
+                                   "because the answer is a distribution over "
+                                   "slots within a run, not a mean over runs. "
+                                   "It printed the result that cut two of four "
+                                   "registered gates before they cost a "
+                                   "campaign pass",
     "g3_reserve_probe.py": "monkeypatches TwoTier._emit_grant and retains the "
                            "rank stream in module-level globals to reconstruct "
                            "FIX-2's per-grant PRB budget; a spawn pool would "

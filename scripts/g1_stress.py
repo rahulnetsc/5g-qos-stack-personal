@@ -60,6 +60,7 @@ from sim.scenarios.g1 import (GAP_BOUND_MS, N_DRIVEN, RAN_PDB_MS,  # noqa: E402
                               build_gt11_scenario, cmd_flow_keys)
 from sim.srb import with_srb                                     # noqa: E402
 from g11_campaign import _arm                                    # noqa: E402
+from proto_arms import resolve_arm                              # noqa: E402
 
 #: `sim/scenarios/g9.py` and the G12 stress runner both run at 8, and every
 #: real study in this branch runs with a delayed CQI rather than the
@@ -120,7 +121,7 @@ def one(task: tuple) -> dict[str, Any]:
     driven_ues = sorted({int(k.split("_")[0][2:]) for k in keys})
     sc = with_srb(sc)
 
-    sched = _arm(arm_name)
+    sched = resolve_arm(arm_name)
     tally = LossPointTally(direction="DL")
     sched.rank_sink = tally
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
