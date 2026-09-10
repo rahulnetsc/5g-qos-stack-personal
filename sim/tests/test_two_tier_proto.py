@@ -474,10 +474,16 @@ def test_G_kpi_REFUSES_both_orderings_at_once():
     name, which is the failure mode E2 already demonstrated."""
     with pytest.raises(ValueError, match="periodic_reserve"):
         TwoTierProto(min_rb=5, kpi_ordered_periodic=True)
-    with pytest.raises(ValueError, match="two\n?\\s*orderings|two orderings"):
-        TwoTierProto(min_rb=5, periodic_reserve=True,
-                     kpi_ordered_periodic=True,
-                     denial_ordered_periodic=True)
+    # DERIVED from the flag set, not a hand-listed pair: every combination of
+    # two reserve-slot orderings must be refused, so a third ordering added
+    # later cannot slip past a test that names only the first two.
+    import itertools
+    orderings = ("denial_ordered_periodic", "kpi_ordered_periodic",
+                 "slack_ordered_periodic")
+    for a, b in itertools.combinations(orderings, 2):
+        with pytest.raises(ValueError, match="orderings enabled at once"):
+            TwoTierProto(min_rb=5, periodic_reserve=True,
+                         **{a: True, b: True})
 
 
 def test_G_kpi_orders_nearest_violation_first_and_breaks_ties_by_denial():
@@ -510,3 +516,40 @@ def test_G_kpi_tie_group_at_zero_is_REAL_so_the_tie_break_is_load_bearing():
         f"the largest group tied at remaining_pdb == 0 was "
         f"{c['gkpi_tied_at_zero_max']}, so the denial tie-break never "
         f"separated anything and this arm is ordering on remaining_pdb alone")
+
+
+# --- G-slack -------------------------------------------------------------
+
+def test_G_slack_puts_the_already_late_LAST_and_orders_the_rest_by_slack():
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     slack_ordered_periodic=True)
+    s._cur_slot = 1_000
+    s._gper_is_reserve = True
+    #  ue1: 40 ms left      ue2: 10 ms left      ue3/ue4: already late
+    s._gpd_remaining = {1: 40.0, 2: 10.0, 3: 0.0, 4: 0.0}
+    s._proto_last_ul_grant_slot = {1: 999, 2: 999, 3: 990, 4: 500}
+    mk = lambda ue: _Candidate(ue_id=ue, flows=[], bits_per_rb=100, bler=0.0,
+                               snr_db=20.0, coef=1.0)
+    order = [c.ue_id for c in sorted([mk(i) for i in (1, 2, 3, 4)],
+                                     key=s._ul_rank_key)]
+    # 2 before 1 (less slack); both before the late pair; 4 before 3 inside it
+    # (denied 500 slots against 10).
+    assert order == [2, 1, 4, 3], order
+
+
+def test_G_slack_is_NOT_G_denial_wearing_a_different_name():
+    """If every candidate were already late the first key element would be
+    constant and this arm would collapse to G-denial -- E2's failure mode."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     deadline_gated_periodic=True, slack_ordered_periodic=True)
+    sc = build_gt22_scenario(seed=35492826, n_ues=16, horizon_slots=8_000,
+                             telemetry_gbr=True)
+    _summary(s, sc)
+    c = s.counters
+    assert c["gslack_slots_ordered"] > 0, "the slack ordering never ran"
+    assert c["gslack_first_has_slack"] > 0, (
+        "the first pick was already late on EVERY reserve slot, so the "
+        "can-still-be-saved distinction never fired and this arm is G-denial")
+    assert c["gslack_all_late_slots"] < c["gslack_slots_ordered"], (
+        "every candidate was late on every reserve slot")

@@ -33,6 +33,11 @@ def resolve_arm(name: str, min_rb: int = 5):
         from g11_campaign import _arm
         return _arm(name)
     from scheduler.two_tier_proto import TwoTierProto
+    if name.startswith("ProtoGslack"):
+        return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
+                            deadline_gated_periodic=True,
+                            slack_ordered_periodic=True,
+                            reserve_period_mult=int(name[11:]) / 100.0)
     if name.startswith("ProtoGkpi"):
         return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
                             deadline_gated_periodic=True,

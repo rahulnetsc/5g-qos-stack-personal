@@ -364,6 +364,38 @@ components readable where a scaled sum would hide the composition.
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+G-SLACK -- SERVE WHO CAN STILL BE SAVED; THE ALREADY-LATE GO LAST
+--------------------------------------------------------------------------
+
+**The defect in G-kpi this corrects.** `remaining_pdb == 0` does not mean *about
+to violate*, it means **already violating** -- `_ul_gbr_and_pdb` computes
+`max(0, pdb_ms - age_ms)`, so it floors. G-kpi orders ascending and therefore
+serves that group FIRST. Under overload that is close to backwards: the packet
+is already late, so the slot buys a miss either way, while a robot that could
+still have been saved slides into the same state. This is the standard way
+earliest-deadline-first degrades once the system is infeasible.
+
+**And the group is large, which is why the treatment matters.** Measured at
+**11.4 % of classifications at N = 8 and 12.8 % at N = 12**
+(`scripts/g3_gate_population_probe.py`), against a flat tail of ~230 samples per
+ms bin. Whatever this arm does with that spike dominates its behaviour.
+
+**So the order is: positive slack first, ascending; already-late last,
+longest-denied first among themselves.**
+
+    key element 3 = (1 if remaining <= 0 else 0, remaining, -denial_slots)
+
+`remaining` is already 0 for the late group, so the same three-tuple serves both
+branches and the denial tie-break applies inside each.
+
+**WHAT WOULD MAKE THIS ARM A NO-OP, so it is measured rather than assumed.** If
+every candidate on a reserve slot is already late, the first element is constant
+and the arm collapses to G-denial under a different name -- E2's failure mode.
+`gslack_first_has_slack` counts the slots where the first pick still had slack,
+and a test refuses the arm if that is never true.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -394,6 +426,7 @@ PROTO_FLAGS: tuple[str, ...] = (
     "deadline_gated_periodic",    # G-periodic-deadline
     "denial_ordered_periodic",    # G-denial
     "kpi_ordered_periodic",       # G-kpi
+    "slack_ordered_periodic",     # G-slack
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -419,6 +452,7 @@ class TwoTierProto(TwoTier):
                  deadline_gated_periodic: bool = False,
                  denial_ordered_periodic: bool = False,
                  kpi_ordered_periodic: bool = False,
+                 slack_ordered_periodic: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -436,15 +470,22 @@ class TwoTierProto(TwoTier):
         self.deadline_gated_periodic = bool(deadline_gated_periodic)
         self.denial_ordered_periodic = bool(denial_ordered_periodic)
         self.kpi_ordered_periodic = bool(kpi_ordered_periodic)
+        self.slack_ordered_periodic = bool(slack_ordered_periodic)
+        n_orderings = sum((self.denial_ordered_periodic,
+                           self.kpi_ordered_periodic,
+                           self.slack_ordered_periodic))
+        if n_orderings > 1:
+            raise ValueError(
+                f"{n_orderings} reserve-slot orderings enabled at once -- one "
+                f"arm's numbers would be reported under another's name.")
+        if slack_ordered_periodic and not periodic_reserve:
+            raise ValueError(
+                "slack_ordered_periodic without periodic_reserve -- it "
+                "reorders a reserve slot that would never fire.")
         if kpi_ordered_periodic and not periodic_reserve:
             raise ValueError(
                 "kpi_ordered_periodic without periodic_reserve -- it reorders "
                 "a reserve slot that would never fire.")
-        if kpi_ordered_periodic and denial_ordered_periodic:
-            raise ValueError(
-                "kpi_ordered_periodic and denial_ordered_periodic are two "
-                "orderings for the same slot -- enabling both would silently "
-                "report one arm's numbers under the other's name.")
         if denial_ordered_periodic and not periodic_reserve:
             raise ValueError(
                 "denial_ordered_periodic without periodic_reserve -- it "
@@ -510,6 +551,11 @@ class TwoTierProto(TwoTier):
             "gkpi_tied_at_zero_total": 0,
             "gkpi_agrees_with_denial": 0,        # same first pick as G-denial
             "gkpi_agrees_with_coef": 0,
+            "gslack_slots_ordered": 0,
+            "gslack_first_has_slack": 0,   # the first pick could still be saved
+            "gslack_all_late_slots": 0,    # ... slots where nobody could
+            "gslack_late_total": 0,
+            "gslack_agrees_with_kpi": 0,
         })
         #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
         #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
@@ -554,7 +600,8 @@ class TwoTierProto(TwoTier):
             # real value rather than a default standing in for it.
             self._gper_cap = int(slot.max_sched_ues)
         out = super().allocate(slot, buffers, channel)
-        if self.denial_ordered_periodic or self.kpi_ordered_periodic:
+        if (self.denial_ordered_periodic or self.kpi_ordered_periodic
+                or self.slack_ordered_periodic):
             for a in out:
                 if a.direction == "UL":
                     self._proto_last_ul_grant_slot[a.ue_id] = slot.slot_index
@@ -588,7 +635,8 @@ class TwoTierProto(TwoTier):
         path does not even take the read.
         """
         out = super()._ul_gbr_and_pdb(ue_id, buffers, slot_index)
-        if self.deadline_gated_periodic or self.kpi_ordered_periodic:
+        if (self.deadline_gated_periodic or self.kpi_ordered_periodic
+                or self.slack_ordered_periodic):
             self._gpd_remaining[ue_id] = float(out[1])
         if self.stale_bsr_reserve:
             self._proto_pdb_ms[ue_id] = self._ul_best_pending_pdb_ms(
@@ -722,6 +770,12 @@ class TwoTierProto(TwoTier):
         key = super()._ul_rank_key(candidate)
         if not (self.periodic_reserve and self._gper_is_reserve):
             return key
+        if self.slack_ordered_periodic:
+            # G-slack. See the module docstring: the FIRST element separates
+            # "can still be saved" from "already late", which is the whole
+            # correction to G-kpi.
+            return (key[0], key[1], key[2],
+                    self._gslack_key(candidate.ue_id), key[4])
         if self.kpi_ordered_periodic:
             # G-kpi. Nearest a KPI violation first, longest-denied among those
             # already violating -- see the module docstring for why the
@@ -743,6 +797,11 @@ class TwoTierProto(TwoTier):
         # untouched: equal values stay equal under negation, and `list.sort` is
         # stable, so a fully tied slot is ordered exactly as the port orders it.
         return (key[0], key[1], key[2], -key[3], key[4])
+
+    def _gslack_key(self, ue_id: int) -> tuple[int, float, int]:
+        """(already_late, remaining_ms, -denial_slots) for one UE."""
+        rem = self._gpd_remaining.get(ue_id, float("inf"))
+        return (1 if rem <= 0.0 else 0, rem, -self._gdo_age(ue_id))
 
     def _gdo_age(self, ue_id: int) -> int:
         """Slots since this UE's last uplink grant.
@@ -800,6 +859,21 @@ class TwoTierProto(TwoTier):
         if data:
             self._gper_leader_ue = min(
                 data, key=lambda c: TwoTier._ul_rank_key(self, c)).ue_id
+        if self.slack_ordered_periodic and data:
+            self.counters["gslack_slots_ordered"] += 1
+            first = min(data, key=lambda c: self._gslack_key(c.ue_id))
+            late = sum(1 for c in data
+                       if self._gpd_remaining.get(c.ue_id, float("inf")) <= 0.0)
+            self.counters["gslack_late_total"] += late
+            if late == len(data):
+                self.counters["gslack_all_late_slots"] += 1
+            if self._gslack_key(first.ue_id)[0] == 0:
+                self.counters["gslack_first_has_slack"] += 1
+            kpi_first = min(data, key=lambda c: (
+                self._gpd_remaining.get(c.ue_id, float("inf")),
+                -self._gdo_age(c.ue_id)))
+            if first.ue_id == kpi_first.ue_id:
+                self.counters["gslack_agrees_with_kpi"] += 1
         if self.kpi_ordered_periodic and data:
             self.counters["gkpi_slots_ordered"] += 1
             rem = {c.ue_id: self._gpd_remaining.get(c.ue_id, float("inf"))
