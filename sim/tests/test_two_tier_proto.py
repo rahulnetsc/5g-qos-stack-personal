@@ -296,3 +296,89 @@ def test_E2_actually_OBSERVES_grants_and_is_not_a_structural_no_op():
         f"every one of {total} classifications was 'never granted' -- "
         f"arithmetically impossible in a cell that grants every slot, so E2 "
         f"is not reaching its own precondition")
+
+
+# --- G-periodic: the manipulation check, per E2's lesson -----------------
+# E2 came back bit-identical while structurally unreachable, and only a
+# decomposed counter caught it. So G-periodic is not accepted on "it ran":
+# the cadence has to match its own derivation and followers have to actually
+# receive the slots.
+
+def _gper_run(n_ues=12, seed=7, mult=1.0):
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     reserve_period_mult=mult)
+    sc = build_gt22_scenario(seed=seed, n_ues=n_ues, horizon_slots=4_000,
+                             telemetry_gbr=True)
+    _summary(s, sc)
+    return s.counters
+
+
+def test_G_periodic_reserve_slots_fire_at_the_DERIVED_cadence():
+    c = _gper_run()
+    assert c["gper_slots_evaluated"] > 0, "G-periodic never evaluated a slot"
+    assert c["gper_reserve_slots"] > 0, "no reserve slot ever fired"
+    # DERIVED from the counters themselves, not restated: with P varying as
+    # the follower count moves, the realised rate must sit between the rates
+    # the smallest and largest observed P imply.
+    lo, hi = c["gper_period_min"], c["gper_period_max"]
+    assert lo >= 1 and hi >= lo
+    rate = c["gper_reserve_slots"] / c["gper_slots_evaluated"]
+    # TIGHT on the slow side deliberately. The first version allowed
+    # `0.5/hi <= rate <= 2.0/lo`, which spans two orders when P moves over
+    # [50, 1200] -- and it PASSED on an implementation that fired on 0 of
+    # 6 400 slots at another fleet size. A bound that wide cannot fail.
+    assert rate >= 0.8 / hi, (
+        f"realised reserve-slot rate {rate:.5f} is far below the slowest "
+        f"derived cadence 1/{hi} -- reserve slots are not firing at the "
+        f"period the derivation sets")
+    assert rate <= 1.2 / lo
+
+
+def test_G_periodic_followers_ACTUALLY_receive_the_reserve_slots():
+    """The E2 failure mode restated: a gate can fire and change nothing."""
+    c = _gper_run()
+    assert c["gper_reserve_grants"] > 0, (
+        "reserve slots fired but no uplink grant was issued on any of them -- "
+        "the gate is structurally inert, exactly E2's first result")
+    # "Followers only" is a claim about who got them, so it is measured.
+    leader = c["gper_leader_served_on_reserve"]
+    assert leader < c["gper_reserve_grants"], (
+        f"every grant on a reserve slot went to the would-be leader "
+        f"({leader} of {c['gper_reserve_grants']}) -- the reordering did not "
+        f"reach the allocation")
+
+
+def test_G_periodic_does_NOT_buy_depth_because_depth_is_already_recovered():
+    """The registered rationale for this gate was depth, and it is WRONG --
+    pinned here so nobody re-derives it.
+
+    The premise was that a follower gets five PRB every slot, a trickle too
+    thin to assemble a 300-byte message, while a reserve slot would hand it
+    the whole band. Measured, with the spatial reserve suppressed on every
+    slot as this gate specifies, an ORDINARY slot's mean grant is already
+    ~54 of 55 PRB. Suppressing the spatial reserve recovers the depth by
+    itself; the reserve slot has nothing left to recover, and its grants are
+    if anything SHALLOWER because the follower being served has less backlog
+    to fill.
+
+    So G-periodic's distinct contribution is not depth. It is WHO gets served
+    -- a reordering aimed at rank persistence -- and that is what its result
+    has to be read as evidence about.
+    """
+    c = _gper_run()
+    flat = c["gper_normal_prb"] / c["gper_normal_grants"]
+    assert flat > 45, (
+        f"an ordinary slot's mean grant is {flat:.1f} PRB, not near the full "
+        f"band -- the spatial reserve is still binding, which this gate is "
+        f"supposed to have removed")
+    deep = c["gper_reserve_prb"] / c["gper_reserve_grants"]
+    assert deep > 0
+
+
+def test_G_periodic_a_shorter_multiplier_fires_MORE_often():
+    """Continuity: the swept parameter has to actually move the cadence."""
+    slow, fast = _gper_run(mult=1.0), _gper_run(mult=0.25)
+    assert fast["gper_reserve_slots"] > slow["gper_reserve_slots"], (
+        "the period multiplier does not change the reserve-slot count, so the "
+        "sweep would report four identical points as four measurements")

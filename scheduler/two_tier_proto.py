@@ -196,6 +196,67 @@ specified `floor(prb_count / min_rb) - 1` so that variant is scored too.
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+G-PERIODIC -- MAKE THE RESERVE TEMPORAL INSTEAD OF SPATIAL
+--------------------------------------------------------------------------
+
+Every other gate here trades in the same dimension: how much band to hold back
+from the leader on EVERY slot. This one changes the dimension. **The spatial
+reserve is removed entirely, and every P-th slot becomes a RESERVE SLOT on
+which followers rank first.** On the other P-1 slots the leader takes the full
+band unreserved.
+
+**Why the measured failure fits it.** The failure is a DEPTH failure, not a
+frequency one: an urgent flow wins the ranking and receives a block too small
+to carry its 300-byte heartbeat. A depth cap of K = 4 still leaves the leader
+35 of 55 PRB; a reserve slot leaves it all 55 on non-reserve slots. And the
+followers plausibly do better as well -- five PRB every slot is a trickle that
+may never assemble a message, whereas the whole band once every P slots is a
+grant that carries one.
+
+**HOW P IS DERIVED. It is not picked, and it is not a round number.** The
+requirement that fixes it is the one the clause is about: every follower must
+get a real grant inside the tightest packet delay budget in the workload.
+
+    pdb_slots = min(f.pdb_ms for every backlogged flow) / slot_ms
+    rounds    = ceil(n_followers / slot.max_sched_ues)
+    P*        = max(1, floor(pdb_slots / rounds))
+
+`rounds` is there because a reserve slot serves at most `max_sched_ues` UEs, so
+covering F followers takes that many reserve slots; P* is what makes one full
+cycle fit inside one PDB. **Each input is read live** -- the PDB from the
+candidates' own flows, the cap from the slot -- so P adapts to fleet size
+instead of encoding one. On this workload the tightest PDB is telemetry's
+100 ms, which is 400 slots at 0.25 ms, and at the deployment's cap of 4 that
+gives P* = 200 at N = 8, 133 at N = 12, 100 at N = 16 and 66 at N = 24.
+
+**Then swept around it**, by a multiplier on P*, because the derivation fixes
+the order of magnitude and not the constant.
+
+**WHAT "FOLLOWERS ONLY" MEANS, precisely, since the term is relative to a
+leader and a reserve slot may not have one yet.** On a reserve slot the UL
+ranking key's Tier 2 -- the composite coefficient -- is REVERSED, and Tiers 1
+and 1.5 are left exactly as they are. So:
+
+  * **the rule is a reordering, not a reference to any previous slot**, which
+    is what makes it total. It is well defined on **slot 0** (which is a
+    reserve slot, since `0 % P == 0`) with no special case, and if no candidate
+    is backlogged there it simply has no effect.
+  * **the leader is not excluded, it is placed last** among ordinary data UEs.
+    Whether that amounts to "followers only" in practice is MEASURED rather
+    than asserted -- `gper_leader_served_on_reserve` counts the times the
+    would-be leader still received a grant on a reserve slot.
+  * **Tier 1 (`sched_inactive`) and Tier 1.5 (`floor_fire`) are untouched.**
+    Demoting a control-plane candidate would break SRB delivery, and demoting a
+    fired floor would disable the very rescue Tier 1.5 exists for. This gate
+    has no business touching either.
+  * **on a fully tied slot it does nothing.** `list.sort` is stable and
+    reversing the sign of a tier does not reorder equal values, so candidates
+    that tie on `coef` keep declaration order -- which is attach order -- on a
+    reserve slot exactly as on any other. The gate only reorders candidates
+    that genuinely differ.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -222,8 +283,14 @@ PROTO_FLAGS: tuple[str, ...] = (
     "gate_follower_reserve",      # E1
     "stale_bsr_reserve",          # E2
     "depth_bounded_reserve",      # G-depth
+    "periodic_reserve",           # G-periodic
     "deadline_sizing",            # E3, not implemented
 )
+
+
+#: Only reached when no candidate declares a usable PDB, which cannot happen
+#: on a backlogged slot -- present so the derivation has no implicit default.
+_GPER_PDB_FALLBACK_MS = 300
 
 
 class TwoTierProto(TwoTier):
@@ -237,6 +304,8 @@ class TwoTierProto(TwoTier):
                  stale_bsr_reserve: bool = False,
                  depth_bounded_reserve: bool = False,
                  reserve_depth: int | None = None,
+                 periodic_reserve: bool = False,
+                 reserve_period_mult: float = 1.0,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -248,6 +317,9 @@ class TwoTierProto(TwoTier):
         #: binds at the same follower count E1 fires at, so the sweep sets it
         #: explicitly rather than relying on the derived value.
         self.reserve_depth = reserve_depth
+        self.periodic_reserve = bool(periodic_reserve)
+        #: Multiplier on the DERIVED P*. 1.0 is the derivation itself.
+        self.reserve_period_mult = float(reserve_period_mult)
         self.deadline_sizing = bool(deadline_sizing)
         if reserve_depth is not None and not depth_bounded_reserve:
             raise ValueError(
@@ -280,7 +352,32 @@ class TwoTierProto(TwoTier):
             "gdepth_candidates_suppressed": 0,
             "gdepth_max_need": 0,
             "gdepth_depth_cap": -1,            # the K actually used
+            "gper_slots_evaluated": 0,
+            "gper_reserve_slots": 0,           # ... of which were reserve slots
+            "gper_period_last": -1,            # the P most recently derived
+            "gper_period_min": -1,
+            "gper_period_max": -1,
+            "gper_reserve_grants": 0,          # UL grants issued on them
+            "gper_reserve_prb": 0,
+            "gper_normal_grants": 0,
+            "gper_normal_prb": 0,
+            "gper_leader_served_on_reserve": 0,
         })
+        #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
+        #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
+        #: it). Cached rather than recomputed per candidate because the sort
+        #: calls the key once per candidate and P is a per-slot quantity.
+        self._gper_is_reserve = False
+        self._gper_leader_ue: int | None = None
+        self._gper_cap = 4
+        #: Slots since the last reserve slot. A COUNTER, not `slot % P`: P is
+        #: derived per slot from the live follower count, so it moves, and a
+        #: modulo test against a moving P fires only when a slot index happens
+        #: to divide the P in force at that instant. Measured before this was
+        #: fixed: at N = 8, P ranged over [50, 1200] and the modulo form fired
+        #: on 0 of 6 400 slots -- the cadence was not the derived cadence, and
+        #: only the counter check found it.
+        self._gper_since_reserve = 0
         #: ue_id -> tightest pending PDB in ms, captured where `buffers` is in
         #: scope. E2 only; empty otherwise.
         self._proto_pdb_ms: dict[int, int] = {}
@@ -299,7 +396,25 @@ class TwoTierProto(TwoTier):
         only reads the allocations it returned. Guarded by the flag so the
         faithful path keeps doing no extra work.
         """
+        if self.periodic_reserve:
+            # The cap is a property of the SLOT, and `_finalize_ul_coef` does
+            # not receive one -- captured here so P's own derivation reads the
+            # real value rather than a default standing in for it.
+            self._gper_cap = int(slot.max_sched_ues)
         out = super().allocate(slot, buffers, channel)
+        if self.periodic_reserve:
+            reserve = self._gper_is_reserve
+            for a in out:
+                if a.direction != "UL":
+                    continue
+                if reserve:
+                    self.counters["gper_reserve_grants"] += 1
+                    self.counters["gper_reserve_prb"] += int(a.prbs)
+                    if a.ue_id == self._gper_leader_ue:
+                        self.counters["gper_leader_served_on_reserve"] += 1
+                else:
+                    self.counters["gper_normal_grants"] += 1
+                    self.counters["gper_normal_prb"] += int(a.prbs)
         if self.stale_bsr_reserve:
             for a in out:
                 if a.direction == "UL":
@@ -351,6 +466,8 @@ class TwoTierProto(TwoTier):
             self._apply_e2(candidates)
         if self.depth_bounded_reserve:
             self._apply_gdepth(candidates)
+        if self.periodic_reserve:
+            self._apply_gperiodic(candidates)
         if not self.gate_follower_reserve:
             return
 
@@ -434,6 +551,71 @@ class TwoTierProto(TwoTier):
         for c in order[cap:]:
             self._suppress_reserve(c)
             self.counters["gdepth_candidates_suppressed"] += 1
+
+    # ----------------------------------------------------------- G-periodic
+
+    def _ul_rank_key(self, candidate: _Candidate) -> tuple:
+        """The port's key, with Tier 2 reversed on a reserve slot.
+
+        Tiers 1 and 1.5 are passed through untouched -- see the module
+        docstring for why demoting a control-plane candidate or a fired floor
+        is out of this gate's scope.
+        """
+        key = super()._ul_rank_key(candidate)
+        if not (self.periodic_reserve and self._gper_is_reserve):
+            return key
+        # key[3] is `-coef`; negating it sorts the WORST composite first, which
+        # is the follower that keeps losing the ordinary ranking. Ties are
+        # untouched: equal values stay equal under negation, and `list.sort` is
+        # stable, so a fully tied slot is ordered exactly as the port orders it.
+        return (key[0], key[1], key[2], -key[3], key[4])
+
+    def _apply_gperiodic(self, candidates: list[_Candidate]) -> None:
+        """Replace the spatial reserve with a temporal one."""
+        self.counters["gper_slots_evaluated"] += 1
+        qual = [c for c in candidates
+                if not c.sched_inactive and c.has_gbr and c.gbr_bytes_slot > 0]
+
+        # THE SPATIAL RESERVE GOES, on every slot -- the point of the gate is
+        # that the leader takes the depth it needs when it is not a reserve
+        # slot. Suppressed through the same seam every other edit uses.
+        for c in qual:
+            self._suppress_reserve(c)
+
+        period = self._gper_period(candidates, len(qual))
+        self.counters["gper_period_last"] = period
+        lo = self.counters["gper_period_min"]
+        self.counters["gper_period_min"] = period if lo < 0 else min(lo, period)
+        self.counters["gper_period_max"] = max(
+            self.counters["gper_period_max"], period)
+
+        self._gper_since_reserve += 1
+        self._gper_is_reserve = self._gper_since_reserve >= period
+        self._gper_leader_ue = None
+        if not self._gper_is_reserve:
+            return
+        self._gper_since_reserve = 0
+        self.counters["gper_reserve_slots"] += 1
+        # Who WOULD have led, recorded before the reordering, so
+        # `gper_leader_served_on_reserve` measures whether "followers only"
+        # actually holds rather than assuming the reversal achieved it.
+        data = [c for c in candidates if not c.sched_inactive]
+        if data:
+            self._gper_leader_ue = min(
+                data, key=lambda c: TwoTier._ul_rank_key(self, c)).ue_id
+
+    def _gper_period(self, candidates: list[_Candidate], n_followers: int) -> int:
+        """P*, derived. See the module docstring for the requirement it meets."""
+        slot_ms = self.slot_duration_s * 1000.0
+        pdb_ms = min(
+            (float(f.pdb_ms) for c in candidates for f in c.flows
+             if f.pdb_ms and f.pdb_ms > 0),
+            default=float(_GPER_PDB_FALLBACK_MS))
+        pdb_slots = pdb_ms / slot_ms
+        cap = max(1, int(self._gper_cap))
+        rounds = max(1, -(-max(1, n_followers) // cap))     # ceil
+        p = int(pdb_slots / rounds * self.reserve_period_mult)
+        return max(1, p)
 
     def _suppress_reserve(self, c: _Candidate) -> None:
         """Remove one candidate's FIX-2 reserve contribution, exactly.

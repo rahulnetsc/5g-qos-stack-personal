@@ -161,6 +161,12 @@ def _resolve_arm(name: str):
     # G-depth's swept points. The bound is part of the arm's identity, so it
     # is in the NAME -- an artefact's `arm` column has to say which K produced
     # it, or two points of one sweep are indistinguishable in the ledger.
+    # G-periodic's swept points, named by the multiplier on the DERIVED P*
+    # (100 = 1.00x) so an artefact's `arm` column carries the sweep point.
+    if name.startswith("ProtoGper"):
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, periodic_reserve=True,
+                  reserve_period_mult=int(name[len("ProtoGper"):]) / 100.0)
     if name.startswith("ProtoGdepth"):
         tail = name[len("ProtoGdepth"):]
         k = None if tail == "" else int(tail)
