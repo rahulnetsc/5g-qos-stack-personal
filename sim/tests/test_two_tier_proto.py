@@ -382,3 +382,46 @@ def test_G_periodic_a_shorter_multiplier_fires_MORE_often():
     assert fast["gper_reserve_slots"] > slow["gper_reserve_slots"], (
         "the period multiplier does not change the reserve-slot count, so the "
         "sweep would report four identical points as four measurements")
+
+
+# --- G-periodic-deadline -------------------------------------------------
+
+def test_G_periodic_deadline_REFUSES_to_gate_a_reserve_that_never_fires():
+    with pytest.raises(ValueError, match="periodic_reserve"):
+        TwoTierProto(min_rb=5, deadline_gated_periodic=True)
+
+
+def test_G_periodic_deadline_threshold_is_DERIVED_from_the_TDD_pattern():
+    """Not a constant. DSUUU at 0.25 ms puts the longest wait to the next
+    uplink slot at 2 slots, and the threshold has to be that."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     deadline_gated_periodic=True)
+    sc = build_gt22_scenario(seed=3, n_ues=8, horizon_slots=400,
+                             telemetry_gbr=True)
+    _summary(s, sc)
+    pat = "".join(s._grid.pattern)
+    assert pat == "DSUUU", f"pattern changed to {pat}; re-derive the threshold"
+    assert s._gpd_near_ms() == pytest.approx(0.5)
+
+
+def test_G_periodic_deadline_SKIPS_slots_and_the_skip_is_counted():
+    """The whole point: at a fleet the faithful arm serves perfectly, the
+    cadence must come due and be declined."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     deadline_gated_periodic=True)
+    sc = build_gt22_scenario(seed=7, n_ues=6, horizon_slots=8_000,
+                             telemetry_gbr=True)
+    _summary(s, sc)
+    c = s.counters
+    assert c["gpd_due_slots"] > 0, "the cadence never came due"
+    assert c["gpd_due_slots"] == c["gpd_fired"] + c["gpd_skipped_nobody_due"], (
+        "a due slot was neither fired nor skipped -- the decomposition does "
+        "not close, so one of the three counters is measuring something else")
+    assert c["gpd_skipped_nobody_due"] > 0, (
+        "no reserve slot was ever declined at six robots, so the gate cannot "
+        "be the reason six robots improves -- it would be inert")
+    assert c["gper_reserve_slots"] == c["gpd_fired"], (
+        "reserve slots and fired slots disagree; the skip did not reach the "
+        "reordering")

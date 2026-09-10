@@ -257,6 +257,41 @@ and 1.5 are left exactly as they are. So:
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+G-PERIODIC-DEADLINE -- SKIP THE RESERVE SLOT WHEN NOTHING NEEDS RESCUING
+--------------------------------------------------------------------------
+
+**The one thing G-periodic costs.** At the derived period it takes the 8-14
+band to 10/10 and holds the top, and its only regression is at **six robots**,
+where part 1 falls 20 -> 18. Six robots is a fleet the faithful arm already
+serves perfectly, so a reserve slot there demotes the leader with no starvation
+to repay it. This gate fires the reserve slot **only when some follower is
+actually near its deadline**.
+
+**THE CONDITION IS DERIVED, from `remaining_pdb`'s own measured structure and
+the TDD pattern -- not picked.** `_ul_gbr_and_pdb` already computes
+`remaining_pdb = max(0, pdb_ms - age_ms)` per candidate, and its distribution
+over a real run is **bimodal**: a spike of 27 822 samples at exactly 0 ms, then
+a flat tail of roughly 230 per millisecond bin
+(`scripts/g3_gate_population_probe.py`, N = 8).
+
+The line has to separate those two populations, and the TDD pattern says where
+it goes. `DSUUU` at 0.25 ms puts the **longest wait to the next uplink slot at
+2 slots, 0.50 ms**, so a flow with less than that left cannot be saved by the
+next opportunity. That is what "near its PDB" has to mean, and it lands in the
+**empty region between the spike and the tail**: 11.35 % of samples sit at or
+below 0.50 ms and 11.44 % at or below 1.00 ms, so the operator choice moves the
+population by 0.09 points. **A threshold on a quantised value's own level is a
+coin flip (CLAUDE.md); this one is deliberately placed where no data sits.**
+
+**`_URG_BARRIER_CAP` is why the port's own rescue does not already do this.**
+The composite's urgency term is bounded -- `Phi(u) = u^2 / (1 - min(u, 0.97) +
+0.03)` maxes at ~16.7 -- and measured `urgency01` never exceeds **0.40** on
+this workload, so the barrier never engages. Urgency reaches the RANKING and
+still cannot rescue a starved flow; this gate gives the deadline a decision it
+can actually carry.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -284,6 +319,7 @@ PROTO_FLAGS: tuple[str, ...] = (
     "stale_bsr_reserve",          # E2
     "depth_bounded_reserve",      # G-depth
     "periodic_reserve",           # G-periodic
+    "deadline_gated_periodic",    # G-periodic-deadline
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -306,6 +342,7 @@ class TwoTierProto(TwoTier):
                  reserve_depth: int | None = None,
                  periodic_reserve: bool = False,
                  reserve_period_mult: float = 1.0,
+                 deadline_gated_periodic: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -320,6 +357,12 @@ class TwoTierProto(TwoTier):
         self.periodic_reserve = bool(periodic_reserve)
         #: Multiplier on the DERIVED P*. 1.0 is the derivation itself.
         self.reserve_period_mult = float(reserve_period_mult)
+        self.deadline_gated_periodic = bool(deadline_gated_periodic)
+        if deadline_gated_periodic and not periodic_reserve:
+            raise ValueError(
+                "deadline_gated_periodic without periodic_reserve -- it gates "
+                "a reserve slot that would never fire, so the arm would "
+                "report the faithful numbers under a divergence name.")
         self.deadline_sizing = bool(deadline_sizing)
         if reserve_depth is not None and not depth_bounded_reserve:
             raise ValueError(
@@ -362,6 +405,10 @@ class TwoTierProto(TwoTier):
             "gper_normal_grants": 0,
             "gper_normal_prb": 0,
             "gper_leader_served_on_reserve": 0,
+            "gpd_due_slots": 0,          # cadence said fire
+            "gpd_fired": 0,              # ... and someone was near a deadline
+            "gpd_skipped_nobody_due": 0,  # ... and nobody was
+            "gpd_urgent_candidates": 0,
         })
         #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
         #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
@@ -378,6 +425,10 @@ class TwoTierProto(TwoTier):
         #: on 0 of 6 400 slots -- the cadence was not the derived cadence, and
         #: only the counter check found it.
         self._gper_since_reserve = 0
+        #: ue_id -> remaining_pdb_ms, from `_ul_gbr_and_pdb`'s own second
+        #: return value. Captured rather than recomputed so the gate reads the
+        #: SAME number the ranking was built from.
+        self._gpd_remaining: dict[int, float] = {}
         #: ue_id -> tightest pending PDB in ms, captured where `buffers` is in
         #: scope. E2 only; empty otherwise.
         self._proto_pdb_ms: dict[int, int] = {}
@@ -432,6 +483,8 @@ class TwoTierProto(TwoTier):
         path does not even take the read.
         """
         out = super()._ul_gbr_and_pdb(ue_id, buffers, slot_index)
+        if self.deadline_gated_periodic:
+            self._gpd_remaining[ue_id] = float(out[1])
         if self.stale_bsr_reserve:
             self._proto_pdb_ms[ue_id] = self._ul_best_pending_pdb_ms(
                 ue_id, buffers)
@@ -594,6 +647,21 @@ class TwoTierProto(TwoTier):
         self._gper_leader_ue = None
         if not self._gper_is_reserve:
             return
+        if self.deadline_gated_periodic:
+            self.counters["gpd_due_slots"] += 1
+            urgent = sum(
+                1 for c in candidates
+                if not c.sched_inactive
+                and self._gpd_remaining_pdb_ms(c.ue_id) <= self._gpd_near_ms())
+            self.counters["gpd_urgent_candidates"] += urgent
+            if urgent == 0:
+                # Nobody is near a deadline. Do NOT consume the cadence -- the
+                # slot is skipped, not spent, so the next genuinely urgent slot
+                # is not delayed by a quiet one.
+                self._gper_is_reserve = False
+                self.counters["gpd_skipped_nobody_due"] += 1
+                return
+            self.counters["gpd_fired"] += 1
         self._gper_since_reserve = 0
         self.counters["gper_reserve_slots"] += 1
         # Who WOULD have led, recorded before the reordering, so
@@ -603,6 +671,24 @@ class TwoTierProto(TwoTier):
         if data:
             self._gper_leader_ue = min(
                 data, key=lambda c: TwoTier._ul_rank_key(self, c)).ue_id
+
+    def _gpd_near_ms(self) -> float:
+        """The longest wait to the next uplink slot, from the TDD pattern.
+
+        DERIVED per grid rather than stored as a constant, so a numerology or
+        pattern change moves it instead of silently invalidating it.
+        """
+        pat = self._grid.pattern
+        ul = [i for i, k in enumerate(pat) if k in ("U", "S")]
+        if not ul:
+            return 0.0
+        gap = max((ul[(j + 1) % len(ul)] - ul[j]) % len(pat)
+                  for j in range(len(ul)))
+        return gap * self.slot_duration_s * 1000.0
+
+    def _gpd_remaining_pdb_ms(self, ue_id: int) -> float:
+        """This UE's tightest remaining PDB, captured in `_ul_gbr_and_pdb`."""
+        return self._gpd_remaining.get(ue_id, float("inf"))
 
     def _gper_period(self, candidates: list[_Candidate], n_followers: int) -> int:
         """P*, derived. See the module docstring for the requirement it meets."""
