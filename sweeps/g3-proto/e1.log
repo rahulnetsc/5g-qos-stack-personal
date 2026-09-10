@@ -1,0 +1,12 @@
+G3 stress: 90 driver runs, 3.6M slots (0.25 simulated hours)
+  parts ['A']  arms ['ProtoE1']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 90 runs, 3.6M slots
+  projected cost: 0.50 h CPU -> 3 min wall at 14 workers (x0.77 measured pool efficiency)
+  projected peak memory: 5.5 GB (400 MB x 14 workers, worst task 40,000 slots)
+  0 banked, 90 to run
+    ... 25/90 (106s)
+    ... 50/90 (160s)
+    ... 75/90 (195s)
+
+wrote sweeps/g3-proto/g3_proto_e1.json  (210s, 90 runs)

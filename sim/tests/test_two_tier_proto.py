@@ -1,0 +1,211 @@
+"""TwoTierProto: OFF is byte-identical, and each edit does only what it says.
+
+**THE LOAD-BEARING TEST IN THIS FILE IS THE FIRST ONE.** A divergence arm whose
+flags-off state has drifted from the port cannot attribute anything to its
+edits: every Proto-vs-faithful difference would be a mixture of the edit and
+the drift, and there would be no way to tell the two apart afterwards. So
+"off == TwoTier" is asserted over whole driver summaries on several scenarios
+and seeds, not argued from the fact that the subclass "only adds" things.
+
+The second group pins the exactness argument the implementation rests on --
+that suppressing a candidate's reserve contribution leaves `B_eff` unchanged
+and the ranking untouched. Both are claims about arithmetic, so both are
+tested as arithmetic rather than inferred from a run that happened to match.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from scheduler.two_tier import TwoTier
+from scheduler.two_tier_proto import PROTO_FLAGS, TwoTierProto
+from sim.driver import run as driver_run
+from sim.scenarios.g3 import build_gt22_scenario
+
+
+def _summary(sched, sc, cap=4):
+    return driver_run(sc, sched, cqi_delay_slots=8, max_sched_ues=cap)
+
+
+#: Keys excluded from the identity comparison, each with the reason it cannot
+#: match by construction. `_ue_lcp` and `_message_ledger` are LIVE OBJECT
+#: HANDLES -- two runs build two instances and neither class defines `__eq__`,
+#: so comparing them compares identities and always differs. That is exactly
+#: the defect G1's rank-hook check hit (`docs/g1-slide-source.md` section 8: "a
+#: check that fails on its own null control is failing on the instrument"), and
+#: it cost this file one false failure before being recognised.
+#: `scheduler_counters` is excluded because Proto ADDS keys to it by design; the
+#: inherited keys are compared explicitly below, so the exclusion cannot hide a
+#: behavioural difference.
+_EXCLUDED = ("scheduler_counters", "_message_ledger", "_ue_lcp")
+
+
+def _comparable(summary):
+    """The result content, with live handles excluded BY NAME and the exclusion
+    then verified to have been necessary -- an exclusion that is not doing work
+    is an exclusion that can hide something later."""
+    return {k: v for k, v in summary.items() if k not in _EXCLUDED}
+
+
+def _handles_really_are_handles(summary):
+    """Every excluded key present must be non-JSON, i.e. genuinely a handle.
+    If one becomes plain data it belongs back in the comparison."""
+    import json
+    bad = []
+    for k in _EXCLUDED:
+        if k == "scheduler_counters" or k not in summary:
+            continue
+        try:
+            json.dumps(summary[k])
+        except (TypeError, ValueError):
+            continue
+        bad.append(k)
+    return bad
+
+
+# --- THE ONE THAT MATTERS -------------------------------------------------
+
+@pytest.mark.parametrize("n_ues,seed", [(4, 1), (6, 2), (12, 3), (16, 4)])
+def test_all_flags_off_is_BYTE_IDENTICAL_to_the_faithful_port(n_ues, seed):
+    """Off must be the port, over a whole run, at fleet sizes either side of
+    the eleven-robot threshold where E1's gate would fire if it were on."""
+    sc = build_gt22_scenario(seed=seed, n_ues=n_ues, horizon_slots=8_000)
+    faithful = _summary(TwoTier(min_rb=5), sc)
+    proto = _summary(TwoTierProto(min_rb=5), sc)
+
+    assert not _handles_really_are_handles(proto), (
+        "an excluded key is now plain data and must be compared again")
+    assert _comparable(proto) == _comparable(faithful), (
+        f"n_ues={n_ues} seed={seed}: TwoTierProto with every flag off differs "
+        f"from TwoTier. Until this passes, no Proto-vs-faithful difference can "
+        f"be attributed to an edit.")
+    # ... and the INHERITED counters too, which the comparison above excludes.
+    fc = faithful["scheduler_counters"]
+    pc = proto["scheduler_counters"]
+    assert {k: pc[k] for k in fc} == fc
+    # The gate must not have been evaluated at all.
+    assert pc["e1_slots_evaluated"] == 0
+
+
+def test_every_flag_defaults_off_and_is_enumerated():
+    s = TwoTierProto(min_rb=5)
+    for flag in PROTO_FLAGS:
+        assert getattr(s, flag) is False, flag
+    # A flag added without being registered in PROTO_FLAGS would be invisible
+    # to a runner enumerating the arm's configurations.
+    declared = set(PROTO_FLAGS)
+    present = {a for a in vars(s)
+               if a.startswith(("gate_", "stale_", "deadline_"))}
+    assert present == declared, (
+        f"flags on the instance {present} do not match PROTO_FLAGS {declared}")
+
+
+def test_an_unimplemented_flag_is_REFUSED_not_ignored():
+    """Enabling an edit that does not exist would report the faithful arm's
+    numbers under the divergence arm's name -- the worst failure available to
+    a comparison, because it looks like a null result."""
+    for flag in ("stale_bsr_reserve", "deadline_sizing"):
+        with pytest.raises(NotImplementedError, match=flag):
+            TwoTierProto(min_rb=5, **{flag: True})
+
+
+# --- the exactness argument, as arithmetic -------------------------------
+
+def test_suppressing_a_reserve_leaves_B_eff_unchanged():
+    """The transform E1 and E2 share: fold `gbr_bytes_slot` into
+    `ul_total_target_bytes`, then zero it. `B_eff` is a maximum over the same
+    three numbers before and after, and this pins that rather than trusting it.
+    """
+    from scheduler.two_tier import _Candidate
+    s = TwoTierProto(min_rb=5)
+    for target, gbr, backlog in ((0, 900, 100), (500, 900, 100),
+                                 (900, 500, 100), (0, 0, 700),
+                                 (1200, 300, 5000)):
+        c = _Candidate(ue_id=1, flows=[], bits_per_rb=100, bler=0.0,
+                       snr_db=10.0, coef=1.0)
+        c.has_gbr = True
+        c.gbr_bytes_slot = gbr
+        c.ul_total_target_bytes = target
+
+        def b_eff(cand):
+            v = max(cand.ul_total_target_bytes, backlog)
+            if cand.has_gbr and cand.gbr_bytes_slot > 0:
+                v = max(v, cand.gbr_bytes_slot)
+            return v
+
+        before = b_eff(c)
+        s._suppress_reserve(c)
+        assert c.gbr_bytes_slot == 0
+        assert c.proto_orig_gbr_bytes_slot == gbr
+        assert b_eff(c) == before, (target, gbr, backlog)
+
+
+def test_E1_changes_grant_sizing_and_NOT_the_ranking():
+    """Given the SAME candidate set, E1 must leave `coef` and the sort key
+    identical -- it acts after `super()` has finalised `coef`, and
+    `gbr_bytes_slot` feeds neither.
+
+    **A whole-run order comparison is the WRONG instrument here and was tried
+    first.** With E1 on the grant sizes differ, so `prbs_left`, what gets
+    delivered and therefore every later slot's candidate set differ too -- the
+    trajectory diverges by design. Comparing rank order across a run cannot
+    separate "the sort changed" from "the state evolved differently", and it
+    reported a failure that meant only the second. Same inputs is the
+    comparison that answers the question asked.
+    """
+    from types import SimpleNamespace
+    from scheduler.two_tier import _Candidate
+
+    def make():
+        cs = []
+        for ue in range(1, 13):
+            c = _Candidate(ue_id=ue, flows=[], bits_per_rb=100, bler=0.0,
+                           snr_db=10.0, coef=float(100 * ue))
+            c.has_gbr = True
+            c.gbr_bytes_slot = 400 + ue
+            c.ul_total_target_bytes = 200
+            c.urgency01 = 0.1 * (ue % 5)
+            c.hyp_tbs_bytes = 1000
+            cs.append(c)
+        return cs
+
+    faithful, proto = TwoTier(min_rb=5), TwoTierProto(
+        min_rb=5, gate_follower_reserve=True)
+    for s_ in (faithful, proto):
+        s_._grid = SimpleNamespace(prb_count=55)
+
+    a, b = make(), make()
+    faithful._finalize_ul_coef(a)
+    proto._finalize_ul_coef(b)
+
+    assert proto.counters["e1_gate_fired"] == 1, (
+        "the gate did not fire on 12 followers against 55/5 = 11, so this "
+        "comparison is not testing E1")
+    assert [c.coef for c in b] == [c.coef for c in a], "E1 moved coef"
+    assert ([proto._ul_rank_key(c) for c in b]
+            == [faithful._ul_rank_key(c) for c in a]), "E1 moved the sort key"
+    # ... and it DID do its own job: the reserve inputs are gone.
+    assert all(c.gbr_bytes_slot == 0 for c in b)
+    assert all(c.gbr_bytes_slot > 0 for c in a)
+
+
+def test_E1_gate_fires_only_when_the_reserve_cannot_fit():
+    """`prb_count > min_rb * need` is the whole gate. Below the threshold it
+    must never fire, above it must; the boundary is 55/5 = 11 on this carrier.
+    """
+    fired = {}
+    for n in (4, 6, 8, 16, 24):
+        sc = build_gt22_scenario(seed=1, n_ues=n, horizon_slots=8_000)
+        s = TwoTierProto(min_rb=5, gate_follower_reserve=True)
+        c = _summary(s, sc)["scheduler_counters"]
+        fired[n] = (c["e1_gate_fired"], c["e1_max_followers_need"])
+    for n in (4, 6, 8):
+        assert fired[n][0] == 0, (
+            f"N={n}: gate fired with only {fired[n][1]} followers -- 55 PRB "
+            f"holds 11 reserves of 5, so it must not")
+    assert fired[16][0] > 0 and fired[24][0] > 0, fired
+    # ... and it fires because the follower count crossed 11, not for some
+    # other reason: the observed need must reach the threshold.
+    assert fired[24][1] >= 11, fired
+
+

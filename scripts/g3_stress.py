@@ -132,6 +132,37 @@ from sim.scenarios.g3 import (                                   # noqa: E402
 )
 from sim.srb import with_srb                                     # noqa: E402
 from g11_campaign import _arm                                    # noqa: E402
+
+
+def _resolve_arm(name: str):
+    """The three faithful arms, plus `TwoTierProto`'s flagged divergences.
+
+    WHY THIS IS HERE AND NOT IN `g11_campaign._arm`. That function is inside the
+    published artefacts' own `code_state` scope (every G1/G2/G3/G10/G12 stamp
+    reaches it), so adding an import of `scheduler/two_tier_proto.py` there
+    would stale every claim in `config/published_claims.yml` for a file those
+    campaigns never ran. Resolving Proto arms in the runner instead leaves the
+    faithful scopes untouched -- checked with `verify_claims --check`, not
+    assumed.
+
+    Names are `Proto` + the flags, so an artefact's `arm` column says which
+    divergence produced it. `ProtoOff` exists to make "off is the port"
+    checkable from a campaign as well as from the unit tests.
+    """
+    if not name.startswith("Proto"):
+        return _arm(name)
+    from scheduler.two_tier_proto import TwoTierProto
+    flags = {
+        "ProtoOff": {},
+        "ProtoE1": {"gate_follower_reserve": True},
+    }
+    if name not in flags:
+        raise ValueError(
+            f"unknown Proto arm {name!r}; known: {sorted(flags)}. A typo must "
+            f"not silently fall through to the faithful arm and be reported "
+            f"under a divergence name.")
+    return TwoTierProto(min_rb=5, **flags[name])
+
 #: Every real study in this branch runs with a delayed CQI rather than the
 #: driver's bare 0 (CLAUDE.md's `cqi_delay_slots` invariant).
 CQI_DELAY_SLOTS = 8
@@ -363,7 +394,7 @@ def one(packed: tuple) -> dict[str, Any]:
     resumes = (resume_times_s(task["silence_s"], cycles=SILENCE_CYCLES)
                if task["kind"] == "gt23" else ())
 
-    sched = _arm(task["arm"])
+    sched = _resolve_arm(task["arm"])
     tally = FloorFireTally()
     sched.rank_sink = tally
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
