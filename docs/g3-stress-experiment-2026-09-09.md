@@ -1240,3 +1240,40 @@ every published G3 figure exactly; any other value draws a disjoint sample from
 over several variants on one seed set is not believed until it is re-scored on a
 fresh one** — and that check cost 10 minutes against five variants' worth of
 ranking it corrected.
+
+
+## 20. THE PROTO SWEEP'S WRITE-UP IS DEFERRED, deliberately
+
+**Decided 2026-09-10.** The `TwoTierProto` sweep produced a candidate that
+clears every guarantee tested (G-kpi: G3 silences 26 -> 0 across two disjoint
+seed sets, G10's admissible fleet 7 -> 12, G7's uplink utilisation 0.456 ->
+0.931, G1/G2/G5/G9 unregressed). **None of it is folded into the roll-ups, and
+that is a decision rather than an omission.**
+
+**Not done, on purpose:**
+
+- no proto figure is registered in `config/published_claims.yml`, so **none of
+  the numbers above is quotable** under this repo's own convention;
+- no proto row in `docs/GUARANTEE-RESULTS.md` or the guarantee table;
+- G7's uplink-utilisation result is not written up as a product finding.
+
+**Why.** The sweep is a side-thread of G3, and the guarantee table is what the
+evaluation is for. Putting *"what a change would do"* beside *"what the product
+does"* in that table before the guarantee set is complete is exactly the
+confusion `scheduler/two_tier_proto.py`'s docstring exists to prevent.
+
+**What IS landed and stays landed:** the arm itself, each edit's own
+registration and result document, and every sweep artefact — so the work is
+reproducible and auditable now, and only its promotion into the published
+figures waits.
+
+**The gate:** all guarantees rebuilt. As of this date **G1, G2, G3, G9 and G12**
+have their own stress experiments; **G4, G6 and G8 have not been started**, and
+**G5, G7 and G10 exist only as runners used for regression checks**.
+
+**One finding worth carrying forward when the gate opens, because it is about
+the DEPLOYED scheduler and not about the divergence:** on the faithful arm G7
+runs the uplink band at **45.6 % utilisation while a protected asset is being
+starved**. FIX-2's reserve was holding capacity nobody spent. That is a
+statement about the port, needs no proto arm to make, and nothing currently
+records it.
