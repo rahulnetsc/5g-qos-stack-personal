@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from scheduler.two_tier import TwoTier
+from scheduler.two_tier import TwoTier, _Candidate
 from scheduler.two_tier_proto import PROTO_FLAGS, TwoTierProto
 from sim.driver import run as driver_run
 from sim.scenarios.g3 import build_gt22_scenario
@@ -465,3 +465,48 @@ def test_G_denial_ACTUALLY_DIFFERS_from_the_composite_ordering():
         f"{agree:.1%} of reserve slots -- at that level the swap is not a "
         f"distinct arm and its result cannot be attributed to the ordering")
     assert c["gdo_max_age_slots"] > 0
+
+
+# --- G-kpi ---------------------------------------------------------------
+
+def test_G_kpi_REFUSES_both_orderings_at_once():
+    """Two orderings for one slot would report one arm under the other's
+    name, which is the failure mode E2 already demonstrated."""
+    with pytest.raises(ValueError, match="periodic_reserve"):
+        TwoTierProto(min_rb=5, kpi_ordered_periodic=True)
+    with pytest.raises(ValueError, match="two\n?\\s*orderings|two orderings"):
+        TwoTierProto(min_rb=5, periodic_reserve=True,
+                     kpi_ordered_periodic=True,
+                     denial_ordered_periodic=True)
+
+
+def test_G_kpi_orders_nearest_violation_first_and_breaks_ties_by_denial():
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     kpi_ordered_periodic=True)
+    s._cur_slot = 1_000
+    s._gper_is_reserve = True
+    s._gpd_remaining = {1: 40.0, 2: 0.0, 3: 0.0}
+    s._proto_last_ul_grant_slot = {1: 999, 2: 990, 3: 500}
+    mk = lambda ue: _Candidate(ue_id=ue, flows=[], bits_per_rb=100, bler=0.0,
+                               snr_db=20.0, coef=1.0)
+    order = sorted([mk(1), mk(2), mk(3)], key=s._ul_rank_key)
+    # 3 and 2 are both already violating, so denial time separates them; 1 has
+    # 40 ms left and must come last despite being the most recently served.
+    assert [c.ue_id for c in order] == [3, 2, 1]
+
+
+def test_G_kpi_tie_group_at_zero_is_REAL_so_the_tie_break_is_load_bearing():
+    """If nothing ever tied at zero the tie-break would be decoration, and
+    the arm would be indistinguishable from ordering on remaining_pdb alone."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     deadline_gated_periodic=True, kpi_ordered_periodic=True)
+    sc = build_gt22_scenario(seed=35492826, n_ues=16, horizon_slots=8_000,
+                             telemetry_gbr=True)
+    _summary(s, sc)
+    c = s.counters
+    assert c["gkpi_slots_ordered"] > 0, "the KPI ordering never ran"
+    assert c["gkpi_tied_at_zero_max"] >= 2, (
+        f"the largest group tied at remaining_pdb == 0 was "
+        f"{c['gkpi_tied_at_zero_max']}, so the denial tie-break never "
+        f"separated anything and this arm is ordering on remaining_pdb alone")

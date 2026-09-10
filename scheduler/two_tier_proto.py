@@ -328,6 +328,42 @@ quantity.
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+G-KPI -- ORDER A RESERVE SLOT BY CLOSENESS TO A KPI VIOLATION
+--------------------------------------------------------------------------
+
+**What it fixes.** G-denial orders by denial time and wins G3's liveness parts
+(part-1s boundary 8 -> 12, part 1 at N = 24 9 -> 10) while LOSING the latency
+part -- part 3 falls 10 -> 9 at N = 7 and 5 -> 0 at N = 16. Denial time says who
+has waited longest; it says nothing about whose data is closest to being late.
+This orders by the deadline itself.
+
+**The quantity is already computed by the port.** `_ul_gbr_and_pdb` returns
+`remaining_pdb = max(0, pdb_ms - age_ms)` per UE, the same number the deadline
+GATE reads. Smallest remaining sorts first, so the UE nearest a violation is
+served first.
+
+**AND IT NEEDS A TIE-BREAK, which the measurement forced.** `remaining_pdb` is
+**bimodal**: a spike of 27 822 samples at **exactly 0 ms** against a flat tail
+of ~230 per ms bin (`scripts/g3_gate_population_probe.py`). So on a reserve slot
+a large fraction of candidates are tied at zero -- all already violating -- and
+ordering on `remaining_pdb` alone would separate them by declaration order,
+which is attach order, i.e. arbitrarily. **The tie-break is denial time**, so
+among UEs already past their deadline the longest-denied is served first:
+
+    key element 3 = (remaining_pdb_ms, -slots_since_last_ul_grant)
+
+**This composes G-denial rather than replacing it** -- denial ordering is what
+happens inside the tied-at-zero group, which is where G-denial's own gains came
+from. `gkpi_tied_at_zero_max` reports how large that group gets, so whether the
+tie-break is load-bearing is measured rather than assumed.
+
+**A nested tuple, deliberately, not an arithmetic pack.** The key must stay five
+elements wide -- `scheduler/rank_trace.py` raises `UnboundRankTerm` on a width
+change, and the campaign attaches a rank sink -- and nesting keeps both
+components readable where a scaled sum would hide the composition.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -357,6 +393,7 @@ PROTO_FLAGS: tuple[str, ...] = (
     "periodic_reserve",           # G-periodic
     "deadline_gated_periodic",    # G-periodic-deadline
     "denial_ordered_periodic",    # G-denial
+    "kpi_ordered_periodic",       # G-kpi
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -381,6 +418,7 @@ class TwoTierProto(TwoTier):
                  reserve_period_mult: float = 1.0,
                  deadline_gated_periodic: bool = False,
                  denial_ordered_periodic: bool = False,
+                 kpi_ordered_periodic: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -397,6 +435,16 @@ class TwoTierProto(TwoTier):
         self.reserve_period_mult = float(reserve_period_mult)
         self.deadline_gated_periodic = bool(deadline_gated_periodic)
         self.denial_ordered_periodic = bool(denial_ordered_periodic)
+        self.kpi_ordered_periodic = bool(kpi_ordered_periodic)
+        if kpi_ordered_periodic and not periodic_reserve:
+            raise ValueError(
+                "kpi_ordered_periodic without periodic_reserve -- it reorders "
+                "a reserve slot that would never fire.")
+        if kpi_ordered_periodic and denial_ordered_periodic:
+            raise ValueError(
+                "kpi_ordered_periodic and denial_ordered_periodic are two "
+                "orderings for the same slot -- enabling both would silently "
+                "report one arm's numbers under the other's name.")
         if denial_ordered_periodic and not periodic_reserve:
             raise ValueError(
                 "denial_ordered_periodic without periodic_reserve -- it "
@@ -456,6 +504,12 @@ class TwoTierProto(TwoTier):
             "gdo_agrees_with_coef": 0,     # ... where BOTH rules pick the same UE
             "gdo_never_granted_first": 0,  # ... where the first pick never had one
             "gdo_max_age_slots": 0,
+            "gkpi_slots_ordered": 0,
+            "gkpi_first_already_violating": 0,   # first pick at remaining 0
+            "gkpi_tied_at_zero_max": 0,          # largest tied group seen
+            "gkpi_tied_at_zero_total": 0,
+            "gkpi_agrees_with_denial": 0,        # same first pick as G-denial
+            "gkpi_agrees_with_coef": 0,
         })
         #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
         #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
@@ -500,7 +554,7 @@ class TwoTierProto(TwoTier):
             # real value rather than a default standing in for it.
             self._gper_cap = int(slot.max_sched_ues)
         out = super().allocate(slot, buffers, channel)
-        if self.denial_ordered_periodic:
+        if self.denial_ordered_periodic or self.kpi_ordered_periodic:
             for a in out:
                 if a.direction == "UL":
                     self._proto_last_ul_grant_slot[a.ue_id] = slot.slot_index
@@ -534,7 +588,7 @@ class TwoTierProto(TwoTier):
         path does not even take the read.
         """
         out = super()._ul_gbr_and_pdb(ue_id, buffers, slot_index)
-        if self.deadline_gated_periodic:
+        if self.deadline_gated_periodic or self.kpi_ordered_periodic:
             self._gpd_remaining[ue_id] = float(out[1])
         if self.stale_bsr_reserve:
             self._proto_pdb_ms[ue_id] = self._ul_best_pending_pdb_ms(
@@ -668,6 +722,14 @@ class TwoTierProto(TwoTier):
         key = super()._ul_rank_key(candidate)
         if not (self.periodic_reserve and self._gper_is_reserve):
             return key
+        if self.kpi_ordered_periodic:
+            # G-kpi. Nearest a KPI violation first, longest-denied among those
+            # already violating -- see the module docstring for why the
+            # tie-break is not optional here.
+            return (key[0], key[1], key[2],
+                    (self._gpd_remaining.get(candidate.ue_id, float("inf")),
+                     -self._gdo_age(candidate.ue_id)),
+                    key[4])
         if self.denial_ordered_periodic:
             # G-denial. REPLACE Tier 2 rather than negate it: `-age` sorts the
             # longest-denied first under the same ascending sort, and the
@@ -738,6 +800,23 @@ class TwoTierProto(TwoTier):
         if data:
             self._gper_leader_ue = min(
                 data, key=lambda c: TwoTier._ul_rank_key(self, c)).ue_id
+        if self.kpi_ordered_periodic and data:
+            self.counters["gkpi_slots_ordered"] += 1
+            rem = {c.ue_id: self._gpd_remaining.get(c.ue_id, float("inf"))
+                   for c in data}
+            first = min(data, key=lambda c: (rem[c.ue_id],
+                                             -self._gdo_age(c.ue_id)))
+            tied = sum(1 for c in data if rem[c.ue_id] <= 0.0)
+            self.counters["gkpi_tied_at_zero_total"] += tied
+            if tied > self.counters["gkpi_tied_at_zero_max"]:
+                self.counters["gkpi_tied_at_zero_max"] = tied
+            if rem[first.ue_id] <= 0.0:
+                self.counters["gkpi_first_already_violating"] += 1
+            if first.ue_id == max(data,
+                                  key=lambda c: self._gdo_age(c.ue_id)).ue_id:
+                self.counters["gkpi_agrees_with_denial"] += 1
+            if first.ue_id == min(data, key=lambda c: c.coef).ue_id:
+                self.counters["gkpi_agrees_with_coef"] += 1
         if self.denial_ordered_periodic and data:
             # Does the swap actually change who is served first? If the two
             # rules agreed everywhere, this arm would be G-periodic under a
