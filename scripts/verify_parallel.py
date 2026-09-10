@@ -89,6 +89,39 @@ CASES: dict[str, dict[str, Any]] = {
         "expect_exit": 1, "error_match": "ZERO 'cold' events|'warm' events but",
         "timing_keys": [], "provenance_keys": [],
     },
+    "g3_stress": {
+        # ONE ARM, ONE SEED, the FULL nine-point fleet axis -- 9 runs each
+        # side. The axis is not narrowed by a flag because `--ue-axis` would
+        # enter `invocation_config` and therefore the `RunLedger` key, which
+        # would orphan the published campaign's own banked rows. The nine
+        # points span N=4 to N=24, so the cost function's longest-first
+        # ordering genuinely reorders submission, which is the only thing the
+        # pool can get wrong here.
+        #
+        # `--parts A` only: the other sub-experiments add horizons up to
+        # 280,000 slots, and a determinism check has no business paying for a
+        # 70-second simulated run. GT-2.3's own resume scoring is pinned by
+        # `sim/tests/test_g3_scenario.py` instead, which is the right level
+        # for it -- this file checks the POOL, not the scoring.
+        #
+        # AND THE TWO INVOCATIONS MUST USE DIFFERENT `--out` PATHS, which this
+        # harness already does. They would otherwise share a `RunLedger`, the
+        # second invocation would RESUME the first's banked rows rather than
+        # re-running them, and the artefacts would match trivially -- a check
+        # that cannot fail. `workers` is deliberately outside the ledger key
+        # (`regime_sweep._NON_BEHAVIOURAL_ARGS`), which is what makes that
+        # trap available.
+        "argv": ["scripts/g3_stress.py", "--parts", "A", "--arms", "PF",
+                 "--seeds", "1", "--caps", "4", "--fixed-n", "6",
+                 "--long-horizon", "0"],
+        "out_flag": "--out", "out_name": "g3.json", "fmt": "json",
+        "timing_keys": ["wall_s", "wall_s_total", "_wall_s_this_invocation",
+                        "_cpu_wall_s_total"],
+        # NO PROVENANCE EXCLUSIONS: this runner stamps neither `out` nor
+        # `workers` into its artefact, and the harness rightly reports an
+        # exclusion that is not present as one doing no work.
+        "provenance_keys": [],
+    },
     "g12_campaign": {
         # --perm-seeds 2, NOT the default 5, and the trade is stated rather
         # than absorbed. A check nobody can afford to run before a commit is

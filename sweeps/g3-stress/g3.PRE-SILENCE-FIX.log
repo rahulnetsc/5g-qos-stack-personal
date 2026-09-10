@@ -1,0 +1,29 @@
+G3 stress: 486 driver runs, 32.2M slots (2.23 simulated hours)
+  parts ['A', 'D', 'ctl', 'snr']  arms ['PF', 'Reservation', 'TwoTier']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 396 runs, 20.6M slots
+    gt23: 90 runs, 11.5M slots
+  projected cost: 3.26 h CPU -> 18 min wall at 14 workers (x0.77 measured pool efficiency)
+  projected peak memory: 9.6 GB (700 MB x 14 workers, worst task 280,000 slots)
+  0 banked, 486 to run
+    ... 25/486 (219s)
+    ... 50/486 (339s)
+    ... 75/486 (427s)
+    ... 100/486 (499s)
+    ... 125/486 (536s)
+    ... 150/486 (593s)
+    ... 175/486 (637s)
+    ... 200/486 (678s)
+    ... 225/486 (716s)
+    ... 250/486 (739s)
+    ... 275/486 (777s)
+    ... 300/486 (807s)
+    ... 325/486 (832s)
+    ... 350/486 (850s)
+    ... 375/486 (871s)
+    ... 400/486 (891s)
+    ... 425/486 (908s)
+    ... 450/486 (922s)
+    ... 475/486 (935s)
+
+wrote sweeps/g3-stress/g3_stress.json  (939s, 486 runs)

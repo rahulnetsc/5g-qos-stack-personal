@@ -315,3 +315,163 @@ claims:
     field: n_missed
     statistic: sum
     value: 0
+
+  # --- G3 rebuilt as a stress experiment, 2026-09-09 -------------------------
+  # The withdrawn G3 row scored M03 over ALL flows, so a saturating flood's own
+  # starvation counted as a telemetry liveness failure. These score the clause
+  # itself, on the telemetry flow, with the silence-aware statistic beside the
+  # literal one -- an inter-arrival maximum cannot see a robot that goes dark
+  # and stays dark (docs/g3-stress-experiment-2026-09-09.md section 4).
+  #
+  # ON THE SELECTIONS, because `where` cannot express "this field is unset"
+  # (`_values` refuses a None match by design, which is right -- a missing field
+  # must not silently satisfy a filter). So:
+  #   * the campaign-wide part-2 claims select on the four POSITIVE markers
+  #     (`snr_db`, `telemetry_gbr`, `pause_ue`, and the arm), which admits the
+  #     bucket-duration control as well: 140 rows against the graded set's 130.
+  #     **Checked, not assumed: those 10 extra rows contribute ZERO silences
+  #     over T_live, so every value below is identical over either set.**
+  #   * the per-fleet-size claims pick an N at which no control cell exists
+  #     (every control sits at N=6), so those selections are exactly the graded
+  #     10 seeds.
+  #
+  # Clause part 2 is CAMPAIGN-wide, so it is one verdict per arm over every run
+  # -- not the per-run pass rate the scorecard row computes, which reads a
+  # failed clause as "90 %".
+  - id: G3.part2.pf.silences_over_tlive
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "PF: zero telemetry silences of two seconds or more, campaign-wide"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 140
+    horizon: 40000
+    where: {arm: PF, snr_db: 20.0, telemetry_gbr: true, pause_ue: false}
+    field: n_gaps_over_tlive
+    statistic: sum
+    value: 0
+
+  - id: G3.part2.reservation.silences_over_tlive
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "Reservation: 10 telemetry silences of two seconds or more, campaign-wide"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 140
+    horizon: 40000
+    where: {arm: Reservation, snr_db: 20.0, telemetry_gbr: true, pause_ue: false}
+    field: n_gaps_over_tlive
+    statistic: sum
+    value: 10
+
+  - id: G3.part2.twotier.silences_over_tlive
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "TwoTier: 26 telemetry silences of two seconds or more, campaign-wide"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 140
+    horizon: 40000
+    where: {arm: TwoTier, snr_db: 20.0, telemetry_gbr: true, pause_ue: false}
+    field: n_gaps_over_tlive
+    statistic: sum
+    value: 26
+
+  # THE INSTRUMENT CORRECTION, pinned as a PAIR so both halves are checkable:
+  # at ten robots Reservation's worst inter-arrival gap is a comfortable pass
+  # while a robot was silent for 6.8 seconds. Quoting either number alone is
+  # how the withdrawn row read clean.
+  - id: G3.GT22.reservation.n10.worst_gap
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "Reservation at 10 robots: worst inter-arrival gap 124.75 ms -- the clause as written PASSES"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: Reservation, kind: gt22, n_ues: 10, committed_mult: 1.0,
+            snr_db: 20.0, telemetry_gbr: true, pause_ue: false, horizon: 40000}
+    field: gap_worst_ms
+    statistic: max
+    value: 124.75
+    tolerance: 0.01
+
+  - id: G3.GT22.reservation.n10.worst_silence
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "Reservation at 10 robots: longest observable silence 6762.0 ms -- 13.5x the bound"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: Reservation, kind: gt22, n_ues: 10, committed_mult: 1.0,
+            snr_db: 20.0, telemetry_gbr: true, pause_ue: false, horizon: 40000}
+    field: silence_worst_ms
+    statistic: max
+    value: 6762.0
+    tolerance: 0.01
+
+  - id: G3.GT22.twotier.n16.worst_silence
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "TwoTier at 16 robots: longest observable silence 9505.75 ms"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: TwoTier, kind: gt22, n_ues: 16, committed_mult: 1.0,
+            snr_db: 20.0, telemetry_gbr: true, pause_ue: false, horizon: 40000}
+    field: silence_worst_ms
+    statistic: max
+    value: 9505.75
+    tolerance: 0.01
+
+  - id: G3.GT22.twotier.n16.msgs_short
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "TwoTier at 16 robots: 823 of 2000 telemetry messages never arrive"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: TwoTier, kind: gt22, n_ues: 16, committed_mult: 1.0,
+            snr_db: 20.0, telemetry_gbr: true, pause_ue: false, horizon: 40000}
+    field: msgs_short
+    statistic: sum
+    value: 823
+
+  # PF at the top of the axis, which is the comparison the whole result rests on
+  - id: G3.GT22.pf.n24.msgs_short
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "PF at 24 robots loses no telemetry message at all"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: PF, kind: gt22, n_ues: 24, committed_mult: 1.0,
+            snr_db: 20.0, telemetry_gbr: true, pause_ue: false, horizon: 40000}
+    field: msgs_short
+    statistic: sum
+    value: 0
+
+  - id: G3.GT22.pf.n24.worst_silence
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "PF at 24 robots: longest observable silence 121.75 ms, 4.1x inside the bound"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 10
+    horizon: 40000
+    where: {arm: PF, kind: gt22, n_ues: 24, committed_mult: 1.0,
+            snr_db: 20.0, telemetry_gbr: true, pause_ue: false, horizon: 40000}
+    field: silence_worst_ms
+    statistic: max
+    value: 121.75
+    tolerance: 0.01
+
+  # GT-2.3 across BOTH configurations, including the one that pauses the whole
+  # robot's uplink so the resume must re-acquire a grant from scratch.
+  - id: G3.GT23.worst_post_silence
+    doc: docs/g3-stress-experiment-2026-09-09.md
+    text: "the largest post-silence gap anywhere, either configuration, is 134.25 ms"
+    artefact: sweeps/g3-stress/g3_stress.json
+    code_state: "current"
+    n: 60
+    horizon: 280000
+    where: {kind: gt23}
+    field: max_post_silence_ms
+    statistic: max
+    value: 134.25
+    tolerance: 0.01

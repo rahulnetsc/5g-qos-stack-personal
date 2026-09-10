@@ -31,7 +31,7 @@ depends on the carrier, and this repo's carrier is not the deployment's.**
 
 ## The guarantees that have been rebuilt as stress experiments
 
-Four so far. Each has a slide source, a Step-0 record of what had to be
+Five so far. Each has a slide source, a Step-0 record of what had to be
 corrected first, and a full record.
 
 | G | question | current answer | slide source |
@@ -40,8 +40,9 @@ corrected first, and a full record.
 | **G2** | the master disconnects — does every robot stop in time | **FAILS its clause. 513 misses in 109 800 STOP trials → miss-rate ≤ 5.0 × 10⁻³ at 95 %.** Nothing is late — every delivered STOP arrived under **5.25 ms**, median 0.75 — **things are missing.** The axis that decides is how many robots stop AT ONCE, not load or fleet size | `docs/g2-slide-source.md` |
 | **G9** | does a robot joining a busy cell start working immediately | **warm re-join free on every arm; cold attach ~100 ms, post-RLF ~1.1 s on PF/Reservation, flat across a 4× load range. TwoTier fails at 5–6 UEs** — half the cold attaches and **all** post-RLF recoveries never complete | `docs/g9-slide-source.md` |
 | **G12** | what breaks first under overload, and does safety telemetry survive | **clause 4 PASSES 10/10 on every arm**, both caps, both tie-break settings. **The first-violation order is NOT SCOREABLE** — nothing breaks in the range swept, so the ramp must extend past ×2.0 | `docs/g12-slide-source.md` |
+| **G3** | can the network make a healthy robot look dead | **FAILS on both QoS arms, PASSES on PF.** Campaign-wide, **36 telemetry silences of ≥ 2 s in 115 872** — PF **0 of 40 854**, Reservation 10, TwoTier 26. **The QoS arms' liveness boundary is exactly G10's contract boundary, 6 and 7**, while PF's is ≥ 24 | `docs/g3-slide-source.md` |
 
-**All four withdrew a published figure**, and in three of the four the reason
+**All five withdrew a published figure**, and in four of the five the reason
 was that **the statistic could not express the clause's own failure**:
 
 | G | what was withdrawn | why |
@@ -50,6 +51,7 @@ was that **the statistic could not express the clause's own failure**:
 | G2 | *"PASS 10/10 at ×19 margin"* | **p98 substituted for a maximum**, on a bearer that discards at 5 ms against a 100 ms bound — the check could not have failed |
 | G9 | the four join rows | run with a sim-only lever **on and undeclared**, on artefacts predating M-9 and M-6 |
 | G12 | the `[2,4]` first-violation order | the 5QI-2 camera was pinned 3.5 % below its own contract, so the class that appeared to break first was the only one that **could not pass by construction** |
+| G3 | *"max gap ≤ 500 ms: PF 10/10, Res 10/10, TwoTier 4/10"* | scored over **all flows**, so a saturating flood's own starvation counted as a telemetry failure; the correction to 10/10 was on pre-rebuild code, and **the telemetry bearer had no GFBR**, so two of the three criteria had no meaning |
 
 ---
 
@@ -80,6 +82,52 @@ discarding 87 of 1 607 STOPs while reading a clean pass.
 
 ---
 
+## G3 — the liveness row, in full
+
+**The clause: "Max telemetry inter-arrival gap at MEC ≤ 500 ms; zero gaps ≥
+T_live over the full campaign; p98 ≤ PDB."** Three parts. Part 2 is
+**campaign-wide**, so one silence anywhere fails it.
+
+| | PF | Reservation | TwoTier |
+|---|---|---|---|
+| **part 2, campaign-wide** | **PASS** — 0 of 40 854 | **FAIL** — 10 of 36 514 | **FAIL** — 26 of 38 504 |
+| **fleet boundary (all parts)** | **≥ 24** | **6** | **7** |
+| telemetry lost over the fleet axis | **3 of 18 000** | 4 310 | 2 351 |
+| protected uplink at N=24 | **67.06 Mbps** | 23.87 | 24.20 |
+
+**AND THE QOS ARMS' LIVENESS BOUNDARY IS G10's CONTRACT BOUNDARY, EXACTLY** —
+6 and 7, the same two numbers — while PF's liveness boundary is at least 24
+against its own contract boundary of 12. One mechanism reads out through both
+criteria: a UE running out of uplink service.
+
+**GT-2.3 (silence and resume) PASSES everywhere**, all three buckets, both
+configurations, 180 runs, no resume failing to complete. The largest
+post-silence gap anywhere is **134.25 ms**, 3.7× inside the bound.
+
+**The UL service-interval floor FIRES — first measurement in this project.**
+1 fire at N=4 rising to 744 at N=24 on TwoTier; `None` (no such tier) on PF and
+Reservation. **It arms, fires, rises with load, and TwoTier fails anyway.**
+
+**Two instrument defects were corrected first, and the second was in the new
+instrument.** The telemetry bearer had no GFBR and therefore no prioritised bit
+rate, which made the p98 criterion's GBR-conformance semantics inapplicable and
+starved telemetry in the UE's own LCP — **not by outranking it**, which the
+standard forbids, but by letting the camera exhaust the transport block in the
+bucket-gated first round so the priority-ordered second round never ran
+(24 062 of 24 062 starved grants). The root cause is a grant too small for the
+urgent flow, and what makes it small is **FIX-2's own anti-monopolisation
+reserve**: it withholds `min_rb` per still-unserved GBR follower, so on a 55-PRB
+band eleven followers exhaust it and **above sixteen robots every grant in the
+run is 5 PRB — including the top-ranked UE's, on 100 % of slots.** At sixteen
+robots 97 % of grants to a robot with a pending heartbeat cannot carry it whole.
+Nothing sizes an uplink grant by urgency in either code base, but that term
+would be **inert**: it could not exceed a budget the reserve has already set. Then the replacement statistic — an
+inter-arrival maximum — was found unable to see a robot that goes dark and stays
+dark: **19 flow-runs silent for up to 9.5 s while the scored maximum read
+114–342 ms.** Both statistics are now published.
+
+---
+
 ## G10 — the fleet size everything else is ranged against
 
 **PF 12 / Reservation 6 / TwoTier 7**, cap 4, RA + SRB, 10 seeds per point,
@@ -103,7 +151,6 @@ a workload whose camera offered load changed by 0.6–3.1 %.
 
 | G | last verdict | why it is stale, and what it would take |
 |---|---|---|
-| **G3** | max gap ≤ 500 ms: PF 10/10, Res 10/10, **TwoTier 4/10** (cap 4: 2/10) | pre-fix workload; the clause has parts nobody scored |
 | **G4** | **not scoreable** — three independently fatal reasons: the artefact records p98 not p99; the axis is duty cycle, not silence length; and the gap buckets cannot resolve 1 s from 60 s | needs its own scenario, like G1's and G2's |
 | **G5** | ≥ 99 % PDU sets: PF 10/10, **Res 1/10, TwoTier 0/10** | pre-fix; the attach path recovers Reservation to 10/10 |
 | **G6** | 24/40, 25/40, 20/40 | pre-fix, **and the DL half (GT-4.2, marked P0) has never run** — no DL background flow existed until G1 built one |

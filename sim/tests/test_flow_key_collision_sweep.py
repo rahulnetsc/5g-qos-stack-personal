@@ -63,6 +63,8 @@ def _cases():
     from sim.parametric import sweep_scenario
     from sim.scenarios.g1 import build_gt11_scenario
     from sim.scenarios.g2 import build_gt12_scenario
+    from sim.scenarios.g3 import (build_gt21_scenario, build_gt22_scenario,
+                                  build_gt23_scenario)
     from sim.scenarios.g11 import build_g11_scenario
     from sim.scenarios.g12 import BG_OFFERED_BPS, COMPOSITIONS, build_g12_scenario
     from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,
@@ -108,6 +110,31 @@ def _cases():
         cases.append((f"gt12(n={n},stop={ns})",
                       build_gt12_scenario(seed=1, n_ues=n, n_stop=ns,
                                           horizon_slots=40000)))
+    # GT-2's three cells share the flood's 5QI with the per-UE filler (the
+    # plan names the flood's class by number), so the flooding robot's filler
+    # is DISPLACED rather than renumbered -- exactly the shape that would
+    # collide if the displacement were ever dropped. Swept at both ends of the
+    # committed axis, at three fleet sizes, and with the telemetry bearer in
+    # BOTH of its configurations, since `telemetry_gbr` changes the flow's
+    # class and a class-conditional branch builds it.
+    for n in (2, 4, 8, 16):
+        for cm in (1.0, 2.0):
+            cases.append((f"gt21(n={n},cm={cm:g})",
+                          build_gt21_scenario(seed=1, n_ues=n, committed_mult=cm,
+                                              horizon_slots=2000)))
+            cases.append((f"gt22(n={n},cm={cm:g})",
+                          build_gt22_scenario(seed=1, n_ues=n, committed_mult=cm,
+                                              horizon_slots=2000)))
+    for tg in (True, False):
+        cases.append((f"gt21(n=6,tgbr={int(tg)})",
+                      build_gt21_scenario(seed=1, n_ues=6, telemetry_gbr=tg,
+                                          horizon_slots=2000)))
+        cases.append((f"gt22(n=6,tgbr={int(tg)})",
+                      build_gt22_scenario(seed=1, n_ues=6, telemetry_gbr=tg,
+                                          horizon_slots=2000)))
+    for sil in (1.0, 5.0, 60.0):
+        cases.append((f"gt23(sil={sil:g})",
+                      build_gt23_scenario(seed=1, silence_s=sil, n_ues=6)))
     for fn in (gt61_warm_rejoin, gt62_cold_attach, gt63_rlf_recovery):
         cases.append((f"g9.{fn.__name__}",
                       fn(seed=1, n_neighbours=3, horizon_slots=40000)))
@@ -152,6 +179,9 @@ def test_the_sweep_COVERS_every_builder_rather_than_the_easy_ones():
         key = {"build_g12_scenario": "g12(", "build_g11_scenario": "g11(",
                "build_gt11_scenario": "gt11(",
                "build_gt12_scenario": "gt12(",
+               "build_gt21_scenario": "gt21(",
+               "build_gt22_scenario": "gt22(",
+               "build_gt23_scenario": "gt23(",
                "scenario": "scenario("}.get(stem, stem)
         if key not in exercised:
             missing.append(full)

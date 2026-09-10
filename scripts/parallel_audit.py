@@ -81,6 +81,14 @@ ALLOW_SERIAL = {
                          "question is which RESOURCE binds, which needs no "
                          "seed replication, and each cell prints as it "
                          "completes so ordering is the readable form",
+    "g3_reserve_probe.py": "monkeypatches TwoTier._emit_grant and retains the "
+                           "rank stream in module-level globals to reconstruct "
+                           "FIX-2's per-grant PRB budget; a spawn pool would "
+                           "give each worker its own SNAPS/GRANTS and the "
+                           "reconstruction is per-run anyway. A diagnostic that "
+                           "answers 'which term set this grant', not a campaign "
+                           "-- one arm, one seed, printed per fleet size "
+                           "(docs/g3-stress-experiment-2026-09-09.md 3.4)",
     "bsr_desync_probe.py": "monkeypatches BsrModel._assemble and .broadcast at "
                            "module level to observe per-slot state; under "
                            "`spawn` a worker re-imports the module and would "

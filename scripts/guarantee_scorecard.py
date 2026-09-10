@@ -133,7 +133,16 @@ CLAUSES = [
       stat=lambda r: r["G3_M03_prot_ms"], ok=lambda v: v is not None and v <= 500.0,
       sev=lambda r: r.get("M02_prot"),
       sums_over="M03 max inter-arrival gap over the PROTECTED FLEET",
-      claim_about="telemetry liveness. FIXED 2026-09-07: this row read "
+      claim_about="telemetry liveness. **SUPERSEDED 2026-09-09** by "
+                  "docs/g3-slide-source.md: G3 was rebuilt as a stress "
+                  "experiment on its own scenario and FAILS on both QoS arms. "
+                  "This row's population is the protected FLEET, not "
+                  "telemetry, and its workload's telemetry bearer has no "
+                  "GFBR -- so the p98 part below has no GBR-conformance "
+                  "meaning on it, and no statistic here can see a robot that "
+                  "goes dark and stays dark. Kept for the supersession trail; "
+                  "do not quote. "
+                  "FIXED 2026-09-07: this row read "
                   "M03 over ALL flows, so a saturating 5QI-9 flood's own "
                   "starvation scored as a telemetry failure -- every breach "
                   "was ue*_qfi9 (wp9-plan.md 24.2, recurring)",
@@ -204,7 +213,10 @@ CLAUSES = [
       ok=lambda v: v is not None and v == 0,
       sev=lambda r: r.get("M02_prot"),
       sums_over="M03's count of gaps exceeding T_live, PROTECTED FLEET",
-      claim_about="the same set",
+      claim_about="the same set. **SUPERSEDED 2026-09-09** -- and this row is "
+                  "scored PER RUN while the clause says 'over the full "
+                  "campaign', so a 9/10 here reads as 90 % where the clause "
+                  "is failed by one gap anywhere (docs/g3-slide-source.md)",
       source="test plan L97, second part: 'zero gaps >= T_live over the "
              "full campaign' -- stated and never scored until today"),
  dict(g="G3", clause="part 3: p98 <= PDB",
@@ -213,7 +225,11 @@ CLAUSES = [
       sev=lambda r: r.get("M02_prot"),
       sums_over="M01 worst-flow p98, PROTECTED FLEET -- NUMERICALLY G1's OWN "
                 "STATISTIC, scored under G1's name and not G3's until today",
-      claim_about="telemetry's own p98. Same caveat as G1: the worst flow is "
+      claim_about="telemetry's own p98. **SUPERSEDED 2026-09-09** -- measured "
+                  "on this row's own artefact, its winning flow is the 5QI-2 "
+                  "CAMERA on 8 of 30 runs, a 150 ms-PDB video bearer scored "
+                  "against telemetry's 95 (docs/g3-slide-source.md). Same "
+                  "caveat as G1: the worst flow is "
                   "5QI 1 or 2, never the DL command flow",
       source="test plan L97, third part: 'p98 <= PDB'"),
  dict(g="G5", clause="part 2: frame age p95 <= 67 ms",

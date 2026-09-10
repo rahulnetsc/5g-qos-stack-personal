@@ -32,6 +32,14 @@ SCEN_DIR = pathlib.Path(g9.__file__).parent
 #: Builders that legitimately have no absolute-time schedule. Each entry is a
 #: CLAIM with a reason, the same shape as parallel_audit's ALLOW_SERIAL --
 #: "no schedule" is fine, "no schedule silently" is the finding.
+#:
+#: A key is either a MODULE stem (every builder in it is unscheduled) or a
+#: single ``module.py::builder``. The per-builder form was added when
+#: `g3.py` became the first module holding BOTH kinds -- GT-2.1 and GT-2.2
+#: are steady state, GT-2.3 owns a silence schedule and guards it -- and a
+#: module-level exemption would have silently covered the one builder in the
+#: repo that most needs the guard. Coarse granularity in a category check is
+#: the same failure as an allow-list: it stops firing where it matters.
 NO_SCHEDULE = {
     "g12": "the ramp is one load per run; no mid-run schedule (defects-log #23)",
     # GT-1.1 is steady state: every flow runs from slot 0 to the end
@@ -44,6 +52,15 @@ NO_SCHEDULE = {
     # truncation one, and this guard is the wrong instrument for it.
     "g1": "steady state, no scripted mid-run event; horizon governs sample "
           "size instead, and scripts/g1_stress.py states that choice",
+    # GT-2.1 and GT-2.2 are steady state for the same reason GT-1.1 is: every
+    # flow runs slot 0 to end and nothing fires at a slot. GT-2.3 in the SAME
+    # module does own a schedule (the silence windows) and calls the guard, so
+    # these two are exempted individually rather than the module being
+    # exempted wholesale.
+    "g3.py::build_gt21_scenario":
+        "steady state; the over-driven camera runs the whole horizon",
+    "g3.py::build_gt22_scenario":
+        "steady state; the neighbour's flood runs the whole horizon",
 }
 
 
@@ -163,6 +180,15 @@ def test_EVERY_scenario_builder_that_takes_a_horizon_guards_its_schedule():
                   "g9.py::gt63_rlf_recovery", "g11.py::build_g11_scenario"):
         assert known in found, f"{known} was not discovered by the AST scan"
 
+    # AND THE PER-BUILDER EXEMPTIONS MUST NOT COVER A SCHEDULED SIBLING.
+    # `g3.py` holds both kinds; if a future edit widened the exemption to the
+    # module, GT-2.3's silence schedule would stop being guarded and this
+    # check is what would notice.
+    assert "g3" not in NO_SCHEDULE, (
+        "g3.py::build_gt23_scenario owns a silence schedule -- exempt the two "
+        "steady-state builders individually, never the module")
+    assert "g3.py::build_gt23_scenario" not in NO_SCHEDULE
+
     unguarded = []
     for path in sorted(SCEN_DIR.glob("*.py")):
         if path.name.startswith("_") or path.name == "schedule_guard.py":
@@ -170,7 +196,8 @@ def test_EVERY_scenario_builder_that_takes_a_horizon_guards_its_schedule():
         for fn in _builders_taking_a_horizon(path):
             if _calls_a_horizon_guard(path, fn):
                 continue
-            if path.stem in NO_SCHEDULE:
+            if (path.stem in NO_SCHEDULE
+                    or f"{path.name}::{fn}" in NO_SCHEDULE):
                 continue
             unguarded.append(f"{path.name}::{fn}")
     assert not unguarded, (
