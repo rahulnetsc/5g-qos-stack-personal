@@ -41,6 +41,7 @@ from sim.run_record import RunRecord                         # noqa: E402
 from sim.scorecard import Population, Scorecard              # noqa: E402
 from sim.trace import GrantCollector                         # noqa: E402
 from g11_campaign import _arm                                # noqa: E402
+from proto_arms import resolve_arm                           # noqa: E402
 
 
 def one(arm: str, seed: int, n_ues: int, horizon: int,
@@ -64,7 +65,7 @@ def one(arm: str, seed: int, n_ues: int, horizon: int,
                   if attach_seed else None)
     grants = GrantCollector()
     t0 = time.time()
-    s = driver_run(sc, _arm(arm), cqi_delay_slots=8, record_timeseries=True,
+    s = driver_run(sc, resolve_arm(arm), cqi_delay_slots=8, record_timeseries=True,
                    grant_sink=grants, attach_seed_slots=seed_slots,
                          max_sched_ues=max_sched_ues, random_access=ra_cfg)
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm,

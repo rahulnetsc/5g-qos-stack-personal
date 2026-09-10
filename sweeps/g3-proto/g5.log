@@ -1,0 +1,27 @@
+24 runs = 2 arms x 4 fleet sizes x 3 seeds @ horizon 20000
+  [1/24] TwoTier      N=8   never_granted=0   M08=0.7743932
+  [2/24] TwoTier      N=8   never_granted=0   M08=0.3230464
+  [3/24] TwoTier      N=8   never_granted=0   M08=0.9457011999999999
+  [4/24] TwoTier      N=4   never_granted=0   M08=0.9946891999999999
+  [5/24] TwoTier      N=4   never_granted=0   M08=0.9898948000000001
+  [6/24] TwoTier      N=16  never_granted=0   M08=0.010858
+  [7/24] TwoTier      N=16  never_granted=0   M08=0.003936
+  [8/24] TwoTier      N=16  never_granted=0   M08=0.0076276
+  [9/24] ProtoGperD100 N=16  never_granted=0   M08=0.8975955999999999
+  [10/24] ProtoGperD100 N=16  never_granted=0   M08=0.938018
+  [11/24] TwoTier      N=4   never_granted=0   M08=0.9964868
+  [12/24] TwoTier      N=2   never_granted=0   M08=1.0118544
+  [13/24] TwoTier      N=2   never_granted=0   M08=0.9929764
+  [14/24] TwoTier      N=2   never_granted=0   M08=1.0049012
+  [15/24] ProtoGperD100 N=4   never_granted=0   M08=0.9899851999999999
+  [16/24] ProtoGperD100 N=4   never_granted=0   M08=0.9946891999999999
+  [17/24] ProtoGperD100 N=2   never_granted=0   M08=1.010584
+  [18/24] ProtoGperD100 N=8   never_granted=0   M08=0.9785868000000001
+  [19/24] ProtoGperD100 N=4   never_granted=0   M08=0.9964868
+  [20/24] ProtoGperD100 N=2   never_granted=0   M08=0.9929764
+  [21/24] ProtoGperD100 N=2   never_granted=0   M08=1.0049588
+  [22/24] ProtoGperD100 N=16  never_granted=0   M08=0.8976836
+  [23/24] ProtoGperD100 N=8   never_granted=0   M08=0.9872284
+  [24/24] ProtoGperD100 N=8   never_granted=0   M08=0.9919684
+
+wrote sweeps/g3-proto/g5_regress.json
