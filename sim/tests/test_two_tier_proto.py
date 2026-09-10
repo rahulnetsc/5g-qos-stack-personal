@@ -85,6 +85,7 @@ def test_all_flags_off_is_BYTE_IDENTICAL_to_the_faithful_port(n_ues, seed):
     assert {k: pc[k] for k in fc} == fc
     # The gate must not have been evaluated at all.
     assert pc["e1_slots_evaluated"] == 0
+    assert pc["e2_slots_evaluated"] == 0
 
 
 def test_every_flag_defaults_off_and_is_enumerated():
@@ -104,9 +105,8 @@ def test_an_unimplemented_flag_is_REFUSED_not_ignored():
     """Enabling an edit that does not exist would report the faithful arm's
     numbers under the divergence arm's name -- the worst failure available to
     a comparison, because it looks like a null result."""
-    for flag in ("stale_bsr_reserve", "deadline_sizing"):
-        with pytest.raises(NotImplementedError, match=flag):
-            TwoTierProto(min_rb=5, **{flag: True})
+    with pytest.raises(NotImplementedError, match="deadline_sizing"):
+        TwoTierProto(min_rb=5, deadline_sizing=True)
 
 
 # --- the exactness argument, as arithmetic -------------------------------
@@ -209,3 +209,84 @@ def test_E1_gate_fires_only_when_the_reserve_cannot_fit():
     assert fired[24][1] >= 11, fired
 
 
+def test_E2_keeps_the_reserve_for_a_UE_that_has_never_been_GRANTED():
+    """The UE with no buffer report at all is the one the reserve exists for,
+    so E2 must never suppress it. Counted, because 'never suppressed' over a
+    population that is empty would pass vacuously."""
+    sc = build_gt22_scenario(seed=1, n_ues=16, horizon_slots=8_000)
+    s = TwoTierProto(min_rb=5, stale_bsr_reserve=True)
+    c = _summary(s, sc)["scheduler_counters"]
+    assert c["e2_slots_evaluated"] > 0, "E2 never ran"
+    assert c["e2_stale_kept"] + c["e2_current_suppressed"] > 0, (
+        "E2 ran but classified no follower -- the precondition did not occur, "
+        "so this cell cannot test the edit")
+
+
+def test_E2_leaves_the_ranking_alone_too():
+    """Same instrument as E1's, for the same reason -- see that test's
+    docstring on why a whole-run order comparison cannot answer this."""
+    from types import SimpleNamespace
+    from scheduler.two_tier import _Candidate
+
+    def make():
+        out = []
+        for ue in (1, 2, 3):
+            c = _Candidate(ue_id=ue, flows=[], bits_per_rb=100, bler=0.0,
+                           snr_db=10.0, coef=float(50 * ue))
+            c.has_gbr = True
+            c.gbr_bytes_slot = 300
+            c.ul_total_target_bytes = 100
+            c.urgency01 = 0.2
+            c.hyp_tbs_bytes = 900
+            out.append(c)
+        return out
+
+    faithful = TwoTier(min_rb=5)
+    proto = TwoTierProto(min_rb=5, stale_bsr_reserve=True)
+    for s_ in (faithful, proto):
+        s_._grid = SimpleNamespace(prb_count=55)
+    # UE 1 granted recently (report current), UE 2 long ago (stale), UE 3 never.
+    proto._cur_slot = 1000
+    proto.slot_duration_s = 0.00025
+    proto._proto_last_ul_grant_slot = {1: 999, 2: 1}
+    proto._proto_pdb_ms = {1: 100, 2: 100, 3: 100}
+
+    a, b = make(), make()
+    faithful._finalize_ul_coef(a)
+    proto._finalize_ul_coef(b)
+
+    assert [c.coef for c in b] == [c.coef for c in a], "E2 moved coef"
+    assert ([proto._ul_rank_key(c) for c in b]
+            == [faithful._ul_rank_key(c) for c in a]), "E2 moved the sort key"
+    # The classification is the edit: fresh report suppressed, stale kept.
+    assert b[0].gbr_bytes_slot == 0, "UE 1's report was current; reserve stays"
+    assert b[1].gbr_bytes_slot == 300, "UE 2's report was stale; reserve must hold"
+    assert b[2].gbr_bytes_slot == 300, "UE 3 never reported; reserve must hold"
+    assert proto.counters["e2_current_suppressed"] == 1
+    assert proto.counters["e2_stale_kept"] == 2
+    assert proto.counters["e2_never_granted_kept"] == 1
+
+
+def test_E2_actually_OBSERVES_grants_and_is_not_a_structural_no_op():
+    """THE TEST THE FIRST VERSION OF E2 NEEDED AND DID NOT HAVE.
+
+    E2 read `TwoTier._last_ul_grant_slot`, which is written only inside
+    `if self.anti_hysteresis > 0.0` -- off by default. The dict was permanently
+    empty, every follower classified "never granted", nothing suppressed, and
+    E2 returned bit-identical results over 90 cells while being a structural
+    no-op. This asserts the precondition OCCURS: on a cell where UEs are
+    granted constantly, "never granted" must not account for every
+    classification.
+    """
+    sc = build_gt22_scenario(seed=1, n_ues=8, horizon_slots=8_000)
+    s = TwoTierProto(min_rb=5, stale_bsr_reserve=True)
+    c = _summary(s, sc)["scheduler_counters"]
+    total = c["e2_stale_kept"] + c["e2_current_suppressed"]
+    assert total > 0, "E2 classified nothing"
+    assert s._proto_last_ul_grant_slot, (
+        "E2 observed no uplink grant at all -- it is reading state nobody "
+        "writes, which is exactly the defect this test exists for")
+    assert c["e2_never_granted_kept"] < total, (
+        f"every one of {total} classifications was 'never granted' -- "
+        f"arithmetically impossible in a cell that grants every slot, so E2 "
+        f"is not reaching its own precondition")

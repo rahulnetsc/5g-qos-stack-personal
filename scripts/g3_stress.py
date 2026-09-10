@@ -155,6 +155,8 @@ def _resolve_arm(name: str):
     flags = {
         "ProtoOff": {},
         "ProtoE1": {"gate_follower_reserve": True},
+        "ProtoE2": {"stale_bsr_reserve": True},
+        "ProtoE1E2": {"gate_follower_reserve": True, "stale_bsr_reserve": True},
     }
     if name not in flags:
         raise ValueError(

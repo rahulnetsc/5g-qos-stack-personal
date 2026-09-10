@@ -96,14 +96,70 @@ The pre-transform values are kept on the candidate as
 faithful quantities.
 
 --------------------------------------------------------------------------
-E2 -- TARGET THE RESERVE AT STALE BUFFER REPORTS (not built yet)
+E2 -- TARGET THE RESERVE AT STALE BUFFER REPORTS
 --------------------------------------------------------------------------
 
-Registered, not implemented. The reserve exists to keep buffer reports flowing;
-reserving band for a follower whose report is already current spends PRB on
-information the gNB holds. The staleness threshold must be DERIVED -- from the
-BSR periodicity or from the tightest PDB among the UE's backlogged flows -- and
-which one is used has to be stated, not chosen silently.
+**The argument.** The reserve exists so that a UE the gNB has stopped serving
+still gets a grant, and therefore still sends a buffer-status report. Reserving
+band for a follower whose report is **already current** spends PRB on
+information the gNB is holding. So the reserve should be aimed at followers
+whose report has gone stale, not at every follower with an unmet obligation.
+
+**THE STALENESS THRESHOLD IS DERIVED, AND WHICH DERIVATION IS USED MATTERS.**
+Two were available and the choice is forced by an architectural boundary, not
+by preference:
+
+  * **The BSR periodicity** is the natural quantity -- a report is stale once a
+    period has passed. It is **not reachable**: the periodic-BSR timer lives in
+    `sim/bsr.py`, and `scheduler/` must not import `sim/` (that is what keeps
+    the scheduler library free of simulator-side state). Reading it would mean
+    a real gNB reading a UE-side constant, which no gNB can do.
+  * **The tightest PDB among the UE's currently-backlogged logical channels**
+    IS reachable, through the port's own `_ul_best_pending_pdb_ms(ue_id,
+    buffers)` -- the same helper Tier-1.5's floor uses for its own theta. **A
+    report older than the deadline of the tightest flow it describes can no
+    longer be relied on for that flow**, which is the property the reserve
+    cares about.
+
+So: **stale iff the UE's last uplink grant is older than its own tightest
+pending PDB.** Both terms are the scheduler's own; no number is chosen here.
+
+**The age proxy, stated because it is a proxy.** A BSR arrives with a grant, so
+the slot of a UE's last uplink grant is when the gNB last had the chance to
+refresh that UE's report. It is an upper bound on report freshness rather than
+the report's own timestamp, which the gNB does not keep. **A UE never granted at
+all has no report and is therefore maximally stale**, which keeps the reserve
+pointed at exactly the UE it was built for.
+
+**AND THIS ARM KEEPS ITS OWN RECORD OF THAT, WHICH THE FIRST VERSION DID NOT --
+the bug is recorded because the shape recurs.** `TwoTier` has a
+`_last_ul_grant_slot` dict that looks exactly right, and E2's first version read
+it. **It is populated only inside `if self.anti_hysteresis > 0.0`** (`allocate`,
+"bookkeeping for the anti-hysteresis diagnostic only"), and that damper defaults
+off -- so the dict was permanently EMPTY, every follower classified as
+"never granted", nothing was ever suppressed, and **E2 was a structural no-op
+that ran to completion over 90 cells and returned bit-identical results.**
+
+That is CLAUDE.md's unreachable-mechanism class, built fresh: an edit whose
+precondition cannot occur because it borrows state maintained under an unrelated
+flag. **What caught it was the DECOMPOSED counter** -- `e2_never_granted_kept ==
+e2_stale_kept == 757 143 of 757 143` is arithmetically impossible in a cell where
+UEs are granted every slot, which is the "does this number factor into the run's
+own dimensions" signature. A single `e2_suppressed` total would have read 0 and
+been reported as a finding about the mechanism instead of a defect in the edit.
+
+So `TwoTierProto` maintains `_proto_last_ul_grant_slot` itself, unconditionally
+while E2 is on, from the allocations `allocate` actually returns.
+
+**Same seam as E1**, so the same exactness argument applies: the reserve
+contribution of a *current* follower is removed by folding `gbr_bytes_slot`
+into `ul_total_target_bytes` and zeroing it, leaving `B_eff` unchanged and the
+ranking untouched.
+
+**E1 AND E2 COMPOSE BUT ARE NOT VALIDATED TOGETHER.** E1 suppresses the whole
+reserve when it cannot fit; E2 suppresses the part of it aimed at UEs that do
+not need it. Enabling both is a third configuration and is not what either
+registration measures.
 
 --------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
@@ -150,7 +206,7 @@ class TwoTierProto(TwoTier):
         self.gate_follower_reserve = bool(gate_follower_reserve)
         self.stale_bsr_reserve = bool(stale_bsr_reserve)
         self.deadline_sizing = bool(deadline_sizing)
-        for name in ("stale_bsr_reserve", "deadline_sizing"):
+        for name in ("deadline_sizing",):
             if getattr(self, name):
                 raise NotImplementedError(
                     f"{name} is REGISTERED but not implemented -- see this "
@@ -167,7 +223,65 @@ class TwoTierProto(TwoTier):
             "e1_gate_fired": 0,          # slots where the reserve was suppressed
             "e1_candidates_suppressed": 0,
             "e1_max_followers_need": 0,
+            "e2_slots_evaluated": 0,
+            "e2_current_suppressed": 0,  # followers whose report was fresh
+            "e2_stale_kept": 0,          # followers the reserve still protects
+            "e2_never_granted_kept": 0,  # ... of which had no report at all
         })
+        #: ue_id -> tightest pending PDB in ms, captured where `buffers` is in
+        #: scope. E2 only; empty otherwise.
+        self._proto_pdb_ms: dict[int, int] = {}
+        #: ue_id -> slot of that UE's last UPLINK grant. THIS ARM'S OWN, not
+        #: `TwoTier._last_ul_grant_slot`, which is only written when the
+        #: anti-hysteresis damper is on -- see the module docstring for the
+        #: no-op that borrowing it produced.
+        self._proto_last_ul_grant_slot: dict[int, int] = {}
+
+    # ------------------------------------------------------------------ E2
+
+    def allocate(self, slot, buffers, channel):
+        """The port's own allocation, plus E2's own grant-recency record.
+
+        Additive and after the fact: `super()` decides everything, and this
+        only reads the allocations it returned. Guarded by the flag so the
+        faithful path keeps doing no extra work.
+        """
+        out = super().allocate(slot, buffers, channel)
+        if self.stale_bsr_reserve:
+            for a in out:
+                if a.direction == "UL":
+                    self._proto_last_ul_grant_slot[a.ue_id] = slot.slot_index
+        return out
+
+    def _ul_gbr_and_pdb(self, ue_id: int, buffers: Any,
+                        slot_index: int) -> tuple:
+        """The port's own computation, plus E2's staleness input.
+
+        `super()` first and its result returned unchanged -- this override adds
+        a pure READ and nothing else. It exists because `_finalize_ul_coef`,
+        where the reserve is gated, does not receive `buffers`, and
+        `_ul_best_pending_pdb_ms` needs it. Guarded by the flag so the faithful
+        path does not even take the read.
+        """
+        out = super()._ul_gbr_and_pdb(ue_id, buffers, slot_index)
+        if self.stale_bsr_reserve:
+            self._proto_pdb_ms[ue_id] = self._ul_best_pending_pdb_ms(
+                ue_id, buffers)
+        return out
+
+    def _e2_report_is_stale(self, ue_id: int) -> tuple[bool, bool]:
+        """(stale, never_granted) for one UE. See the module docstring."""
+        last = self._proto_last_ul_grant_slot.get(ue_id)
+        if last is None:
+            return True, True           # no grant ever -> no report at all
+        pdb_ms = self._proto_pdb_ms.get(ue_id)
+        if pdb_ms is None:
+            # Not observed this slot: treat as stale rather than fresh. An
+            # unknown must not silently earn a UE the "current" disposition,
+            # which is the direction that would quietly remove protection.
+            return True, False
+        age_ms = (self._cur_slot - last) * self.slot_duration_s * 1000.0
+        return age_ms > float(pdb_ms), False
 
     # ------------------------------------------------------------------ E1
 
@@ -180,6 +294,8 @@ class TwoTierProto(TwoTier):
         than a ranking change.
         """
         super()._finalize_ul_coef(candidates)
+        if self.stale_bsr_reserve:
+            self._apply_e2(candidates)
         if not self.gate_follower_reserve:
             return
 
@@ -212,14 +328,31 @@ class TwoTierProto(TwoTier):
             self._suppress_reserve(c)
             self.counters["e1_candidates_suppressed"] += 1
 
+    def _apply_e2(self, candidates: list[_Candidate]) -> None:
+        """Keep the reserve only for followers whose buffer report is stale."""
+        self.counters["e2_slots_evaluated"] += 1
+        for c in candidates:
+            if c.sched_inactive or not c.has_gbr or c.gbr_bytes_slot <= 0:
+                continue
+            stale, never = self._e2_report_is_stale(c.ue_id)
+            if stale:
+                self.counters["e2_stale_kept"] += 1
+                if never:
+                    self.counters["e2_never_granted_kept"] += 1
+                continue
+            # Report is current: this follower does not need band reserved to
+            # make it report. Remove its reserve contribution, B_eff-neutrally.
+            self._suppress_reserve(c)
+            self.counters["e2_current_suppressed"] += 1
+
     def _suppress_reserve(self, c: _Candidate) -> None:
         """Remove one candidate's FIX-2 reserve contribution, exactly.
 
         `gbr_bytes_slot` has two live readers: `gbr_below`'s reverse scan and
         `B_eff`'s `max`. Folding the value into `ul_total_target_bytes` before
         zeroing it leaves the second identical and removes the first -- see the
-        module docstring's arithmetic. A method rather than inline so E2, when
-        it lands, cannot diverge from E1 in how it suppresses.
+        module docstring's arithmetic. Shared by E1 and E2 so the two edits
+        cannot diverge in how they suppress.
         """
         c.proto_orig_gbr_bytes_slot = c.gbr_bytes_slot
         c.ul_total_target_bytes = max(c.ul_total_target_bytes,
