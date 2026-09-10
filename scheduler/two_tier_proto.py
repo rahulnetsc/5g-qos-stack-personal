@@ -162,6 +162,40 @@ not need it. Enabling both is a third configuration and is not what either
 registration measures.
 
 --------------------------------------------------------------------------
+G-DEPTH -- BOUND THE RESERVE'S DEPTH RATHER THAN GATING IT ON/OFF
+--------------------------------------------------------------------------
+
+**The measurement this exists to answer.** E1 gates the reserve on feasibility
+and moves no boundary; E2 removes it essentially always and moves the boundary
+but loses the top of the axis. The pair localises the cost: the reserve is
+harmful just BELOW the boundary, where it fits and is applied in full, and
+protective above it (`docs/g3-stress-experiment-2026-09-09.md` §18.2).
+
+**So the reserve's DEPTH is the continuous variable, and E1's gate is the
+K = floor(prb_count / min_rb) - 1 point on it.** Reserve for at most `K`
+followers, chosen BY NEED rather than by rank position, and suppress the rest.
+
+**WHY THE OBVIOUS K IS THE WRONG ONE, measured before this was built.**
+`floor(prb_count / min_rb) - 1` is 10 on a 55-PRB carrier at `min_rb = 5`, and
+a bound of 10 binds only when the qualifying-follower count exceeds 10 --
+**the identical threshold E1 fires at.** `scripts/g3_gate_population_probe.py`
+confirms it directly: the "need >= 11" and "need > 10" columns are equal at
+every fleet size, and both are **0.0 % at N = 4 through 10**, where G3's
+boundary of 7 sits. So the specified K inherits E1's blind spot exactly.
+
+**The harm is continuous in the follower count well before the reserve stops
+fitting.** Derived from the probe's modal `need` per fleet size, the top-ranked
+candidate's own cap is:
+
+    N = 8   need 6    reserve 25 PRB   leader capped at 30 of 55
+    N = 10  need 8    reserve 35 PRB   leader capped at 20 of 55
+    N = 12  need 11   reserve 50 PRB   leader capped at  5 of 55
+
+**K is therefore swept rather than fixed**, and `K = None` derives the
+specified `floor(prb_count / min_rb) - 1` so that variant is scored too.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -186,7 +220,8 @@ __all__ = ["TwoTierProto", "PROTO_FLAGS"]
 #: registration is visible.
 PROTO_FLAGS: tuple[str, ...] = (
     "gate_follower_reserve",      # E1
-    "stale_bsr_reserve",          # E2, not implemented
+    "stale_bsr_reserve",          # E2
+    "depth_bounded_reserve",      # G-depth
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -200,12 +235,25 @@ class TwoTierProto(TwoTier):
     def __init__(self, *args: Any,
                  gate_follower_reserve: bool = False,
                  stale_bsr_reserve: bool = False,
+                 depth_bounded_reserve: bool = False,
+                 reserve_depth: int | None = None,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.gate_follower_reserve = bool(gate_follower_reserve)
         self.stale_bsr_reserve = bool(stale_bsr_reserve)
+        self.depth_bounded_reserve = bool(depth_bounded_reserve)
+        #: G-depth's bound. None derives `floor(prb_count / min_rb) - 1`, the
+        #: variant registered in the sweep -- which the population probe shows
+        #: binds at the same follower count E1 fires at, so the sweep sets it
+        #: explicitly rather than relying on the derived value.
+        self.reserve_depth = reserve_depth
         self.deadline_sizing = bool(deadline_sizing)
+        if reserve_depth is not None and not depth_bounded_reserve:
+            raise ValueError(
+                "reserve_depth set without depth_bounded_reserve -- a bound "
+                "that silently does nothing would be reported as a swept "
+                "point that ran.")
         for name in ("deadline_sizing",):
             if getattr(self, name):
                 raise NotImplementedError(
@@ -227,6 +275,11 @@ class TwoTierProto(TwoTier):
             "e2_current_suppressed": 0,  # followers whose report was fresh
             "e2_stale_kept": 0,          # followers the reserve still protects
             "e2_never_granted_kept": 0,  # ... of which had no report at all
+            "gdepth_slots_evaluated": 0,
+            "gdepth_slots_bound_binding": 0,   # slots where need exceeded K
+            "gdepth_candidates_suppressed": 0,
+            "gdepth_max_need": 0,
+            "gdepth_depth_cap": -1,            # the K actually used
         })
         #: ue_id -> tightest pending PDB in ms, captured where `buffers` is in
         #: scope. E2 only; empty otherwise.
@@ -296,6 +349,8 @@ class TwoTierProto(TwoTier):
         super()._finalize_ul_coef(candidates)
         if self.stale_bsr_reserve:
             self._apply_e2(candidates)
+        if self.depth_bounded_reserve:
+            self._apply_gdepth(candidates)
         if not self.gate_follower_reserve:
             return
 
@@ -345,14 +400,50 @@ class TwoTierProto(TwoTier):
             self._suppress_reserve(c)
             self.counters["e2_current_suppressed"] += 1
 
+    # -------------------------------------------------------------- G-depth
+
+    def _apply_gdepth(self, candidates: list[_Candidate]) -> None:
+        """Keep the reserve for at most K qualifying followers, chosen by need.
+
+        Not a gate: below K nothing is suppressed and the arm is the port, and
+        above it exactly `need - K` reserves are dropped. That is what makes it
+        continuous where E1 is binary.
+        """
+        self.counters["gdepth_slots_evaluated"] += 1
+        qual = [c for c in candidates
+                if not c.sched_inactive and c.has_gbr and c.gbr_bytes_slot > 0]
+        need = len(qual)
+        if need > self.counters["gdepth_max_need"]:
+            self.counters["gdepth_max_need"] = need
+
+        cap = self.reserve_depth
+        if cap is None:
+            # The registered variant, derived from the band rather than picked:
+            # the count at which the reserve stops fitting, less one.
+            cap = self._grid.prb_count // self.min_rb - 1
+        cap = max(0, cap)
+        self.counters["gdepth_depth_cap"] = cap
+        if need <= cap:
+            return                      # the bound does not bind: stay faithful
+
+        self.counters["gdepth_slots_bound_binding"] += 1
+        # BY NEED, not by rank position -- the neediest keep their reserve, and
+        # `ue_id` breaks ties so the choice is deterministic rather than
+        # dependent on the incoming list order.
+        order = sorted(qual, key=lambda c: (-c.gbr_bytes_slot, c.ue_id))
+        for c in order[cap:]:
+            self._suppress_reserve(c)
+            self.counters["gdepth_candidates_suppressed"] += 1
+
     def _suppress_reserve(self, c: _Candidate) -> None:
         """Remove one candidate's FIX-2 reserve contribution, exactly.
 
         `gbr_bytes_slot` has two live readers: `gbr_below`'s reverse scan and
         `B_eff`'s `max`. Folding the value into `ul_total_target_bytes` before
         zeroing it leaves the second identical and removes the first -- see the
-        module docstring's arithmetic. Shared by E1 and E2 so the two edits
-        cannot diverge in how they suppress.
+        module docstring's arithmetic. Shared by every edit that suppresses a
+        reserve, so they cannot diverge in HOW they suppress -- only in which
+        candidates they choose.
         """
         c.proto_orig_gbr_bytes_slot = c.gbr_bytes_slot
         c.ul_total_target_bytes = max(c.ul_total_target_bytes,

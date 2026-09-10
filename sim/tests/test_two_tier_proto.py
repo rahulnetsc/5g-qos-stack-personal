@@ -93,12 +93,18 @@ def test_every_flag_defaults_off_and_is_enumerated():
     for flag in PROTO_FLAGS:
         assert getattr(s, flag) is False, flag
     # A flag added without being registered in PROTO_FLAGS would be invisible
-    # to a runner enumerating the arm's configurations.
-    declared = set(PROTO_FLAGS)
-    present = {a for a in vars(s)
-               if a.startswith(("gate_", "stale_", "deadline_"))}
-    assert present == declared, (
-        f"flags on the instance {present} do not match PROTO_FLAGS {declared}")
+    # to a runner enumerating the arm's configurations. DERIVED from the
+    # constructor signature, not from a name prefix: the first version of this
+    # test matched on ("gate_", "stale_", "deadline_") and a fourth flag named
+    # outside those prefixes would have gone unseen -- a restated set in test
+    # code, which fails in the direction of PASSING (CLAUDE.md).
+    import inspect
+    sig = inspect.signature(TwoTierProto.__init__)
+    present = {n for n, prm in sig.parameters.items()
+               if isinstance(prm.default, bool)}
+    assert present == set(PROTO_FLAGS), (
+        f"bool constructor flags {present} do not match "
+        f"PROTO_FLAGS {set(PROTO_FLAGS)}")
 
 
 def test_an_unimplemented_flag_is_REFUSED_not_ignored():

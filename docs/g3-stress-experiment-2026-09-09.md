@@ -1113,3 +1113,77 @@ tidied away.
 **The probe is preserved** as `scripts/g3_reserve_probe.py` and registered in
 `scripts/parallel_audit.py`'s `ALLOW_SERIAL` with its reason, so §3.4 can be
 re-derived rather than re-discovered.
+
+## 18. THE PROTO ARM'S TWO EDITS, and what has to be recorded before sweeping further
+
+**2026-09-10**, after `docs/proto-e1-result-2026-09-10.md` and
+`docs/proto-e2-result-2026-09-10.md`. Two records that have to stand before any
+further gate is built, because both correct something a later reader would
+otherwise take from the edits' own names and headline numbers.
+
+### 18.1 E2 IS MISLABELLED — the finding is about REMOVAL, not targeting
+
+The flag is called `stale_bsr_reserve` and was registered as *"keep the reserve
+only for followers whose buffer report is stale"*. **It does not do that.** Its
+own classification counters, which exist precisely so an edit cannot be
+believed on its name:
+
+| N | followers classified | current → suppressed | stale → kept |
+|---|---|---|---|
+| 6 | 97 677 | 97 677 — **100.0 %** | 0 |
+| 8 | 166 972 | 166 972 — **100.0 %** | 0 |
+| 12 | 311 156 | 311 110 — **100.0 %** | 46 |
+| 24 | 631 904 | 630 689 — **99.8 %** | 1 215 |
+
+**The staleness test holds on 0.0–0.2 % of classifications.** A qualifying
+follower has `gbr_bytes_slot > 0`, which requires a backlogged GBR LCG with an
+unmet obligation — such a UE is a candidate nearly every slot and is therefore
+granted well inside its own PDB, so "current" is almost always true.
+
+**So E2 measured "remove the reserve, always."** The name is doing no work, and
+its improvement is evidence for *removal*, not for *report-targeting*. Every
+number in E2's result table should be read under that heading. The flag name is
+left as it is only because renaming it would move
+`scheduler/two_tier_proto.py`'s AST hash and stale the artefact the counters
+above come from; **the label is corrected here rather than in the identifier**,
+and no future edit should cite E2 as evidence that targeting works.
+
+**This is the manipulation check earning its place a second time.** The first
+was the unreachability catch — `e2_never_granted_kept == e2_stale_kept ==
+757 143 of 757 143`, an impossible equality. The second is this one: the same
+counters that proved the edit ran also proved it was not doing what it was
+named for. A headline improvement with no decomposition underneath it would
+have shipped both errors.
+
+### 18.2 THE RESERVE'S PROTECTIVE ROLE IS REAL, so "improves G3" is not sufficient
+
+Both edits bought the middle of the axis by giving up the top:
+
+| | N = 12 part 1 | N = 16 part 1 | N = 24 part 1 |
+|---|---|---|---|
+| faithful | 3 | **9** | **9** |
+| E1 (removes above 11 followers) | 8 | **4** | **3** |
+| E2 (removes essentially always) | 9 | **2** | **2** |
+
+**Part 1 falls 9 → 2 at both N = 16 and N = 24 under E2, and 9 → 4 and 9 → 3
+under E1.** The mechanism is the one the reserve exists for: with no reserve,
+greedy-by-rank lets the leader take the band it asks for, so fewer robots are
+served per slot and more end up moderately starved — **the monopolisation FIX-2
+was written to prevent, reproduced by removing it.**
+
+**Taken with E1 the pair localises the reserve's cost precisely.** E1 removes it
+only above eleven qualifying followers and moves no boundary; E2 removes it
+essentially always and moves part 1 from 7 to 8 and part 2 from 7 to 16. **So
+the reserve is harmful just BELOW the boundary — at 8 to 14 robots, where it
+fits and is therefore applied in full — and protective above it.**
+
+**The success criterion for any further gate is therefore two-sided, and is
+registered here so a one-sided win cannot be reported as a win:**
+
+1. **improve the 8–14 band** — part-1 and part-2 pass counts up, worst silence
+   down, relative to the faithful arm on the same seeds; **and**
+2. **do not lose the top** — part 1 at N = 16 and N = 24 must not fall below
+   the faithful arm's 9 and 9.
+
+**Neither E1 nor E2 meets it.** A candidate that satisfies (1) and fails (2) is
+the same trade already measured twice, not a new result.

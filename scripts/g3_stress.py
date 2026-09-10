@@ -158,6 +158,14 @@ def _resolve_arm(name: str):
         "ProtoE2": {"stale_bsr_reserve": True},
         "ProtoE1E2": {"gate_follower_reserve": True, "stale_bsr_reserve": True},
     }
+    # G-depth's swept points. The bound is part of the arm's identity, so it
+    # is in the NAME -- an artefact's `arm` column has to say which K produced
+    # it, or two points of one sweep are indistinguishable in the ledger.
+    if name.startswith("ProtoGdepth"):
+        tail = name[len("ProtoGdepth"):]
+        k = None if tail == "" else int(tail)
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, depth_bounded_reserve=True, reserve_depth=k)
     if name not in flags:
         raise ValueError(
             f"unknown Proto arm {name!r}; known: {sorted(flags)}. A typo must "
