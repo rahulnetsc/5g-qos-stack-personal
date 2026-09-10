@@ -425,3 +425,43 @@ def test_G_periodic_deadline_SKIPS_slots_and_the_skip_is_counted():
     assert c["gper_reserve_slots"] == c["gpd_fired"], (
         "reserve slots and fired slots disagree; the skip did not reach the "
         "reordering")
+
+
+# --- G-denial ------------------------------------------------------------
+
+def test_G_denial_REFUSES_to_reorder_a_reserve_slot_that_never_fires():
+    with pytest.raises(ValueError, match="periodic_reserve"):
+        TwoTierProto(min_rb=5, denial_ordered_periodic=True)
+
+
+def test_G_denial_orders_by_AGE_and_a_never_granted_UE_sorts_FIRST():
+    """The age rule has to make "never served" the largest age by
+    construction, with no sentinel -- that is what `-1` buys."""
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     denial_ordered_periodic=True)
+    s._cur_slot = 1_000
+    s._proto_last_ul_grant_slot = {7: 900, 8: 500}
+    assert s._gdo_age(7) == 100
+    assert s._gdo_age(8) == 500
+    assert s._gdo_age(9) == 1_001, "a never-granted UE must have the largest age"
+    assert s._gdo_age(9) > s._gdo_age(8) > s._gdo_age(7)
+
+
+def test_G_denial_ACTUALLY_DIFFERS_from_the_composite_ordering():
+    """The whole point of the arm. If the two rules agreed everywhere this
+    would be G-periodic under a different name, which is E2's failure mode."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     deadline_gated_periodic=True,
+                     denial_ordered_periodic=True)
+    sc = build_gt22_scenario(seed=35492826, n_ues=16, horizon_slots=8_000,
+                             telemetry_gbr=True)
+    _summary(s, sc)
+    c = s.counters
+    assert c["gdo_slots_ordered"] > 0, "the denial ordering never ran"
+    agree = c["gdo_agrees_with_coef"] / c["gdo_slots_ordered"]
+    assert agree < 0.5, (
+        f"the denial rule picks the same UE as the composite rule on "
+        f"{agree:.1%} of reserve slots -- at that level the swap is not a "
+        f"distinct arm and its result cannot be attributed to the ordering")
+    assert c["gdo_max_age_slots"] > 0

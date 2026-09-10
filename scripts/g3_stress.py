@@ -163,6 +163,11 @@ def _resolve_arm(name: str):
     # it, or two points of one sweep are indistinguishable in the ledger.
     # G-periodic's swept points, named by the multiplier on the DERIVED P*
     # (100 = 1.00x) so an artefact's `arm` column carries the sweep point.
+    if name.startswith("ProtoGdenial"):
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, periodic_reserve=True,
+                  deadline_gated_periodic=True, denial_ordered_periodic=True,
+                  reserve_period_mult=int(name[12:]) / 100.0)
     if name.startswith("ProtoGperD"):
         from scheduler.two_tier_proto import TwoTierProto as _T
         return _T(min_rb=5, periodic_reserve=True,

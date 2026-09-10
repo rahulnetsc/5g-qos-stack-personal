@@ -292,6 +292,42 @@ can actually carry.
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+G-DENIAL -- ORDER A RESERVE SLOT BY DENIAL TIME, NOT BY THE COMPOSITE
+--------------------------------------------------------------------------
+
+**This corrects a claim I made about G-periodic and did not measure.** That
+gate's docstring said reversing Tier 2 serves *"the follower that keeps losing
+the ordinary ranking"*. Measured, it picks that robot on **2.6-10.3 %** of
+reserve slots, and the rank correlation between the implemented order and
+longest-denied is **-0.29 at N = 8, -0.19 at N = 12 and +0.39 at N = 24** --
+so below the boundary it orders candidates *against* denial time. The
+improvement G-periodic produced is real; the reason given for it was not.
+
+**Why the composite cannot express denial time.** `coef` is
+`(base_q + urg) * hyp_tbs_bytes`. Denial appears only inside `base_q`, which is
+`sum(vq_ul)` over LCGs and is clamped to `min(backlog_bits, 5 * target_window)`
+(`two_tier.py`, `_update_vq_ul`) -- so it **saturates**, and past that a robot
+denied 50 slots and one denied 500 are indistinguishable. `hyp_tbs_bytes` then
+multiplies the whole sum by a channel term that has nothing to do with denial.
+
+**So Tier 2 is replaced rather than negated on a reserve slot**, by the
+quantity the slot exists to bound: slots since that UE's last uplink grant. A
+UE never granted takes `self._cur_slot - (-1)`, which is the largest age
+available by construction, so "never served" sorts first without a sentinel.
+
+**Tiers 1, 1.5 and the tie-break still pass through untouched**, and the
+deadline gate still decides WHETHER a slot fires -- this changes only the order
+within one that does.
+
+**KNOWN LIMITATION, registered before the run so a weak result is not
+misread.** `_proto_last_ul_grant_slot` records the last grant to the **UE**,
+not to the starved flow on it. A robot whose camera is being served looks
+recently granted while its telemetry starves. If this underperforms, that is
+the first thing to check rather than concluding denial time is the wrong
+quantity.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -320,6 +356,7 @@ PROTO_FLAGS: tuple[str, ...] = (
     "depth_bounded_reserve",      # G-depth
     "periodic_reserve",           # G-periodic
     "deadline_gated_periodic",    # G-periodic-deadline
+    "denial_ordered_periodic",    # G-denial
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -343,6 +380,7 @@ class TwoTierProto(TwoTier):
                  periodic_reserve: bool = False,
                  reserve_period_mult: float = 1.0,
                  deadline_gated_periodic: bool = False,
+                 denial_ordered_periodic: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -358,6 +396,11 @@ class TwoTierProto(TwoTier):
         #: Multiplier on the DERIVED P*. 1.0 is the derivation itself.
         self.reserve_period_mult = float(reserve_period_mult)
         self.deadline_gated_periodic = bool(deadline_gated_periodic)
+        self.denial_ordered_periodic = bool(denial_ordered_periodic)
+        if denial_ordered_periodic and not periodic_reserve:
+            raise ValueError(
+                "denial_ordered_periodic without periodic_reserve -- it "
+                "reorders a reserve slot that would never fire.")
         if deadline_gated_periodic and not periodic_reserve:
             raise ValueError(
                 "deadline_gated_periodic without periodic_reserve -- it gates "
@@ -409,6 +452,10 @@ class TwoTierProto(TwoTier):
             "gpd_fired": 0,              # ... and someone was near a deadline
             "gpd_skipped_nobody_due": 0,  # ... and nobody was
             "gpd_urgent_candidates": 0,
+            "gdo_slots_ordered": 0,
+            "gdo_agrees_with_coef": 0,     # ... where BOTH rules pick the same UE
+            "gdo_never_granted_first": 0,  # ... where the first pick never had one
+            "gdo_max_age_slots": 0,
         })
         #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
         #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
@@ -453,6 +500,10 @@ class TwoTierProto(TwoTier):
             # real value rather than a default standing in for it.
             self._gper_cap = int(slot.max_sched_ues)
         out = super().allocate(slot, buffers, channel)
+        if self.denial_ordered_periodic:
+            for a in out:
+                if a.direction == "UL":
+                    self._proto_last_ul_grant_slot[a.ue_id] = slot.slot_index
         if self.periodic_reserve:
             reserve = self._gper_is_reserve
             for a in out:
@@ -617,11 +668,27 @@ class TwoTierProto(TwoTier):
         key = super()._ul_rank_key(candidate)
         if not (self.periodic_reserve and self._gper_is_reserve):
             return key
-        # key[3] is `-coef`; negating it sorts the WORST composite first, which
-        # is the follower that keeps losing the ordinary ranking. Ties are
+        if self.denial_ordered_periodic:
+            # G-denial. REPLACE Tier 2 rather than negate it: `-age` sorts the
+            # longest-denied first under the same ascending sort, and the
+            # composite is not consulted at all. See the module docstring for
+            # why negating `coef` does not express this.
+            return (key[0], key[1], key[2],
+                    -self._gdo_age(candidate.ue_id), key[4])
+        # key[3] is `-coef`; negating it sorts the LOWEST composite first.
+        # MEASURED, and it is NOT the longest-denied robot -- see the G-denial
+        # section of the module docstring for the correlations. Ties are
         # untouched: equal values stay equal under negation, and `list.sort` is
         # stable, so a fully tied slot is ordered exactly as the port orders it.
         return (key[0], key[1], key[2], -key[3], key[4])
+
+    def _gdo_age(self, ue_id: int) -> int:
+        """Slots since this UE's last uplink grant.
+
+        A UE never granted gets `_cur_slot - (-1)`, the largest age available,
+        so "never served" sorts first without needing a sentinel value.
+        """
+        return self._cur_slot - self._proto_last_ul_grant_slot.get(ue_id, -1)
 
     def _apply_gperiodic(self, candidates: list[_Candidate]) -> None:
         """Replace the spatial reserve with a temporal one."""
@@ -671,6 +738,21 @@ class TwoTierProto(TwoTier):
         if data:
             self._gper_leader_ue = min(
                 data, key=lambda c: TwoTier._ul_rank_key(self, c)).ue_id
+        if self.denial_ordered_periodic and data:
+            # Does the swap actually change who is served first? If the two
+            # rules agreed everywhere, this arm would be G-periodic under a
+            # different name -- the E2 failure mode, and the counter is here
+            # so it cannot pass unnoticed.
+            self.counters["gdo_slots_ordered"] += 1
+            by_age = max(data, key=lambda c: self._gdo_age(c.ue_id))
+            by_coef = min(data, key=lambda c: c.coef)
+            if by_age.ue_id == by_coef.ue_id:
+                self.counters["gdo_agrees_with_coef"] += 1
+            if by_age.ue_id not in self._proto_last_ul_grant_slot:
+                self.counters["gdo_never_granted_first"] += 1
+            age = self._gdo_age(by_age.ue_id)
+            if age > self.counters["gdo_max_age_slots"]:
+                self.counters["gdo_max_age_slots"] = age
 
     def _gpd_near_ms(self) -> float:
         """The longest wait to the next uplink slot, from the TDD pattern.
