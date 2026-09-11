@@ -553,3 +553,50 @@ def test_G_slack_is_NOT_G_denial_wearing_a_different_name():
         "can-still-be-saved distinction never fired and this arm is G-denial")
     assert c["gslack_all_late_slots"] < c["gslack_slots_ordered"], (
         "every candidate was late on every reserve slot")
+
+
+# --- the per-slot UE cap bounds the reserve ------------------------------
+
+def test_the_reserve_is_bounded_by_what_the_PER_SLOT_CAP_can_serve():
+    """`cap_ues_per_slot` truncates to the first `max_sched_ues` distinct UEs
+    AFTER allocation, so a reservation held for a follower below the cap buys
+    nothing -- its grant is discarded and the band returns to no one.
+    Measured on the faithful port at cap 4: 65.2 % of allocated UL PRB
+    discarded at N = 16.
+
+    So K is bounded by `max_sched_ues - 1` (the leader takes one place), and
+    that ceiling is DERIVED from the slot rather than swept.
+    """
+    from sim.scenarios.g3 import build_gt22_scenario
+    for cap, want in ((4, 3), (2, 1)):
+        s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                         deadline_gated_periodic=True,
+                         kpi_ordered_periodic=True,
+                         reserve_depth_under_periodic=8)   # far above the cap
+        sc = build_gt22_scenario(seed=35492826, n_ues=12, horizon_slots=4_000,
+                                 telemetry_gbr=True)
+        _summary(s, sc, cap=cap)
+        c = s.counters
+        assert c["gpb_cap_bound"] == want, (
+            f"at max_sched_ues={cap} the reserve ceiling should be {want}, "
+            f"got {c['gpb_cap_bound']}")
+        assert c["gpb_kept"] <= want * c["gper_slots_evaluated"], (
+            "more reserves were kept than the cap can serve")
+
+
+def test_followers_below_the_cap_are_EXCLUDED_and_the_count_is_reported():
+    """Choosing by need alone would reserve for a needy follower ranked below
+    the cap, whose grant is then discarded. The exclusion is measured, not
+    assumed, so a run where it never fires is visible."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, periodic_reserve=True,
+                     deadline_gated_periodic=True, kpi_ordered_periodic=True,
+                     reserve_depth_under_periodic=2)
+    sc = build_gt22_scenario(seed=35492826, n_ues=16, horizon_slots=8_000,
+                             telemetry_gbr=True)
+    _summary(s, sc, cap=4)
+    c = s.counters
+    assert c["gpb_excluded_by_cap"] > 0, (
+        "no qualifying follower was ever ranked below the per-slot cap at "
+        "N=16 -- the rank-based selection is doing nothing and the arm is "
+        "choosing by need alone")

@@ -168,6 +168,12 @@ def _resolve_arm(name: str):
         return _T(min_rb=5, periodic_reserve=True,
                   deadline_gated_periodic=True, slack_ordered_periodic=True,
                   reserve_period_mult=int(name[11:]) / 100.0)
+    if name.startswith("ProtoGkpiD"):
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, periodic_reserve=True,
+                  deadline_gated_periodic=True, kpi_ordered_periodic=True,
+                  reserve_depth_under_periodic=int(name[10:]),
+                  reserve_period_mult=1.0)
     if name.startswith("ProtoGkpi"):
         from scheduler.two_tier_proto import TwoTierProto as _T
         return _T(min_rb=5, periodic_reserve=True,

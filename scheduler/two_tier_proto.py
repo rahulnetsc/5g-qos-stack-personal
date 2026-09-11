@@ -396,6 +396,40 @@ and a test refuses the arm if that is never true.
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+G-PERIODIC + BOUNDED DEPTH -- keep a trickle, drop the saturation
+--------------------------------------------------------------------------
+
+**The measurement that forced this.** G5 scores a statistic no earlier
+guarantee did: the AGE of a multi-fragment video frame at the receiver. On it,
+the winning arm regresses badly -- median p95 65.9 ms at N = 4 against the
+faithful port's 22.3 ms, over a 66.67 ms bound, with the cell nearly idle.
+
+**And the cause is NOT the reordering.** The two halves separate, because E2
+removes the reserve and never reorders:
+
+    N = 4    TwoTier / ProtoOff   22.1 ms     reserve ON
+             ProtoE2              68.1 ms     reserve OFF, no reordering
+             ProtoGkpi100         65.6 ms     reserve OFF + reordering
+
+**Removing the spatial reserve costs the whole regression; the reordering adds
+nothing.** And at N = 7 it inverts -- removal takes age 130.2 -> 99.9 ms and
+completeness 0.970 -> 1.000.
+
+**The mechanism is what a frame statistic exposes and a heartbeat cannot.** The
+reserve makes the leader leave `min_rb` for every follower, so each camera gets
+a steady trickle and its fragments assemble promptly. Remove it and service is
+all-or-nothing: the leader takes the band, the others wait, and a frame's
+fragments arrive in a burst AFTER that wait. A 300-byte heartbeat does not care
+which slot it lands in; a frame that only counts when its last fragment arrives
+does.
+
+**So the reserve is not to be removed under the periodic scheme -- it is to be
+BOUNDED**, which is exactly what G-depth already does. `reserve_depth_under_
+periodic` keeps the reserve for at most K followers chosen by need, so the
+trickle survives at small fleets while the saturation that pins everyone at
+`min_rb` above eleven followers does not.
+
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -451,6 +485,7 @@ class TwoTierProto(TwoTier):
                  reserve_period_mult: float = 1.0,
                  deadline_gated_periodic: bool = False,
                  denial_ordered_periodic: bool = False,
+                 reserve_depth_under_periodic: "int | None" = None,
                  kpi_ordered_periodic: bool = False,
                  slack_ordered_periodic: bool = False,
                  deadline_sizing: bool = False,
@@ -469,6 +504,15 @@ class TwoTierProto(TwoTier):
         self.reserve_period_mult = float(reserve_period_mult)
         self.deadline_gated_periodic = bool(deadline_gated_periodic)
         self.denial_ordered_periodic = bool(denial_ordered_periodic)
+        #: K for the periodic scheme's own reserve. None removes the spatial
+        #: reserve entirely (the original G-periodic); an int keeps it for at
+        #: most K followers chosen by need. See the module docstring for the
+        #: frame-age measurement that made this necessary.
+        self.reserve_depth_under_periodic = reserve_depth_under_periodic
+        if reserve_depth_under_periodic is not None and not periodic_reserve:
+            raise ValueError(
+                "reserve_depth_under_periodic without periodic_reserve -- it "
+                "bounds a reserve the periodic scheme is not managing.")
         self.kpi_ordered_periodic = bool(kpi_ordered_periodic)
         self.slack_ordered_periodic = bool(slack_ordered_periodic)
         n_orderings = sum((self.denial_ordered_periodic,
@@ -556,6 +600,11 @@ class TwoTierProto(TwoTier):
             "gslack_all_late_slots": 0,    # ... slots where nobody could
             "gslack_late_total": 0,
             "gslack_agrees_with_kpi": 0,
+            "gpb_slots_bounded": 0,        # slots where the bound bound
+            "gpb_kept": 0,                 # reserves KEPT that G-periodic drops
+            "gpb_suppressed": 0,
+            "gpb_excluded_by_cap": 0,     # qualifying, but below max_sched_ues
+            "gpb_cap_bound": -1,          # the DERIVED ceiling on K
         })
         #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
         #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
@@ -817,12 +866,6 @@ class TwoTierProto(TwoTier):
         qual = [c for c in candidates
                 if not c.sched_inactive and c.has_gbr and c.gbr_bytes_slot > 0]
 
-        # THE SPATIAL RESERVE GOES, on every slot -- the point of the gate is
-        # that the leader takes the depth it needs when it is not a reserve
-        # slot. Suppressed through the same seam every other edit uses.
-        for c in qual:
-            self._suppress_reserve(c)
-
         period = self._gper_period(candidates, len(qual))
         self.counters["gper_period_last"] = period
         lo = self.counters["gper_period_min"]
@@ -834,6 +877,7 @@ class TwoTierProto(TwoTier):
         self._gper_is_reserve = self._gper_since_reserve >= period
         self._gper_leader_ue = None
         if not self._gper_is_reserve:
+            self._apply_periodic_reserve(candidates, qual)
             return
         if self.deadline_gated_periodic:
             self.counters["gpd_due_slots"] += 1
@@ -848,10 +892,12 @@ class TwoTierProto(TwoTier):
                 # is not delayed by a quiet one.
                 self._gper_is_reserve = False
                 self.counters["gpd_skipped_nobody_due"] += 1
+                self._apply_periodic_reserve(candidates, qual)
                 return
             self.counters["gpd_fired"] += 1
         self._gper_since_reserve = 0
         self.counters["gper_reserve_slots"] += 1
+        self._apply_periodic_reserve(candidates, qual)
         # Who WOULD have led, recorded before the reordering, so
         # `gper_leader_served_on_reserve` measures whether "followers only"
         # actually holds rather than assuming the reversal achieved it.
@@ -906,6 +952,60 @@ class TwoTierProto(TwoTier):
             age = self._gdo_age(by_age.ue_id)
             if age > self.counters["gdo_max_age_slots"]:
                 self.counters["gdo_max_age_slots"] = age
+
+    def _apply_periodic_reserve(self, candidates: list[_Candidate],
+                                qual: list[_Candidate]) -> None:
+        """The spatial reserve under the periodic scheme, bounded by what the
+        PER-SLOT UE CAP CAN ACTUALLY SERVE.
+
+        **Why the cap has to enter here.** `scheduler/link.py::cap_ues_per_slot`
+        truncates to the first `max_sched_ues` distinct UEs in rank order AFTER
+        `_allocate_direction` has already decremented `prbs_left` for every
+        candidate it reached. So a reservation held for a follower ranked below
+        the cap buys nothing: that follower's grant is discarded and the band
+        is not returned to anyone. Measured on the faithful port at cap 4:
+        0.7 % of allocated UL PRB discarded at N = 4, 36.7 % at N = 8 and
+        65.2 % at N = 16.
+
+        **So two things bound the reserve, and both are DERIVED from the slot
+        rather than swept.** At most `max_sched_ues - 1` followers can be
+        reserved for, because the leader occupies one of the cap's places; and
+        the followers are chosen from the top `max_sched_ues` BY PROSPECTIVE
+        RANK, not by need alone, because rank is what the cap truncates on. A
+        needy follower ranked tenth is discarded either way.
+
+        This runs AFTER the reserve-slot decision so `_ul_rank_key` returns the
+        ordering that will actually apply on this slot -- on a reserve slot
+        that is the deadline ordering, not the composite.
+        """
+        k = self.reserve_depth_under_periodic
+        if k is None:
+            for c in qual:
+                self._suppress_reserve(c)
+            return
+        cap = max(1, int(self._gper_cap))
+        # DERIVED, not picked: the leader takes one of the cap's places.
+        k = max(0, min(int(k), cap - 1))
+        self.counters["gpb_cap_bound"] = cap - 1
+        if not qual:
+            return
+        # Who the cap will actually keep, under THIS slot's own ordering.
+        servable = {c.ue_id for c in
+                    sorted((c for c in candidates if not c.sched_inactive),
+                           key=self._ul_rank_key)[:cap]}
+        eligible = [c for c in qual if c.ue_id in servable]
+        n_cap_excluded = len(qual) - len(eligible)
+        self.counters["gpb_excluded_by_cap"] += n_cap_excluded
+        # Among those the cap keeps, the neediest `k` hold their reserve.
+        order = sorted(eligible, key=lambda c: (-c.gbr_bytes_slot, c.ue_id))
+        keep = {c.ue_id for c in order[:k]}
+        if len(qual) > len(keep):
+            self.counters["gpb_slots_bounded"] += 1
+        self.counters["gpb_kept"] += len(keep)
+        for c in qual:
+            if c.ue_id not in keep:
+                self._suppress_reserve(c)
+                self.counters["gpb_suppressed"] += 1
 
     def _gpd_near_ms(self) -> float:
         """The longest wait to the next uplink slot, from the TDD pattern.

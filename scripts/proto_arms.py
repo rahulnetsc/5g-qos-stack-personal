@@ -38,6 +38,12 @@ def resolve_arm(name: str, min_rb: int = 5):
                             deadline_gated_periodic=True,
                             slack_ordered_periodic=True,
                             reserve_period_mult=int(name[11:]) / 100.0)
+    # G-kpi with a BOUNDED rather than removed spatial reserve: name carries
+    # K, e.g. ProtoGkpiD4 keeps the reserve for 4 followers.
+    if name.startswith("ProtoGkpiD"):
+        return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
+                            deadline_gated_periodic=True, kpi_ordered_periodic=True,
+                            reserve_depth_under_periodic=int(name[10:]), reserve_period_mult=1.0)
     if name.startswith("ProtoGkpi"):
         return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
                             deadline_gated_periodic=True,
