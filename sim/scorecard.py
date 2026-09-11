@@ -176,7 +176,7 @@ class Scorecard:
     #: are properties of the cell, not of a flow subset.
     POPULATION_SENSITIVE: frozenset = frozenset({
         "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09",
-        "M14", "M15", "M17", "M18", "M19", "M21", "M22",
+        "M14", "M15", "M17", "M18", "M19", "M21", "M22", "M23",
     })
 
     #: Which metrics each scoring-variation parameter can REACH. Not a claim
@@ -201,6 +201,7 @@ class Scorecard:
         "survival_miss_n": frozenset({"M04"}),
         "gbr_contract_fraction": frozenset({"M07"}),
         "slo_green_dwell_s": frozenset({"M19"}),
+        "gfbr_window_s": frozenset({"M23"}),
     }
 
     def score(self, record: RunRecord, *, population: Optional[Population] = None,
@@ -296,6 +297,9 @@ class Scorecard:
             out["M07"] = self._m07_gbr_contract_count(scoped, cfg["gbr_contract_fraction"])
         if _want("M08"):
             out["M08"] = self._m08_worst_flow_gfbr_fraction(scoped)
+        if _want("M23"):
+            out["M23"] = self._m23_windowed_gfbr_floor(
+                scoped, cfg["gfbr_window_s"])
         if _want("M09"):
             out["M09"] = self._m09_per_second_jain(scoped)
         if _want("M10"):
@@ -971,6 +975,93 @@ class Scorecard:
         worst_key, worst_val = min(fractions, key=lambda kv: kv[1])
         return MetricResult("M08", "worst_flow_gfbr_fraction",
                              {"flow": worst_key, "fraction": worst_val}, "ok", "fraction")
+
+    def _m23_windowed_gfbr_floor(self, record: RunRecord,
+                                 window_s: float) -> MetricResult:
+        """G5 clause part 3: the worst window of the worst feed.
+
+        WHY THIS IS NOT M08. M08 is `min_f(delivered_f / GFBR_f)`, a minimum
+        over flows and a MEAN over time. The clause is a minimum over both, so
+        a run-level 0.99 can contain a bad window and read as a pass -- M08
+        could not fail in the way this part is meant to fail.
+
+        THE DENOMINATOR IS CAPPED AT WHAT WAS OFFERED, and the first version
+        of this metric was WRONG for want of it. A GBR contract obliges the
+        NETWORK to carry up to the GFBR; it does not oblige the application to
+        send. A variable-frame-size video source sized to the contract on
+        AVERAGE offers a few percent above and below it in any one window, so
+        `delivered / (GFBR * window)` scores a shortfall in roughly half the
+        windows of a run in which the network delivered every byte offered.
+        Measured before the fix, PF at N=4 with no contention: windows 2-4 all
+        at `delivered == offered` and scored 1.0274, 0.9834, 0.9941 -- one of
+        them a "failure" while nothing was held back.
+
+        **That is this project's own offered-shortfall defect one level down**
+        (`docs/gbr-offered-shortfall-2026-09-08.md`): a contract-reading metric
+        measuring the traffic generator instead of the scheduler. So the
+        denominator is `min(offered_w, GFBR * window_s)`, which is 1.0 exactly
+        when the network held nothing back, and `offered_fraction` is reported
+        beside it so an under-offering source is visible rather than silently
+        forgiven.
+
+        The trailing partial window is DISCARDED rather than scored: its
+        denominator is smaller by construction, so scoring it would report a
+        shortfall that is an artefact of where the run ended.
+        """
+        name = "windowed_gfbr_floor"
+        if not record.has_timeseries():
+            return MetricResult("M23", name, None, "pending", "fraction",
+                                "requires record_timeseries=True")
+        gbr = [fr for fr in record.flows_by(flow_class="GBR")
+               if fr.gfbr_bps > 0 and fr.ts_delivered_bytes is not None]
+        if not gbr:
+            return MetricResult("M23", name, None, "ok", "fraction",
+                                "no GBR flow with timeseries in this run")
+        time_s = record.timeseries_time_s
+        if not time_s or len(time_s) < 2:
+            return MetricResult("M23", name, None, "pending", "fraction",
+                                "timeseries too short to form a window")
+        step_s = time_s[1] - time_s[0]
+        per_window = max(1, int(round(window_s / step_s)))
+        n_full = len(time_s) // per_window
+        if n_full < 1:
+            return MetricResult(
+                "M23", name, None, "pending", "fraction",
+                f"run is shorter than one {window_s} s window "
+                f"({len(time_s)} samples of {step_s} s)")
+        worst = None
+        worst_offered = None
+        for fr in gbr:
+            need = fr.gfbr_bps * window_s / 8.0        # bytes owed per window
+            if need <= 0:
+                continue
+            delivered = fr.ts_delivered_bytes
+            arrived = fr.ts_arrived_bytes
+            for w in range(n_full):
+                lo, hi = w * per_window, (w + 1) * per_window
+                got = sum(delivered[lo:hi])
+                # The network's obligation is the SMALLER of the contract and
+                # what the application actually handed it -- see the docstring.
+                offered = sum(arrived[lo:hi]) if arrived is not None else need
+                owed = min(offered, need)
+                frac = 1.0 if owed <= 0 else got / owed
+                off_frac = offered / need
+                if worst is None or frac < worst[2]:
+                    worst = (fr.key, w, frac, off_frac)
+                if worst_offered is None or off_frac < worst_offered:
+                    worst_offered = off_frac
+        if worst is None:
+            return MetricResult("M23", name, None, "ok", "fraction",
+                                "no GBR flow with a positive GFBR")
+        return MetricResult(
+            "M23", name,
+            {"flow": worst[0], "window": worst[1], "fraction": worst[2],
+             "offered_fraction": worst[3],
+             "worst_offered_fraction": worst_offered,
+             "window_s": window_s, "n_windows": n_full,
+             "n_windows_discarded_partial":
+                 1 if len(time_s) % per_window else 0},
+            "ok", "fraction")
 
     def _m09_per_second_jain(self, record: RunRecord) -> MetricResult:
         if not record.has_timeseries():

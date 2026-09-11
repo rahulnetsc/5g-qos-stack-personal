@@ -69,6 +69,8 @@ def _cases():
     from sim.scenarios.g12 import BG_OFFERED_BPS, COMPOSITIONS, build_g12_scenario
     from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,
                                   gt63_rlf_recovery)
+    from sim.scenarios.g5 import (build_gt31_scenario, build_gt32_scenario,
+                                  build_gt33_scenario)
 
     cases = []
     for sid in range(1, 8):
@@ -138,6 +140,23 @@ def _cases():
     for fn in (gt61_warm_rejoin, gt62_cold_attach, gt63_rlf_recovery):
         cases.append((f"g9.{fn.__name__}",
                       fn(seed=1, n_neighbours=3, horizon_slots=40000)))
+
+    # G5's three, added with the builders. A builder with no case here cannot
+    # be reported as collision-free, which is how G12's collision survived the
+    # first sweep -- and G5 puts FOUR uplink flows on one robot (telemetry,
+    # camera, lidar, background), the densest per-UE flow list in the repo.
+    for n in (2, 4, 8, 16):
+        cases.append((f"gt31(n={n})",
+                      build_gt31_scenario(seed=1, n_ues=n,
+                                          horizon_slots=4_000)))
+    for x in (1.0, 1.5):
+        cases.append((f"gt32(n=7,x={x:g})",
+                      build_gt32_scenario(seed=1, load_mult=x, n_ues=7,
+                                          horizon_slots=4_000)))
+    for db in (20.0, -6.0):
+        cases.append((f"gt33(n=7,snr={db:g})",
+                      build_gt33_scenario(seed=1, edge_snr_db=db, n_ues=7,
+                                          horizon_slots=4_000)))
     return cases
 
 
@@ -182,6 +201,9 @@ def test_the_sweep_COVERS_every_builder_rather_than_the_easy_ones():
                "build_gt21_scenario": "gt21(",
                "build_gt22_scenario": "gt22(",
                "build_gt23_scenario": "gt23(",
+               "build_gt31_scenario": "gt31(",
+               "build_gt32_scenario": "gt32(",
+               "build_gt33_scenario": "gt33(",
                "scenario": "scenario("}.get(stem, stem)
         if key not in exercised:
             missing.append(full)

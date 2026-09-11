@@ -307,6 +307,35 @@ metrics:
     status: ok
     requires: null
 
+  # G5 clause part 3, added 2026-09-10. M08 above is a minimum over FLOWS and
+  # a MEAN over TIME; G5's clause is "per-feed goodput >= GFBR in EVERY 2 s
+  # window", a minimum over BOTH. A run-level M08 of 0.99 can contain a 2 s
+  # window at 0.2 and read as a pass, so M08 could not fail in the way part 3
+  # is meant to fail -- the third instance in this project of an aggregate
+  # read at the wrong level (CCE's denominator, M03's population).
+  # APPENDED, never by redefining M08: the panel is pre-registered.
+  - id: M23
+    name: windowed_gfbr_floor
+    definition: >
+      min over (GBR flow f, window w) of
+      delivered_bytes(f, w) / min(offered_bytes(f, w), GFBR_f * window_s) --
+      the worst 2 s window of the worst feed. THE DENOMINATOR IS CAPPED AT
+      WHAT WAS OFFERED: a GBR contract obliges the network to carry up to the
+      GFBR, not the application to send it, and a variable-frame-size source
+      sized to the contract on average offers a few percent either side of it
+      per window. Uncapped, a run delivering every offered byte scores a
+      shortfall in about half its windows. `offered_fraction` is reported
+      beside the value so an under-offering source stays visible. Windows tile
+      the run from t=0; a trailing partial window is DISCARDED, because a
+      short window's denominator is smaller and would report a spurious
+      shortfall.
+    guarantees: [G5]
+    population: protected_fleet
+    unit: fraction
+    direction: higher_better
+    status: ok
+    requires: "record_timeseries=True (per-flow ts_delivered_bytes)"
+
   - id: M09
     name: per_second_jain_index
     definition: >
@@ -609,3 +638,4 @@ defaults:
   survival_miss_n: 3            # M04: [OPEN] in docs/p5g-sim-plan.md sec 7 -- start at 3, report as f(N)
   t_live_s: 2.0                 # [OPEN] in docs/p5g-sim-plan.md sec 13 -- MEC liveness timeout, unconfirmed
   slo_green_dwell_s: 1.0         # M19: [OPEN] -- anchored to M09's own 1s Jain window, not independently calibrated
+  gfbr_window_s: 2.0            # M23: the test plan's own window, GT-3.1/GT-3.2 "goodput >= GFBR in every 2 s window"

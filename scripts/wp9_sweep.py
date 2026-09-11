@@ -184,6 +184,10 @@ _SCORING_VARIATIONS = (
     ("t_live_s", (1.0, 2.0, 4.0)),           # M03/M14 -- T_live is [OPEN: HARDWARE]
     ("gbr_contract_fraction", (0.90, 0.95, 0.99)),   # M07/M08
     ("slo_green_dwell_s", (0.5, 1.0, 2.0)),  # M19
+    # M23 -- G5 clause part 3. 2.0 is GT-3.1/GT-3.2's own window; 1.0 and 4.0
+    # bracket it so a dispatch that ignored the parameter would show as an
+    # unchanged value rather than as nothing.
+    ("gfbr_window_s", (1.0, 2.0, 4.0)),
 )
 
 

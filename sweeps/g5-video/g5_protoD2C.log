@@ -1,0 +1,11 @@
+G5 video: 220 driver runs, 8.8M slots
+  parts A,B,C  arms ProtoGkpiD2  seeds 10 (base 0)  cap 4  fixed N=7
+  bounds: PDU sets >= 99% within 150 ms; frame age p95 <= 66.67 ms (2 frame periods at 30 fps); goodput >= GFBR in EVERY 2 s window
+  0 banked, 220 to run
+    ... 50/220 (263s)
+    ... 100/220 (517s)
+    ... 150/220 (774s)
+    ... 200/220 (1012s)
+    ... 220/220 (1113s)
+
+wrote sweeps/g5-video/g5_protoD2C.json  (1114s, 220 runs)

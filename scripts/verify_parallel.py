@@ -122,6 +122,24 @@ CASES: dict[str, dict[str, Any]] = {
         # exclusion that is not present as one doing no work.
         "provenance_keys": [],
     },
+    "g5_video": {
+        # ONE ARM, ONE SEED, `--parts A` only -- the nine-point fleet axis,
+        # 9 runs each side. Same reasoning as g3_stress above: the axis is not
+        # narrowed by a flag, because a narrowing flag would enter
+        # `invocation_config` and therefore the RunLedger key, orphaning the
+        # published campaign's banked rows.
+        #
+        # `--parts A` and not B or C: the load ramp and the SNR sweep add
+        # nothing the pool could get wrong that the fleet axis does not
+        # already exercise -- N=4 to N=24 is the widest cost spread in the
+        # grid, so longest-first genuinely reorders submission there.
+        "argv": ["scripts/g5_video.py", "--parts", "A", "--arms", "PF",
+                 "--seeds", "1"],
+        "out_flag": "--out", "out_name": "g5.json", "fmt": "json",
+        "timing_keys": ["wall_s", "_wall_s_this_invocation"],
+        # This runner stamps neither `out` nor `workers` into its artefact.
+        "provenance_keys": [],
+    },
     "g12_campaign": {
         # --perm-seeds 2, NOT the default 5, and the trade is stated rather
         # than absorbed. A check nobody can afford to run before a commit is

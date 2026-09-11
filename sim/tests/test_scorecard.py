@@ -68,6 +68,7 @@ _REGISTERED_METRIC_IDS = (
     "M20",                                             # WP9 Step 2
     "M21",                                             # WP9 G9 commit 3
     "M22",                                             # WP9 Phase-1 fix pass
+    "M23",                                             # G5 clause part 3
 )
 
 

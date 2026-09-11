@@ -21,6 +21,23 @@ telemetry liveness failure; the correction to 10/10 was made on pre-rebuild
 code, before M-9, M-6, random access, SRBs, `cp_floor` and the GBR
 offered-shortfall fix. Nothing here inherits from it.
 
+**A CAVEAT ADDED 2026-09-11 THAT APPLIES TO EVERY BOUNDARY QUOTED BELOW.** The
+boundary rule -- *"the last passing fleet size before the first failure"* -- is
+a **maximum over rare events**, so its variance depends on how often the arm
+fails at all. An arm that fails often has a stable boundary; an arm that passes
+nearly everywhere has one decided by whichever single seed fails earliest.
+Measured on ten held-out seeds: **the faithful arm's part-1 boundary is 7 on
+both seed sets**, while a candidate scheduler's read **14 on the seeds it was
+selected on and 8 on fresh ones** -- on one seed failing at a different fleet
+size. **Every aggregate reproduced to within four cells in a hundred; only the
+boundary moved.**
+
+**So the boundaries below are sound as DEPLOYMENT figures and must not be used
+to RANK two arms that both pass nearly everywhere.** The faithful arms' own
+boundaries here are the stable kind, because they fail often enough for the
+first failure not to be a rare event. `docs/g3-stress-experiment-2026-09-09.md`
+§19 carries the full table and the mechanism.
+
 ---
 
 ## 1. The question, in operator terms

@@ -57,6 +57,18 @@ NO_SCHEDULE = {
     # module does own a schedule (the silence windows) and calls the guard, so
     # these two are exempted individually rather than the module being
     # exempted wholesale.
+    # GT-3.1/3.2/3.3 are steady state: every flow runs slot 0 to end
+    # (periodic_control and xr_video), no `active_windows`, nothing scripted to
+    # fire at a slot. The load RAMP is one multiplier per run -- the same shape
+    # as g12's, and the same reason it needs no guard.
+    # THE HORIZON STILL MATTERS, for the sample-size reason G1 records: at
+    # 30 fps it sets how many frames a p95 is computed over, and it fixes how
+    # many 2 s windows M23's floor ranges over (five at 40,000 slots).
+    # `docs/g5-step0-2026-09-10.md` sec 5 states both. That is a sample-size
+    # constraint, not a truncation one, and this guard is the wrong instrument.
+    "g5": "steady state, no scripted mid-run event; the load ramp is one "
+          "multiplier per run, and horizon governs frame/window sample size "
+          "instead -- docs/g5-step0-2026-09-10.md sec 5",
     "g3.py::build_gt21_scenario":
         "steady state; the over-driven camera runs the whole horizon",
     "g3.py::build_gt22_scenario":

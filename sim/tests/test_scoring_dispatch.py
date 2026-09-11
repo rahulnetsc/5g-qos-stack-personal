@@ -52,6 +52,9 @@ VARIATIONS = {
     "t_live_s": (1.0, 2.0, 4.0),
     "gbr_contract_fraction": (0.90, 0.95, 0.99),
     "slo_green_dwell_s": (0.5, 1.0, 2.0),
+    # M23's window. 2.0 is GT-3.1/GT-3.2's own wording; 1.0 and 4.0 bracket it
+    # so a dispatch that ignored the parameter would show as an unchanged value.
+    "gfbr_window_s": (1.0, 2.0, 4.0),
 }
 
 
