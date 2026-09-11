@@ -28,10 +28,15 @@ Read-only: every override calls `super()` first and returns its result
 unchanged, so the tallied run is the faithful arm's own trajectory.
 """
 import sys
+from pathlib import Path
 from collections import Counter
 
-sys.path.insert(0, "/home/smart/projects/5g-qos-stack-personal")
-sys.path.insert(0, "/home/smart/projects/5g-qos-stack-personal/scripts")
+# Resolved from THIS file, never an absolute path: an absolute path makes
+# the script unrunnable on any other checkout, and this repo is meant to
+# be clonable and continued elsewhere.
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "scripts"))
 
 from scheduler.two_tier import TwoTier
 from sim.scenarios.g3 import build_gt22_scenario

@@ -1,0 +1,43 @@
+G3 stress: 576 driver runs, 43.7M slots (3.03 simulated hours)
+  parts ['A', 'D', 'E', 'ctl', 'snr']  arms ['PF', 'Reservation', 'TwoTier']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 396 runs, 20.6M slots
+    gt23: 180 runs, 23.0M slots
+  projected cost: 4.21 h CPU -> 41 min wall at 8 workers (x0.77 measured pool efficiency)
+  projected peak memory: 5.5 GB (700 MB x 8 workers, worst task 280,000 slots)
+  0 banked, 576 to run
+    ... 25/576 (664s)
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 6 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+G3 stress: 576 driver runs, 43.7M slots (3.03 simulated hours)
+  parts ['A', 'D', 'E', 'ctl', 'snr']  arms ['PF', 'Reservation', 'TwoTier']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 396 runs, 20.6M slots
+    gt23: 180 runs, 23.0M slots
+  projected cost: 4.21 h CPU -> 12 min wall at 28 workers (x0.77 measured pool efficiency)
+  projected peak memory: 19.1 GB (700 MB x 28 workers, worst task 280,000 slots)
+  26 banked, 550 to run
+    ... 50/576 (141s)
+    ... 75/576 (230s)
+    ... 100/576 (290s)
+    ... 125/576 (345s)
+    ... 150/576 (387s)
+    ... 175/576 (425s)
+    ... 200/576 (460s)
+    ... 225/576 (492s)
+    ... 250/576 (514s)
+    ... 275/576 (544s)
+    ... 300/576 (570s)
+    ... 325/576 (596s)
+    ... 350/576 (620s)
+    ... 375/576 (636s)
+    ... 400/576 (655s)
+    ... 425/576 (672s)
+    ... 450/576 (684s)
+    ... 475/576 (700s)
+    ... 500/576 (714s)
+    ... 525/576 (726s)
+    ... 550/576 (738s)
+    ... 575/576 (743s)
+
+wrote sweeps/g3-stress/g3_stress.json  (744s, 576 runs)

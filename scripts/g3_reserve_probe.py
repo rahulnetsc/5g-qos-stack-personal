@@ -16,9 +16,14 @@ count per grant in emission (= candidate) order, which is what makes
 `prbs_left` recoverable.
 """
 import sys
+from pathlib import Path
 from collections import defaultdict
-sys.path.insert(0, "/home/smart/projects/5g-qos-stack-personal")
-sys.path.insert(0, "/home/smart/projects/5g-qos-stack-personal/scripts")
+# Resolved from THIS file, never an absolute path: an absolute path makes
+# the script unrunnable on any other checkout, and this repo is meant to
+# be clonable and continued elsewhere.
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "scripts"))
 
 from scheduler.two_tier import TwoTier, _UL_TERMS, _UL_FACTORS
 from sim.scenarios.g3 import build_gt22_scenario, QFI_TELEMETRY

@@ -124,6 +124,48 @@ not the convenience copy.
 **What re-opens it:** access to the full checkout, or any decision that turns on
 uplink utilisation.
 
+## 7. G10's published artefact cannot be reproduced by the code its stamp records
+
+**Found 2026-09-11, during the §2 re-stamp. NOT resolved.**
+
+`sweeps/g1-stress/g10_remeasure_cap4.PRE-M23.json` carries a `code_state`
+stamp that matches the current source hash **exactly** -- `b8827baea94604b6`
+over 37 files including `two_tier.py`, `reservation.py` and `tier1.py`. Yet the
+code behind that hash, run twice with the artefact's own invocation, **cannot
+produce its numbers**:
+
+    run 1 vs run 2 (same code, same args)      0 of 270 differ
+    run 1 vs published                       137 of 270 differ
+    run 2 vs published                       137 of 270 differ
+
+**So the runner is deterministic and the artefact is the outlier.** Its numbers
+and its stamp did not come from the same code, and the mechanism cannot detect
+that: the stamp is written when the artefact is serialised, so an artefact
+re-serialised or re-stamped after the fact carries a stamp that describes the
+wrong thing.
+
+**Ruled out by measurement, in order:** the `--max-sched-ues 4` flag the
+filename implies (necessary but not sufficient -- it fixes some cells and not
+others); worker-count dependence (identical at 2 and 8); M23 (reverting it
+changes nothing); a YAML input (`sweep_scenario` reads none, and the only YAML
+edits are the panel and the claims file); and a scope hole (the schedulers ARE
+hashed -- the `scope` field lists ENTRY MODULES and the hash follows imports
+transitively, which I misread once and corrected).
+
+**Why it matters beyond one file.** G10's boundary -- **PF 12 / Reservation 6 /
+TwoTier 7** -- is quoted in G1's, G3's and G5's documents as the axis everything
+else is ranged against, and it rests on this artefact. **Two reproducible runs
+now exist and disagree with it on half the cells.**
+
+**The next step is two minutes of arithmetic, not a campaign:** compute the
+boundary from the reproducible runs and compare. A boundary is a threshold
+crossing, so the underlying numbers can move without it moving. If it holds,
+this is a provenance problem in one file. If it moves, several documents are
+built on a figure that needs correcting.
+
+**The replaced artefact is committed** (reproducible, current code) and the
+original is preserved beside it as `.PRE-M23.json`.
+
 ---
 
 ## Guarantee status, as of 2026-09-11
