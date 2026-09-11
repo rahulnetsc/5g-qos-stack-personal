@@ -1,0 +1,17 @@
+G6 isolation: 1080 runs, 43.2M slots
+  instruments g1,g3,g5  conditions none,ul,dl  arms PF,Reservation,TwoTier,ProtoGkpiD2  seeds 10  N [4, 7, 12]  cap 4
+  part A: each statistic within its own bound; part B: shift <= +20% IN THE DIRECTION OF HARM, absolute for zero-baseline counts
+  0 banked, 1080 to run
+    ... 100/1080 (39s)
+    ... 200/1080 (73s)
+    ... 300/1080 (114s)
+    ... 400/1080 (165s)
+    ... 500/1080 (215s)
+    ... 600/1080 (292s)
+    ... 700/1080 (379s)
+    ... 800/1080 (465s)
+    ... 900/1080 (554s)
+    ... 1000/1080 (640s)
+    ... 1080/1080 (715s)
+
+wrote sweeps/g6-isolation/g6.json  (715s, 1080 runs)
