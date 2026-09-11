@@ -229,7 +229,7 @@ claims:
 
   - id: G10.2026-09-09.reservation.at7
     doc: docs/g1-stress-experiment-2026-09-09.md
-    text: "Reservation fails the contract on 3/10 seeds at N=7, the first point past its boundary"
+    text: "Reservation fails the contract on 8/10 seeds at N=7"
     artefact: sweeps/g1-stress/g10_remeasure_cap4.json
     code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
     n: 10
@@ -238,11 +238,11 @@ claims:
     field: M08_fraction
     statistic: count_lt
     statistic_arg: 0.95
-    value: 3
+    value: 8
 
   - id: G10.2026-09-09.twotier.at7
     doc: docs/g1-stress-experiment-2026-09-09.md
-    text: "TwoTier meets the contract on 10/10 seeds at N=7, its boundary"
+    text: "TwoTier fails the contract on 9/10 seeds at N=7 -- its boundary is 5, not 7"
     artefact: sweeps/g1-stress/g10_remeasure_cap4.json
     code_state: "post delay_p999_ms/delay_max_ms (shape-only)"
     n: 10
@@ -251,7 +251,7 @@ claims:
     field: M08_fraction
     statistic: count_lt
     statistic_arg: 0.95
-    value: 0
+    value: 9
 
   # --- G2 rebuilt as a stress experiment, 2026-09-09 -------------------------
   # The withdrawn G2 row scored `*_stop_p98_ms`, a PERCENTILE substituted for
