@@ -430,6 +430,54 @@ trickle survives at small fleets while the saturation that pins everyone at
 `min_rb` above eleven followers does not.
 
 --------------------------------------------------------------------------
+M1 -- ENFORCE THE MFBR CEILING, RATHER THAN RECLASSIFYING WHAT EXCEEDS IT
+--------------------------------------------------------------------------
+
+**The measurement.** G7/GT-4.3 offers Asset B's camera at 2.1x its MFBR and
+asks that the excess be clipped. Measured at N = 8: **B delivers 2.05x MFBR on
+Reservation and TwoTier and 1.92x on the Proto arm.** PF clips at 1.05x and has
+no contract machinery at all -- it shares proportionally, so its clipping is a
+side effect rather than enforcement.
+
+**WHY THE EXISTING CAP DOES NOT BIND.** `two_tier.py:1716-1724` computes
+`max_burst` from `mfbr_bps` and caps `target` with it -- but `target` feeds
+`guaranteed_bytes`, and everything above it is moved into `be_bytes` and stays
+fully eligible. Grant sizing then reads
+`b_eff = max(ul_total_target_bytes, ue_backlog)` (`:1518`), and `ue_backlog` is
+the FULL reported backlog. So the ceiling caps how much of the demand counts as
+*guaranteed*; it never caps what is *delivered*.
+
+**AND THE DEPLOYED C DOES THE SAME.** `ia_p5g_scheduler.c:2663-2665` computes
+`_max_burst` from `_c->gbr_ul_max`, caps `_target` with it, and adds only
+`_target` to `ul_total_target_bytes`. There is no enforcement step anywhere.
+**So this is a PRODUCT finding, not a port defect, and M1 is a real divergence
+from deployed behaviour rather than a bug fix.**
+
+**WHY THE UNIT IS BYTES AND NOT PRB.** A PRB carries a different number of
+bytes at every modulation, so an *n*-PRB cap enforces a different bitrate on a
+robot at the cell edge than on one beside the gNB. The guarantee is stated in
+bits per second and has to be enforced in bits per second. And the trigger is
+per-flow, never aggregate load: a ceiling that relaxes when the cell is quiet
+is not a ceiling, which is the whole point GT-4.3 makes about entitlement.
+
+**HOW IT IS IMPLEMENTED, and what the gNB can actually see.** The gNB has no
+view of a UE's intra-TB per-flow split -- only per-LCG BSR. In this deployment
+**LCG = DRB ID**, so a per-LCG limit IS per-flow, and that is the only reason
+this is implementable with real information rather than simulator omniscience.
+
+M1 composes by **wrapping `BufferView`**, the pattern this repo already uses
+for radio-layer gating (`sim/join.py::JoinAwareBufferView`), so no scheduler
+code changes: a GBR flow's `bytes_reported` is exposed only up to its remaining
+MFBR allowance, which bounds `ue_backlog`, therefore `b_eff`, therefore
+`prbs_needed` and `tbs_bytes`.
+
+**The one approximation, stated rather than hidden:** the bucket is debited by
+the UE's granted bytes attributed across its exposed flows *in proportion to
+exposure*, because the scheduler cannot observe the real split. A flow whose UE
+is never granted is never debited.
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -443,6 +491,7 @@ before E3 is built.**
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from .two_tier import TwoTier, _Candidate
@@ -461,6 +510,7 @@ PROTO_FLAGS: tuple[str, ...] = (
     "denial_ordered_periodic",    # G-denial
     "kpi_ordered_periodic",       # G-kpi
     "slack_ordered_periodic",     # G-slack
+    "mfbr_enforced",              # M1
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -487,6 +537,8 @@ class TwoTierProto(TwoTier):
                  denial_ordered_periodic: bool = False,
                  reserve_depth_under_periodic: "int | None" = None,
                  kpi_ordered_periodic: bool = False,
+                 mfbr_enforced: bool = False,
+                 mfbr_burst_mult: float = 2.0,
                  slack_ordered_periodic: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
@@ -514,6 +566,11 @@ class TwoTierProto(TwoTier):
                 "reserve_depth_under_periodic without periodic_reserve -- it "
                 "bounds a reserve the periodic scheme is not managing.")
         self.kpi_ordered_periodic = bool(kpi_ordered_periodic)
+        self.mfbr_enforced = bool(mfbr_enforced)
+        #: Bucket depth as a multiple of one slot's allowance. 2.0 matches the
+        #: shape of the port's own `max_burst` (`two_tier.py:1716`), so the
+        #: burst tolerance is inherited rather than invented.
+        self.mfbr_burst_mult = float(mfbr_burst_mult)
         self.slack_ordered_periodic = bool(slack_ordered_periodic)
         n_orderings = sum((self.denial_ordered_periodic,
                            self.kpi_ordered_periodic,
@@ -605,7 +662,15 @@ class TwoTierProto(TwoTier):
             "gpb_suppressed": 0,
             "gpb_excluded_by_cap": 0,     # qualifying, but below max_sched_ues
             "gpb_cap_bound": -1,          # the DERIVED ceiling on K
+            "m1_flows_seen": 0,
+            "m1_flows_capped": 0,          # exposure actually reduced
+            "m1_bytes_withheld": 0,
+            "m1_bytes_exposed": 0,
         })
+        #: (ue_id, qfi) -> remaining MFBR allowance in bytes.
+        self._m1_bucket: dict[tuple[int, int], float] = {}
+        self._m1_last_slot: int = -1
+        self._m1_exposed: dict[tuple[int, int], int] = {}
         #: G-periodic per-slot state, recomputed in `_finalize_ul_coef` (which
         #: runs BEFORE the sort) and read by `_ul_rank_key` (which runs during
         #: it). Cached rather than recomputed per candidate because the sort
@@ -636,19 +701,23 @@ class TwoTierProto(TwoTier):
 
     # ------------------------------------------------------------------ E2
 
-    def allocate(self, slot, buffers, channel):
+    def allocate(self, slot, buffers, channel):   # noqa: C901
         """The port's own allocation, plus E2's own grant-recency record.
 
         Additive and after the fact: `super()` decides everything, and this
         only reads the allocations it returned. Guarded by the flag so the
         faithful path keeps doing no extra work.
         """
+        if self.mfbr_enforced:
+            buffers = self._m1_view(slot, buffers)
         if self.periodic_reserve:
             # The cap is a property of the SLOT, and `_finalize_ul_coef` does
             # not receive one -- captured here so P's own derivation reads the
             # real value rather than a default standing in for it.
             self._gper_cap = int(slot.max_sched_ues)
         out = super().allocate(slot, buffers, channel)
+        if self.mfbr_enforced:
+            self._m1_debit(out)
         if (self.denial_ordered_periodic or self.kpi_ordered_periodic
                 or self.slack_ordered_periodic):
             for a in out:
@@ -1037,6 +1106,74 @@ class TwoTierProto(TwoTier):
         rounds = max(1, -(-max(1, n_followers) // cap))     # ceil
         p = int(pdb_slots / rounds * self.reserve_period_mult)
         return max(1, p)
+
+    # ------------------------------------------------------------------ M1
+
+    def _m1_view(self, slot, buffers):
+        """Expose a GBR flow's backlog only up to its remaining MFBR allowance.
+
+        A BufferView wrapper, which is this repo's documented pattern for
+        hiding backlog from scheduling without touching scheduler code
+        (`sim/join.py::JoinAwareBufferView`). Bounding `bytes_reported` bounds
+        `ue_backlog`, hence `b_eff`, hence `prbs_needed` and `tbs_bytes`.
+        """
+        slots_per_sec = 1.0 / self.slot_duration_s
+        if slot.slot_index != self._m1_last_slot:
+            self._m1_last_slot = slot.slot_index
+            self._m1_exposed = {}
+            for f in self._flows:
+                if f.direction != "UL" or f.mfbr_bps <= 0:
+                    continue
+                key = (f.ue_id, f.qfi)
+                per_slot = f.mfbr_bps / 8.0 / slots_per_sec
+                cap = per_slot * self.mfbr_burst_mult
+                self._m1_bucket[key] = min(
+                    cap, self._m1_bucket.get(key, cap) + per_slot)
+        proto = self
+
+        class _MfbrView:
+            """Pass-through except for `state`, and only for capped flows."""
+            def __getattr__(self, name):
+                return getattr(buffers, name)
+
+            def state(self, ue_id, qfi):
+                st = buffers.state(ue_id, qfi)
+                key = (ue_id, qfi)
+                if key not in proto._m1_bucket:
+                    return st
+                proto.counters["m1_flows_seen"] += 1
+                allow = int(proto._m1_bucket[key])
+                if st.bytes_reported <= allow:
+                    proto._m1_exposed[key] = st.bytes_reported
+                    proto.counters["m1_bytes_exposed"] += st.bytes_reported
+                    return st
+                proto.counters["m1_flows_capped"] += 1
+                proto.counters["m1_bytes_withheld"] += st.bytes_reported - allow
+                proto.counters["m1_bytes_exposed"] += allow
+                proto._m1_exposed[key] = allow
+                return dataclasses.replace(st, bytes_reported=allow)
+
+        return _MfbrView()
+
+    def _m1_debit(self, allocations) -> None:
+        """Debit each UE's granted bytes across its exposed flows.
+
+        IN PROPORTION TO EXPOSURE, because the scheduler cannot observe a UE's
+        intra-TB split -- see the module docstring. A flow whose UE was not
+        granted is not debited.
+        """
+        for a in allocations:
+            if a.direction != "UL":
+                continue
+            mine = {k: v for k, v in self._m1_exposed.items()
+                    if k[0] == a.ue_id and v > 0}
+            total = sum(mine.values())
+            if total <= 0:
+                continue
+            for key, exposed in mine.items():
+                share = a.bytes_capacity * (exposed / total)
+                self._m1_bucket[key] = max(
+                    0.0, self._m1_bucket.get(key, 0.0) - share)
 
     def _suppress_reserve(self, c: _Candidate) -> None:
         """Remove one candidate's FIX-2 reserve contribution, exactly.

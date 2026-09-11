@@ -40,6 +40,13 @@ def resolve_arm(name: str, min_rb: int = 5):
                             reserve_period_mult=int(name[11:]) / 100.0)
     # G-kpi with a BOUNDED rather than removed spatial reserve: name carries
     # K, e.g. ProtoGkpiD4 keeps the reserve for 4 followers.
+    # M1: MFBR enforcement layered on the current candidate.
+    if name == "ProtoM1":
+        return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
+                            deadline_gated_periodic=True,
+                            kpi_ordered_periodic=True,
+                            reserve_depth_under_periodic=2,
+                            mfbr_enforced=True)
     if name.startswith("ProtoGkpiD"):
         return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
                             deadline_gated_periodic=True, kpi_ordered_periodic=True,

@@ -168,6 +168,12 @@ def _resolve_arm(name: str):
         return _T(min_rb=5, periodic_reserve=True,
                   deadline_gated_periodic=True, slack_ordered_periodic=True,
                   reserve_period_mult=int(name[11:]) / 100.0)
+    # M1: MFBR enforcement layered on the current candidate.
+    if name == "ProtoM1":
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, periodic_reserve=True,
+                  deadline_gated_periodic=True, kpi_ordered_periodic=True,
+                  reserve_depth_under_periodic=2, mfbr_enforced=True)
     if name.startswith("ProtoGkpiD"):
         from scheduler.two_tier_proto import TwoTierProto as _T
         return _T(min_rb=5, periodic_reserve=True,
