@@ -63,7 +63,15 @@ in `sim/ul_access.py` / `sim/bsr.py` for the mapped LCH only. Every
 scheduler sees the reduced slot, so the arm can be measured on all four —
 labelled, since the deployed C has no CG.
 
-### 1.5 Measurement plan
+### 1.5 Measurement plan — DONE 2026-09-14, results in `docs/results-cg-2026-09-14.md`
+Built as `sim/configured_grant.py` (commit `b0b0cc7`) and measured on G3,
+G5, G7 and G10, both restriction settings, all four arms. Headline:
+restricted CG takes G3 to 10/10 at every fleet size on every arm and fixes
+TwoTier's G7 clause 1; unrestricted CG fixes silences but not latency (G3
+boundary 12–14, not 24, on the faithful arms) and costs PF at small fleets
+— the UE-side `allowedCG-List` half is worth 12 robots of boundary. CG
+does not reach the video guarantees, except that the cell-edge robot's own
+telemetry now survives on every arm. The plan below is what was run.
 G3, G5, G7, G10 first (the UL failures), both restriction settings, all
 four arms, 10 seeds, the aligned model — same runners, one flag. Then G4,
 G6, G9. Register expectations before running; the one that matters: does

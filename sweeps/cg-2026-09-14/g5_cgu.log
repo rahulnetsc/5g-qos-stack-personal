@@ -1,0 +1,24 @@
+G5 video: 880 driver runs, 35.2M slots
+  parts A,B,C  arms PF+CGu,Reservation+CGu,TwoTier+CGu,ProtoRRageD2+CGu  seeds 10 (base 0)  cap 4  fixed N=7
+  bounds: PDU sets >= 99% within 150 ms; frame age p95 <= 66.67 ms (2 frame periods at 30 fps); goodput >= GFBR in EVERY 2 s window
+  0 banked, 880 to run
+    ... 50/880 (102s)
+    ... 100/880 (185s)
+    ... 150/880 (267s)
+    ... 200/880 (362s)
+    ... 250/880 (474s)
+    ... 300/880 (594s)
+    ... 350/880 (713s)
+    ... 400/880 (821s)
+    ... 450/880 (972s)
+    ... 500/880 (1164s)
+    ... 550/880 (1358s)
+    ... 600/880 (1571s)
+    ... 650/880 (1746s)
+    ... 700/880 (1869s)
+    ... 750/880 (1969s)
+    ... 800/880 (2050s)
+    ... 850/880 (2130s)
+    ... 880/880 (2203s)
+
+wrote sweeps\cg-2026-09-14\g5_cgu.json  (2203s, 880 runs)

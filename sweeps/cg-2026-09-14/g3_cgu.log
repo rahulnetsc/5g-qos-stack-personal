@@ -1,0 +1,25 @@
+G3 stress: 400 driver runs, 22.4M slots (1.56 simulated hours)
+  parts ['A']  arms ['PF+CGu', 'Reservation+CGu', 'TwoTier+CGu', 'ProtoRRageD2+CGu']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 400 runs, 22.4M slots
+  projected cost: 2.68 h CPU -> 9 min wall at 23 workers (x0.77 measured pool efficiency)
+  projected peak memory: 11.2 GB (500 MB x 23 workers, worst task 200,000 slots)
+  0 banked, 400 to run
+    ... 25/400 (217s)
+    ... 50/400 (399s)
+    ... 75/400 (511s)
+    ... 100/400 (583s)
+    ... 125/400 (672s)
+    ... 150/400 (749s)
+    ... 175/400 (803s)
+    ... 200/400 (882s)
+    ... 225/400 (942s)
+    ... 250/400 (983s)
+    ... 275/400 (1038s)
+    ... 300/400 (1071s)
+    ... 325/400 (1123s)
+    ... 350/400 (1165s)
+    ... 375/400 (1187s)
+    ... 400/400 (1219s)
+
+wrote sweeps\cg-2026-09-14\g3_cgu.json  (1219s, 400 runs)

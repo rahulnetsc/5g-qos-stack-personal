@@ -292,6 +292,14 @@ CG reaches them only as pre-scheduler occupancy (`sim/pre_sched.py`) plus
 a reduced buffer view, never as a scheduler mechanism. The UE-side LCP
 mapping restriction (`allowedCG-List`) is an explicit switch because the
 vendored OAI UE implements none (`docs/plan-cg-and-config-scheduler-2026-09-14.md` §1.2).
+**Measured (`docs/results-cg-2026-09-14.md`): restricted CG takes G3 to
+10/10 at every fleet size on every arm and fixes TwoTier's G7 clause 1;
+UNRESTRICTED CG breaks G5 on every arm** (frame age +30–50 ms, PF's
+admissible fleet 14 → none) because an active CG that may carry every
+channel suppresses SR for every channel (TS 38.321 §5.4.4) and the camera's
+BSR then leaves only on the 40 ms occasion. The UE half of the port-back is
+the one that decides. CG is sized for the heartbeat and never carries the
+camera; video stays the scheduler's problem.
 
 **Do not add SPS / Configured Grant to the schedulers.** `main`'s
 `scheduler/two_tier.py` had it (`_SPSReservation`, `_allocate_sps`); the real
