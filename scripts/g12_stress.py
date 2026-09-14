@@ -114,7 +114,12 @@ def _clause4_verdict(points: list[dict[str, Any]]) -> str:
 
 def one(task: tuple) -> dict[str, Any]:
     comp, n_ues, arm_name, seed, tb_seed, cap = task
-    factory = _arms()[arm_name]
+    # Divergence arms resolve through proto_arms (2026-09-14); the faithful
+    # dict in g12_campaign is untouched so its artefacts' scope is too.
+    factory = _arms().get(arm_name)
+    if factory is None:
+        from proto_arms import resolve_arm
+        factory = lambda: resolve_arm(arm_name)  # noqa: E731
 
     def armed():
         a = factory()

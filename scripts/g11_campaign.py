@@ -40,8 +40,14 @@ import argparse
 import json
 import multiprocessing as mp
 import os
-import resource
 import sys
+try:
+    import resource
+except ImportError:
+    # POSIX-only module. Without this guard every runner that resolves an
+    # arm through `_arm` (g1/g2/g3/g5/g6/g7 stress, proto_arms) fails at
+    # import on Windows, before any scheduler code is reached.
+    resource = None
 import threading
 import time
 from pathlib import Path
@@ -180,7 +186,8 @@ def run_one(task: tuple) -> dict:
         "arm": arm, "seed": seed, "permutation": permutation,
         "n_ues": n_ues, "horizon_slots": horizon,
         "wall_s": round(time.time() - t0, 1),
-        "peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
+        "peak_rss_mb": (round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
+                        if resource is not None else None),
         "n_windows": len(windows), "schedule": sched, "rows": rows,
         # Emitted, not just checked: a scripted flow that generated nothing
         # is exactly the "did the mechanism fire at all" question, and it

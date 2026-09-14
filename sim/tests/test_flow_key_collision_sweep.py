@@ -157,6 +157,22 @@ def _cases():
         cases.append((f"gt33(n=7,snr={db:g})",
                       build_gt33_scenario(seed=1, edge_snr_db=db, n_ues=7,
                                           horizon_slots=4_000)))
+    # G6's TRANSFORMATIONS remove and re-add 5QI-9 flows on the instrument's
+    # neighbours (the control, then a saturator in either direction, then a
+    # finite firmware image), on top of G1/G3/G5 bases -- so a renumbering
+    # slip there would collide exactly like #30. Swept on the densest base.
+    from sim.scenarios.g6 import (with_firmware_push, with_saturator,
+                                  without_background)
+    for label, base in (("gt22", build_gt22_scenario(seed=1, n_ues=8,
+                                                       horizon_slots=4_000)),
+                        ("gt31", build_gt31_scenario(seed=1, n_ues=8,
+                                                       horizon_slots=4_000))):
+        cases.append((f"without_background({label})", without_background(base)))
+        for d in ("UL", "DL"):
+            cases.append((f"with_saturator({label},{d})",
+                          with_saturator(base, direction=d)))
+        cases.append((f"with_firmware_push({label})",
+                      with_firmware_push(base, horizon_s=1.0)))
     return cases
 
 

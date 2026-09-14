@@ -35,7 +35,7 @@ def test_rollup_sentence_matches_the_rows_it_is_derived_from():
 
 
 def test_every_guarantee_row_buckets_exactly_once():
-    rows = R.parse_rows(R.MAP_PATH.read_text())
+    rows = R.parse_rows(R.MAP_PATH.read_text(encoding="utf-8"))
     by, _ = R.rollup(rows)
     assert sum(len(v) for v in by.values()) == len(rows)
     ids = [g for v in by.values() for g in v]

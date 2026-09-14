@@ -112,7 +112,7 @@ def main() -> int:
                     help="exit non-zero if the committed sentence disagrees")
     a = ap.parse_args()
 
-    text = MAP_PATH.read_text()
+    text = MAP_PATH.read_text(encoding="utf-8")
     rows = parse_rows(text)
     by, sentence = rollup(rows)
 

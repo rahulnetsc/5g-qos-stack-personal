@@ -478,6 +478,104 @@ is never granted is never debited.
 
 --------------------------------------------------------------------------
 --------------------------------------------------------------------------
+AGE -- AN OVERDUE TIER ABOVE THE COMPOSITE, GATED ON THE FAIR-SHARE PERIOD
+--------------------------------------------------------------------------
+
+**The measurement (2026-09-13, GT-2.2 cap 4).** With G-kpi + D2 the ordering
+fires on 0.2-1.1 % of slots -- the deadline gate declines 91-99.7 % of the
+slots the cadence offers -- so the composite ranks the other ~98 %, and it
+leaves a robot unvisited for up to 300 ms at N = 16/24 while protected uplink
+throughput already equals PF's. Telemetry p98 tracks that visit tail almost
+one for one (PF: max visit gap 20 ms, p98 12-23 ms; G-kpi D2: 300 ms, 68-100
+ms). Ordering EVERY slot by age (`ProtoRRageD2`, existing flags) took G3's
+all-parts boundary 12 -> 16 and N = 16 p98 98 -> 16 ms, but discards the
+composite entirely, and the composite's channel term is what the design
+claims for video and mixed load.
+
+**The edit.** A tier BETWEEN Tier 1.5 and the composite: a candidate whose
+last uplink grant is at least P* slots old is OVERDUE and outranks every
+non-overdue data candidate, longest-overdue first; among non-overdue
+candidates the composite decides exactly as the port does. P* is the fair-
+share period the periodic scheme already derives (`_gper_period`: the tightest
+PDB divided by the rounds the per-slot UE cap needs to visit every follower),
+so the bound sits at the cadence PF achieves naturally rather than at a picked
+number. The reserve is BOUNDED (K followers by need, inside the cap) exactly
+as under the periodic scheme -- `reserve_depth_under_periodic` -- because G5's
+frame age needs the trickle (module section above).
+
+    key = (sched_inactive, floor_fire, -floor_sil,
+           (0, -age) if age >= P* else (1, -coef),
+           tie)
+
+**What makes it inert where the port is fine:** at small N nobody reaches P*
+(200 slots at N = 8), so the arm is the port plus a bounded reserve there, and
+the N = 6 regression the deadline gate was written for cannot recur through
+this tier. Under heavy overload it degrades into age round-robin.
+
+**AGE IS THE CONTRACTED LCGs' CLOCK, NOT "ANY UPLINK GRANT" -- corrected
+2026-09-14 after the first version was measured.** The first version aged a
+UE from its last uplink grant of any size. With the K = 2 reserve, 50-62 % of
+the instrument robot's grants were 288 B crumbs, each of which reset the age
+without carrying the 300 B heartbeat, so robots read "not overdue" while the
+message sat: G3 all-parts boundary 14, N = 16 p98 97.6 ms against RRageD2's
+15.9. So `age` is now the LARGEST age over the UE's active contracted LCGs
+(GBR / Delay class) from `ul_lcg_last_grant_slot` -- the port's own per-LCG
+clock -- captured in `_ul_gbr_and_pdb` where `buffers` is in scope. Without
+C3 that clock is reset by crumbs exactly as the port's is; with C3 it is
+honest. `ProtoAgeC34D2` is therefore the configuration that means what the
+tier says.
+
+**Counters** say whether it fired: `age_slots_with_overdue` (slots where the
+tier bound anyone) against `age_slots_evaluated`, `age_first_pick_overdue`
+(the top pick came from the tier), `age_max_age_slots`, `age_period_last`.
+A flag that never binds is indistinguishable from off (CLAUDE.md), so a test
+requires `age_slots_with_overdue > 0` at N = 16.
+
+--------------------------------------------------------------------------
+C3 -- A CRUMB MUST NOT RESET THE DEADLINE CLOCK
+--------------------------------------------------------------------------
+
+**Mechanism (measured 2026-09-13, GT-2.2 cap 4, N = 16).** `_ul_stamp` writes
+`ul_lcg_last_grant_slot[lcg]` for every LCG the gNB's greedy priority walk
+served with `served > 0` (faithful: `two_tier.py::_ul_stamp`). Telemetry is
+the highest-priority LCG, so a 5-PRB crumb (288 B here) against a 300 B
+heartbeat stamps telemetry as freshly served and resets `remaining_pdb` to the
+full budget while 12 B of the message are still queued. 92-99 % of the
+port's grants to the instrument robot are such crumbs, 38-70 % of G-kpi D2's.
+Two readers see the poisoned value: `u_lcg = 1 - remaining/pdb` inside the
+urgency term, and any deadline gate/ordering.
+
+**The edit.** Stamp an LCG only when the grant covered the gNB's OWN estimate
+for it (`served >= estimated_ul_buffer_per_lcg` at grant time). Both numbers
+are the scheduler's; no UE-side knowledge. The deficit drain is untouched --
+the crumb's bytes were genuinely served against the GFBR obligation.
+Counters: `c3_stamps_kept` / `c3_stamps_withheld`.
+
+--------------------------------------------------------------------------
+C4 -- URGENCY FROM CONTRACTED BEARERS ONLY
+--------------------------------------------------------------------------
+
+**Mechanism.** `worst_urgency01` is the max over a UE's active LCGs of
+`u_lcg x priority_weight (x delta for GBR)`, and `priority_weight` is exactly
+`_URG_PRIO_W_MIN = 0.35` for 5QI 9 (priority 90). Every robot carries a 5QI-9
+best-effort flow whose LCG is essentially never cleared, so its `u_lcg` is 1
+permanently and **every UE reads urgency >= 0.35 at all times** -- measured
+`urg p50/p98/max = 0.35/0.35/0.35` on the instrument robot. A term equal on
+every candidate reorders nothing; the composite's barrier (Phi -> 16.7 as
+u -> 0.97) is unreachable from a floor of 0.35, and a starving GBR heartbeat's
+own term (<= 0.86 x delta, delta drained by the same crumbs) cannot exceed it.
+
+**The edit.** Recompute `worst_urgency01` over LCGs whose representative flow
+carries a latency contract (`flow_class` GBR or Delay); a best-effort (`PF`)
+bearer casts no urgency vote. Weights, delta and deficit are the port's; the
+excluded LCG still counts in `be_bytes` / `ul_total_target_bytes` / sizing
+exactly as before. Counters: `c4_lcgs_excluded`, `c4_max_urgency01`.
+
+**C3 and C4 are validated together and against AGE** (2026-09-14 plan): if
+the port's own rescue path, made honest, reproduces AGE's G3 result, it is
+the smaller divergence and the one to carry.
+
+--------------------------------------------------------------------------
 E3 -- A DEADLINE TERM IN UPLINK GRANT SIZING (not built yet)
 --------------------------------------------------------------------------
 
@@ -494,7 +592,8 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
-from .two_tier import TwoTier, _Candidate
+from .two_tier import (TwoTier, _Candidate, _URG_GBR_FLOOR, _URG_PRIO_MAX,
+                       _URG_PRIO_W_MIN)
 
 __all__ = ["TwoTierProto", "PROTO_FLAGS"]
 
@@ -511,6 +610,9 @@ PROTO_FLAGS: tuple[str, ...] = (
     "kpi_ordered_periodic",       # G-kpi
     "slack_ordered_periodic",     # G-slack
     "mfbr_enforced",              # M1
+    "age_gated_ordering",         # AGE
+    "clear_gated_stamp",          # C3
+    "urgency_contract_only",      # C4
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -540,6 +642,9 @@ class TwoTierProto(TwoTier):
                  mfbr_enforced: bool = False,
                  mfbr_burst_mult: float = 2.0,
                  slack_ordered_periodic: bool = False,
+                 age_gated_ordering: bool = False,
+                 clear_gated_stamp: bool = False,
+                 urgency_contract_only: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -561,10 +666,23 @@ class TwoTierProto(TwoTier):
         #: most K followers chosen by need. See the module docstring for the
         #: frame-age measurement that made this necessary.
         self.reserve_depth_under_periodic = reserve_depth_under_periodic
-        if reserve_depth_under_periodic is not None and not periodic_reserve:
+        self.age_gated_ordering = bool(age_gated_ordering)
+        self.clear_gated_stamp = bool(clear_gated_stamp)
+        self.urgency_contract_only = bool(urgency_contract_only)
+        #: lcg -> the gNB's own per-LCG estimate at the most recent
+        #: `_ul_served_split`, read by C3's stamp gate for the same grant.
+        self._c3_avail: dict[int, int] = {}
+        if age_gated_ordering and periodic_reserve:
             raise ValueError(
-                "reserve_depth_under_periodic without periodic_reserve -- it "
-                "bounds a reserve the periodic scheme is not managing.")
+                "age_gated_ordering with periodic_reserve -- two orderings of "
+                "the same tier; one arm's numbers would be reported under "
+                "the other's name.")
+        if (reserve_depth_under_periodic is not None
+                and not (periodic_reserve or age_gated_ordering)):
+            raise ValueError(
+                "reserve_depth_under_periodic without periodic_reserve or "
+                "age_gated_ordering -- it bounds a reserve neither scheme is "
+                "managing.")
         self.kpi_ordered_periodic = bool(kpi_ordered_periodic)
         self.mfbr_enforced = bool(mfbr_enforced)
         #: Bucket depth as a multiple of one slot's allowance. 2.0 matches the
@@ -662,11 +780,29 @@ class TwoTierProto(TwoTier):
             "gpb_suppressed": 0,
             "gpb_excluded_by_cap": 0,     # qualifying, but below max_sched_ues
             "gpb_cap_bound": -1,          # the DERIVED ceiling on K
+            "gpb_cap_bound_max": -1,      # ... its largest value: the cap unreduced by retx UEs
             "m1_flows_seen": 0,
             "m1_flows_capped": 0,          # exposure actually reduced
             "m1_bytes_withheld": 0,
             "m1_bytes_exposed": 0,
+            "age_slots_evaluated": 0,
+            "age_slots_with_overdue": 0,   # the tier bound at least one UE
+            "age_overdue_candidates": 0,
+            "age_first_pick_overdue": 0,   # top of the order came from the tier
+            "age_max_age_slots": 0,
+            "age_period_last": -1,         # the P* in force most recently
+            "c3_stamps_kept": 0,           # grant cleared the LCG's estimate
+            "c3_stamps_withheld": 0,       # a crumb: clock left running
+            "c4_ues_evaluated": 0,
+            "c4_lcgs_excluded": 0,         # best-effort LCGs denied a vote
+            "c4_max_urgency01": 0.0,
         })
+        #: ue_id -> age in slots, for candidates the AGE tier holds this slot.
+        #: Rebuilt per slot in `_apply_age_gate`; read by `_ul_rank_key`.
+        self._age_overdue: dict[int, int] = {}
+        #: ue_id -> largest age over its active CONTRACTED LCGs, from the
+        #: port's per-LCG clock; captured in `_ul_gbr_and_pdb` this slot.
+        self._age_lcg_age: dict[int, int] = {}
         #: (ue_id, qfi) -> remaining MFBR allowance in bytes.
         self._m1_bucket: dict[tuple[int, int], float] = {}
         self._m1_last_slot: int = -1
@@ -710,7 +846,7 @@ class TwoTierProto(TwoTier):
         """
         if self.mfbr_enforced:
             buffers = self._m1_view(slot, buffers)
-        if self.periodic_reserve:
+        if self.periodic_reserve or self.age_gated_ordering:
             # The cap is a property of the SLOT, and `_finalize_ul_coef` does
             # not receive one -- captured here so P's own derivation reads the
             # real value rather than a default standing in for it.
@@ -719,7 +855,7 @@ class TwoTierProto(TwoTier):
         if self.mfbr_enforced:
             self._m1_debit(out)
         if (self.denial_ordered_periodic or self.kpi_ordered_periodic
-                or self.slack_ordered_periodic):
+                or self.slack_ordered_periodic or self.age_gated_ordering):
             for a in out:
                 if a.direction == "UL":
                     self._proto_last_ul_grant_slot[a.ue_id] = slot.slot_index
@@ -753,6 +889,14 @@ class TwoTierProto(TwoTier):
         path does not even take the read.
         """
         out = super()._ul_gbr_and_pdb(ue_id, buffers, slot_index)
+        if self.age_gated_ordering:
+            self._age_lcg_age[ue_id] = self._contracted_lcg_age(
+                ue_id, buffers, slot_index)
+        if self.urgency_contract_only:
+            # C4: replace element 4 (worst_urgency01) only; every other
+            # return stays the port's.
+            u = self._c4_worst_urgency(ue_id, buffers, slot_index)
+            out = out[:4] + (u,) + out[5:]
         if (self.deadline_gated_periodic or self.kpi_ordered_periodic
                 or self.slack_ordered_periodic):
             self._gpd_remaining[ue_id] = float(out[1])
@@ -760,6 +904,79 @@ class TwoTierProto(TwoTier):
             self._proto_pdb_ms[ue_id] = self._ul_best_pending_pdb_ms(
                 ue_id, buffers)
         return out
+
+    # ------------------------------------------------------------------ C3
+
+    def _ul_served_split(self, ue_id: int, buffers: Any,
+                         tbs_bytes: int) -> list[tuple[int, int]]:
+        """The port's walk, plus a record of each LCG's estimate for C3."""
+        served = super()._ul_served_split(ue_id, buffers, tbs_bytes)
+        if self.clear_gated_stamp:
+            avail: dict[int, int] = {}
+            for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+                if f.lcg in avail:
+                    continue
+                est = buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg
+                if est > 0:
+                    avail[f.lcg] = est
+            self._c3_avail = avail
+        return served
+
+    def _ul_stamp(self, served: list[tuple[int, int]], ue_id: int,
+                  slot_index: int) -> None:
+        """C3: stamp only an LCG the grant cleared (by the gNB's own estimate)."""
+        if not self.clear_gated_stamp:
+            super()._ul_stamp(served, ue_id, slot_index)
+            return
+        kept = [(lcg, b) for lcg, b in served
+                if b >= self._c3_avail.get(lcg, 0)]
+        self.counters["c3_stamps_kept"] += len(kept)
+        self.counters["c3_stamps_withheld"] += len(served) - len(kept)
+        super()._ul_stamp(kept, ue_id, slot_index)
+
+    # ------------------------------------------------------------------ C4
+
+    def _c4_worst_urgency(self, ue_id: int, buffers: Any,
+                          slot_index: int) -> float:
+        """`worst_urgency01` over contracted LCGs only. Mirrors the port's own
+        arithmetic in `_ul_gbr_and_pdb` term for term -- weights, delta from
+        the deficit the port has ALREADY updated this slot -- and differs only
+        in skipping best-effort (`PF`) bearers."""
+        state = self._ue_state[ue_id]
+        slots_per_sec = 1.0 / self.slot_duration_s
+        slot_ms = self.slot_duration_s * 1000.0
+        self.counters["c4_ues_evaluated"] += 1
+        worst = 0.0
+        seen: set[int] = set()
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen or f.is_srb:
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            seen.add(f.lcg)
+            if f.flow_class not in ("GBR", "Delay"):
+                self.counters["c4_lcgs_excluded"] += 1
+                continue
+            pdb_ms = int(f.pdb_ms) if f.pdb_ms > 0 else 300
+            last = state.ul_lcg_last_grant_slot.get(f.lcg)
+            remaining = (pdb_ms if last is None
+                         else max(0, pdb_ms - int((slot_index - last) * slot_ms)))
+            u = max(0.0, min(1.0, 1.0 - remaining / pdb_ms))
+            w = _URG_PRIO_W_MIN + (1.0 - _URG_PRIO_W_MIN) * (
+                1.0 - (f.priority_level - 1) / (_URG_PRIO_MAX - 1))
+            w = max(_URG_PRIO_W_MIN, min(1.0, w))
+            if f.flow_class != "GBR" or f.gfbr_bps <= 0:
+                worst = max(worst, u * w)
+                continue
+            obligation = max(1, int((f.gfbr_bps / 8.0) / slots_per_sec))
+            window = obligation * int(pdb_ms / slot_ms)
+            deficit = state.ul_lcg_deficit_bytes.get(f.lcg, 0)
+            delta = _URG_GBR_FLOOR + (1.0 - _URG_GBR_FLOOR) * (
+                min(1.0, deficit / window) if window > 0 else 0.0)
+            worst = max(worst, u * w * delta)
+        if worst > self.counters["c4_max_urgency01"]:
+            self.counters["c4_max_urgency01"] = worst
+        return worst
 
     def _e2_report_is_stale(self, ue_id: int) -> tuple[bool, bool]:
         """(stale, never_granted) for one UE. See the module docstring."""
@@ -792,6 +1009,8 @@ class TwoTierProto(TwoTier):
             self._apply_gdepth(candidates)
         if self.periodic_reserve:
             self._apply_gperiodic(candidates)
+        if self.age_gated_ordering:
+            self._apply_age_gate(candidates)
         if not self.gate_follower_reserve:
             return
 
@@ -878,6 +1097,57 @@ class TwoTierProto(TwoTier):
 
     # ----------------------------------------------------------- G-periodic
 
+    def _contracted_lcg_age(self, ue_id: int, buffers: Any,
+                            slot_index: int) -> int:
+        """Largest age (slots) over this UE's active GBR/Delay LCGs, from the
+        port's `ul_lcg_last_grant_slot`. A never-granted LCG reads
+        `slot_index + 1`, the largest age available, so "never served" sorts
+        first with no sentinel. A UE with no active contracted LCG reads 0."""
+        state = self._ue_state[ue_id]
+        worst = 0
+        seen: set[int] = set()
+        for f in self._by_ue_dir.get((ue_id, "UL"), ()):
+            if f.lcg in seen or f.is_srb:
+                continue
+            if f.flow_class not in ("GBR", "Delay"):
+                continue
+            if buffers.state(f.ue_id, f.qfi).estimated_ul_buffer_per_lcg <= 0:
+                continue
+            seen.add(f.lcg)
+            last = state.ul_lcg_last_grant_slot.get(f.lcg)
+            age = slot_index + 1 if last is None else slot_index - last
+            if age > worst:
+                worst = age
+        return worst
+
+    def _apply_age_gate(self, candidates: list[_Candidate]) -> None:
+        """AGE: mark overdue candidates for `_ul_rank_key`, then bound the
+        reserve exactly as the periodic scheme does (same helper, same K)."""
+        self.counters["age_slots_evaluated"] += 1
+        qual = [c for c in candidates
+                if not c.sched_inactive and c.has_gbr and c.gbr_bytes_slot > 0]
+        period = self._gper_period(candidates, len(qual))
+        self.counters["age_period_last"] = period
+        self._age_overdue = {}
+        for c in candidates:
+            if c.sched_inactive:
+                continue
+            age = self._age_lcg_age.get(c.ue_id, 0)
+            if age >= period:
+                self._age_overdue[c.ue_id] = age
+        if self._age_overdue:
+            self.counters["age_slots_with_overdue"] += 1
+            self.counters["age_overdue_candidates"] += len(self._age_overdue)
+            worst = max(self._age_overdue.values())
+            if worst > self.counters["age_max_age_slots"]:
+                self.counters["age_max_age_slots"] = worst
+            data = [c for c in candidates if not c.sched_inactive]
+            if data and min(data, key=self._ul_rank_key).ue_id in self._age_overdue:
+                self.counters["age_first_pick_overdue"] += 1
+        # The bounded reserve, chosen against THIS slot's order (the helper
+        # sorts by `_ul_rank_key`, which now sees `_age_overdue`).
+        self._apply_periodic_reserve(candidates, qual)
+
     def _ul_rank_key(self, candidate: _Candidate) -> tuple:
         """The port's key, with Tier 2 reversed on a reserve slot.
 
@@ -886,6 +1156,14 @@ class TwoTierProto(TwoTier):
         is out of this gate's scope.
         """
         key = super()._ul_rank_key(candidate)
+        if self.age_gated_ordering:
+            # AGE. Nested so the key stays five wide for the rank trace; the
+            # first element separates overdue (0) from not (1), so an overdue
+            # candidate beats every composite-ranked one regardless of coef.
+            age = self._age_overdue.get(candidate.ue_id)
+            if age is not None:
+                return (key[0], key[1], key[2], (0, -age), key[4])
+            return (key[0], key[1], key[2], (1, key[3]), key[4])
         if not (self.periodic_reserve and self._gper_is_reserve):
             return key
         if self.slack_ordered_periodic:
@@ -1056,6 +1334,7 @@ class TwoTierProto(TwoTier):
         # DERIVED, not picked: the leader takes one of the cap's places.
         k = max(0, min(int(k), cap - 1))
         self.counters["gpb_cap_bound"] = cap - 1
+        self.counters["gpb_cap_bound_max"] = max(self.counters["gpb_cap_bound_max"], cap - 1)
         if not qual:
             return
         # Who the cap will actually keep, under THIS slot's own ordering.

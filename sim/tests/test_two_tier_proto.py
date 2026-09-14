@@ -577,9 +577,15 @@ def test_the_reserve_is_bounded_by_what_the_PER_SLOT_CAP_can_serve():
                                  telemetry_gbr=True)
         _summary(s, sc, cap=cap)
         c = s.counters
-        assert c["gpb_cap_bound"] == want, (
+        # The per-slot value is the REDUCED cap (M-6 counts HARQ-retx UEs
+        # against it, `Occupancy.ue_counts`), so it reads below `want` on a
+        # slot carrying a retry -- and since retries were aligned to the TDD
+        # pattern (2026-09-14) UL retries land on UL slots, so the last slot
+        # usually is one. The unreduced ceiling is the maximum over slots.
+        assert c["gpb_cap_bound_max"] == want, (
             f"at max_sched_ues={cap} the reserve ceiling should be {want}, "
-            f"got {c['gpb_cap_bound']}")
+            f"got {c['gpb_cap_bound_max']}")
+        assert 0 <= c["gpb_cap_bound"] <= want
         assert c["gpb_kept"] <= want * c["gper_slots_evaluated"], (
             "more reserves were kept than the cap can serve")
 
@@ -600,3 +606,99 @@ def test_followers_below_the_cap_are_EXCLUDED_and_the_count_is_reported():
         "no qualifying follower was ever ranked below the per-slot cap at "
         "N=16 -- the rank-based selection is doing nothing and the arm is "
         "choosing by need alone")
+
+
+# --- AGE -----------------------------------------------------------------
+
+def _two_candidates():
+    from scheduler.two_tier import _Candidate
+    a = _Candidate(ue_id=1, flows=[], bits_per_rb=100, bler=0.0,
+                   snr_db=10.0, coef=10.0)      # the composite's favourite
+    b = _Candidate(ue_id=2, flows=[], bits_per_rb=100, bler=0.0,
+                   snr_db=10.0, coef=1.0)
+    return a, b
+
+
+def test_AGE_overdue_candidate_outranks_every_composite_candidate():
+    """An overdue UE beats a non-overdue one regardless of coef; two overdue
+    UEs order longest-overdue first. Tiers 1 and 1.5 pass through."""
+    s = TwoTierProto(min_rb=5, age_gated_ordering=True)
+    s._cur_slot = 1_000
+    a, b = _two_candidates()
+    s._age_overdue = {2: 300}
+    assert s._ul_rank_key(b) < s._ul_rank_key(a)
+    s._age_overdue = {1: 100, 2: 300}
+    assert s._ul_rank_key(b) < s._ul_rank_key(a), "longest-overdue first"
+    a.sched_inactive = True                       # Tier 1 still wins
+    assert s._ul_rank_key(a) < s._ul_rank_key(b)
+
+
+def test_AGE_with_nobody_overdue_orders_EXACTLY_as_the_port():
+    s = TwoTierProto(min_rb=5, age_gated_ordering=True)
+    s._age_overdue = {}
+    a, b = _two_candidates()
+    port = sorted([a, b], key=lambda c: TwoTier._ul_rank_key(s, c))
+    age = sorted([a, b], key=s._ul_rank_key)
+    assert [c.ue_id for c in age] == [c.ue_id for c in port]
+    assert len(s._ul_rank_key(a)) == 5, "the rank trace needs a five-wide key"
+
+
+def test_AGE_actually_BINDS_at_N16_and_is_near_inert_at_N4():
+    """A tier that never binds is indistinguishable from off; one that binds
+    at an idle fleet would be the N=6 regression the deadline gate was
+    written for. Both directions are measured."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    seen = {}
+    for n in (4, 16):
+        s = TwoTierProto(min_rb=5, age_gated_ordering=True,
+                         reserve_depth_under_periodic=2)
+        sc = build_gt22_scenario(seed=35492826, n_ues=n, horizon_slots=8_000,
+                                 telemetry_gbr=True)
+        _summary(s, sc, cap=4)
+        c = s.counters
+        assert c["age_slots_evaluated"] > 0
+        assert s._proto_last_ul_grant_slot, "the tier never observed a grant"
+        seen[n] = c["age_slots_with_overdue"] / c["age_slots_evaluated"]
+        assert c["age_period_last"] > 0
+    assert seen[16] > 0.0, "the overdue tier never bound at N=16"
+    assert seen[4] < 0.05, f"the tier binds on {seen[4]:.1%} of slots at N=4"
+
+
+def test_AGE_REFUSES_to_combine_with_the_periodic_scheme():
+    with pytest.raises(ValueError, match="age_gated_ordering"):
+        TwoTierProto(min_rb=5, age_gated_ordering=True, periodic_reserve=True)
+    # ... but the bounded reserve is allowed under it.
+    TwoTierProto(min_rb=5, age_gated_ordering=True,
+                 reserve_depth_under_periodic=2)
+
+
+# --- C3 / C4 --------------------------------------------------------------
+
+def test_C3_a_crumb_does_NOT_stamp_and_a_clearing_grant_DOES():
+    from scheduler.two_tier import _UeState
+    s = TwoTierProto(min_rb=5, clear_gated_stamp=True)
+    s._ue_state[1] = _UeState()
+    s._c3_avail = {3: 300, 4: 5000}
+    s._ul_stamp([(3, 288), (4, 5000)], ue_id=1, slot_index=42)
+    st = s._ue_state[1].ul_lcg_last_grant_slot
+    assert 3 not in st, "a 288 B grant against a 300 B estimate reset the clock"
+    assert st[4] == 42
+    assert s.counters["c3_stamps_withheld"] == 1
+    assert s.counters["c3_stamps_kept"] == 1
+
+
+def test_C3_and_C4_are_REACHED_at_N16():
+    """Both edits must be shown to fire (CLAUDE.md's unreachable-mechanism
+    rule): C3 withholds some stamps and keeps others; C4 excludes at least
+    one best-effort LCG and the urgency it reports is no longer pinned."""
+    from sim.scenarios.g3 import build_gt22_scenario
+    s = TwoTierProto(min_rb=5, clear_gated_stamp=True,
+                     urgency_contract_only=True,
+                     depth_bounded_reserve=True, reserve_depth=2)
+    sc = build_gt22_scenario(seed=35492826, n_ues=16, horizon_slots=8_000,
+                             telemetry_gbr=True)
+    _summary(s, sc, cap=4)
+    c = s.counters
+    assert c["c3_stamps_withheld"] > 0 and c["c3_stamps_kept"] > 0
+    assert c["c4_ues_evaluated"] > 0 and c["c4_lcgs_excluded"] > 0
+    assert c["c4_max_urgency01"] > 0.0

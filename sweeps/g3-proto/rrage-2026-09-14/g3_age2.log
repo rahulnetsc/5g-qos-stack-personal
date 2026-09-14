@@ -1,0 +1,21 @@
+G3 stress: 300 driver runs, 16.8M slots (1.17 simulated hours)
+  parts ['A']  arms ['ProtoAgeC34D2', 'ProtoC34D2', 'ProtoAgeD2']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 300 runs, 16.8M slots
+  projected cost: 2.01 h CPU -> 7 min wall at 23 workers (x0.77 measured pool efficiency)
+  projected peak memory: 11.2 GB (500 MB x 23 workers, worst task 200,000 slots)
+  0 banked, 300 to run
+    ... 25/300 (320s)
+    ... 50/300 (455s)
+    ... 75/300 (551s)
+    ... 100/300 (639s)
+    ... 125/300 (721s)
+    ... 150/300 (793s)
+    ... 175/300 (857s)
+    ... 200/300 (917s)
+    ... 225/300 (973s)
+    ... 250/300 (1021s)
+    ... 275/300 (1051s)
+    ... 300/300 (1076s)
+
+wrote C:\Users\Smart\AppData\Local\Temp\claude\c--Users-Smart-Documents-Personal-Rahul-R-5g-5g-qos-stack-personal\4755f44b-a6f3-4e8b-b086-ed7b6ce715be\scratchpad\g3_age2.json  (1076s, 300 runs)

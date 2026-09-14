@@ -1,0 +1,14 @@
+10 runs = 1 arms x 10 seeds, asset B (ue2) camera offered at 2.1x MFBR
+  [1/10] ProtoRRageD2 seed=1367864806 B_cam=9.87 Mbps (MFBR 8.0)
+  [2/10] ProtoRRageD2 seed=1097657231 B_cam=9.46 Mbps (MFBR 8.0)
+  [3/10] ProtoRRageD2 seed=579362555 B_cam=8.91 Mbps (MFBR 8.0)
+  [4/10] ProtoRRageD2 seed=161576974 B_cam=7.87 Mbps (MFBR 8.0)
+  [5/10] ProtoRRageD2 seed=376383645 B_cam=9.22 Mbps (MFBR 8.0)
+  [6/10] ProtoRRageD2 seed=661058651 B_cam=8.86 Mbps (MFBR 8.0)
+  [7/10] ProtoRRageD2 seed=1826701614 B_cam=9.13 Mbps (MFBR 8.0)
+  [8/10] ProtoRRageD2 seed=87989972 B_cam=8.82 Mbps (MFBR 8.0)
+  [9/10] ProtoRRageD2 seed=35492826 B_cam=9.17 Mbps (MFBR 8.0)
+  [10/10] ProtoRRageD2 seed=1746484539 B_cam=9.32 Mbps (MFBR 8.0)
+achieved offered rate: 2.07-2.16x MFBR (GT-4.3 requires >= 2.0x)
+
+wrote C:\Users\Smart\AppData\Local\Temp\claude\c--Users-Smart-Documents-Personal-Rahul-R-5g-5g-qos-stack-personal\4755f44b-a6f3-4e8b-b086-ed7b6ce715be\scratchpad\g7_rrage.json

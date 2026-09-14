@@ -29,6 +29,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
 from g11_campaign import AggregateMemoryGuard
 
+# The guard discovers pool workers through /proc (`regime_sweep`'s own
+# docstring: "returns [] where /proc is absent rather than pretending to
+# know"), so on a platform without it these tests would fail on the
+# instrument, not the guard. Skipped there, never silently passed.
+pytestmark = pytest.mark.skipif(not Path("/proc").is_dir(),
+                                reason="pool-worker discovery reads /proc")
+
 
 def _sleep(seconds):          # module-level: spawn needs it picklable
     time.sleep(seconds)

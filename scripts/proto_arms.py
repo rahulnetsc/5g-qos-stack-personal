@@ -72,6 +72,33 @@ def resolve_arm(name: str, min_rb: int = 5):
         tail = name[len("ProtoGdepth"):]
         return TwoTierProto(min_rb=min_rb, depth_bounded_reserve=True,
                             reserve_depth=(None if tail == "" else int(tail)))
+    # AGE (fix 1 + 2, 2026-09-14): overdue tier gated on P*, composite
+    # otherwise; reserve bounded at K (ProtoAgeD2) or removed (ProtoAge).
+    if name in ("ProtoAge", "ProtoAgeD2"):
+        return TwoTierProto(min_rb=min_rb, age_gated_ordering=True,
+                            reserve_depth_under_periodic=(
+                                2 if name.endswith("D2") else None))
+    # C3 + C4 (fix 3 + 4): honest deadline clock and contract-only urgency.
+    # ProtoC34D2 = the port's own rescue path made honest, reserve bounded by
+    # need at K=2 (G-depth); ProtoAgeC34D2 = all of it on top of AGE.
+    if name == "ProtoC34D2":
+        return TwoTierProto(min_rb=min_rb, clear_gated_stamp=True,
+                            urgency_contract_only=True,
+                            depth_bounded_reserve=True, reserve_depth=2)
+    if name == "ProtoAgeC34D2":
+        return TwoTierProto(min_rb=min_rb, age_gated_ordering=True,
+                            reserve_depth_under_periodic=2,
+                            clear_gated_stamp=True, urgency_contract_only=True)
+    # RR-age (probe, 2026-09-13): EVERY slot is a reserve slot (P forced to 1
+    # via a zero multiplier), ordered by slots-since-last-UL-grant; Tiers 1 and
+    # 1.5 untouched. The spatial reserve is removed (RRage) or kept for K=2
+    # followers (RRageD2). Existing flags only -- no new scheduler code.
+    if name in ("ProtoRRage", "ProtoRRageD2"):
+        return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
+                            denial_ordered_periodic=True,
+                            reserve_period_mult=0.0,
+                            reserve_depth_under_periodic=(
+                                2 if name.endswith("D2") else None))
     if name not in _FLAGS:
         raise ValueError(
             f"unknown Proto arm {name!r}; known: {sorted(_FLAGS)} plus the "

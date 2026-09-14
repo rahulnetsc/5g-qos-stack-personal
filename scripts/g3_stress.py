@@ -204,6 +204,26 @@ def _resolve_arm(name: str):
         k = None if tail == "" else int(tail)
         from scheduler.two_tier_proto import TwoTierProto as _T
         return _T(min_rb=5, depth_bounded_reserve=True, reserve_depth=k)
+    # RR-age (probe, 2026-09-13): every slot ordered by slots-since-last-UL-
+    # grant (P forced to 1), spatial reserve removed / kept for K=2. Mirrors
+    # scripts/proto_arms.py; existing flags only.
+    if name in ("ProtoAge", "ProtoAgeD2"):
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, age_gated_ordering=True,
+                  reserve_depth_under_periodic=(2 if name.endswith("D2") else None))
+    if name == "ProtoC34D2":
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, clear_gated_stamp=True, urgency_contract_only=True,
+                  depth_bounded_reserve=True, reserve_depth=2)
+    if name == "ProtoAgeC34D2":
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, age_gated_ordering=True, reserve_depth_under_periodic=2,
+                  clear_gated_stamp=True, urgency_contract_only=True)
+    if name in ("ProtoRRage", "ProtoRRageD2"):
+        from scheduler.two_tier_proto import TwoTierProto as _T
+        return _T(min_rb=5, periodic_reserve=True, denial_ordered_periodic=True,
+                  reserve_period_mult=0.0,
+                  reserve_depth_under_periodic=(2 if name.endswith("D2") else None))
     if name not in flags:
         raise ValueError(
             f"unknown Proto arm {name!r}; known: {sorted(flags)}. A typo must "

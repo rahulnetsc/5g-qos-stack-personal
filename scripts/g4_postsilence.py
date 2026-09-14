@@ -165,7 +165,7 @@ def _task(task: tuple) -> list[dict[str, Any]]:
             summary, axis_values, record.scheduler_name, record.seed))
 
     sweep(axes={"duty_cycle": [duty]}, build_scenario=_build,
-          schedulers=_arms(), seeds=[seed], driver_kwargs=_driver_kwargs,
+          schedulers=_schedulers(), seeds=[seed], driver_kwargs=_driver_kwargs,
           run_sink=sink)
     return collected
 
@@ -277,6 +277,14 @@ def report(rows: list[dict[str, Any]]) -> dict[str, Any]:
             out["across_arms"].setdefault(str(duty), {})[f"{arm}-{base_arm}"] = ci
     print("\n  (* = paired bootstrap CI excludes zero)")
     return out
+
+
+def _schedulers() -> dict:
+    """wp9_sweep's three faithful arms plus the divergence arm (2026-09-14),
+    added HERE rather than in wp9_sweep so that module's scope -- shared by
+    every WP9 artefact -- is untouched."""
+    from proto_arms import resolve_arm
+    return {**_arms(), "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2")}
 
 
 def main(argv: list[str]) -> int:

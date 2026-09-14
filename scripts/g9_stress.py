@@ -86,9 +86,13 @@ NEIGHBOUR_EPSILON_MS = (0.5, 1.0, 2.0, 5.0)
 
 
 def _arms():
+    # The divergence arms resolve through proto_arms (2026-09-14), a
+    # separate module so the faithful path's code_state scope is untouched.
+    from proto_arms import resolve_arm
     return {"PF": lambda: ProportionalFair(ewma_window_slots=200),
             "Reservation": lambda: Reservation(min_rb=5),
-            "TwoTier": lambda: load_two_tier(_TT, min_rb=5)}
+            "TwoTier": lambda: load_two_tier(_TT, min_rb=5),
+            "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2")}
 
 
 def _availability_budget_s(fr) -> float:
