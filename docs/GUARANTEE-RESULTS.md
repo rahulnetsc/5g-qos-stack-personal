@@ -1,5 +1,13 @@
 # Guarantee results — the current answer for each
 
+> **SUPERSEDED 2026-09-14 for every row below.** HARQ retransmissions were
+> aligned to the TDD pattern (`docs/harq-tdd-alignment-2026-09-14.md`), which
+> moves every artefact this file quotes, and ten of the twelve guarantees
+> were then re-measured on all four arms — the three faithful ones plus the
+> `ProtoRRageD2` divergence — in `docs/results-aligned-2026-09-14.md`. Read
+> verdicts there. This file is kept as the pre-alignment record; no verdict
+> changed, but every number here is stale.
+
 **2026-09-09.** One row per guarantee, **current only**. Where a figure was
 withdrawn this says so and points at what replaced it; it does not reproduce
 the withdrawn number.

@@ -1,0 +1,17 @@
+G6 isolation: 1080 runs, 43.2M slots
+  instruments g1,g3,g5  conditions none,ul,dl  arms PF,Reservation,TwoTier,ProtoRRageD2  seeds 10  N [4, 7, 12]  cap 4
+  part A: each statistic within its own bound; part B: shift <= +20% IN THE DIRECTION OF HARM, absolute for zero-baseline counts
+  0 banked, 1080 to run
+    ... 100/1080 (54s)
+    ... 200/1080 (103s)
+    ... 300/1080 (154s)
+    ... 400/1080 (222s)
+    ... 500/1080 (292s)
+    ... 600/1080 (395s)
+    ... 700/1080 (514s)
+    ... 800/1080 (633s)
+    ... 900/1080 (751s)
+    ... 1000/1080 (864s)
+    ... 1080/1080 (970s)
+
+wrote sweeps\g3-proto\rrage-2026-09-14\aligned\g6.json  (970s, 1080 runs)

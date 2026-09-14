@@ -1267,6 +1267,13 @@ registration and result document, and every sweep artefact — so the work is
 reproducible and auditable now, and only its promotion into the published
 figures waits.
 
+**Update 2026-09-14.** The sweep continued past G-kpi: the candidate is
+now `ProtoRRageD2` and the reasons are in
+`docs/proto-age-c34-2026-09-14.md` (§1 measures the cadence mechanism this
+section's §18–19 were circling; §3.1 records the variants that lost). Every
+G3 figure in this file predates the HARQ/TDD alignment; the current G3
+result on all four arms is `docs/results-aligned-2026-09-14.md` §3.
+
 **The gate:** all guarantees rebuilt. As of this date **G1, G2, G3, G9 and G12**
 have their own stress experiments; **G4, G6 and G8 have not been started**, and
 **G5, G7 and G10 exist only as runners used for regression checks**.

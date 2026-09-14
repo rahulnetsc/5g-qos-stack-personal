@@ -1,0 +1,25 @@
+G3 stress: 400 driver runs, 22.4M slots (1.56 simulated hours)
+  parts ['A']  arms ['PF', 'Reservation', 'TwoTier', 'ProtoRRageD2']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 400 runs, 22.4M slots
+  projected cost: 2.66 h CPU -> 9 min wall at 23 workers (x0.77 measured pool efficiency)
+  projected peak memory: 11.2 GB (500 MB x 23 workers, worst task 200,000 slots)
+  0 banked, 400 to run
+    ... 25/400 (222s)
+    ... 50/400 (321s)
+    ... 75/400 (440s)
+    ... 100/400 (569s)
+    ... 125/400 (627s)
+    ... 150/400 (672s)
+    ... 175/400 (736s)
+    ... 200/400 (773s)
+    ... 225/400 (828s)
+    ... 250/400 (867s)
+    ... 275/400 (916s)
+    ... 300/400 (939s)
+    ... 325/400 (972s)
+    ... 350/400 (1002s)
+    ... 375/400 (1029s)
+    ... 400/400 (1052s)
+
+wrote sweeps\g3-proto\rrage-2026-09-14\aligned\g3.json  (1052s, 400 runs)

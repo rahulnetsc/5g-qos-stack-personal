@@ -1527,6 +1527,32 @@ bugs, the same pass that caught WP3's real M02 denominator bug (`c7baba9`)
 and an unrecorded open decision (`86c54b9`). Treat this as a standing step
 for every WP, not an opportunistic one.
 
+**HARQ retransmissions respect the TDD pattern (2026-09-14) — a retry due
+on a slot without its direction's symbols waits for the next slot that has
+them (`sim/driver.py::align_due_slot`).** Before this, a retry resolved at a
+FIXED offset on whatever slot that was: ~25 % of UL retries "transmitted" on
+D-slots and their PRBs came out of the DL budget. The corpus was
+deliberately re-captured (8 of 20 records moved, the 12 with no failed TBs
+bit-identical); every artefact older than that date carries the old timing
+(`docs/harq-tdd-alignment-2026-09-14.md`). K1/K2 themselves are still the
+WP5 "representative" offsets, not deployed values.
+
+**`ProtoRRageD2` is the divergence candidate (2026-09-14), and the lesson is
+that on the uplink REGULAR VISITING wins, not the composite.** Every slot
+ordered by slots-since-last-UL-grant, FIX-2's reserve bounded to the two
+neediest followers the per-slot cap will keep; Tiers 1/1.5, sizing, Tier-1
+and the whole DL untouched. Three gated variants (AGE, C3, C4 — flags in
+`scheduler/two_tier_proto.py`) were built and lost to it; a gate that
+fires on ~1 % of slots is decoration. `docs/results-aligned-2026-09-14.md`
+scores it on ten guarantees beside the faithful arms; nothing is
+registered as a claim. The deployed C has none of this.
+
+**Windows works, with one guard: `scripts/g11_campaign.py`'s `import
+resource` is POSIX-only and is wrapped.** `regime_sweep.check_for_orphans`
+already returns `[]` without `/proc`; the memory-guard tests skip there;
+`regime_map_rollup` reads UTF-8 explicitly. Run everything with 23 workers
+(`os.cpu_count() - 1`) on the 24-thread box.
+
 ## Known issues (flagged deliberately, do not fix as a drive-by)
 
 - `sim/metrics.py::record_hol_delay` drops zero-delay samples, biasing every

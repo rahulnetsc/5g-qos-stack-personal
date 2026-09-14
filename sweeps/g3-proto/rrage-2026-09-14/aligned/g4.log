@@ -1,0 +1,73 @@
+
+==============================================================================
+G4 -- latency vs the SILENCE THAT PRECEDED the message (p98 ms)
+==============================================================================
+  No silence threshold is chosen; the gap axis IS the answer.
+
+   duty arm                      [0,1)          [10,100)        [100,1000)        [1000,inf)
+    1.0 PF              161.46/   839B     10.24/   633B     23.71/   300B                 -
+    1.0 ProtoRRageD2    160.70/   839B      8.51/   633B     19.87/   300B                 -
+    1.0 Reservation     163.11/   840B     14.39/   573B     26.35/   300B                 -
+    1.0 TwoTier         178.05/   839B     28.05/   633B     62.97/   300B                 -
+
+    0.5 PF              170.17/   858B      5.97/   850B     19.50/   400B                 -
+    0.5 ProtoRRageD2    169.73/   858B      4.32/   850B     18.76/   400B                 -
+    0.5 Reservation     172.01/   858B     16.90/   746B     15.18/   368B                 -
+    0.5 TwoTier         181.71/   858B     18.06/   850B     25.86/   400B                 -
+
+    0.1 PF              222.90/   874B                 -      5.65/  1250B     78.72/  3000B
+    0.1 ProtoRRageD2    223.08/   874B                 -      4.44/  1250B     80.38/  3000B
+    0.1 Reservation     221.57/   872B                 -     54.29/  1218B     56.95/  3000B
+    0.1 TwoTier         223.13/   874B                 -      7.44/  1250B     82.20/  3000B
+
+  cells are  p98_ms / mean message size.  '-' = no message in that gap bucket.
+
+------------------------------------------------------------------------------
+ACROSS DUTY, within an arm -- CARRIES THE SIZE CONFOUND
+------------------------------------------------------------------------------
+  `_burstify` grows the burst by exactly 1/duty at constant mean
+  rate, so a size-proportional latency baseline IS 1/duty. The
+  excess over that baseline is the part access delay could explain.
+  PF           duty 0.1   p98   107.24 ms vs    62.89 at duty 1.0  ->  x  1.71   size baseline x10.0   excess x 0.17
+  PF           duty 0.5   p98    65.21 ms vs    62.89 at duty 1.0  ->  x  1.04   size baseline x2.0   excess x 0.52
+  ProtoRRageD2 duty 0.1   p98   107.15 ms vs    61.13 at duty 1.0  ->  x  1.75   size baseline x10.0   excess x 0.18
+  ProtoRRageD2 duty 0.5   p98    64.27 ms vs    61.13 at duty 1.0  ->  x  1.05   size baseline x2.0   excess x 0.53
+  Reservation  duty 0.1   p98   118.03 ms vs    62.89 at duty 1.0  ->  x  1.88   size baseline x10.0   excess x 0.19
+  Reservation  duty 0.5   p98    62.19 ms vs    62.89 at duty 1.0  ->  x  0.99   size baseline x2.0   excess x 0.49
+  TwoTier      duty 0.1   p98   108.66 ms vs    83.87 at duty 1.0  ->  x  1.30   size baseline x10.0   excess x 0.13
+  TwoTier      duty 0.5   p98    75.21 ms vs    83.87 at duty 1.0  ->  x  0.90   size baseline x2.0   excess x 0.45
+
+------------------------------------------------------------------------------
+ACROSS ARMS at one duty level -- CONFOUND-FREE (identical sizes)
+------------------------------------------------------------------------------
+
+  duty_cycle = 0.1
+    PF           p98   107.24 ms  [  106.87,   107.65]  n=10
+    ProtoRRageD2 p98   107.15 ms  [  106.63,   107.68]  n=10
+    Reservation  p98   117.31 ms  [  112.65,   121.84]  n=10
+    TwoTier      p98   108.66 ms  [  107.88,   109.52]  n=10
+      ProtoRRageD2 - PF:    -0.09 ms [   -0.42,    +0.20]  
+      Reservation - PF:   +10.07 ms [   +4.93,   +14.56] *
+      TwoTier - PF:    +1.42 ms [   +0.58,    +2.22] *
+
+  duty_cycle = 0.5
+    PF           p98    65.21 ms  [   65.01,    65.42]  n=10
+    ProtoRRageD2 p98    64.27 ms  [   64.06,    64.47]  n=10
+    Reservation  p98    62.05 ms  [   59.48,    64.05]  n=10
+    TwoTier      p98    75.21 ms  [   73.85,    76.63]  n=10
+      ProtoRRageD2 - PF:    -0.94 ms [   -1.13,    -0.77] *
+      Reservation - PF:    -3.17 ms [   -5.53,    -1.17] *
+      TwoTier - PF:   +10.00 ms [   +8.81,   +11.28] *
+
+  duty_cycle = 1.0
+    PF           p98    62.89 ms  [   62.54,    63.27]  n=10
+    ProtoRRageD2 p98    61.13 ms  [   61.01,    61.26]  n=10
+    Reservation  p98    62.60 ms  [   60.18,    65.03]  n=10
+    TwoTier      p98    83.87 ms  [   81.79,    85.80]  n=10
+      ProtoRRageD2 - PF:    -1.76 ms [   -2.10,    -1.41] *
+      Reservation - PF:    -0.29 ms [   -2.83,    +2.36]  
+      TwoTier - PF:   +20.98 ms [  +18.98,   +22.65] *
+
+  (* = paired bootstrap CI excludes zero)
+
+wrote sweeps\g3-proto\rrage-2026-09-14\aligned\g4.json  (5168 flow-bucket rows)

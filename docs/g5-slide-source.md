@@ -128,6 +128,15 @@ operationally: the cell has more headroom than expected on two of three arms.
 
 ## 8. THE DIVERGENCE ARM, and the one thing it cannot fix
 
+> **Superseded 2026-09-14.** The "Proto 12" in §3's table is the
+> `ProtoGkpi100` run; under the 10/10 rule `ProtoGkpiD2` reads 4. Both are
+> replaced by `ProtoRRageD2`, which is PF-equivalent on every G5 part
+> (admissible fleet 14, no load knee, frame age 12–38 ms across the fleet
+> axis) — `docs/results-aligned-2026-09-14.md` §5, measured on the aligned
+> retry model with the faithful arms beside it. The "one thing it cannot fix"
+> below no longer applies: the frame-age regression was the reserve's
+> removal, and RRageD2 keeps a bounded reserve.
+
 The proto arm reaches **90 of 90 on telemetry** and 61 on completeness against
 the port's 40 and 24 — and is **worse on frame age**, 14 against 20.
 

@@ -60,6 +60,15 @@ a third makes it a structural problem rather than an incident.
 
 ## 3. The TwoTierProto write-up
 
+**Update 2026-09-14.** The candidate is no longer G-kpi D2: it is
+`ProtoRRageD2` (every-slot age ordering, reserve bounded at K = 2), after
+the AGE / C3 / C4 variants were built and measured against it and lost
+(`docs/proto-age-c34-2026-09-14.md`). It is now scored on ten guarantees
+under the aligned retry model beside all three faithful arms
+(`docs/results-aligned-2026-09-14.md`). The **promotion** into the
+guarantee table and `published_claims.yml` remains deferred for the reason
+below; the write-up itself exists.
+
 **Deferred 2026-09-10.** No proto figure is registered in
 `config/published_claims.yml` and no proto row appears in
 `docs/GUARANTEE-RESULTS.md` or the guarantee table, so **none of the arm's
