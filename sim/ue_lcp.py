@@ -91,6 +91,15 @@ class UeLcp:
         token bucket and its backlog. Round 2 gives whatever is left to the
         same flows in strict priority order, ignoring buckets. Returns
         [(qfi, bytes), ...].
+
+        Checked against TS 38.321 V18.10.0 sec 5.4.3.1.3 (2026-09-14): the
+        two rounds, the `Bj > 0` gate on round 1, PBR = infinity serving all
+        data, and round 2 "regardless of the value of Bj" all match. ONE
+        stated deviation: the spec serves a whole MAC SDU in round 1 even
+        when it exceeds Bj ("the value of Bj can be negative"); this model
+        serves `min(Bj, backlog)` -- byte-granular, so a bucket is never
+        overdrawn. That is a segmentation-level abstraction (the model
+        carries bytes, not SDUs), not a priority difference.
         """
         order = sorted(ue_flows, key=lambda f: f.priority_level)
         taken: dict[int, int] = {}

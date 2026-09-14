@@ -233,3 +233,50 @@ def test_discard_harq_loss_defaults_to_never_late_without_pdb_s():
     buffers.discard_harq_loss(1, 2, 200, now_s=1000.0)  # no pdb_s
     completions = buffers.pop_completions(1, 2)
     assert completions[0].late is False
+
+
+# --- TDD alignment of retransmissions (2026-09-14) -------------------------
+
+def test_a_retry_due_on_a_wrong_kind_slot_waits_for_the_next_right_kind_slot():
+    """DSUUU: slot 0 D, 1 S, 2-4 U. A DL retry due on a U-slot moves to the
+    next D/S; a UL retry due on the D-slot moves to the S-slot (which carries
+    UL symbols under the default split); a retry already on a right-kind
+    slot is untouched."""
+    from sim.config import CarrierConfig, TDDConfig
+    from sim.driver import align_due_slot
+    from sim.resource import ResourceGrid
+    grid = ResourceGrid(CarrierConfig(), TDDConfig())
+    assert grid.pattern == "DSUUU", "this test derives its expectations from DSUUU"
+    assert align_due_slot(grid, 2, "DL") == 5          # U -> next D
+    assert align_due_slot(grid, 4, "DL") == 5
+    assert align_due_slot(grid, 5, "DL") == 5          # already D
+    assert align_due_slot(grid, 6, "DL") == 6          # S carries DL
+    assert align_due_slot(grid, 5, "UL") == 6          # D -> S (carries UL)
+    assert align_due_slot(grid, 7, "UL") == 7          # already U
+
+
+def test_no_retransmission_is_resolved_on_a_slot_without_its_symbols():
+    """Run-level: every retry trace must land on a slot whose kind carries
+    the retry's direction. Measured BEFORE the fix on this cell: 625 of
+    2 682 UL retries on D-slots -- so this assertion could fail."""
+    from sim.driver import run
+    from sim.random_access import RandomAccessConfig
+    from sim.scenarios.g3 import build_gt22_scenario
+    from sim.srb import with_srb
+    from scheduler.two_tier import TwoTier
+    sc = build_gt22_scenario(seed=1097657231, n_ues=8, horizon_slots=4_000)
+    pat = sc.tdd.pattern
+    bad, retx = [], 0
+    def sink(g):
+        nonlocal retx
+        if g.retx_count <= 0:
+            return
+        retx += 1
+        kind = pat[g.slot_index % len(pat)]
+        if (g.direction == "DL" and kind == "U") or (g.direction == "UL" and kind == "D"):
+            bad.append((g.slot_index, g.direction, kind))
+    run(with_srb(sc), TwoTier(min_rb=5), cqi_delay_slots=8, max_sched_ues=4,
+        random_access={**RandomAccessConfig.deployed().to_dict(), "srb": True},
+        grant_sink=sink)
+    assert retx > 0, "no retransmission happened -- the check could not have failed"
+    assert not bad, f"{len(bad)} of {retx} retries on wrong-kind slots, e.g. {bad[:5]}"

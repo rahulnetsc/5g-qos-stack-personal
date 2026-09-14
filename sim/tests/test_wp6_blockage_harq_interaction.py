@@ -27,7 +27,9 @@ granted fresh during an already-blocked window is correctly matched from
 the start. Measured directly (not assumed): at ``cqi_delay_slots=0``,
 long-blockage ``bytes_harq_lost`` across 7 seeds ranged 0-6193, WITH
 overlap against the no-blockage baseline's 0-1000 range on several seeds
--- not a reliable signal.
+-- not a reliable signal. (Re-measured 2026-09-14 after HARQ retries were
+aligned to the TDD pattern: 200-4793 against a baseline of 0-600 -- no
+seed reads 0 any more, but the ranges still overlap, which is the finding.)
 
 **With ``cqi_delay_slots=8`` (the value ``scripts/scheduler_study.py::
 CQI_DELAY_SLOTS`` uses -- CLAUDE.md's own note that this, not the bare
@@ -60,7 +62,8 @@ estimated):**
 
 No-blockage and short-blockage never exceed 800 bytes; long blockage
 never drops below 5200 -- a clean, non-overlapping separation across
-every seed tried, not a cherry-picked one. Against WP5's own reported
+every seed tried, not a cherry-picked one. (Re-measured 2026-09-14 under
+TDD-aligned retries: 4600-15636 against <= 800; still non-overlapping.) Against WP5's own reported
 baseline (``bytes_harq_lost`` nonzero on only 6 of 510 flow-records
 across the FULL 22-scenario/3-study regression corpus, most of those
 6 in the low hundreds of bytes -- docs/wp5-plan.md commit 4b) -- this
@@ -204,11 +207,23 @@ def test_pure_retry_freeze_without_cqi_delay_is_too_unreliable_to_demonstrate():
     in prose."""
     long_config = _long_config()
     results = [_bytes_harq_lost(long_config, seed, cqi_delay_slots=0) for seed in SEEDS]
-    assert any(r == 0 for r in results), (
-        "expected at least one seed where cqi_delay_slots=0's long-blockage "
-        "bytes_harq_lost is 0 -- if this no longer happens, the 'CQI delay "
-        "is necessary for a reliable demonstration' finding above needs "
-        "re-checking, not silently dropping this test"
+    baseline = [_bytes_harq_lost(None, seed, cqi_delay_slots=0) for seed in SEEDS]
+    # RE-CHECKED 2026-09-14 when HARQ retries were aligned to the TDD
+    # pattern (docs/harq-tdd-alignment-2026-09-14.md). The first form of
+    # this test asserted "at least one seed reads 0". Under aligned retries
+    # no seed does -- long-blockage loss at cqi_delay_slots=0 measured
+    # [1200, 804, 4793, 200, 800, 800, 1604] against a no-blockage
+    # [0, 600, 0, 0, 0, 0, 400] -- but the FINDING is the overlap, not the
+    # zero: the two regimes still share a range at cqi_delay_slots=0 (200
+    # vs 600), while at cqi_delay_slots=8 they do not (4600+ vs <=800, the
+    # tests below). So the property asserted is the one the docstring
+    # claims. If long-blockage loss ever separates from the baseline at
+    # cqi_delay_slots=0, the "CQI delay is necessary" finding is refuted
+    # and the module docstring needs rewriting, not this assertion loosening.
+    assert min(results) <= max(baseline), (
+        f"cqi_delay_slots=0 long-blockage losses {results} no longer overlap "
+        f"the no-blockage range {baseline} -- the mechanism has become "
+        f"reliable WITHOUT CQI delay; re-check the finding above"
     )
 
 

@@ -25,6 +25,27 @@ from scheduler import Scheduler
 from .traffic import TrafficModel
 
 
+
+def align_due_slot(grid, due_slot: int, direction: str) -> int:
+    """The first slot >= ``due_slot`` whose TDD kind carries ``direction``'s
+    symbols -- a retransmission due on a slot the pattern gives to the other
+    direction waits for the next one it can actually use.
+
+    Until 2026-09-14 a retry was due at a FIXED offset (``k1 + k2`` DL,
+    ``k2`` UL) and resolved on whatever slot that was: measured on GT-2.2 at
+    N = 8 under ``DSUUU``, roughly a quarter of UL retries (625 of 2 682 on
+    TwoTier) "transmitted" on a D-slot and their PRBs were carved out of that
+    slot's DL budget, while new-data grants had always respected the pattern.
+    Bounded by one pattern period; a pattern with no slot for a direction is
+    a configuration error and raises.
+    """
+    n = len(grid.pattern)
+    for k in range(due_slot, due_slot + n + 1):
+        sg = grid.slot_grid(k)
+        if (sg.ul_symbols if direction == "UL" else sg.dl_symbols) > 0:
+            return k
+    raise ValueError(f"TDD pattern {grid.pattern!r} has no slot carrying {direction}")
+
 def run(
     scenario: ScenarioConfig,
     scheduler: Scheduler,
@@ -662,7 +683,7 @@ def run(
                     harq_pool.free(proc.ue_id, proc.direction, proc.pid)
                 else:
                     proc.retx_count += 1
-                    proc.due_slot = slot_index + harq_rtt_dl
+                    proc.due_slot = align_due_slot(grid, slot_index + harq_rtt_dl, "DL")
                 # PRBs/CCE are consumed by the attempt regardless of
                 # outcome -- matches the unconditional record_prb_use
                 # below for new grants.
@@ -726,7 +747,7 @@ def run(
                     harq_pool.free(proc.ue_id, proc.direction, proc.pid)
                 else:
                     proc.retx_count += 1
-                    proc.due_slot = slot_index + harq_rtt_ul
+                    proc.due_slot = align_due_slot(grid, slot_index + harq_rtt_ul, "UL")
                 metrics.record_prb_use("UL", proc.prbs)
                 cce_used_this_slot += proc.cce_cost
                 ul_prbs_used_this_slot += proc.prbs
@@ -910,7 +931,7 @@ def run(
                     harq_pool.free(alloc.ue_id, harq_direction, harq_proc.pid)
                 else:
                     harq_proc.retx_count = 1
-                    harq_proc.due_slot = slot_index + harq_rtt_ul
+                    harq_proc.due_slot = align_due_slot(grid, slot_index + harq_rtt_ul, "UL")
                     harq_proc.ul_split = ue_split
                     # Stays busy -- resolved by a later slot's
                     # due_this_slot() pass, above, at the top of this loop.
@@ -944,7 +965,7 @@ def run(
                     harq_pool.free(alloc.ue_id, harq_direction, harq_proc.pid)
                 else:
                     harq_proc.retx_count = 1
-                    harq_proc.due_slot = slot_index + harq_rtt_dl
+                    harq_proc.due_slot = align_due_slot(grid, slot_index + harq_rtt_dl, "DL")
                     # Stays busy -- resolved by a later slot's
                     # due_this_slot() pass, above, at the top of this loop.
 
