@@ -132,6 +132,22 @@ bare `python` invocation that works.
   likely from a pre-Phase-2 capture whose `TwoTier-nomaxmin`/
   `TwoTier-adaptive` arms were deleted at Phase 2 two-tier commit 1.)
 - `docs/` — planning docs. `p5g-sim-plan.md` §9 has the per-WP technical spec.
+  **`docs/results-aligned-2026-09-14.md` is where the guarantee verdicts
+  live now** (ten guarantees, four arms, TDD-aligned retries; artefacts
+  under `sweeps/g3-proto/rrage-2026-09-14/aligned/`, tables regenerable by
+  the two `report_tables*.py` beside them). `docs/GUARANTEE-RESULTS.md` is
+  the pre-alignment record with a banner pointing there.
+  `docs/plan-cg-and-config-scheduler-2026-09-14.md` is the agreed forward
+  plan: configured grants (Type 2) first, the configuration scheduler after.
+- `docs/ts_138{212,214,300,321,331}*.pdf` — 3GPP Rel-18 specs (multiplexing
+  & coding, PHY data procedures, overall description, MAC, RRC), added
+  2026-09-14 as the fidelity references. **Spec-derived behaviour is read
+  from these, never recalled**: extract text with
+  `uv run --with pypdf python` (no poppler on this box; the Read tool cannot
+  render them) and cite the clause. Checked so far: TS 38.214 §6.1.2.1 (K2)
+  against the retry alignment; TS 38.321 §5.4.3.1 against `sim/ue_lcp.py`.
+  TS 38.213 (K1 / PUCCH timing, slot-direction rule §11.1) and TS 38.322
+  (RLC segmentation) are not in the set yet.
 
 ## Non-obvious invariants
 
