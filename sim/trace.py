@@ -78,6 +78,11 @@ class GrantTrace:
     #: DL only: the single flow the grant belongs to. -1 for a UE-level UL
     #: grant, whose composition is in `split`.
     qfi: int = -1
+    #: UL only: True for a transmission on a configured-grant occasion
+    #: (`sim/configured_grant.py`) -- no DCI, `cce_cost` 0 -- as opposed to
+    #: a dynamic grant. Default False keeps every existing consumer's reading
+    #: of the stream unchanged.
+    configured: bool = False
 
 
 GrantSink = Callable[[GrantTrace], None]

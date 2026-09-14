@@ -164,7 +164,8 @@ class UlAccessModel:
             return
         self._state[ue_id] = _UeSrState()
 
-    def on_arrivals(self, per_flow_arrived: dict[tuple[int, int], int], buffers) -> None:
+    def on_arrivals(self, per_flow_arrived: dict[tuple[int, int], int], buffers,
+                    cg_covers=None) -> None:
         """SR trigger: new data arriving when this UE has no other way to
         signal it -- no standing grant (SR flag not already set), no SR
         already pending, and not mid-RACH-recovery. Mirrors `nr_update_sr`
@@ -209,6 +210,16 @@ class UlAccessModel:
             st = self._state[ue_id]
             if st.pending or st.gnb_sr_flag or st.rach_recovery_until is not None or st.ra_pending:
                 continue
+            if cg_covers is not None:
+                # TS 38.321 sec 5.4.4: an SR is triggered for a Regular BSR
+                # only if no UL-SCH resource is available, and an active
+                # configured grant counts as available for the channels it
+                # may carry (NOTE 2 + the LCP-restriction clause). Channels
+                # a CG covers therefore never raise an SR here; the CG
+                # occasion carries their BSR instead (sim/configured_grant.py).
+                flows = [f for f in flows if not cg_covers(f.ue_id, f.qfi)]
+                if not flows:
+                    continue
             states = [buffers.state(f.ue_id, f.qfi) for f in flows]
             arrived = sum(per_flow_arrived.get((f.ue_id, f.qfi), 0) for f in flows)
             total_now = sum(s.bytes_queued for s in states)

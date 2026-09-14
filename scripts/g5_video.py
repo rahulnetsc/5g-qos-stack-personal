@@ -55,7 +55,7 @@ from sim.scenarios.g5 import (  # noqa: E402
     QFI_CAMERA, QFI_LIDAR, QFI_TELEMETRY, build_gt31_scenario,
     build_gt32_scenario, build_gt33_scenario, camera_flow_key,
     frame_age_bound_ms, telemetry_flow_keys)
-from proto_arms import resolve_arm  # noqa: E402
+from proto_arms import resolve_arm, split_cg  # noqa: E402
 
 HORIZON_SLOTS = 40_000
 CQI_DELAY_SLOTS = 8
@@ -120,11 +120,12 @@ def _one(task: dict[str, Any]) -> dict[str, Any]:
     """
     t0 = time.time()
     sc = _scenario(task)
-    sched = resolve_arm(task["arm"])
+    base_arm, cg_cfg = split_cg(task["arm"])     # "PF+CG": the suffix is the label
+    sched = resolve_arm(base_arm)
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
     summ = driver_run(with_srb(sc), sched, cqi_delay_slots=CQI_DELAY_SLOTS,
                       max_sched_ues=CAP, random_access=ra,
-                      record_timeseries=True)
+                      record_timeseries=True, configured_grant=cg_cfg)
     rec = RunRecord.from_summary(
         scenario_name=sc.name, scheduler_name=task["arm"], seed=task["seed"],
         flow_configs=sc.flows, summary=summ, arm={}, meta={})

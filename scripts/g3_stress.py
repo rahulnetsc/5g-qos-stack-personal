@@ -132,6 +132,7 @@ from sim.scenarios.g3 import (                                   # noqa: E402
 )
 from sim.srb import with_srb                                     # noqa: E402
 from g11_campaign import _arm                                    # noqa: E402
+from proto_arms import split_cg                                  # noqa: E402
 
 
 def _resolve_arm(name: str):
@@ -462,13 +463,17 @@ def one(packed: tuple) -> dict[str, Any]:
     resumes = (resume_times_s(task["silence_s"], cycles=SILENCE_CYCLES)
                if task["kind"] == "gt23" else ())
 
-    sched = _resolve_arm(task["arm"])
+    # "Product + CG": the arm name may carry a configured-grant suffix
+    # (`PF+CG`), which is the label; the scheduler gets the base name.
+    base_arm, cg_cfg = split_cg(task["arm"])
+    sched = _resolve_arm(base_arm)
     tally = FloorFireTally()
     sched.rank_sink = tally
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
     t0 = time.time()
     summ = driver_run(with_srb(sc), sched, cqi_delay_slots=CQI_DELAY_SLOTS,
-                      max_sched_ues=task["cap"], random_access=ra)
+                      max_sched_ues=task["cap"], random_access=ra,
+                      configured_grant=cg_cfg)
     wall = time.time() - t0
     rec = RunRecord.from_summary(
         scenario_name=sc.name, scheduler_name=task["arm"], seed=task["seed"],

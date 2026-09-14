@@ -13,7 +13,32 @@ clean null result.
 """
 from typing import Any
 
-__all__ = ["resolve_arm", "is_proto"]
+__all__ = ["resolve_arm", "is_proto", "split_cg", "CG_PRESETS"]
+
+#: "Product + CG" (README section 8): an arm name may carry a configured-
+#: grant suffix, and the suffix IS the label -- it travels into every row,
+#: block key and ledger key because the arm name does. `+CG` is the
+#: restricted UE (`allowedCG-List` honoured), `+CGu` the unrestricted one
+#: (the OAI UE today). The driver gets the config; the scheduler gets the
+#: base name. Every value inside a preset is `sim/configured_grant.py`'s
+#: CHOSEN default, so a preset is a switch, not a tuning.
+CG_PRESETS: dict[str, dict[str, Any]] = {
+    "+CG": {"lcp_restriction": True},
+    "+CGu": {"lcp_restriction": False},
+}
+
+
+def split_cg(name: str) -> tuple[str, "dict[str, Any] | None"]:
+    """`"PF+CG"` -> `("PF", {...})`; a name without a suffix -> `(name, None)`.
+    An unknown `+` suffix RAISES rather than silently running without CG
+    under a name that claims it."""
+    if "+" not in name:
+        return name, None
+    base, _, suffix = name.partition("+")
+    key = "+" + suffix
+    if key not in CG_PRESETS:
+        raise ValueError(f"unknown arm suffix {key!r} in {name!r}; known: {sorted(CG_PRESETS)}")
+    return base, dict(CG_PRESETS[key])
 
 _FLAGS: dict[str, dict[str, Any]] = {
     "ProtoOff": {},

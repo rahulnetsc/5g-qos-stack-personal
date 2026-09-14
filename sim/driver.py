@@ -7,6 +7,8 @@ from .bsr import BsrModel
 from .buffer import BufferModel
 from .channel import ChannelModel
 from .config import ScenarioConfig
+from .configured_grant import CgConfig, ConfiguredGrantModel
+from scheduler.link import cce_aggregation_level
 from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
 from .pre_sched import Occupancy
 from .random_access import RandomAccessConfig, RandomAccessModel
@@ -71,6 +73,11 @@ def run(
     attach_seed_slots: Optional[dict[int, int] | str] = None,
     rejoin_seed_bsr: bool = False,
     random_access: Optional[RandomAccessConfig | dict] = None,
+    #: Configured grants, Type 2 (`sim/configured_grant.py`). None = off,
+    #: which is the deployed system. A `CgConfig` or its dict turns the
+    #: MAC feature on for EVERY arm ("product + CG", README section 8); the
+    #: arm must then be labelled `+CG` by whoever names it.
+    configured_grant: Optional[CgConfig | dict] = None,
 ) -> dict:
     """Run one scenario through one scheduler.
 
@@ -176,6 +183,14 @@ def run(
         # (10 subframes x 2^mu slots each).
         slots_per_frame=10 * (2 ** scenario.carrier.numerology),
     )
+    # Build 2: configured grants (sim/configured_grant.py). None keeps every
+    # path below byte-identical to pre-Build-2; a dict is accepted for the
+    # same JSON-serialisable-kwargs reason as `random_access` below.
+    cg: Optional[ConfiguredGrantModel] = None
+    if configured_grant is not None:
+        cg_cfg = (configured_grant if isinstance(configured_grant, CgConfig)
+                  else CgConfig.from_dict(dict(configured_grant)))
+        cg = ConfiguredGrantModel(scenario.flows, grid, cg_cfg)
     # Build 1: 4-step CBRA (sim/random_access.py). None keeps every path
     # below byte-identical to pre-Build-1; a dict is accepted so a campaign
     # can pass the config through JSON-serialisable driver kwargs (the
@@ -759,7 +774,8 @@ def run(
         # occasion/timer tick before broadcast() asks it for a report.
         bsr.on_arrivals(per_flow_arrived, buffers)
         bsr.tick_timers(slot_index)
-        ul_access.on_arrivals(per_flow_arrived, buffers)
+        ul_access.on_arrivals(per_flow_arrived, buffers,
+                              cg_covers=(cg.covers if cg is not None else None))
         # M-9 needs the current slot before any eligibility is read.
         ul_access.note_slot(slot_index)
         ul_access.tick(slot_index, gated_ues=(
@@ -820,6 +836,76 @@ def run(
             dl_prbs_used_this_slot += ra_res.occupancy.prbs_dl
             ul_prbs_used_this_slot += ra_res.occupancy.prbs_ul
             cce_used_this_slot += ra_res.occupancy.cce
+        # Build 2: configured grants (sim/configured_grant.py). The model
+        # decides activations, resizes, releases and this slot's occasions
+        # from gNB-visible state; every occasion's PRBs are reserved in the
+        # occupancy whether or not the UE transmits (the gNB schedules the
+        # dynamic grants around them before it can know). The occasion
+        # itself is resolved HERE, ahead of the dynamic scheduler, exactly
+        # like a dynamic UL grant except that no DCI is spent: the UE's LCP
+        # fills the TB from the channels the CG may carry, a pending BSR
+        # rides it, the outcome is drawn, and a failure retransmits through
+        # the ordinary retry loop (a CS-RNTI dynamic grant, which DOES cost a
+        # DCI -- that is why the process carries a CCE cost).
+        if cg is not None:
+            cg_res = cg.step(slot_index, slot_grid, buffers, channel)
+            occupancy.add(cg_res.occupancy)
+            cce_used_this_slot += cg_res.occupancy.cce
+            for occ_ in cg_res.occasions:
+                metrics.record_prb_use("UL", occ_.prbs)
+                ul_prbs_used_this_slot += occ_.prbs
+                cg_flows = ue_flows_by_ue.get(occ_.ue_id, [])
+                if occ_.allowed_qfis is not None:
+                    cg_flows = [f for f in cg_flows if f.qfi in occ_.allowed_qfis]
+                # The FIFO-masking invariant (HarqAwareBufferView is per UE
+                # on UL): no second UL TB while one is pending. Checked
+                # AFTER this slot's due retries resolved above.
+                if harq_pool.is_pending(occ_.ue_id, "UL"):
+                    cg.note_occasion(occ_.ue_id, occ_.qfi, "harq_pending")
+                    continue
+                # TS 38.321 sec 5.4.3.1.3: nothing to send -> no MAC PDU.
+                if sum(buffers.state(f.ue_id, f.qfi).bytes_queued for f in cg_flows) <= 0:
+                    cg.note_occasion(occ_.ue_id, occ_.qfi, "empty")
+                    continue
+                harq_allocate_calls += 1
+                cg_proc = harq_pool.allocate(
+                    occ_.ue_id, "UL", occ_.tbs_bytes, slot_index, qfi=-1,
+                    prbs=occ_.prbs, cce_cost=cce_aggregation_level(occ_.snr_used_db),
+                    snr_used_db=occ_.snr_used_db,
+                )
+                if cg_proc is None:
+                    harq_exhausted_count += 1
+                    cg.note_occasion(occ_.ue_id, occ_.qfi, "cg_busy")
+                    continue
+                true_snr = channel.get_snr_db(occ_.ue_id)
+                success = draw_harq_outcome(
+                    harq_rng_ul, true_snr, occ_.snr_used_db, retx_count=0,
+                    mode=harq_combining_mode, symbols=slot_grid.ul_symbols,
+                )
+                ue_split = ue_lcp.fill(cg_flows, occ_.tbs_bytes, buffers)
+                cg_filled = sum(byts for _, byts in ue_split)
+                bsr.on_ul_grant(occ_.ue_id, occ_.tbs_bytes, 0, slot_index, buffers,
+                                filled_bytes=cg_filled)
+                ul_access.on_ul_grant(occ_.ue_id)
+                cg.note_occasion(occ_.ue_id, occ_.qfi, "used", cg_filled)
+                if grant_sink is not None:
+                    grant_sink(GrantTrace(
+                        slot_index=slot_index, ue_id=occ_.ue_id, direction="UL",
+                        prbs=occ_.prbs, bytes_capacity=occ_.tbs_bytes, cce_cost=0,
+                        retx_count=0, success=success, split=tuple(ue_split),
+                        configured=True))
+                if success:
+                    for qfi, byts in ue_split:
+                        pdb_s = pdb_by_flow.get((occ_.ue_id, qfi), 1.0)
+                        buffers.drain(occ_.ue_id, qfi, byts, now_s, pdb_s)
+                        metrics.record_delivery(occ_.ue_id, qfi, byts)
+                        per_flow_delivered[(occ_.ue_id, qfi)] += byts
+                    bsr.on_ul_confirmed_receipt(occ_.ue_id, cg_filled)
+                    harq_pool.free(occ_.ue_id, "UL", cg_proc.pid)
+                else:
+                    cg_proc.retx_count = 1
+                    cg_proc.due_slot = align_due_slot(grid, slot_index + harq_rtt_ul, "UL")
+                    cg_proc.ul_split = ue_split
         reduced_slot_grid = ReducedSlotView(slot_grid, occupancy=occupancy)
         # WP-Join commit 5: JoinAwareBufferView composed OUTERMOST over
         # HarqAwareBufferView (docs/wp-join-plan.md sec1.4) -- a radio-
@@ -1116,9 +1202,11 @@ def run(
         "max_sched_ues_override": max_sched_ues,
         "random_access": bool(ra is not None),
         "srb": bool(srb is not None),
+        "configured_grant": (cg.cfg.to_dict() if cg is not None else None),
     }
     _defaults = {"rejoin_seed_bsr": False, "attach_seed_slots": None,
-                 "max_sched_ues_override": None, "random_access": False, "srb": False}
+                 "max_sched_ues_override": None, "random_access": False, "srb": False,
+                 "configured_grant": None}
     _non_default = {k: v for k, v in _levers.items() if v != _defaults[k]}
     if _non_default:
         summary["levers"] = _non_default
@@ -1135,6 +1223,8 @@ def run(
         summary["random_access"] = ra.summary()
     if srb is not None:
         summary["srb"] = srb.summary(grid.slot_duration_s)
+    if cg is not None:
+        summary["configured_grant"] = cg.summary()
     # Emitted only when something was counted: a scheduler that keeps a
     # tally must serialise exactly as before on a run where it never fired.
     _sc_counters = getattr(scheduler, "counters", None)
