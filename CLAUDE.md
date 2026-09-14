@@ -281,6 +281,18 @@ where this does not, since GLPK's vertex selection is not HiGHS's. Do not
 "fix" the convergence by raising the cap — that would depart from ground
 truth to chase a property nobody has established the real system has.
 
+**DECIDED 2026-09-14 — configured grants ARE being built, as a MAC feature
+in `sim/` (`sim/configured_grant.py`, Type 2, TS 38.321 §5.8.2 / 38.214
+§6.1.2.3 / 38.331 `ConfiguredGrantConfig`), and "product + CG" is the
+comparison: every arm, faithful ports included, runs with CG through one
+driver flag, and any arm with CG on is labelled `+CG` in its name and in
+every table.** The invariant below still holds for the SCHEDULER files —
+`scheduler/two_tier.py` and `scheduler/reservation.py` stay the port, and
+CG reaches them only as pre-scheduler occupancy (`sim/pre_sched.py`) plus
+a reduced buffer view, never as a scheduler mechanism. The UE-side LCP
+mapping restriction (`allowedCG-List`) is an explicit switch because the
+vendored OAI UE implements none (`docs/plan-cg-and-config-scheduler-2026-09-14.md` §1.2).
+
 **Do not add SPS / Configured Grant to the schedulers.** `main`'s
 `scheduler/two_tier.py` had it (`_SPSReservation`, `_allocate_sps`); the real
 hardware scheduler defers SPS to a Phase 2 that was never built. The Python

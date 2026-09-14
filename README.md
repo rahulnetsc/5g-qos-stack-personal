@@ -1608,6 +1608,16 @@ these five, add a new tag rather than forcing it into an existing one.
 
 ---
 
+- `[DECIDED 2026-09-14 — product + CG]` **Configured grants (Type 2) are
+  built as a MAC feature in `sim/`, and every arm — the faithful ports
+  included — is measured with them.** An arm with CG on is labelled `+CG`
+  in its name and in every table; it is a divergence from the deployed C
+  (which has no CG), and the scheduler files stay the port. The UE-side
+  `allowedCG-List` restriction is modelled as an explicit switch because the
+  vendored OAI UE implements no LCP mapping restriction. Sequence and design:
+  `docs/plan-cg-and-config-scheduler-2026-09-14.md`; baseline it is measured
+  against: `docs/results-aligned-2026-09-14.md`.
+
 ## 9. Repository layout (this branch)
 
 ```

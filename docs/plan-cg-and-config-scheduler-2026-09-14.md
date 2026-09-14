@@ -71,11 +71,19 @@ the cold-start lock-out become structurally impossible for the mapped LCH.
 Counters: occasions offered / used / wasted PRB / LCH bytes on CG vs
 dynamic.
 
-### 1.6 Open decisions
-Faithful arms carry CG in the comparison ("product + CG", labelled) or only
-the divergence arm; period set for μ = 2 from 38.331 to be transcribed, not
-recalled; what the allocator does with the flood robot's telemetry (the
-one G3 miss no ranking reaches).
+### 1.6 Decisions and what is still open
+**DECIDED 2026-09-14 — "product + CG": every arm, the faithful ports
+included, is measured with configured grants.** The CG machinery is a MAC
+feature that lives in `sim/` ahead of `scheduler.allocate()`, not in any
+scheduler, so all four arms take it through one flag. A faithful arm with
+CG on is **labelled `+CG`** everywhere it is reported (arm name, artefact
+`arm` column, tables) and is a divergence from the deployed C, which has no
+CG — the port stays the port. Recorded in `README.md` §8 and CLAUDE.md.
+
+Still open: the μ = 2 periodicity set from 38.331 is transcribed in
+`sim/configured_grant.py` (never recalled); what the allocator does with
+the flood robot's telemetry (the one G3 miss no ranking reaches) is a
+measurement, not a design choice.
 
 ## 2. The configuration-based scheduler — written after §1's measurement
 
