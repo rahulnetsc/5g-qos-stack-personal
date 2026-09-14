@@ -1,0 +1,4 @@
+# PDFs are binary whatever their first kilobytes look like -- two of the
+# 3GPP specs were auto-detected as text, and autocrlf would rewrite them
+# on checkout.
+*.pdf binary
