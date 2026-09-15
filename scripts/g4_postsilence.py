@@ -309,7 +309,8 @@ def _schedulers() -> dict:
     from proto_arms import resolve_arm
     return {**_arms(), "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2"),
             # the configuration-based divergence arm (2026-09-15)
-            "ConfigSched": lambda: resolve_arm("ConfigSched")}
+            "ConfigSched": lambda: resolve_arm("ConfigSched"),
+            "ConfigSched2": lambda: resolve_arm("ConfigSched2")}
 
 
 def main(argv: list[str]) -> int:

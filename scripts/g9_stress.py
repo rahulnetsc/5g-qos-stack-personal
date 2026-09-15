@@ -93,7 +93,8 @@ def _arms():
             "Reservation": lambda: Reservation(min_rb=5),
             "TwoTier": lambda: load_two_tier(_TT, min_rb=5),
             "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2"),
-            "ConfigSched": lambda: resolve_arm("ConfigSched")}
+            "ConfigSched": lambda: resolve_arm("ConfigSched"),
+            "ConfigSched2": lambda: resolve_arm("ConfigSched2")}
 
 
 def _availability_budget_s(fr) -> float:

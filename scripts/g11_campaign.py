@@ -87,9 +87,15 @@ def _arm(name: str):
         return Reservation(min_rb=5)
     if name == "ConfigSched":
         # The configuration-based divergence arm (sim/baselines/config_sched.py,
-        # docs/config-scheduler-handoff.md sec 8a) -- prototype 2026-09-15.
+        # docs/config-scheduler-handoff.md sec 8a) -- prototype 2026-09-15,
+        # frozen as measured in the 2026-09-16 campaign.
         from sim.baselines.config_sched import ConfigSched
         return ConfigSched(min_rb=5)
+    if name == "ConfigSched2":
+        # The same design rebuilt toward the v2 formulation (handoff sec 8c),
+        # one fidelity change per commit from the prototype (2026-09-16).
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=5)
     return load_two_tier(_TT, min_rb=5)
 
 
