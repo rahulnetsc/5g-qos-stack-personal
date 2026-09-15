@@ -43,23 +43,9 @@ class ConfigSched2:
     """See the module docstring. `min_rb` is the deployed grant floor."""
 
     def __init__(self, min_rb: int = 5, window_ms: float = 100.0,
-                 resolve_ms: float = 10.0, deadline_margin_slots: int = 6) -> None:
+                 resolve_ms: float = 10.0) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
-        # Increment 2 (2026-09-16): a contracted flow's visit interval is
-        # PDB - margin, not PDB. The prototype planned one visit per PDB
-        # (`ceil(W / PDB)`), so a source whose period equals its PDB (the
-        # 100 ms heartbeat) or exceeds it (cmd_vel: 50 ms period, 100 ms PDB,
-        # one visit per 100 ms) had every other message arrive with its flow
-        # "early", and an early visit is placed only after every due unit --
-        # G1 at cap 2 (10.5 ms from N = 4), G12's telemetry indicator, G9's
-        # incumbent heartbeat at x1.25. The margin is the DL HARQ retry gap
-        # `k1 + k2` = 6 slots of sim/driver.py -- CHOSEN to match the driver,
-        # the same constant that set G2's miss floor -- so a message that
-        # arrives just after a visit gets the next visit and one retry inside
-        # its PDB. The undeclared form: no message period is read (a declared
-        # period could cap the visits at one per period, the +CGt caveat).
-        self.deadline_margin_slots = int(deadline_margin_slots)
         self.resolve_ms = float(resolve_ms)
         self.counters: dict[str, int] = defaultdict(int)
         self._flows: list[FlowConfig] = []
@@ -154,10 +140,7 @@ class ConfigSched2:
                     continue
                 tb_max = (self._prb_count * se) // 8
                 pdb_slots = max(1, int(round(f.pdb_ms / 1000.0 / self._slot_s)))
-                # Increment 2: a visit at least every PDB - margin slots (see
-                # __init__); the prototype used every PDB.
-                interval_bound = max(1, pdb_slots - self.deadline_margin_slots)
-                floor_visits = int(math.ceil(self._window_slots / interval_bound)) if contracted else 0
+                floor_visits = int(math.ceil(self._window_slots / pdb_slots)) if contracted else 0
                 floor_bytes = int(math.ceil(f.gfbr_bps * w_s / 8.0)) if (contracted and f.gfbr_bps > 0) else 0
                 if contracted and f.flow_class == "Delay":
                     floor_bytes = max(floor_bytes, backlog)
@@ -328,18 +311,6 @@ class ConfigSched2:
             cce_cost = cce_aggregation_level(snr)
             if cce_left < cce_cost:
                 continue
-            # Increment 3 (2026-09-16): a contracted flow's visit carries what
-            # it REPORTS, up to a cap-th of this slot, never less than the
-            # plan's r/n share. Increment 2 alone (two visits per window for
-            # the heartbeat) halved `bytes_per_visit` to 150 B for a 300 B
-            # message: every message split across two visits 50 ms apart,
-            # delivery rate = arrival rate with no slack, one missed visit and
-            # the backlog grew without bound -- a 4.2 s silence at N = 24 and
-            # G3's campaign part 2 failing (running log, increment 2). A
-            # message is the unit of service (v2's L2); the plan's arithmetic
-            # decides how OFTEN a flow is visited, not how much of a message a
-            # visit may carry. Best-effort keeps the r/n share.
-            per_visit_cap = max(1, ((int(slot.prb_count) * se) // 8) // max(1, cap))
             # size: the planned visits of this unit's flows (the due ones for a
             # due unit; every planned one for an early visit); a unit with no
             # share this window gets its backlog from whatever is left
@@ -365,12 +336,7 @@ class ConfigSched2:
                 k = self._due_key(key, now)
                 if cls <= 0 and k[0] > 0:
                     continue            # a due unit serves only its due flows
-                if self._contracted.get(key):
-                    want = min(reported, max(plan.bytes_per_visit, per_visit_cap))
-                    if want > plan.bytes_per_visit:
-                        self.counters["visit_sized_to_report"] += 1
-                else:
-                    want = min(plan.bytes_per_visit, reported)
+                want = min(plan.bytes_per_visit, reported)
                 planned += want
                 visits.append((f, plan, want))
             target = planned if planned > 0 else backlog
