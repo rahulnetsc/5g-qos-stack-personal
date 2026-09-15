@@ -326,6 +326,34 @@ order like Reservation's — registered, hit); telemetry violation 0.105 at
 as the ramp grows the video/camera visits); "by declaration" unscoreable
 at class level. Written into `docs/results-cell-2026-09-15.md` §10.
 
+## 8. ConfigSched2 — the increments (running)
+
+The arm `ConfigSched2` (`sim/baselines/config_sched2.py`) starts as a
+byte-identical copy of the prototype (increment 0, asserted on a full G3
+run) and takes one fidelity change per commit toward the v2 formulation.
+Each increment is measured by `sweeps/cs2-increments/run_increment.sh`
+(the campaign's G3, G7, G10, G2, G1, G5, G6, G9, G12 steps, same flags
+and seeds, one arm, ~20 min on 31 workers) into `sweeps/cs2-increments/
+incN/`, and read by `sweeps/cs2-increments/compare.py`, which prints the
+campaign's `ConfigSched` against the increment on every guarantee's
+deciding statistics. An increment is kept if it moves what it was built
+to move and nothing else moves the wrong way; a regression is recorded,
+not tuned away.
+
+Order, by evidence weight from the campaign:
+
+| # | change | what it is built to move | expected effect, registered before the run |
+|---|---|---|---|
+| 1 | a contracted flow with backlog and no plan is due now (class 0), not leftover | G2 cap 2 (1 390 misses; the no-plan STOPs) | G2 cap 2 → within ~2× the deadline-tier arms (≈ 250–500); cap 4 unchanged; nothing else moves beyond noise |
+| 2 | visit interval ≤ PDB/2 for a contracted flow (L7, undeclared form) | G1 cap 2 (10.5 ms), G12's telemetry indicator (0.82), G9's broken incumbent at ×1.25, G3 part 1s at N = 24 | G1 cap 2 p98 → ≤ 6 ms; G12 M02 at ×2.0 → < 0.3; G9 cold (6) → PASS; cost: more visits per window, G10 admissible may fall by 1 |
+| 3 | residual: contracted above-floor demand before best-effort | G5 load knee (×1.1), G6 windowed floor (4/30) | G5 knee → ≥ ×1.3; G6 floor → ≥ 9/30; cost: bg delivered in G12 falls |
+| 4 | floors dropped most-expensive-first, shortfall shared within a class (`z_i`) | G10 past the boundary (M08 0.007 at N = 16), G12 order by declaration | G10 M08 at N = 16 → ≥ 0.4; admissible unchanged |
+| 5 | harmonic periods and table placement replace the due order (L4, tracks) | G1's early-order loss, all cadence tails | structural: max gap = T_i; every G3/G9 cadence statistic ≤ the Proto arm's |
+
+| increment | commit | result | kept? |
+|---|---|---|---|
+| 0 copy | see git log | identical on G3 N = 10 (summaries, counters) | yes |
+
 ## 7. After the results: ConfigSched iteration
 
 The redesign to build once the table is complete, from the 2026-09-16
