@@ -41,7 +41,12 @@ deadline constraints, and they are enforced here, not in a rank):
     of its due flows' bytes_per_visit. A grant that carries less than the
     visit's size (a crumb) does NOT stamp the visit (`crumb_not_counted`) --
     the C3 lesson: a crumb must not reset the clock. A visit served more than
-    one interval late is `visits_late`.
+    one interval late is `visits_late`. The M-6 per-slot UE cap is applied
+    DURING placement: once `cap` UEs hold a grant, every further unit is
+    skipped (`cap_skipped_<dir>_due` / `_notdue`) and its clock untouched.
+    The first build placed past the cap and let `cap_ues_per_slot` trim the
+    list afterwards, so a visit was stamped for a grant that was never sent
+    -- measured at N = 24 as 46 of the flood robot's 94 heartbeat stamps.
 
 WHAT IT DOES NOT DO (deliberate, for the prototype): no deficit carried
 across windows (the receding backlog is the memory); no per-role group
@@ -64,7 +69,7 @@ from typing import Any
 
 from scheduler.flow import FlowConfig, require_assigned_lcgs
 from scheduler.interfaces import Allocation
-from scheduler.link import bits_per_prb, cap_ues_per_slot, cce_aggregation_level
+from scheduler.link import bits_per_prb, cce_aggregation_level
 
 from ._mac import emit_grant
 
@@ -246,10 +251,21 @@ class ConfigSched:
         if slot.slot_index % self._resolve_slots == 0 or not self._plan:
             self._resolve_tier1(slot, buffers, channel)
         out: list[Allocation] = []
-        if slot.dl_symbols > 0:
-            out.extend(cap_ues_per_slot(self._place(slot, buffers, channel, "DL"), slot.max_sched_ues))
-        if slot.ul_symbols > 0:
-            out.extend(cap_ues_per_slot(self._place(slot, buffers, channel, "UL"), slot.max_sched_ues))
+        cap = int(slot.max_sched_ues)
+        for direction, symbols in (("DL", slot.dl_symbols), ("UL", slot.ul_symbols)):
+            if symbols <= 0:
+                continue
+            placed = self._place(slot, buffers, channel, direction)
+            # The M-6 cap is applied INSIDE `_place` (it stops placing once
+            # `cap` UEs hold a grant), so nothing here has to trim. Asserted
+            # rather than re-applied: `cap_ues_per_slot` would silently hide
+            # a regression to place-then-trim, which stamped visits for
+            # grants that never left the gNB (2026-09-15, N = 24: 46 of the
+            # flood robot's 94 heartbeat stamps, 70 % of all DL stamps).
+            if cap > 0 and len({a.ue_id for a in placed}) > cap:
+                raise AssertionError(f"ConfigSched placed more than {cap} UEs in slot "
+                                     f"{slot.slot_index} {direction}")
+            out.extend(placed)
         return out
 
     def _due_key(self, key: tuple[int, int], now: int) -> tuple[int, int, int, int]:
@@ -285,11 +301,21 @@ class ConfigSched:
         scored.sort(key=lambda x: (x[0], x[1]))
         prbs_left = int(slot.prb_count)
         cce_left = int(slot.pdcch_cce_budget)
+        cap = int(slot.max_sched_ues)
+        granted_ues: set[int] = set()
         out: list[Allocation] = []
         for (cls, _due, _c, _iv), unit, flows in scored:
             if prbs_left <= 0:
                 break
             ue_id = unit[0]
+            # M-6, with `cap_ues_per_slot`'s exact semantics (distinct UEs; a
+            # later flow of a UE already granted still passes): a UE that
+            # would need a DCI the slot cannot issue is not placed at all,
+            # so its visit clock is not stamped for a grant that is never
+            # sent. Counted per kind so a run shows how often the cap bound.
+            if cap > 0 and ue_id not in granted_ues and len(granted_ues) >= cap:
+                self.counters[f"cap_skipped_{direction.lower()}_{'due' if cls == 0 else 'notdue'}"] += 1
+                continue
             snr = channel.get_reported_snr_db(ue_id)
             se, _bler = bits_per_prb(snr, symbols=symbols)
             if se <= 0:
@@ -342,6 +368,7 @@ class ConfigSched:
                 else:
                     self.counters["crumb_not_counted"] += 1
             self.counters["grants_" + direction.lower()] += 1
+            granted_ues.add(ue_id)
             out.extend(emit_grant(ue_id, direction, prbs_used, tbs, flows, buffers,
                                   cce_cost=cce_cost, snr_used_db=snr))
         return out
