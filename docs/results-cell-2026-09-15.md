@@ -30,8 +30,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `aligned/g2.json` | 2 700 | 1 143 s | done |
 | `cg/g2_cg.json` | 5 400 | 2 390 s | done |
 | `aligned/g6.json` | 1 350 | 477 s | done |
-| `cg/g6_cg.json` | | | running |
-| `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
+| `cg/g6_cg.json` | 2 700 | 979 s | done |
+| `aligned/g4.json` (all fifteen arm names in one file) | | | running |
 | `aligned/g9.json`, `cg/g9_cg.json` | | | pending |
 | `aligned/g12.json`, `cg/g12_cg.json` | | | pending |
 
@@ -678,6 +678,30 @@ exception in PF's favour: the windowed GFBR floor (goodput ≥ GFBR in every
 (§5.4), the camera's above-floor demand waiting behind an equal PRB share
 for the flood. No expectation was registered for G6; this is its first
 measurement.
+
+### 6.5 With configured grants (`cg/g6_cg.json`, 2 700 runs)
+
+**The telemetry half of G6 is fixed on every arm.** Under either CG,
+every G3 statistic passes part A on 30 of 30 cells on all ten CG arms,
+and the worst telemetry silence under flood is one message period on
+every one of them:
+
+| arm | worst telemetry gap under flood, G3 / G5 instrument (ms): plain → +CG / +CGt | part A / B, UL flood: plain → +CG |
+|---|---|---|
+| PF | 300 / 498 → 214 / 204 · 201 / 201 | 229 / 255 → 228 / 264 |
+| Reservation | 6 538 / 8 907 → **220 / 200** · 200 / 201 | 204 / 227 → **228 / 258** |
+| TwoTier | 8 160 / 9 592 → **207 / 201** · 200 / 202 | 143 / 182 → **185 / 226** |
+| ProtoRRageD2 | 300 / 397 → 203 / 202 · 198 / 202 | 240 / 256 → 238 / 257 |
+| ConfigSched | 399 / 395 → 200 / 201 · 203 / 200 | 225 / 254 → 225 / 259 |
+
+What does not change is the G5 half: the camera's frame age (0/30 on
+TwoTier, 20/30 on the rest under the UL flood) and the windowed GFBR
+floor (4–9 of 30 on the arms without a lock-out) are the same numbers
+with the CG on, so **G6 still fails on every arm** — on the camera, and
+on G1's command p98 shifting more than 20 % inside its bound. A guarantee
+about isolation from background traffic is, on this cell, two
+guarantees: the heartbeat's, which a CG closes structurally, and the
+camera's, which is capacity and the scheduler's.
 
 ## 7. G7 — "One misconfigured robot cannot take down the fleet"
 

@@ -1,0 +1,33 @@
+G6 isolation: 2700 runs, 54.0M slots
+  instruments g1,g3,g5  conditions none,ul,dl  arms PF+CG,Reservation+CG,TwoTier+CG,ProtoRRageD2+CG,ConfigSched+CG,PF+CGt,Reservation+CGt,TwoTier+CGt,ProtoRRageD2+CGt,ConfigSched+CGt  seeds 10  N [4, 7, 12]  cap 4
+  part A: each statistic within its own bound; part B: shift <= +20% IN THE DIRECTION OF HARM, absolute for zero-baseline counts
+  0 banked, 2700 to run
+    ... 100/2700 (21s)
+    ... 200/2700 (40s)
+    ... 300/2700 (60s)
+    ... 400/2700 (85s)
+    ... 500/2700 (108s)
+    ... 600/2700 (154s)
+    ... 700/2700 (206s)
+    ... 800/2700 (258s)
+    ... 900/2700 (321s)
+    ... 1000/2700 (384s)
+    ... 1100/2700 (436s)
+    ... 1200/2700 (458s)
+    ... 1300/2700 (479s)
+    ... 1400/2700 (499s)
+    ... 1500/2700 (518s)
+    ... 1600/2700 (536s)
+    ... 1700/2700 (560s)
+    ... 1800/2700 (584s)
+    ... 1900/2700 (615s)
+    ... 2000/2700 (667s)
+    ... 2100/2700 (719s)
+    ... 2200/2700 (776s)
+    ... 2300/2700 (840s)
+    ... 2400/2700 (906s)
+    ... 2500/2700 (935s)
+    ... 2600/2700 (957s)
+    ... 2700/2700 (978s)
+
+wrote sweeps/cell-2026-09-16-linux/cg/g6_cg.json  (979s, 2700 runs)

@@ -107,6 +107,7 @@ and anything that needed a fix.
 | g2 | 0 | 1 143 | 2 700 runs, 183 000 STOP events. No Windows artefact. Campaign miss-rate 2.2e-2 (previous cell 3.1e-3) — a cell effect on every arm |
 | g2_cg | 0 | 2 390 | 5 400 runs. CG changes nothing on G2 (downlink); every arm within ±15 % of plain |
 | g6 | 0 | 477 | 1 350 runs (2 s). No Windows artefact. Fails on every arm; ConfigSched = PF except the windowed GFBR floor |
+| g6_cg | 0 | 979 | 2 700 runs. Every CG arm's worst flood silence ~200 ms (Reservation from 6.5–8.9 s, TwoTier from 8.2–9.6 s); G5 half unchanged |
 
 ## 5. Expectations registered before the artefacts are read
 
