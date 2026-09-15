@@ -24,8 +24,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `aligned/g5.json` (Windows: 880, 719 s; identical on the four arms) | 1 100 | 496 s | done |
 | `cg/g5_cg.json`, `cg/g5_cgt.json` | 1 100 + 1 100 | 520 s + 519 s | done |
 | `aligned/g7.json`, `cg/g7.json` | 50, 100 | 16 s, 28 s | done |
-| `aligned/g10.json`, `cg/g10.json` | | | running |
-| `aligned/g1.json` (Windows: 1 280, 1 198 s), `cg/g1_cg.json` | | | pending |
+| `aligned/g10.json`, `cg/g10.json` | 450, 900 | 134 s, 269 s | done |
+| `aligned/g1.json` (Windows: 1 280, 1 198 s), `cg/g1_cg.json` | | | running |
 | `aligned/g2.json`, `cg/g2_cg.json` | | | pending |
 | `aligned/g6.json`, `cg/g6_cg.json` | | | pending |
 | `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
@@ -597,6 +597,25 @@ and the Proto arm keeps the worst at 0.418. "Ordered degradation by
 declaration order" was registered for G12; it shows here first. The v2
 formulation's `z_i` (drop the most expensive floors first, or share the
 shortfall) is the change that addresses it.
+
+### 9.5 With configured grants (`cg/g10.json`, 900 runs)
+
+| arm | admissible: plain → +CG / +CGt | worst flow ÷ GFBR at N = 10: plain → +CG / +CGt | UEs never granted, N = 16: plain → +CG |
+|---|---|---|---|
+| PF | 8 → 8 / 8 | 0.955 → 0.948 / 0.951 | 0 → 0 |
+| Reservation | 4 → **8 / 8** | 0.000 → **0.957 / 0.970** | **94 → 0** |
+| TwoTier | 5 → **7 / 7** | 0.606 → 0.618 / 0.635 | 0 → 0 |
+| ProtoRRageD2 | 7 → 7 / 6 | 0.661 → 0.664 / 0.694 | 0 → 0 |
+| ConfigSched | 10 → 10 / 10 | 0.981 → 0.983 / 0.981 | 0 → 0 |
+
+**The CG removes Reservation's cold-start lock-out.** Its first occasion
+carries the BSR that a UE with no grant could never send, so no robot is
+starved outright at any N (94 → 0 at N = 16), and Reservation's admissible
+fleet doubles to PF's 8 — the arm's G10 failure was the lock-out, not its
+share rule. TwoTier gains two robots for the same reason on a smaller
+scale. On the three arms with no lock-out the CG changes nothing within
+±0.01 of M08, and the Proto arm's `+CGt` reads one robot fewer (a single
+seed at N = 7, 9/10). ConfigSched stays at 10 under every form.
 
 ## 10. G12 — "When the cell truly runs out, what breaks first — and does safety telemetry survive?"
 

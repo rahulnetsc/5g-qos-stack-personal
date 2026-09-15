@@ -101,6 +101,7 @@ and anything that needed a fix.
 | g7 | 0 | 16 | 50 runs (N = 8, 5 s). No Windows artefact to check against |
 | g7_cg | 0 | 28 | 100 runs, `+CG` and `+CGt` in one file |
 | g10 | 0 | 134 | 450 runs (N = 2 … 16, 5 s). No Windows artefact |
+| g10_cg | 0 | 269 | 900 runs. Reservation+CG: never-granted 94 → 0, admissible 4 → 8 |
 
 ## 5. Expectations registered before the artefacts are read
 
