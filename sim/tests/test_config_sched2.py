@@ -95,6 +95,26 @@ def test_inc2_floor_visits_follow_pdb_minus_the_retry_margin():
             assert want == proto, (qfi, want, proto)    # and left the camera's floor alone
 
 
+def test_inc3_a_contracted_visit_carries_the_whole_report_not_the_plans_share():
+    """Increment 2 gives the heartbeat two visits per window, so its planned
+    share per visit is half a 300 B message; increment 3 sizes the visit to
+    what the flow reports (up to a cap-th of the slot). Cap 1 keeps the slot
+    to this UE; the grant must carry the whole 300 B and stamp the visit."""
+    sc = _cell(n_ues=2)
+    grid = ResourceGrid(sc.carrier, sc.tdd)
+    s = ConfigSched2(min_rb=5)
+    s.configure(sc.flows, grid.slot_duration_s, grid)
+    slot = grid.slot_grid(2)
+    table = {(1, QFI_TELEMETRY): 300}
+    s._resolve_tier1(slot, _Buffers(table), _Channel())
+    plan = s._plan[(1, QFI_TELEMETRY)]
+    assert plan.n_visits >= 2 and plan.bytes_per_visit < 300, (plan.n_visits, plan.bytes_per_visit)
+    got = s._place(slot, _Buffers(table), _Channel(), "UL")
+    assert got and got[0].ue_id == 1 and got[0].bytes_capacity >= 300, [(a.ue_id, a.bytes_capacity) for a in got]
+    assert s.counters["visit_sized_to_report"] == 1
+    assert s.counters["visits_stamped"] == 1 and s.counters.get("crumb_not_counted", 0) == 0
+
+
 def test_inc1_is_reached_at_scale_on_g2_and_no_planned_stop_expires_for_want_of_a_plan():
     """G2 at N = 12, two simultaneous STOPs, cap 2, 2 s: the mechanism fires
     (counted), and every STOP that arrives between re-solves is granted --
