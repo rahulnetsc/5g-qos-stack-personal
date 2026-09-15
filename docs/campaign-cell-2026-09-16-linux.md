@@ -350,12 +350,50 @@ Order, by evidence weight from the campaign:
 | 4 | floors dropped most-expensive-first, shortfall shared within a class (`z_i`) | G10 past the boundary (M08 0.007 at N = 16), G12 order by declaration | G10 M08 at N = 16 → ≥ 0.4; admissible unchanged |
 | 5 | harmonic periods and table placement replace the due order (L4, tracks) | G1's early-order loss, all cadence tails | structural: max gap = T_i; every G3/G9 cadence statistic ≤ the Proto arm's |
 
+**Increment 5 design, registered 2026-09-16 04:50 before it is built** (the
+v2 core; increments 2–3 showed the due-order under contention is what
+binds, and increment 4 does not touch it, so 5 comes next):
+
+- *Tier 1 adds a period.* For every flow with visits `n_i`, `T_i` = the
+  largest power of two ≤ `W / n_i` in slots (so visits ≥ `n_i`); then
+  spare density is spent shortening `T_i` for contracted flows, shortest
+  PDB first, while `Σ_i 1/T_i ≤ cap` per direction (the M-6 cap as a
+  density — Kraft). Under overload the residual visits are cut first
+  (largest density, best-effort first) until the density fits; floors
+  are cut last, in the existing priority order (increment 4 will change
+  that order; not here).
+- *Tracks.* `cap` tracks per direction; flows assigned coarsest period
+  first by the canonical Kraft construction (a free block `(r, T')` with
+  `T' ≤ T` is split into `(r, 2T')`, `(r + T', 2T')` until modulus `T`);
+  first-fit over tracks. Harmonic sizes make first-fit exact whenever the
+  density fits.
+- *Tier 2 is the table.* In slot `t`, each track's mapped flow (residue
+  `t mod T_i`) is placed first, sized as increment 3 sizes a visit; a
+  mapped slot with no symbols for the direction slips to the next slot
+  that has them (the driver's own alignment rule); a mapped flow with
+  nothing reported frees its DCI. Freed DCIs go, in order, to a flow owed
+  a slipped or pre-empted visit, then an unplanned contracted flow
+  (increment 1's rule), then best-effort by the r/n share. The visit
+  clock, EDF, the early/no-share classes and the `ue_id` tie-break are
+  deleted.
+- *Expectations.* G3: flood robot 100/100 at N = 24 (it holds a residue
+  class no other flow can take), worst silence ≤ `T` + a slip at every N
+  (≤ Proto's 199–494 ms), campaign part 2 PASS. G1 cap 2: `cmd_vel`'s
+  wait ≤ its `T`; with two driven robots and fleet DL at N = 4 the
+  density is small, so `T` ≤ 8 slots and p98 ≤ 6 ms. G2: unchanged
+  (increment 1's rule survives as the freed-DCI order). G5, G7, G10:
+  within noise — the plan's bytes do not change. G9 (6, ×1.25): the
+  incumbents' heartbeats hold their classes — PASS. G12 M02 at ×2.0 <
+  0.3. Cost: at N = 24 UL, 72 contracted flows on a cap of 4 give a mean
+  density of 1/18, so `T` ≈ 32 slots (16 ms) is the structural wait
+  bound; p98 at N = 24 will be ~16–20 ms, not the 5 ms of small fleets.
+
 | increment | commit | result | kept? |
 |---|---|---|---|
 | 0 copy | `592d587` | identical on G3 N = 10 (summaries, counters) | yes |
 | 1 unplanned contracted flow first, shortest PDB | `10efeb6` | "due now" (class 0) built first and refuted on the seed (32 of 34 expiries remained: the least overdue of the due units, the fleet's visits bunched); ahead-of-planned by PDB: G2 probe expiries 34 → 2. **Measured (`inc1/`, 9 steps, all rc 0):** G2 cap 2 **1 390 → 317** (deadline arms 247–263, PF 748; registered "within ~2×" — hit), cap 4 224 → 192; STOP axis cap 2 22/78/124/318 → 1/8/20/108; fleet axis 58–295 → 22–47. G3, G5 (bar one seed's part 3 at −6 dB), G7, G10, G6, G9, G12 identical. G1 cap 2: N = 14 13.25 → 13.0 ms, N = 16 15.5 → 16.75 (fleet-DL messages now ahead of `cmd_vel`'s early visit); boundaries unchanged | **yes** |
 | 2 visit interval = PDB − 6 slots (the retry gap) | see git log | telemetry and `cmd_vel` 1 → 2 visits/window, fleet DL 10 → 15, camera 1. G1 probe BEFORE the run: `cmd_vel` due in 175 of its waiting slots (2 before) and its wait unchanged at p98 13 slots — the DCIs go to unplanned fleet-DL messages (increment 1, PDB 10 ms), so the registered G1 ≤ 6 ms is predicted a miss; the uplink targets (G12 indicator, G9 (6)) go to the measurement `inc2/`. Correction to `5092c09`'s message: the suite before it was 1 569 passed, 1 failed — `test_m09_hoist`'s cost-growth ratio under 24 workers, which passes serially on the idle box (7 s, twice tonight); not "green" as written. **Measured (`inc2/`, 9 steps rc 0): NOT KEPT.** G3 campaign part 2 PASS → **FAIL** (1 gap ≥ 2 s: a 4 164 ms silence on one seed at N = 24), part-2 boundary 24 → 16, messages missing at N = 14/16/24 37/57/60 → 63/81/123, worst silences at N = 7/10 107/122 → 198/198 ms; G7 A-telemetry p98 31.5 → 47.8, B 9.0 → 12.8; G12 M02 at ×2.0 0.82 → 0.88 (registered < 0.3: **miss**); G9 (6, ×1.25) still broken (b7; registered PASS: **miss**); G1 cap 2 N = 24 20.5 → 9.25 ms, N = 4–8 unchanged 10.5 (registered ≤ 6: **miss**, as the probe predicted); G2 301 (noise). **Mechanism, traced to the line:** `bytes_per_visit = ceil(r_i / n_i)` and `want = min(bytes_per_visit, reported)` — two visits per window halve the heartbeat's visit to 150 B for a 300 B message, so every message is split across visits 50 ms apart, delivery rate = arrival rate with no slack, and one missed visit grows the backlog without bound; `cmd_vel`'s 100 B message still fits its 100 B visit, which is why G1 alone improved. Left in the tree (a revert would lose the attribution): increment 3 stacks the companion rule — a visit carries what the flow reports, up to a cap-th of the slot — so inc3 − inc2 isolates the sizing and inc3 − campaign measures the pair | **not on its own** |
-| 3 a contracted visit carries what the flow reports, up to a cap-th of the slot (on top of 2) | see git log | unit test: the 300 B heartbeat rides one grant again with a 2-visit plan. Probe BEFORE the run, N = 24 seed 1826701614: instrument robot 100/100, worst gap 104.5 ms (prototype 117.5); **flood robot 71/100 (prototype 97)**, 294 late telemetry visits — two visits per robot per window double the due-unit load on the cap and the `ue_id` tie-break makes the last robot lose. Registered: G3 campaign part 2 back to PASS and part-2 boundary 24 (the sizing fixed the unbounded backlog); G3 messages missing at N = 24 expected WORSE than the campaign's 60 (probe: the flood robot's loss); G1 cap 2 N = 24 ≈ 9 ms kept; if G3 regresses, the pair is not kept and the due-order is the finding — increment 5's table placement is the next change, not increment 4 | pending |
+| 3 a contracted visit carries what the flow reports, up to a cap-th of the slot (on top of 2) | see git log | unit test: the 300 B heartbeat rides one grant again with a 2-visit plan. Probe BEFORE the run, N = 24 seed 1826701614: instrument robot 100/100, worst gap 104.5 ms (prototype 117.5); **flood robot 71/100 (prototype 97)**, 294 late telemetry visits — two visits per robot per window double the due-unit load on the cap and the `ue_id` tie-break makes the last robot lose. Registered: G3 campaign part 2 back to PASS and part-2 boundary 24 (the sizing fixed the unbounded backlog); G3 messages missing at N = 24 expected WORSE than the campaign's 60 (probe: the flood robot's loss); G1 cap 2 N = 24 ≈ 9 ms kept; if G3 regresses, the pair is not kept and the due-order is the finding — increment 5's table placement is the next change, not increment 4. (The suite before `e7fd1cf` was fully green, 1 571 passed — its message says the timing flake fired; it did not) | pending |
 
 ## 7. After the results: ConfigSched iteration
 
