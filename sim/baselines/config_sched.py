@@ -18,8 +18,12 @@ Tier 1 -- every `resolve_ms` (10 ms), over a receding window of `window_ms`
                                             S_dir slots carrying this
                                             direction -- LINEAR here, so no
                                             Dantzig-Wolfe is needed
-                sum_i r_i * 8 / se_i <= PRB * S_dir   PRB-slots, se_i the
-                                            bits per PRB at the CQI-visible SNR
+                sum_i r_i * 8 / se_i <= PRB * P_dir   PRB-slots, se_i the
+                                            bits per PRB at the CQI-visible
+                                            SNR; P_dir the direction's
+                                            symbols per window in full-slot
+                                            units (a special slot counts its
+                                            own 6 of 14, not a whole slot)
     coupling    r_i <= n_i * TB_max,i       a visit carries at most a full slot
     objective   floors first, in priority order; the residual PRB budget by
                 max-min fairness over demand (a separable concave utility on
@@ -103,6 +107,7 @@ class ConfigSched:
         self._flows_by_dir: dict[str, list[FlowConfig]] = {"DL": [], "UL": []}
         self._flows_by_ue_dir: dict[tuple[int, str], list[FlowConfig]] = defaultdict(list)
         self._dir_slots_per_window: dict[str, int] = {"DL": 0, "UL": 0}
+        self._dir_prbslots_per_window: dict[str, float] = {"DL": 0.0, "UL": 0.0}
         self._dir_symbols: dict[str, int] = {"DL": 14, "UL": 14}
         self._window_slots = 1
         self._resolve_slots = 1
@@ -122,22 +127,35 @@ class ConfigSched:
             if f.direction in self._flows_by_dir:
                 self._flows_by_dir[f.direction].append(f)
                 self._flows_by_ue_dir[(f.ue_id, f.direction)].append(f)
-        # How many of a window's slots carry each direction, from the pattern
-        # the grid actually runs -- derived, so a pattern change moves it.
+        # Two budgets per direction, both from the pattern the grid actually
+        # runs -- derived, so a pattern change moves them:
+        #   * VISITS: how many of a window's slots carry the direction at all.
+        #     A DCI in a special slot is a whole DCI, so this is a slot COUNT.
+        #   * PRBs: the direction's symbols, in units of a full slot's symbols
+        #     (`_dir_symbols`, which is also what Tier 1's `se_i` is computed
+        #     at). A special slot carries 6 of 14 symbols per direction on the
+        #     deployed cell; the first build counted it as a full slot for
+        #     BOTH directions and planned 22 % more PRB-time than the cell has.
         pat_len = len(grid.pattern)
         dl = ul = 0
         dl_sym = ul_sym = 0
+        dl_sym_sum = ul_sym_sum = 0
         for k in range(pat_len):
             sg = grid.slot_grid(k)
             if sg.dl_symbols > 0:
                 dl += 1
                 dl_sym = max(dl_sym, int(sg.dl_symbols))
+                dl_sym_sum += int(sg.dl_symbols)
             if sg.ul_symbols > 0:
                 ul += 1
                 ul_sym = max(ul_sym, int(sg.ul_symbols))
+                ul_sym_sum += int(sg.ul_symbols)
         self._dir_slots_per_window = {"DL": max(1, self._window_slots * dl // pat_len),
                                       "UL": max(1, self._window_slots * ul // pat_len)}
         self._dir_symbols = {"DL": max(1, dl_sym), "UL": max(1, ul_sym)}
+        self._dir_prbslots_per_window = {
+            "DL": self._window_slots * dl_sym_sum / (pat_len * self._dir_symbols["DL"]),
+            "UL": self._window_slots * ul_sym_sum / (pat_len * self._dir_symbols["UL"])}
         self._plan = {}
         self._last_visit = {}
 
@@ -154,7 +172,9 @@ class ConfigSched:
         for direction, flows in self._flows_by_dir.items():
             s_dir = self._dir_slots_per_window[direction]
             visit_budget = int(slot.max_sched_ues) * s_dir
-            prb_budget = self._prb_count * s_dir            # PRB-slots
+            # PRB-slots at `_dir_symbols[direction]` symbols -- the same unit
+            # `se` below is computed in, so bytes / se is comparable to it.
+            prb_budget = int(self._prb_count * self._dir_prbslots_per_window[direction])
             symbols = self._dir_symbols[direction]
             rows = []
             for f in flows:

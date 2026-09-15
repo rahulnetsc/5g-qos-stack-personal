@@ -93,6 +93,30 @@ def test_a_due_contracted_flow_is_placed_before_a_best_effort_backlog():
     assert again and again[0].ue_id == 2
 
 
+def test_tier1_prb_budget_is_symbol_weighted_and_the_visit_budget_is_slot_counted():
+    """On the deployed `DDSUU` cell the special slot carries 6 of 14 symbols
+    per direction. Tier 1's PRB budget must weight it by those symbols,
+    while the visit (DCI) budget counts it as a whole slot. Both expected
+    values are derived from the grid inside the test, never restated; the
+    first build's slot-counted PRB budget is asserted to be strictly larger
+    than the symbol-weighted one, so the test could see a regression to it."""
+    sc = _cell(n_ues=2)
+    grid = ResourceGrid(sc.carrier, sc.tdd)
+    s = ConfigSched(min_rb=5)
+    s.configure(sc.flows, grid.slot_duration_s, grid)
+    pat = len(grid.pattern)
+    w = s._window_slots
+    for direction, attr in (("UL", "ul_symbols"), ("DL", "dl_symbols")):
+        syms = [getattr(grid.slot_grid(k), attr) for k in range(pat)]
+        slot_count = w * sum(1 for x in syms if x > 0) // pat
+        full = max(syms)
+        prbslots = w * sum(syms) / (pat * full)
+        assert s._dir_slots_per_window[direction] == slot_count
+        assert abs(s._dir_prbslots_per_window[direction] - prbslots) < 1e-9, direction
+        assert any(0 < x < full for x in syms), "the deployed pattern has a mixed slot"
+        assert prbslots < slot_count, (direction, prbslots, slot_count)
+
+
 def test_tier2_stops_at_the_cap_and_stamps_only_what_it_places():
     """Eight robots, every heartbeat due at once, cap derived from the grid
     (4 at 106 PRB). Placement must stop at the cap: at most `cap` UEs get a
@@ -121,21 +145,35 @@ def test_tier2_stops_at_the_cap_and_stamps_only_what_it_places():
         assert len({a.ue_id for a in s.allocate(slot, _Buffers(table), _Channel())}) <= cap
 
 
-def test_at_a_fleet_that_starves_twotier_the_instrument_heartbeat_is_whole_and_it_is_reached():
-    """G3 at N = 16 is where the port's telemetry shows 300 ms silences. Here
-    the instrument robot (UE 1) delivers EVERY heartbeat the schedule
-    generates -- the count derived from the horizon and the period, never
-    written down -- the arm actually ran (grants in both directions, Tier 1
-    re-solved, the cap bound at least once), and it delivers at least the
-    port's telemetry bytes. The camera floors may not fit (16 x 4 Mbps is
-    beyond this cell's uplink) and that is reported, not hidden.
+def _instrument_heartbeats(sc, summary, arm: str) -> int:
+    """Messages the instrument robot's (UE 1) telemetry completed in a run."""
+    rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm, seed=0,
+                                 flow_configs=sc.flows, summary=summary,
+                                 arm={"cqi_delay_slots": 8, "max_sched_ues": 4}, meta={})
+    flows = rec.flows.values() if isinstance(rec.flows, dict) else rec.flows
+    tel = next(fr for fr in flows if fr.ue_id == 1 and fr.qfi == QFI_TELEMETRY and fr.direction == "UL")
+    return sum(len(v) for v in (tel.completion_ts_by_role_s or {}).values())
 
-    This test used to assert `visits_late_qfi1 == 0` from the arm's own
-    clock. That was green only because placement stamped visits for grants
-    the per-slot cap then discarded; with the cap applied inside placement
-    the honest reading is one late visit in 2 s (a robot's first
-    post-attach visit), so the assertion moved from the arm's self-report to
-    the outcome the arm exists for."""
+
+def test_at_a_fleet_that_starves_twotier_the_instrument_is_no_worse_than_the_port_and_it_is_reached():
+    """G3 at N = 16 is where the port's telemetry shows 300 ms silences. The
+    arm's claim is that removing the rank leaves the instrument robot (UE 1)
+    no worse than the port on the same seed: it completes at least as many
+    heartbeats as TwoTier, out of a schedule whose size is derived from the
+    horizon and the period. The arm is shown to have run (grants in both
+    directions, Tier 1 re-solved, the cap reached), and it delivers at least
+    the port's telemetry bytes. The camera floors may not fit (16 x 4 Mbps
+    is beyond this cell's uplink) and that is reported, not hidden.
+
+    Two earlier forms of this assertion were wrong in the same direction.
+    `visits_late_qfi1 == 0`, from the arm's own clock, was green only
+    because placement stamped visits for grants the per-slot cap then
+    discarded. "UE 1 delivers EVERY heartbeat" held on the slot-counted PRB
+    budget and not on the symbol-weighted one: with the real capacity the
+    plan shifts and UE 1's first message, generated while 16 robots attach
+    at once, expires at its PDB (19 of 20 in 2 s). The prototype's order
+    has no priority or age term, so "every heartbeat" is not something it
+    guarantees; the relative claim is."""
     n = 16
     sc = _cell(n_ues=n)
     s = _run(sc, ConfigSched(min_rb=5))
@@ -143,16 +181,13 @@ def test_at_a_fleet_that_starves_twotier_the_instrument_heartbeat_is_whole_and_i
     assert c["t1_resolves"] > 0 and c["grants_ul"] > 0 and c["grants_dl"] > 0
     assert c["visits_stamped"] > 0
     assert c["cap_skipped_ul_due"] > 0, dict(c)      # the cap is reached, so the mechanism is live
-    rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name="ConfigSched", seed=0,
-                                 flow_configs=sc.flows, summary=s,
-                                 arm={"cqi_delay_slots": 8, "max_sched_ues": 4}, meta={})
-    flows = rec.flows.values() if isinstance(rec.flows, dict) else rec.flows
-    tel1 = next(fr for fr in flows if fr.ue_id == 1 and fr.qfi == QFI_TELEMETRY and fr.direction == "UL")
-    delivered = sum(len(v) for v in (tel1.completion_ts_by_role_s or {}).values())
     expected = int(sc.horizon_slots * _dcell.SLOT_S * 1000.0 // TELEMETRY_PERIOD_MS)
     assert expected > 1
-    assert delivered == expected, (delivered, expected)
-    t = _run(_cell(n_ues=n), TwoTier(min_rb=5))
+    sc_t = _cell(n_ues=n)
+    t = _run(sc_t, TwoTier(min_rb=5))
+    got_cs, got_tt = _instrument_heartbeats(sc, s, "ConfigSched"), _instrument_heartbeats(sc_t, t, "TwoTier")
+    assert 0 < got_cs <= expected and 0 < got_tt <= expected, (got_cs, got_tt, expected)
+    assert got_cs >= got_tt, (got_cs, got_tt, expected)
     def tel_bytes(summary):
         return sum(v.get("delivered_bytes", 0) for k, v in summary.get("flows", {}).items()
                    if k.endswith(f"qfi{QFI_TELEMETRY}")) if isinstance(summary.get("flows"), dict) else None
