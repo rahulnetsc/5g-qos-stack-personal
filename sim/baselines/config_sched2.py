@@ -67,6 +67,10 @@ class ConfigSched2:
         self._flows = list(flows)
         self._slot_s = float(slot_duration_s)
         self._grid = grid
+        # Increment 1: which flows carry a contract, by key, so placement can
+        # tell an unplanned contracted flow (due now) from best-effort leftover.
+        self._contracted = {(f.ue_id, f.qfi): f.flow_class in _CONTRACT_CLASSES for f in flows}
+        self._pdb_slots = {(f.ue_id, f.qfi): max(1, int(round(f.pdb_ms / 1000.0 / self._slot_s))) for f in flows}
         self._window_slots = max(1, int(round(self.window_ms / 1000.0 / self._slot_s)))
         self._resolve_slots = max(1, int(round(self.resolve_ms / 1000.0 / self._slot_s)))
         self._prb_count = int(grid.prb_count)
@@ -244,6 +248,23 @@ class ConfigSched2:
         A flow never visited is due now."""
         plan = self._plan.get(key)
         if plan is None or plan.n_visits <= 0:
+            # Increment 1 (2026-09-16): a CONTRACTED flow with backlog and no
+            # plan is served AHEAD of every planned unit, shortest PDB first.
+            # The prototype classed it "no share" and it sorted after every
+            # planned unit; a 5 ms STOP arriving between two 10 ms re-solves
+            # then lost the slot and expired -- G2 at cap 2, 1 390 misses
+            # against the deadline-tier arms' ~250 (docs/campaign-cell-2026-
+            # 09-16-linux.md section 6.6). "Due now" (class 0 at `now`) was
+            # tried first and measured insufficient on the same seed: it is
+            # the LEAST overdue of the due units, and the fleet's visits fall
+            # due together, so two more-overdue units hold the cap for ~6 DL
+            # slots -- the STOP's whole budget. Only a Delay-class flow with
+            # no GFBR can be unplanned (a GBR flow always has a floor plan),
+            # so what jumps the queue is a STOP or a fleet message, never a
+            # burst, and it is sized for what it reports.
+            if self._contracted.get(key):
+                self.counters["unplanned_contracted_due"] += 1
+                return (-1, self._pdb_slots.get(key, 10 ** 9), 0, 10 ** 9)
             return (2, now, 1, 10 ** 9)
         last = self._last_visit.get(key)
         due = now if last is None else last + plan.interval_slots
@@ -301,10 +322,19 @@ class ConfigSched2:
                 reported = int(buffers.state(f.ue_id, f.qfi).bytes_reported)
                 backlog += reported
                 plan = self._plan.get(key)
-                if plan is None or plan.n_visits <= 0 or reported <= 0:
+                if reported <= 0:
+                    continue
+                if plan is None or plan.n_visits <= 0:
+                    # Increment 1: an unplanned contracted flow is sized for
+                    # what it reports (a STOP is 40 B) so the grant that makes
+                    # its unit due actually carries it; it has no visit clock
+                    # to stamp. Best-effort with no plan stays leftover.
+                    if self._contracted.get(key):
+                        planned += reported
+                        self.counters["unplanned_contracted_sized"] += 1
                     continue
                 k = self._due_key(key, now)
-                if cls == 0 and k[0] != 0:
+                if cls <= 0 and k[0] > 0:
                     continue            # a due unit serves only its due flows
                 want = min(plan.bytes_per_visit, reported)
                 planned += want
