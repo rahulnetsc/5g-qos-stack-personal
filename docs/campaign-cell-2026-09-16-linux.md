@@ -92,6 +92,7 @@ and anything that needed a fix.
 
 | step | rc | wall (s) | note |
 |---|---|---|---|
+| g3 | 0 | 555 | 500 runs. **Cross-platform determinism check passed:** the four faithful arms' `A/cap4/<arm>` cells are byte-identical to the Windows artefact (`sweeps/cell-2026-09-15/aligned/g3.json`) on every field of every fleet-size point, and the campaign-wide part-2 counts match exactly (PF 0 / 37 910, Reservation 3 / 30 219, TwoTier 30 / 35 075, Proto 0 / 38 106). Windows took 759 s for four arms on 23 workers |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -132,8 +133,37 @@ the runbook's §5. Each is scorable; a miss is recorded as a miss.
 ## 6. Results
 
 Regenerated from the artefacts by `sweeps/cell-2026-09-15/report_tables.py`
-and `report_tables_cg.py` (the directory is the argument); filled in per
+(the directory is the argument; `--cg` adds the CG rows); filled in per
 guarantee as steps land, and folded into `docs/results-cell-2026-09-15.md`.
+
+### 6.1 G3, plain arms (`aligned/g3.json`, 500 runs)
+
+The four faithful arms reproduce the Windows figures exactly (§4), so
+`docs/results-cell-2026-09-15.md` §3 stands and gains the ConfigSched row:
+
+| ConfigSched | 4 | 6 | 7 | 8 | 10 | 12 | 14 | 16 | 24 | boundary |
+|---|---|---|---|---|---|---|---|---|---|---|
+| part 1 / 1s / 2 / 3 (of 10) | 10/10/10/10 | 10/10/10/10 | 10/10/10/10 | 10/10/10/10 | 10/10/10/10 | 10/10/10/5 | 10/10/10/0 | 10/10/10/0 | 10/8/10/0 | 24 / 16 / 24 / 10 |
+| all parts | 10 | 10 | 10 | 10 | 10 | 5 | 0 | 0 | 0 | **10** (PF 10, Proto 10, TwoTier 6, Reservation 4) |
+| p98 median (ms) | 5.2 | 9.0 | 10.2 | 14.0 | 22.0 | 93.0 | 98.8 | 99.2 | 99.0 |
+| worst silence (ms) | 104 | 105 | 107 | 110 | 122 | 357 | 399 | 492 | 1 357 |
+| messages missing (of 2 000) | 0 | 0 | 0 | 0 | 0 | 46 | 37 | 57 | 60 |
+| protected UL (Mbps) | 16.1 | 24.2 | 28.2 | 32.2 | 40.2 | 41.7 | 41.4 | 41.4 | 40.9 |
+
+**Expectations scored (§5, G3):** part 1 to N = 16 — **HIT**, and 10/10 at
+N = 24 as well, where the runbook's own expectation (written before the two
+fixes) was a failure; the flood robot's heartbeat passes part 1 on every
+seed, not "most". Part 3 at the expiry ceiling from N = 12 — **HIT**
+(93.0 → 98.8–99.2 ms). Not registered but worth stating: at N ≤ 10 the arm
+has the lowest p98 of any arm at N = 4 (5.2 ms) and the fewest missing
+messages at every N ≤ 10 (0), and its protected uplink is PF's to N = 10;
+from N = 12 it carries 41–42 Mbps against PF's 43–44 and misses 37–60
+messages per 2 000 against PF's 34–96 and the Proto arm's 4–68. The one
+loss is part 1s at N = 24 (8/10): a 1 357 ms silence in one seed, which is
+the head-of-run attach silence, not a steady-state gap (part 1 is 10/10 on
+the same seeds). Campaign-wide part 2 (zero gaps ≥ 2 s over every run):
+ConfigSched **PASS**, 0 of 37 998 gaps — with PF (0 / 37 910) and the
+Proto arm (0 / 38 106); Reservation and TwoTier FAIL as before.
 
 ## 7. After the results: ConfigSched iteration
 
