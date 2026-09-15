@@ -143,8 +143,8 @@ def test_an_empty_occasion_wastes_its_prbs_and_is_counted():
     assert t["skipped_empty"] > 0
     assert t["prb_wasted"] > 0
     assert t["prb_reserved"] >= t["prb_wasted"]
-    assert t["occasions"] == (t["used"] + t["skipped_empty"]
-                              + t["skipped_harq_pending"] + t["skipped_cg_busy"])
+    assert t["occasions"] == (t["used"] + t["skipped_empty"] + t["skipped_harq_pending"]
+                              + t["skipped_same_slot"] + t["skipped_cg_busy"])
 
 
 def test_off_leaves_no_trace_in_the_summary():
@@ -205,3 +205,57 @@ def test_dynamic_grants_stay_off_the_reserved_harq_processes():
     with pytest.raises(ValueError):
         pool.reserve_ul(1, (15, 16))                          # overlap and out of range
     assert pool.allocate(2, "UL", 100, 5).pid == 0             # another UE: nothing reserved
+
+
+# --- Build 2c: a restricted CG TB masks only its own channel ----------------
+
+def test_restricted_cg_tbs_mask_their_own_channel_only():
+    from sim.harq import HarqAwareBufferView, HarqProcessPool
+    pool = HarqProcessPool(ul_capacity=16)
+    pool.reserve_ul(1, (14, 15))
+    p = pool.allocate(1, "UL", 300, 5, pids=(14, 15), cg_qfi=7)
+    assert p.pid == 14 and p.cg_qfi == 7
+    assert pool.ul_cg_pending(1, 7) and not pool.ul_dynamic_pending(1)
+    assert pool.ul_flow_in_flight(1, 7) and not pool.ul_flow_in_flight(1, 9)
+    assert pool.is_pending(1, "UL")                          # "any UL TB": unchanged meaning
+
+    class _St:
+        def __init__(self):
+            self.bytes_queued = 500
+            self.bytes_reported = 500
+
+    class _B:
+        def state(self, ue, qfi):
+            return _St()
+    dirs = {(1, 7): "UL", (1, 9): "UL", (2, 7): "UL"}
+    view = HarqAwareBufferView(_B(), pool, dirs)
+    assert view.state(1, 7).bytes_queued == 0                # the CG's own channel is hidden
+    assert view.state(1, 9).bytes_queued == 500              # the UE's other channel is not
+    assert view.state(2, 7).bytes_queued == 500
+    busy = HarqAwareBufferView(_B(), pool, dirs, ul_busy_this_slot=frozenset({1}))
+    assert busy.state(1, 9).bytes_queued == 0                # one PUSCH per slot per UE
+    d = pool.allocate(1, "UL", 400, 5, ul_split=[(9, 400)])
+    assert d.cg_qfi == -1 and pool.ul_dynamic_pending(1) and pool.ul_flow_in_flight(1, 9)
+    assert view.state(1, 9).bytes_queued == 0                # a dynamic TB masks the whole UE
+    pool.free(1, "UL", d.pid)
+    pool.free(1, "UL", p.pid)
+    assert not pool.ul_flow_in_flight(1, 7) and not pool.is_pending(1, "UL")
+    assert pool._busy_ul_cg == {(1, 7): 0} and pool._busy_ul_cg_total == {1: 0}
+
+
+def test_one_uplink_pusch_per_ue_per_slot_with_cg_and_dynamic_grants_mixed():
+    """Two CGs per robot plus dynamic grants: never two UL PUSCHs of one UE in
+    one slot, and no CG occasion is refused for a TB that carries none of its
+    channel's bytes -- the refusals that remain are the same-slot rule."""
+    sc, q_tel, q_mon = _two_cg_cell()
+    per_slot: dict[tuple[int, int], int] = {}
+
+    def sink(g):
+        if g.direction == "UL" and not g.retx_count:
+            per_slot[(g.slot_index, g.ue_id)] = per_slot.get((g.slot_index, g.ue_id), 0) + 1
+    s = _run(sc, {"lcp_restriction": True}, sink)
+    assert per_slot and max(per_slot.values()) == 1
+    t = s["configured_grant"]["totals"]
+    assert t["used"] > 0 and t["occasions"] == (
+        t["used"] + t["skipped_empty"] + t["skipped_harq_pending"]
+        + t["skipped_same_slot"] + t["skipped_cg_busy"])

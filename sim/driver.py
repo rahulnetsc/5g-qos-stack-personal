@@ -855,6 +855,9 @@ def run(
         # rides it, the outcome is drawn, and a failure retransmits through
         # the ordinary retry loop (a CS-RNTI dynamic grant, which DOES cost a
         # DCI -- that is why the process carries a CCE cost).
+        # Build 2c: UEs that transmit a CG PUSCH in this slot -- hidden from
+        # the dynamic scheduler for the slot (one PUSCH per slot per UE).
+        cg_tx_ues_this_slot: set[int] = set()
         if cg is not None:
             cg_res = cg.step(slot_index, slot_grid, buffers, channel)
             occupancy.add(cg_res.occupancy)
@@ -865,10 +868,19 @@ def run(
                 cg_flows = ue_flows_by_ue.get(occ_.ue_id, [])
                 if occ_.allowed_qfis is not None:
                     cg_flows = [f for f in cg_flows if f.qfi in occ_.allowed_qfis]
-                # The FIFO-masking invariant (HarqAwareBufferView is per UE
-                # on UL): no second UL TB while one is pending. Checked
-                # AFTER this slot's due retries resolved above.
-                if harq_pool.is_pending(occ_.ue_id, "UL"):
+                # One PUSCH per slot per UE (TS 38.214 sec 6.1): a retry or
+                # another CG of this UE already transmits in this slot.
+                if occ_.ue_id in retx_ues_this_slot["UL"] or occ_.ue_id in cg_tx_ues_this_slot:
+                    cg.note_occasion(occ_.ue_id, occ_.qfi, "same_slot")
+                    continue
+                # Build 2c: a RESTRICTED CG TB carries one channel, so the
+                # FIFO rule needs only that channel's bytes to be out of
+                # flight (sim/harq.py, HarqAwareBufferView); an unrestricted
+                # one keeps the whole-UE rule. Checked AFTER this slot's due
+                # retries resolved above.
+                restricted = occ_.allowed_qfis is not None
+                if (harq_pool.ul_flow_in_flight(occ_.ue_id, occ_.qfi) if restricted
+                        else harq_pool.is_pending(occ_.ue_id, "UL")):
                     cg.note_occasion(occ_.ue_id, occ_.qfi, "harq_pending")
                     continue
                 # TS 38.321 sec 5.4.3.1.3: nothing to send -> no MAC PDU.
@@ -880,11 +892,13 @@ def run(
                     occ_.ue_id, "UL", occ_.tbs_bytes, slot_index, qfi=-1,
                     prbs=occ_.prbs, cce_cost=cce_aggregation_level(occ_.snr_used_db),
                     snr_used_db=occ_.snr_used_db, pids=occ_.harq_pids,
+                    cg_qfi=(occ_.qfi if occ_.allowed_qfis is not None else -1),
                 )
                 if cg_proc is None:
                     harq_exhausted_count += 1
                     cg.note_occasion(occ_.ue_id, occ_.qfi, "cg_busy")
                     continue
+                cg_tx_ues_this_slot.add(occ_.ue_id)
                 true_snr = channel.get_snr_db(occ_.ue_id)
                 success = draw_harq_outcome(
                     harq_rng_ul, true_snr, occ_.snr_used_db, retx_count=0,
@@ -922,7 +936,8 @@ def run(
         # docstring a future reader meets first. A no-op wrapper (join_
         # states is empty) for every scenario with no UEConfig.join set.
         masked_buffers = JoinAwareBufferView(
-            HarqAwareBufferView(buffers, harq_pool, direction_by_flow), join_states,
+            HarqAwareBufferView(buffers, harq_pool, direction_by_flow,
+                                ul_busy_this_slot=frozenset(cg_tx_ues_this_slot)), join_states,
             srb_keys=srb_keys,
             # Built fresh for this slot and used for exactly one
             # `scheduler.allocate()` call, during which buffers and the HARQ
@@ -942,7 +957,14 @@ def run(
             # ineligible (DL per-flow, UL per-UE); this only fires if some
             # scheduler grants one anyway, which would otherwise
             # double-book the same bytes (README.md sec8's SPS finding).
-            if harq_pool.is_pending(alloc.ue_id, harq_direction, harq_qfi):
+            if alloc.ue_grant:
+                # Build 2c: a pending restricted-CG TB no longer makes the
+                # UE ineligible (its channel is masked, the rest is not).
+                masked_now = (harq_pool.ul_dynamic_pending(alloc.ue_id)
+                              or alloc.ue_id in cg_tx_ues_this_slot)
+            else:
+                masked_now = harq_pool.is_pending(alloc.ue_id, "DL", harq_qfi)
+            if masked_now:
                 harq_masked_flow_double_grant_count += 1
                 continue
 
@@ -981,8 +1003,13 @@ def run(
                     harq_rng_ul, true_snr, alloc.snr_used_db, retx_count=0,
                     mode=harq_combining_mode, symbols=symbols,
                 )
+                # Build 2c: a channel with a restricted-CG TB pending is
+                # masked from the scheduler; keep it out of the UE's LCP
+                # fill too, or its in-flight bytes would be reserved twice.
                 ue_split = ue_lcp.fill(
-                    ue_flows_by_ue.get(alloc.ue_id, []), alloc.bytes_capacity, buffers
+                    [f for f in ue_flows_by_ue.get(alloc.ue_id, [])
+                     if not harq_pool.ul_cg_pending(f.ue_id, f.qfi)],
+                    alloc.bytes_capacity, buffers
                 )
                 # BSR: if pending, assemble/quantise a report from the true
                 # current per-LCG backlog; always credit sched_ul_bytes and

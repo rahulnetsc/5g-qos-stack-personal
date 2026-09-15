@@ -212,6 +212,9 @@ class HarqProcess:
     cce_cost: int = 0
     snr_used_db: float = math.nan
     ul_split: list[tuple[int, int]] | None = None
+    #: Build 2c: the ONE channel a restricted configured-grant TB carries
+    #: (`allowedCG-List`); -1 for a dynamic TB or an unrestricted CG TB.
+    cg_qfi: int = -1
 
     def reset(self) -> None:
         self.busy = False
@@ -223,6 +226,7 @@ class HarqProcess:
         self.cce_cost = 0
         self.snr_used_db = math.nan
         self.ul_split = None
+        self.cg_qfi = -1
 
 
 class HarqProcessPool:
@@ -266,6 +270,12 @@ class HarqProcessPool:
         # block (`allocate(pids=...)`). Empty for every UE without a CG, so
         # the pre-2b path is byte-identical.
         self._reserved_ul: dict[int, frozenset[int]] = {}
+        # Build 2c: busy UL processes that are restricted-CG TBs, per
+        # (ue, channel) and per UE, so `ul_dynamic_pending` /
+        # `ul_cg_pending` are O(1) like `is_pending`. Same two writers as
+        # `_busy_ul` (allocate / _drop_busy).
+        self._busy_ul_cg: dict[tuple[int, int], int] = {}
+        self._busy_ul_cg_total: dict[int, int] = {}
 
     def _capacity(self, direction: Direction) -> int:
         return self.dl_capacity if direction == "DL" else self.ul_capacity
@@ -305,6 +315,7 @@ class HarqProcessPool:
         snr_used_db: float = math.nan,
         ul_split: list[tuple[int, int]] | None = None,
         pids: tuple[int, ...] | None = None,
+        cg_qfi: int = -1,
     ) -> HarqProcess | None:
         """Claim a free process for a new TB. ``None`` if every process
         for this (ue_id, direction) is already busy (harq_exhausted).
@@ -317,8 +328,13 @@ class HarqProcessPool:
             if not proc.busy and eligible:
                 proc.busy = True
                 proc.qfi = qfi
+                proc.cg_qfi = int(cg_qfi) if direction == "UL" else -1
                 if direction == "UL":
                     self._busy_ul[ue_id] = self._busy_ul.get(ue_id, 0) + 1
+                    if proc.cg_qfi >= 0:
+                        ck = (ue_id, proc.cg_qfi)
+                        self._busy_ul_cg[ck] = self._busy_ul_cg.get(ck, 0) + 1
+                        self._busy_ul_cg_total[ue_id] = self._busy_ul_cg_total.get(ue_id, 0) + 1
                 else:
                     k = (ue_id, qfi)
                     self._busy_dl[k] = self._busy_dl.get(k, 0) + 1
@@ -339,6 +355,10 @@ class HarqProcessPool:
             return
         if proc.direction == "UL":
             self._busy_ul[proc.ue_id] = self._busy_ul.get(proc.ue_id, 0) - 1
+            if proc.cg_qfi >= 0:
+                ck = (proc.ue_id, proc.cg_qfi)
+                self._busy_ul_cg[ck] = self._busy_ul_cg.get(ck, 0) - 1
+                self._busy_ul_cg_total[proc.ue_id] = self._busy_ul_cg_total.get(proc.ue_id, 0) - 1
         else:
             k = (proc.ue_id, proc.qfi)
             self._busy_dl[k] = self._busy_dl.get(k, 0) - 1
@@ -407,6 +427,35 @@ class HarqProcessPool:
             return self._busy_ul.get(ue_id, 0) > 0
         return self._busy_dl.get((ue_id, qfi), 0) > 0
 
+    def ul_dynamic_pending(self, ue_id: int) -> bool:
+        """Build 2c: an unresolved UL TB whose bytes the gNB cannot pin to
+        one flow -- a dynamic grant, or an unrestricted CG TB. While one is
+        pending the whole UE stays masked, the pre-2c rule unchanged.
+        Calls `_pool` for the same lazy-creation side effect `is_pending`
+        documents, at the same call sites, so the HARQ draw order is
+        unchanged."""
+        self._pool(ue_id, "UL")
+        return (self._busy_ul.get(ue_id, 0) - self._busy_ul_cg_total.get(ue_id, 0)) > 0
+
+    def ul_cg_pending(self, ue_id: int, qfi: int) -> bool:
+        """Build 2c: an unresolved restricted-CG TB carrying exactly this
+        flow's bytes -- masks this flow only. No `_pool` side effect."""
+        return self._busy_ul_cg.get((ue_id, qfi), 0) > 0
+
+    def ul_flow_in_flight(self, ue_id: int, qfi: int) -> bool:
+        """Build 2c: does ANY unresolved UL TB of this UE hold bytes of
+        this flow -- a restricted-CG TB for it, or a dynamic TB whose
+        stored LCP split gave it bytes (a split not yet stored is treated
+        as holding them). The check a CG occasion makes before it
+        transmits, so the reserved bytes stay at the flow's queue head."""
+        if self.ul_cg_pending(ue_id, qfi):
+            return True
+        for proc in self._pool(ue_id, "UL"):
+            if proc.busy and proc.cg_qfi < 0:
+                if proc.ul_split is None or any(q == qfi and b > 0 for q, b in proc.ul_split):
+                    return True
+        return False
+
     def due_this_slot(self, slot_index: int) -> list[HarqProcess]:
         """Every busy process across every (ue_id, direction) pool whose
         ``due_slot`` has arrived -- the retries/resolutions ``driver.py``
@@ -453,23 +502,40 @@ class HarqAwareBufferView:
     with ``buffers.drain(...)``. A partial mask would silently reintroduce
     that corruption the moment a flow accumulates enough new backlog to
     look grantable again while still mid-retry.
+
+    Build 2c (2026-09-15): a RESTRICTED configured-grant TB is the one
+    case where the gNB knows exactly which bytes are in flight -- the TB
+    carries a single channel (``allowedCG-List``), ``HarqProcess.cg_qfi``
+    names it, and only THAT flow is masked while it is pending; the UE's
+    other flows, and its other CGs, stay schedulable, as on a real UE
+    with its independent HARQ processes (TS 38.321 sec 5.4.1 NOTE 5).
+    The FIFO argument above is unchanged: the reserved bytes are that
+    flow's queue head and nothing else can drain it (the driver keeps a
+    dynamic TB's LCP fill off a flow with a CG TB pending). A dynamic TB
+    or an unrestricted CG TB (``cg_qfi == -1``) still masks the whole
+    UE. ``ul_busy_this_slot`` masks a UE that already transmits a CG
+    PUSCH in this slot -- one PUSCH per slot per UE (TS 38.214 sec 6.1),
+    which the per-UE mask used to guarantee for free.
     """
 
     def __init__(
-        self, buffers, pool: HarqProcessPool, direction_by_flow: dict[tuple[int, int], str]
+        self, buffers, pool: HarqProcessPool, direction_by_flow: dict[tuple[int, int], str],
+        ul_busy_this_slot: frozenset[int] = frozenset(),
     ) -> None:
         self._buffers = buffers
         self._pool = pool
         self._direction_by_flow = direction_by_flow
+        self._ul_busy_this_slot = ul_busy_this_slot
 
     def state(self, ue_id: int, qfi: int):
         real = self._buffers.state(ue_id, qfi)
         direction = self._direction_by_flow.get((ue_id, qfi), "DL")
-        pending = (
-            self._pool.is_pending(ue_id, "UL")
-            if direction == "UL"
-            else self._pool.is_pending(ue_id, "DL", qfi)
-        )
+        if direction == "UL":
+            pending = (self._pool.ul_dynamic_pending(ue_id)
+                       or self._pool.ul_cg_pending(ue_id, qfi)
+                       or ue_id in self._ul_busy_this_slot)
+        else:
+            pending = self._pool.is_pending(ue_id, "DL", qfi)
         if pending:
             masked = copy.copy(real)
             masked.bytes_queued = 0

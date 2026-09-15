@@ -115,11 +115,19 @@ POLICY (the vendor part), stated so a reader can see what was chosen:
     occasion's TB retransmits through the ordinary dynamic HARQ path
     (CS-RNTI DCI, k2 later, TDD-aligned), which is what the timer exists
     to allow.
-  * ONE STATED LIMITATION: the simulator masks a UE's whole uplink while
-    any UL TB of its is pending (`HarqAwareBufferView`, a FIFO-correctness
-    rule), so an occasion that falls while a DYNAMIC TB is awaiting retry
-    is skipped here (`skipped_harq_pending`) where a real UE would
-    transmit on a different HARQ process. Counted, so its size is visible.
+  * IN FLIGHT (Build 2c, 2026-09-15): a RESTRICTED occasion transmits
+    unless bytes of ITS channel are already in an unresolved UL TB -- a
+    pending CG TB of this configuration, or a dynamic TB whose stored LCP
+    split holds some (`HarqProcessPool.ul_flow_in_flight`); an
+    unrestricted occasion keeps the whole-UE rule, since its TB may carry
+    any channel. Skipped occasions are `skipped_harq_pending`. Before 2c
+    the whole UE was masked while ANY UL TB was pending, which cost 3 %
+    of single-CG occasions and would have cost a second CG on the same
+    robot most of its occasions.
+  * ONE PUSCH PER SLOT (TS 38.214 sec 6.1): an occasion on a slot in
+    which the UE already transmits a retry or another CG is skipped
+    (`skipped_same_slot`), and a UE that transmits a CG PUSCH is hidden
+    from the dynamic scheduler for that slot.
 
 MORE THAN ONE CG ON A UE (Build 2b, 2026-09-15). One configuration per
 eligible flow was always the model; what the probe of 2026-09-15 showed is
@@ -146,9 +154,8 @@ on the 2026-09-15 reference runs).
 WHAT THE DRIVER DOES WITH AN OCCASION (`sim/driver.py`, "CG" block):
 the occasion's PRBs enter `Occupancy` whether or not the UE transmits; the
 UE transmits iff a channel the CG may carry has data (the skip rule), and
-only if it has no UL HARQ process pending (the FIFO masking invariant --
-`HarqAwareBufferView` is per UE on UL) and fewer than `nrof_harq_processes`
-CG TBs in flight; the UE's own LCP fills the TB from the allowed channels
+only if none of its channel's bytes are in flight (IN FLIGHT above) and a
+process of its own block is free (`cg_busy` otherwise); the UE's own LCP fills the TB from the allowed channels
 (or all channels when the restriction is off); a BSR rides it if one is
 pending (`BsrModel.on_ul_grant`); the outcome is drawn exactly as for a
 dynamic TB; a failure retransmits through the existing retry loop.
@@ -271,6 +278,7 @@ class _CgState:
     skipped_empty: int = 0
     skipped_harq_pending: int = 0
     skipped_cg_busy: int = 0
+    skipped_same_slot: int = 0      # the UE already transmits a PUSCH this slot
     invalid_slot: int = 0
     prb_reserved: int = 0
     prb_wasted: int = 0
@@ -518,7 +526,7 @@ class ConfiguredGrantModel:
     def note_occasion(self, ue_id: int, qfi: int, outcome: str,
                       bytes_carried: int = 0) -> None:
         """The driver reports what happened on an occasion: "used",
-        "empty", "harq_pending" or "cg_busy". An unused occasion counts
+        "empty", "harq_pending", "same_slot" or "cg_busy". An unused occasion counts
         toward release only if the gNB saw no report for the LCG during the
         period that led to it."""
         st = self._states[(ue_id, qfi)]
@@ -537,6 +545,8 @@ class ConfiguredGrantModel:
             st.skipped_empty += 1
         elif outcome == "harq_pending":
             st.skipped_harq_pending += 1
+        elif outcome == "same_slot":
+            st.skipped_same_slot += 1
         elif outcome == "cg_busy":
             st.skipped_cg_busy += 1
         else:
@@ -551,7 +561,7 @@ class ConfiguredGrantModel:
         distinguishable from one where it was off (CLAUDE.md's
         unreachable-mechanism rule)."""
         keys = ("occasions", "used", "skipped_empty", "skipped_harq_pending",
-                "skipped_cg_busy", "invalid_slot", "prb_reserved", "prb_wasted",
+                "skipped_same_slot", "skipped_cg_busy", "invalid_slot", "prb_reserved", "prb_wasted",
                 "bytes_carried", "activations", "resizes", "releases",
                 "phase_deferred", "phase_deferred_slots", "phase_collisions")
         total = {k: sum(getattr(s, k) for s in self._states.values()) for k in keys}
