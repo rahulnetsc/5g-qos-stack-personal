@@ -1,0 +1,29 @@
+G3 stress: 500 driver runs, 19.0M slots (2.64 simulated hours)
+  parts ['A']  arms ['PF', 'Reservation', 'TwoTier', 'ProtoRRageD2', 'ConfigSched']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 500 runs, 19.0M slots
+  projected cost: 2.08 h CPU -> 5 min wall at 31 workers (x0.77 measured pool efficiency)
+  projected peak memory: 15.1 GB (500 MB x 31 workers, worst task 200,000 slots)
+  0 banked, 500 to run
+    ... 25/500 (166s)
+    ... 50/500 (217s)
+    ... 75/500 (254s)
+    ... 100/500 (286s)
+    ... 125/500 (339s)
+    ... 150/500 (356s)
+    ... 175/500 (372s)
+    ... 200/500 (392s)
+    ... 225/500 (411s)
+    ... 250/500 (428s)
+    ... 275/500 (448s)
+    ... 300/500 (461s)
+    ... 325/500 (478s)
+    ... 350/500 (491s)
+    ... 375/500 (503s)
+    ... 400/500 (511s)
+    ... 425/500 (523s)
+    ... 450/500 (535s)
+    ... 475/500 (543s)
+    ... 500/500 (555s)
+
+wrote sweeps/cell-2026-09-16-linux/aligned/g3.json  (555s, 500 runs)

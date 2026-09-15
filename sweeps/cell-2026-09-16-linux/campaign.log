@@ -1,0 +1,8 @@
+campaign start 2026-09-16 00:07:54  workers=31  H5=10000  HEAD=88d5bd0  OUT=sweeps/cell-2026-09-16-linux  ARMS=PF,Reservation,TwoTier,ProtoRRageD2,ConfigSched  CG=on
+=== g3  start 2026-09-16 00:07:54
+=== g3  end   2026-09-16 00:17:09  rc=0  555s
+=== g3_cg  start 2026-09-16 00:17:09
+=== g3_cg  end   2026-09-16 00:26:31  rc=0  562s
+=== g3_cgt  start 2026-09-16 00:26:31
+=== g3_cgt  end   2026-09-16 00:35:54  rc=0  563s
+=== g5  start 2026-09-16 00:35:54

@@ -93,6 +93,8 @@ and anything that needed a fix.
 | step | rc | wall (s) | note |
 |---|---|---|---|
 | g3 | 0 | 555 | 500 runs. **Cross-platform determinism check passed:** the four faithful arms' `A/cap4/<arm>` cells are byte-identical to the Windows artefact (`sweeps/cell-2026-09-15/aligned/g3.json`) on every field of every fleet-size point, and the campaign-wide part-2 counts match exactly (PF 0 / 37 910, Reservation 3 / 30 219, TwoTier 30 / 35 075, Proto 0 / 38 106). Windows took 759 s for four arms on 23 workers |
+| g3_cg | 0 | 562 | 500 runs, five `+CG` arms |
+| g3_cgt | 0 | 563 | 500 runs, five `+CGt` arms |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -164,6 +166,13 @@ the head-of-run attach silence, not a steady-state gap (part 1 is 10/10 on
 the same seeds). Campaign-wide part 2 (zero gaps ≥ 2 s over every run):
 ConfigSched **PASS**, 0 of 37 998 gaps — with PF (0 / 37 910) and the
 Proto arm (0 / 38 106); Reservation and TwoTier FAIL as before.
+
+**With CG** (`cg/g3_cg.json`, `cg/g3_cgt.json`): every arm 10/10 on all four
+parts to N = 24, campaign part 2 PASS on all ten CG arms (0 of 38 192–
+38 197). `+CGt` p98 4.5–12 ms against `+CG`'s 16–22 ms from N = 12;
+protected uplink unchanged by CG on every arm (TwoTier 8.5 Mbps at N = 24
+under both). Registered expectation for ConfigSched+CG (§5) — hit.
+Written into `docs/results-cell-2026-09-15.md` §3.5.
 
 ## 7. After the results: ConfigSched iteration
 
