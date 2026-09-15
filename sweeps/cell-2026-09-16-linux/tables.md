@@ -471,6 +471,50 @@ runs: 1600  horizon 20000  driven robots 2  PDB 95.0  gap bound 200.0
 
 runs: 1800  cap 4  axis (N, committed) [[3, 0.5], [4, 0.75], [5, 1.0], [6, 1.25], [7, 1.5], [8, 2.0]]
 
+## G12 tables
+
+ramp [0.5, 0.75, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0]; specified first-violation order [9, 4, 2]
+
+**mixedN4, tiebreak-4243** — clause 4 (safety telemetry survives) PASS / VIOLATION / PREMISE-FAILS of 10; first-violation orders seen; agreement
+
+| arm | clause 4 | orders seen | agreement | matches spec |
+|---|---|---|---|---|
+| PF | 10 / 0 / 0 | [[4], [4, 2]] | 7/10 | 0 |
+| Reservation | 10 / 0 / 0 | [[]] | 10/10 | 0 |
+| TwoTier | 10 / 0 / 0 | [[], [4]] | 7/10 | 0 |
+| ProtoRRageD2 | 10 / 0 / 0 | [[2], [2, 4], [4], [4, 2]] | 7/10 | 0 |
+| ConfigSched | 10 / 0 / 0 | [[], [2]] | 7/10 | 0 |
+
+**mixedN6, tiebreak-4243** — clause 4 (safety telemetry survives) PASS / VIOLATION / PREMISE-FAILS of 10; first-violation orders seen; agreement
+
+| arm | clause 4 | orders seen | agreement | matches spec |
+|---|---|---|---|---|
+| PF | 10 / 0 / 0 | [[4], [4, 2]] | 5/10 | 0 |
+| Reservation | 10 / 0 / 0 | [[]] | 10/10 | 0 |
+| TwoTier | 10 / 0 / 0 | [[], [2], [4]] | 7/10 | 0 |
+| ProtoRRageD2 | 10 / 0 / 0 | [[2], [2, 4], [4], [4, 2]] | 6/10 | 0 |
+| ConfigSched | 10 / 0 / 0 | [[], [2]] | 8/10 | 0 |
+
+**mixedN4, tiebreak-off** — clause 4 (safety telemetry survives) PASS / VIOLATION / PREMISE-FAILS of 10; first-violation orders seen; agreement
+
+| arm | clause 4 | orders seen | agreement | matches spec |
+|---|---|---|---|---|
+| PF | 10 / 0 / 0 | [[4], [4, 2]] | 7/10 | 0 |
+| Reservation | 10 / 0 / 0 | [[]] | 10/10 | 0 |
+| TwoTier | 10 / 0 / 0 | [[], [4]] | 7/10 | 0 |
+| ProtoRRageD2 | 10 / 0 / 0 | [[], [4]] | 8/10 | 0 |
+| ConfigSched | 10 / 0 / 0 | [[], [2]] | 7/10 | 0 |
+
+**mixedN6, tiebreak-off** — clause 4 (safety telemetry survives) PASS / VIOLATION / PREMISE-FAILS of 10; first-violation orders seen; agreement
+
+| arm | clause 4 | orders seen | agreement | matches spec |
+|---|---|---|---|---|
+| PF | 10 / 0 / 0 | [[4], [4, 2]] | 5/10 | 0 |
+| Reservation | 10 / 0 / 0 | [[]] | 10/10 | 0 |
+| TwoTier | 10 / 0 / 0 | [[], [2], [4]] | 7/10 | 0 |
+| ProtoRRageD2 | 10 / 0 / 0 | [[], [2], [4]] | 8/10 | 0 |
+| ConfigSched | 10 / 0 / 0 | [[], [2]] | 8/10 | 0 |
+
 ## G4 tables
 
 **across duty levels, per arm** — post-silence p98 (ms) / p98 at duty 1.0 baseline / ratio

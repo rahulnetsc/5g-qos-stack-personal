@@ -111,6 +111,7 @@ and anything that needed a fix.
 | g4 | 0 | 131 | 450 runs, all fifteen arm names in one artefact. Every arm inside 300 ms on every bucket; PF/Proto's telemetry-after-period p98 24/20 → 72/70 ms on this cell; `+CGt` 11–17 ms on every arm |
 | g9 | 0 | 708 | 1 800 runs. Axis top (7, ×1.5) and (8, ×2.0) "cell already broken" on every arm (derived from the OLD cell's G10 boundary). Informative cells passed: Proto 12, PF 11, Reservation 10, ConfigSched 9 (its cell breaks at (6, ×1.25)), TwoTier 4 |
 | g9_cg | 0 | 1 461 | 3 600 runs. TwoTier 4 → 11 / 11 (cold 1.0–3.8 s → 0.12–0.25 s); ConfigSched 9 → 12 / 12 (the broken incumbent at ×1.25 was the heartbeat); cold first service +100–200 ms on every arm |
+| g12 | 0 | 264 | 200 ramp sweeps (2 200 runs). Clause 4 10/10 everywhere; no arm matches `[9, 4, 2]`; TwoTier's telemetry PDB-violation 0.76 at ×1.0 (previous cell 0.000); ConfigSched 0.105 at ×1.4 → 0.82 |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -292,6 +293,19 @@ floor shape). TwoTier's G9 becomes PF-like under CG (11 of 12). Cost on
 every arm: cold-attach first service +100–200 ms (the joiner waits for
 its CG occasion); after RLF `+CGt` +0.06–0.16 s (the model's CG persists
 through RLF — the recorded caveat). Written into §8.5.
+
+### 6.8 G12 (`aligned/g12.json`)
+
+Clause 4 10/10 on every arm; the ordering now partly scoreable (GBR
+classes break inside the ramp on four arms) and no arm matches
+`[9, 4, 2]` — PF sacrifices video then camera while the background keeps
+12 Mbps; Reservation alone breaks nothing (`[]` 10/10). Leading
+indicator: TwoTier's telemetry PDB-violation 0.76 at ×1.0 on this cell
+(0.000 before). ConfigSched: `[]` on 7–8 seeds, `[2]` on the rest (class
+order like Reservation's — registered, hit); telemetry violation 0.105 at
+×1.4 → 0.82 at ×2.0 (the heartbeat's one visit per window losing its slot
+as the ramp grows the video/camera visits); "by declaration" unscoreable
+at class level. Written into `docs/results-cell-2026-09-15.md` §10.
 
 ## 7. After the results: ConfigSched iteration
 
