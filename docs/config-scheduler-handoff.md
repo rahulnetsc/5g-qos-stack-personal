@@ -262,6 +262,24 @@ while the camera floors do not all fit (16 × 4 Mbps exceeds this cell's
 uplink; `floors_unmet` reports it). Whether that turns into guarantee
 results is the campaign's question; nothing here is registered.
 
+### 8b.1 First measurement, 2026-09-15 — `sweeps/config-sched-2026-09-15/SCORED.md`
+
+G3 part A on the deployed cell, three paired seeds, against the campaign's
+four arms. Registered first (`EXPECTATIONS.md`), scored after: one clean
+hit — **Asset A's heartbeat is 100/100 at every fleet size to N = 24 with
+p98 31–37 ms at N = 24**, the rank is gone — and one finding the
+expectations did not ask for: **the flood robot's own heartbeat loses
+half its messages at N = 24** (33–49 of 100, silences to 967 ms; Proto
+95/100 on the same seed). The counters locate it: the visit interval
+equals the message period and the PDB, a visit is stamped by attribution
+whether or not the UE's LCP put the message in the TB, and the flood
+robot's camera floor is the one dropped under `floors_unmet` because the
+tie-break is `ue_id`. So the three changes the next commit should make,
+each one fidelity change: a visit interval of `PDB − period` (or `PDB/2`
+undeclared), a BSR-confirmed stamp, and a floor-shortfall rule that is not
+declaration order. The prototype is left as measured so that commit has
+its before.
+
 ## 9. Open external inputs
 
 None specific to this work. The SRB capture and TS 22.104's survival-time
