@@ -25,11 +25,12 @@ import pytest
 
 from sim.baselines.pf import ProportionalFair
 from sim.driver import run
-from sim.parametric import sweep_scenario
+from sim.parametric import sweep_scenario
+from sim.scenarios import deployed_cell as _dcell
 from sim.run_record import RunRecord
 from sim.scorecard import Population, Scorecard
 
-HORIZON = 20_000          # 5.0 s at numerology 2
+HORIZON = _dcell.slots(5_000.0)   # 5.0 s at the deployed cell's slot
 
 
 def _rec(resolution: str, seed: int = 1, n_ues: int = 4) -> RunRecord:
@@ -59,7 +60,7 @@ def test_the_fold_actually_shrinks_the_series():
     """Otherwise the test above passes for the wrong reason."""
     slot, sec = _rec("slot"), _rec("second")
     assert len(slot.timeseries_time_s) == HORIZON
-    assert len(sec.timeseries_time_s) == pytest.approx(HORIZON * 0.00025, abs=1)
+    assert len(sec.timeseries_time_s) == pytest.approx(HORIZON * _dcell.SLOT_S, abs=1)
     assert len(sec.timeseries_time_s) < len(slot.timeseries_time_s) / 100
 
 

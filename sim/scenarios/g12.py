@@ -73,6 +73,7 @@ import random
 from typing import Optional
 
 from sim.config import CarrierConfig, FlowConfig, ScenarioConfig, TDDConfig, UEConfig
+from . import deployed_cell as _dcell
 from sim.fleet import COMPOSITIONS, LIDAR_MAX_CONCURRENT, LidarActivation, build_fleet
 
 __all__ = [
@@ -181,8 +182,9 @@ REFERENCE_COMMITTED_BPS = 28_000_000.0
 
 _BASE_SNR_DB = 20.0
 _COHERENCE_SLOTS = 2000
-_NUMEROLOGY = 2
-_BANDWIDTH_HZ = 40_000_000
+# The deployed cell (sim/scenarios/deployed_cell.py): numerology 1, 106 PRB, DDSUU.
+_NUMEROLOGY = _dcell.NUMEROLOGY
+_BANDWIDTH_HZ = _dcell.BANDWIDTH_HZ
 
 
 # --- construction --------------------------------------------------------
@@ -229,7 +231,7 @@ def build_g12_scenario(
     composition: str,
     committed_mult: float,
     seed: int,
-    horizon_slots: int = 20_000,
+    horizon_slots: int = _dcell.slots(5_000.0),
     bg_offered_bps: float = BG_OFFERED_BPS,
     bg_ue_id: Optional[int] = None,
 ) -> ScenarioConfig:
@@ -299,9 +301,8 @@ def build_g12_scenario(
     return ScenarioConfig(
         name=f"g12_{composition}_n{n_ues}_x{committed_mult}",
         horizon_slots=horizon_slots,
-        carrier=CarrierConfig(bandwidth_hz=_BANDWIDTH_HZ,
-                              numerology=_NUMEROLOGY),
-        tdd=TDDConfig(pattern="DSUUU"),
+        carrier=_dcell.carrier(),
+        tdd=_dcell.tdd(),
         ues=ues, flows=flows, seed=seed,
     )
 

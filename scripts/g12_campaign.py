@@ -55,6 +55,7 @@ from regime_sweep import (RunLedger, invocation_config, arm_cost,  # noqa: E402
 from scheduler import load_two_tier  # noqa: E402
 from scheduler.reservation import Reservation  # noqa: E402
 from sim.baselines.pf import ProportionalFair  # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.driver import run  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
 from sim.scenarios.g12 import (GBR_CLASSES, GUARANTEE_RAMP_TOP_MULT,  # noqa: E402
@@ -73,7 +74,7 @@ CQI_DELAY_SLOTS = 8
 #: moment another label is added.
 BG_QFIS = frozenset({QFI_BG, QFI_BG_UL})
 
-HORIZON_SLOTS = 20_000
+HORIZON_SLOTS = _dcell.slots(5_000.0)       # 5 s at the deployed cell's numerology
 # 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
 # G12's ramp makes every task 8 runs long, so the pool is well fed even at
 # the reference cell -- this is the runner that timed out at 2,400 s having

@@ -28,6 +28,7 @@ from sim.bsr import LCG_COUNT
 from sim.driver import run
 from sim.parametric import sweep_scenario
 from sim.run_record import RunRecord
+from sim.scenarios import deployed_cell as _dcell
 
 ARMS = {
     "PF": lambda: ProportionalFair(ewma_window_slots=200),
@@ -108,7 +109,7 @@ def test_the_seeded_array_is_NON_ZERO_at_the_slot_it_is_written():
     buffers = BufferModel()
     for x in flows:
         buffers.register(x.ue_id, x.qfi, is_ul=True, lcg=x.lcg)
-    bsr = BsrModel(sc.flows, slot_duration_s=0.00025)
+    bsr = BsrModel(sc.flows, slot_duration_s=_dcell.SLOT_S)
 
     # Empty backlog: the seed must REFUSE rather than write zeros.
     assert bsr.seed_attach_bsr(flows[0].ue_id, buffers) is False
@@ -144,7 +145,7 @@ def test_the_seed_quantises_like_a_real_bsr_and_is_not_privileged():
         if x.direction == "UL":
             buffers.register(x.ue_id, x.qfi, is_ul=True, lcg=x.lcg)
     buffers.enqueue(f.ue_id, f.qfi, 12_345, 0.0)
-    bsr = BsrModel(sc.flows, slot_duration_s=0.00025)
+    bsr = BsrModel(sc.flows, slot_duration_s=_dcell.SLOT_S)
     assert bsr.seed_attach_bsr(f.ue_id, buffers) is True
     got = bsr._state[f.ue_id].estimated_ul_buffer_per_lcg[f.lcg]
     assert got == quantise_long(12_345), "the seed bypassed quantisation"

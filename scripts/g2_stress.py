@@ -53,6 +53,7 @@ from code_state import stamp                                     # noqa: E402
 from regime_sweep import (arm_cost, invocation_config, paired_seeds,  # noqa: E402
                           RunLedger, run_cells)
 from sim.driver import run as driver_run                          # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.random_access import RandomAccessConfig                  # noqa: E402
 from sim.run_record import RunRecord                              # noqa: E402
 from sim.scenarios.g2 import (N_TRIALS, QFI_STOP, STOP_BOUND_MS,   # noqa: E402
@@ -69,7 +70,7 @@ CQI_DELAY_SLOTS = 8
 #: put the last scoring window's close at ~33.4 k slots.
 #: `sim/scenarios/g2.py::minimum_horizon_slots` derives it and the scenario
 #: refuses a horizon that cannot score the last trial.
-HORIZON_SLOTS = 40_000
+HORIZON_SLOTS = _dcell.slots(10_000.0)      # 10 s at the deployed cell's numerology
 
 #: Sub-experiment A: how many robots the disconnect stops, at once.
 #: GT-1.2's own number is 2. The guarantee's wording is "on every ground

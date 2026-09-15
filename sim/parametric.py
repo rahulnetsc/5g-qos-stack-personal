@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+from .scenarios import deployed_cell as _dcell
 from scheduler.flow import LCG_UNASSIGNED, FlowConfig
 from .workload import min_bytes_per_period_for_gfbr, scale_committed_load
 
@@ -39,9 +40,10 @@ __all__ = ["sweep_scenario", "MIXES"]
 # 55 PRB at mu=2, 0.25ms slots, DSUUU. Fixed for the whole sweep so that
 # §1.1's N_crit prediction (min(55/min_rb, 32/4)) is a single number to
 # check against, not one that moves per cell.
-_BASE_BANDWIDTH_HZ = 40_000_000
-_BASE_NUMEROLOGY = 2
-_BASE_TDD_PATTERN = "DSUUU"
+# The deployed cell (sim/scenarios/deployed_cell.py): numerology 1, 106 PRB, DDSUU.
+_BASE_BANDWIDTH_HZ = _dcell.BANDWIDTH_HZ
+_BASE_NUMEROLOGY = _dcell.NUMEROLOGY
+_BASE_TDD_PATTERN = _dcell.TDD_PATTERN
 
 _BASE_SNR_DB = 20.0
 _COHERENCE_SLOTS = 2000
@@ -158,7 +160,7 @@ def sweep_scenario(
     mfbr_multiple: float = 2.0,
     bg: bool = False,
     inf_scenario: Optional[str] = None,
-    horizon_slots: int = 20_000,
+    horizon_slots: int = _dcell.slots(5_000.0),
     **_ignored: Any,
 ) -> ScenarioConfig:
     """One WP9 grid cell as a ScenarioConfig. Defaults ARE the base point.
@@ -347,10 +349,8 @@ def sweep_scenario(
             f"{'_sharedlcg' if shared_lcg else ''}{'_bg' if bg else ''}"
         ),
         horizon_slots=horizon_slots,
-        carrier=CarrierConfig(
-            bandwidth_hz=_BASE_BANDWIDTH_HZ, numerology=_BASE_NUMEROLOGY,
-        ),
-        tdd=TDDConfig(pattern=_BASE_TDD_PATTERN),
+        carrier=_dcell.carrier(),
+        tdd=_dcell.tdd(),
         ues=ues,
         flows=flows,
         seed=seed,

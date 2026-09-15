@@ -53,6 +53,7 @@ from regime_sweep import (arm_cost, invocation_config, paired_seeds,  # noqa: E4
                           RunLedger, run_cells)
 from scheduler.rank_trace import LossPointTally                  # noqa: E402
 from sim.driver import run as driver_run                         # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.random_access import RandomAccessConfig                 # noqa: E402
 from sim.run_record import RunRecord                             # noqa: E402
 from sim.scenarios.g1 import (GAP_BOUND_MS, N_DRIVEN, RAN_PDB_MS,  # noqa: E402
@@ -86,7 +87,7 @@ CQI_DELAY_SLOTS = 8
 #:
 #: The same convention is why p99.9 comes from a separate long-horizon pass
 #: and not from this grid: at n <= 1000 the p99.9 INDEX IS THE MAXIMUM.
-HORIZON_SLOTS = 40_000
+HORIZON_SLOTS = _dcell.slots(10_000.0)      # 10 s at the deployed cell's numerology
 
 #: Sub-experiment A. Brackets every arm's re-measured G10 boundary so each
 #: arm's own boundary falls strictly inside the swept range rather than at

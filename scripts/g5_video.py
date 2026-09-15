@@ -46,6 +46,7 @@ from regime_sweep import (RunLedger, check_for_orphans,  # noqa: E402
                           invocation_config, paired_seeds, run_cells)
 from code_state import stamp  # noqa: E402
 from sim.driver import run as driver_run  # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.random_access import RandomAccessConfig  # noqa: E402
 from sim.run_record import RunRecord  # noqa: E402
 from sim.scorecard import Population, Scorecard  # noqa: E402
@@ -57,7 +58,7 @@ from sim.scenarios.g5 import (  # noqa: E402
     frame_age_bound_ms, telemetry_flow_keys)
 from proto_arms import resolve_arm, split_cg  # noqa: E402
 
-HORIZON_SLOTS = 40_000
+HORIZON_SLOTS = _dcell.slots(10_000.0)      # 10 s at the deployed cell's numerology
 CQI_DELAY_SLOTS = 8
 CAP = 4
 #: Ranges across G10's RE-MEASURED boundaries (PF 12 / Res 6 / TwoTier 7), so

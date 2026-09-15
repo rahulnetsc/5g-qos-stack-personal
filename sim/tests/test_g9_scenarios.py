@@ -150,18 +150,18 @@ def test_neighbours_carry_no_join_config():
 
 
 def test_rlf_fade_must_outlast_t310_or_no_event_ever_fires():
-    """THE DEFECT THIS PINS. t310 is 2,000 ms = 8,000 slots at numerology 2,
+    """THE DEFECT THIS PINS. t310 is 2,000 ms -- 4,000 slots at the deployed cell's numerology 1 --
     and the driver builds `RlfDetectorConfig()` with that default. The first
     version of `gt63_rlf_recovery` used a 4,000-slot fade -- half the dwell
     -- so t310 re-armed and the scenario produced ZERO RLF events. Zero
     events reads as "recovery was instant", not as "the scenario never
     fired", which is why depth alone is not enough: depth ARMS t310,
     duration EXPIRES it."""
-    from sim.scenarios.g9 import T310_SLOTS_MU2
+    from sim.scenarios.g9 import T310_SLOTS
     sc = gt63_rlf_recovery()
     fade = sc.ues[0].scripted_fade[0]
     fade_len = fade.end_slot - fade.start_slot
-    assert fade_len > T310_SLOTS_MU2, (
-        f"fade is {fade_len} slots, t310 is {T310_SLOTS_MU2} -- RLF cannot "
+    assert fade_len > T310_SLOTS, (
+        f"fade is {fade_len} slots, t310 is {T310_SLOTS} -- RLF cannot "
         f"be declared and the scenario will silently produce no events")
     assert sc.horizon_slots > fade.end_slot, "no room for recovery after the fade"

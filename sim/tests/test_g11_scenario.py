@@ -23,7 +23,7 @@ from sim.scenarios.g11 import (
 )
 
 # 40 s, with the whole shift's structure compressed into it
-H = 160_000
+H = int(round(40.0 / SLOT_S))          # 40 s at the deployed cell's slot
 FAST = dict(teleop=TeleopDuty(period_s=5.0, on_s=3.0),
             pauses=WaypointPauses(first_s=8.0, period_s=12.0, pause_s=2.0),
             firmware=FirmwareWindow(start_s=10.0, duration_s=4.0),
@@ -43,7 +43,7 @@ def _run(seed=1, **kw):
 
 def test_the_soak_horizon_is_thirty_minutes():
     assert SOAK_HORIZON_SLOTS * SLOT_S == 1800.0
-    assert SOAK_HORIZON_SLOTS == 7_200_000
+    assert SOAK_HORIZON_SLOTS == int(round(1800.0 / SLOT_S))   # derived, never restated
 
 
 def test_no_two_flows_share_a_ue_qfi_pair():

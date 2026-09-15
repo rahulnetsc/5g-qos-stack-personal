@@ -121,6 +121,7 @@ from regime_sweep import (arm_cost, invocation_config, paired_seeds,  # noqa: E4
                           RunLedger, run_cells)
 from scheduler.rank_trace import RankSnapshot                    # noqa: E402
 from sim.driver import run as driver_run                         # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.random_access import RandomAccessConfig                 # noqa: E402
 from sim.run_record import RunRecord                             # noqa: E402
 from sim.scenarios.g3 import (                                   # noqa: E402
@@ -249,7 +250,7 @@ CQI_DELAY_SLOTS = 8
 #: the gap it forbids: 10 s can hold five 2 s gaps, and the positive control
 #: demonstrates a >500 ms gap at this exact horizon rather than leaving it
 #: argued.
-HORIZON_SLOTS = 40_000
+HORIZON_SLOTS = _dcell.slots(10_000.0)      # 10 s at the deployed cell's numerology
 
 #: Sub-experiment A. Brackets every arm's re-measured G10 boundary
 #: (PF 12 / Reservation 6 / TwoTier 7, `sweeps/g1-stress/g10_remeasure_cap4.json`)

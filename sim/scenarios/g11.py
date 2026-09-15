@@ -39,6 +39,7 @@ from typing import Any, Optional
 
 from scheduler.flow import assign_deployed_lcgs, FlowConfig
 from sim.config import ScenarioConfig
+from . import deployed_cell as _dcell
 from sim.parametric import sweep_scenario
 
 __all__ = [
@@ -47,7 +48,7 @@ __all__ = [
     "assert_schedule_fired", "scripted_windows",
 ]
 
-SLOT_S = 0.00025                       # numerology 2
+SLOT_S = _dcell.SLOT_S                  # the deployed cell's slot (sim/scenarios/deployed_cell.py)
 SOAK_MINUTES = 30.0
 SOAK_HORIZON_SLOTS = int(SOAK_MINUTES * 60.0 / SLOT_S)      # 7,200,000
 

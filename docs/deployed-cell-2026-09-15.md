@@ -20,7 +20,12 @@ date; the two discrepancies in §2 are recorded, not smoothed.
 | `prach_ConfigurationIndex` | 159 | the RACH configuration `sim/random_access.py` ports |
 | `ssb_periodicityServingCell` | 2 | 20 ms SSB |
 | `max_rxgain` | 102 | may be lower in deployment (user) |
-| SR periodicity, `min_grant_prb`, k1/k2 | absent | come from OAI's code defaults, not the conf; the SR value is being looked up in the deployed code base — until then the model keeps 10 slots, which is lawful at 30 kHz (`docs/rel16-baseline-2026-09-15.md` §4.2) |
+| `uess_agg_levels` | (0, 4, 2, 1, 0) | PDCCH candidates per aggregation level 1/2/4/8/16 in the UE-specific search space: 4 at AL2, 2 at AL4, 1 at AL8 -- the per-slot DCI budget behind the cap model, to be reconciled with `sim/resource.py`'s CCE budgets |
+| `initialDLBWPcontrolResourceSetZero`, `initialDLBWPsearchSpaceZero` | 12, 0 | CORESET0 / search space 0 configuration index |
+| `preambleTransMax`, `ra_ContentionResolutionTimer`, `powerRampingStep`, `preambleReceivedTargetPower`, `zeroCorrelationZoneConfig`, `ssb_perRACH_OccasionAndCB_PreamblesPerSSB` | 6, 7, 1, -90, 12, 15 | the RACH set `sim/random_access.py::RandomAccessConfig.deployed()` transcribes |
+| `p0_NominalWithGrant`, `p0_nominal`, `pMax` | -90, -90, 23 | UL power control (dormant `sim/power.py`) |
+| `uess_agg_levels`-adjacent: `max_pdschReferenceSignalPower` | -27 | RU power reference |
+| SR periodicity, `min_grant_prb`, k1/k2 (`min_rxtxtime`) | absent | come from OAI's code defaults, not the conf; the SR value is being looked up in the deployed code base — until then the model keeps 10 slots, which is lawful at 30 kHz (`docs/rel16-baseline-2026-09-15.md` §4.2) |
 
 ## 2. Two discrepancies
 
@@ -44,7 +49,7 @@ date; the two discrepancies in §2 are recorded, not smoothed.
 
 ## 3. What changes, what does not
 
-- Changes: `sim/scenarios/deployed_cell.py` becomes the single source of
+- Changes (landed in the commit after this note): `sim/scenarios/deployed_cell.py` becomes the single source of
   the cell (numerology, bandwidth, pattern, special-slot split), every
   guarantee builder and `sim/parametric.py` take their carrier and TDD
   from it, and every slot count is derived from milliseconds through it.

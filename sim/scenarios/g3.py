@@ -186,6 +186,7 @@ import math
 from typing import Any, Optional, Sequence
 
 from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+from . import deployed_cell as _dcell
 from sim.scenarios.schedule_guard import require_horizon
 from sim.workload import min_bytes_per_period_for_gfbr, scale_committed_load
 from scheduler.flow import DERIVE_PDB_FROM_5QI, LCG_UNASSIGNED, FlowConfig
@@ -285,7 +286,7 @@ SETTLE_MS = 1000.0
 
 # --- GT-2.3's silence schedule -------------------------------------------
 
-SLOT_S = 0.00025                      # numerology 2, this cell's carrier
+SLOT_S = _dcell.SLOT_S                 # the deployed cell's slot (sim/scenarios/deployed_cell.py)
 
 #: How long telemetry runs between pauses. 5 s is 50 telemetry messages, so
 #: each active window carries its own gap distribution rather than a handful
@@ -319,9 +320,10 @@ SILENCE_CYCLES = 1
 
 _BASE_SNR_DB = 20.0
 _COHERENCE_SLOTS = 2000
-_NUMEROLOGY = 2
-_BANDWIDTH_HZ = 40_000_000
-_TDD_PATTERN = "DSUUU"
+# The deployed cell (sim/scenarios/deployed_cell.py): numerology 1, 106 PRB, DDSUU.
+_NUMEROLOGY = _dcell.NUMEROLOGY
+_BANDWIDTH_HZ = _dcell.BANDWIDTH_HZ
+_TDD_PATTERN = _dcell.TDD_PATTERN
 
 
 # --- flow constructors ---------------------------------------------------
@@ -539,9 +541,8 @@ def _cell(
 
     sc = ScenarioConfig(
         name=name, horizon_slots=horizon_slots,
-        carrier=CarrierConfig(bandwidth_hz=_BANDWIDTH_HZ,
-                              numerology=_NUMEROLOGY),
-        tdd=TDDConfig(pattern=_TDD_PATTERN),
+        carrier=_dcell.carrier(),
+        tdd=_dcell.tdd(),
         ues=ues, flows=fleet, seed=seed,
     )
     scaled = scale_committed_load(sc, committed_mult)
@@ -595,7 +596,7 @@ def _cell(
 
 def build_gt21_scenario(
     *, seed: int, n_ues: int = 6, committed_mult: float = 1.0,
-    horizon_slots: int = 40_000,
+    horizon_slots: int = _dcell.slots(10_000.0),
     camera_offer_x_gfbr: float = 2.0,
     telemetry_gbr: bool = True,
     telemetry_pbr_bps: Optional[float] = None,
@@ -628,7 +629,7 @@ def build_gt21_scenario(
 
 def build_gt22_scenario(
     *, seed: int, n_ues: int = 6, committed_mult: float = 1.0,
-    horizon_slots: int = 40_000,
+    horizon_slots: int = _dcell.slots(10_000.0),
     flood_bps: float = FLOOD_UL_BPS,
     telemetry_gbr: bool = True,
     telemetry_pbr_bps: Optional[float] = None,

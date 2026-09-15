@@ -6,6 +6,7 @@ import itertools
 
 import pytest
 
+from sim.scenarios import deployed_cell as _dcell
 from sim.parametric import MIXES, sweep_scenario
 
 
@@ -14,9 +15,9 @@ def test_defaults_are_the_base_point():
     base point, so every excursion is one keyword away from it."""
     sc = sweep_scenario(seed=1)
     assert len(sc.ues) == 8
-    assert sc.horizon_slots == 20_000
-    assert sc.carrier.numerology == 2
-    assert sc.tdd.pattern == "DSUUU"
+    assert sc.horizon_slots == _dcell.slots(5_000.0)   # 5 s, derived
+    assert sc.carrier.numerology == _dcell.NUMEROLOGY
+    assert sc.tdd.pattern == _dcell.TDD_PATTERN
     assert "load1.0" in sc.name
 
 

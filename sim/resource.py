@@ -63,6 +63,8 @@ class ResourceGrid:
         self.pattern = tdd.pattern
 
     def _compute_prb_count(self) -> int:
+        if getattr(self.carrier, "prb_count", None):
+            return int(self.carrier.prb_count)
         scs_hz = 15_000 * (2 ** self.carrier.numerology)
         rb_hz = 12 * scs_hz
         # Crude: ignore guard bands. Good enough for comparative work.

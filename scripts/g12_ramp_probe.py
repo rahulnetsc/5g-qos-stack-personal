@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scheduler import load_two_tier
 from scheduler.reservation import Reservation
 from sim import driver
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.baselines.pf import ProportionalFair
 from sim.scenarios.g12 import (GBR_CLASSES, build_g12_scenario,
                                gbr_flow_census)
@@ -56,7 +57,7 @@ _TT_CONFIG = str(Path(__file__).resolve().parents[1] / "scheduler"
 # `defaults.gbr_contract_fraction`), not a local threshold.
 CONTRACT_FRACTION = 0.95
 CQI_DELAY_SLOTS = 8          # scripts/scheduler_study.py's pinned value
-HORIZON_SLOTS = 20_000
+HORIZON_SLOTS = _dcell.slots(5_000.0)       # 5 s at the deployed cell's numerology
 
 CANDIDATE_MULTS = (1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0)
 

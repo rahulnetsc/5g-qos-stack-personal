@@ -58,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from regime_sweep import (arm_cost, bootstrap_ci,  # noqa: E402
                           paired_seeds, run_cells, sweep)
 from sim.parametric import sweep_scenario  # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from wp9_sweep import BASE, _arms, _driver_kwargs  # noqa: E402
 
 # Log-spaced gap buckets, in ms. Chosen from the workload's own cadences
@@ -66,7 +67,7 @@ from wp9_sweep import BASE, _arms, _driver_kwargs  # noqa: E402
 GAP_BUCKETS_MS = (0.0, 1.0, 10.0, 100.0, 1000.0, float("inf"))
 DUTY_LEVELS = (1.0, 0.5, 0.1)
 N_SEEDS = 10
-HORIZON = 20_000
+HORIZON = _dcell.slots(5_000.0)              # 5 s at the deployed cell's numerology
 # 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).
 _DEFAULT_WORKERS = 16
 # Set per worker from the task -- `sweep()`'s builder takes only

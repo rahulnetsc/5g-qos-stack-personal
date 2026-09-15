@@ -86,6 +86,17 @@ bare `python` invocation that works.
   tokens and an RRC message starves behind it — measured as 10,085 grants
   and zero SRB bytes delivered on the re-establishment path. Do not "fix" a
   slow SRB by touching the LCP; check the bucket first.
+- `sim/scenarios/deployed_cell.py` — (2026-09-15) the ONE source of the
+  radio every guarantee builder and `sim/parametric.py` use: numerology 1,
+  106 PRB (set explicitly — `ResourceGrid`'s bandwidth formula ignores
+  guard bands), `DDSUU` with a 6/2/6 special slot, from
+  `docs/conf/gnbx310.conf`. **Slot counts are derived from milliseconds
+  through `slots(ms)`, never written as literals** in a builder or runner:
+  before this module every builder carried its own `_NUMEROLOGY = 2` and
+  `SLOT_S = 0.00025`, a cell that was never the deployed one, and every
+  `HORIZON_SLOTS = 40_000` silently meant "10 s at numerology 2". The
+  regression corpus is NOT on this cell (its own 30 MHz numerology-1
+  `DSUUU` radio) and stays there on purpose.
 - `sim/pre_sched.py` — Build 1. `Occupancy`, the ONE pre-scheduler
   resource map HARQ retx, RA and (Build 2) CG all add to; `ReducedSlotView`
   subtracts it once. Contributors add, nothing else touches the view — so a

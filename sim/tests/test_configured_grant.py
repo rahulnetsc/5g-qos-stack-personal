@@ -10,12 +10,14 @@ from sim.configured_grant import (CG_PERIODICITY_N_BY_SCS_KHZ, CgConfig,
 from sim.driver import run as driver_run
 from sim.random_access import RandomAccessConfig
 from sim.resource import ResourceGrid
+from sim.scenarios import deployed_cell as _dcell
 from sim.scenarios.g3 import QFI_CAMERA, QFI_TELEMETRY, build_gt22_scenario
 from sim.srb import with_srb
 from sim.ul_access import UlAccessModel
 
 
-def _cell(n_ues=8, horizon=8_000, seed=1097657231):
+def _g3(n_ues=8, horizon=None, seed=1097657231):
+    horizon = _dcell.slots(2_000.0) if horizon is None else horizon
     return with_srb(build_gt22_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon))
 
 
@@ -36,20 +38,24 @@ def test_periodicity_table_is_per_scs_sorted_and_the_mu2_set_is_the_60khz_row():
 
 
 def test_period_is_the_largest_pattern_aligned_value_under_half_the_pdb():
-    """mu = 2, DSUUU, PDB 100 ms = 400 slots: cap is 200, the allowed values
-    under it are ... 128, 160; 160 is a multiple of 5 and 128 is not."""
-    sc = _cell()
-    m = ConfiguredGrantModel(sc.flows, ResourceGrid(sc.carrier, sc.tdd), CgConfig())
+    """The deployed cell: PDB 100 ms in slots, the cap half of it, and the
+    period the largest allowed value under the cap that is a multiple of the
+    pattern length -- derived, so the test survives a numerology change."""
+    sc = _g3()
+    grid = ResourceGrid(sc.carrier, sc.tdd)
+    m = ConfiguredGrantModel(sc.flows, grid, CgConfig())
     st = m._states[(1, QFI_TELEMETRY)]
-    assert st.pdb_slots == 400
-    assert st.period_slots == 160
+    assert st.pdb_slots == _dcell.slots(100.0)
+    cap = st.pdb_slots // 2
+    expect = max(p for p in m._allowed if p <= cap and p % len(sc.tdd.pattern) == 0)
+    assert st.period_slots == expect
     assert st.period_slots % len(sc.tdd.pattern) == 0
 
 
 def test_eligibility_is_the_contract_not_the_traffic_kind():
     """Telemetry (300 B per 100 ms) qualifies; the 4 Mbps camera (75 kB per
     150 ms) does not; the flood and filler are best-effort and never do."""
-    sc = _cell()
+    sc = _g3()
     m = ConfiguredGrantModel(sc.flows, ResourceGrid(sc.carrier, sc.tdd), CgConfig())
     qfis = {qfi for _, qfi in m.eligible_flows()}
     assert qfis == {QFI_TELEMETRY}
@@ -63,9 +69,9 @@ def test_an_active_cg_suppresses_sr_only_for_the_channels_it_may_carry():
     `bytes_reported` through `buffers.state(ue, qfi)`, so the fixture is a
     two-attribute stand-in: UE 1's telemetry just arrived on an otherwise
     empty UE -- the classic empty -> non-empty SR trigger."""
-    sc = _cell(n_ues=2)
-    ua = UlAccessModel(sc.flows, 0.00025, sr_period_slots=10, sr_offset_slots=0,
-                       slots_per_frame=40)
+    sc = _g3(n_ues=2)
+    ua = UlAccessModel(sc.flows, _dcell.SLOT_S, sr_period_slots=10, sr_offset_slots=0,
+                       slots_per_frame=_dcell.SLOTS_PER_FRAME)
 
     class _St:
         def __init__(self, q):
@@ -87,13 +93,13 @@ def test_an_active_cg_suppresses_sr_only_for_the_channels_it_may_carry():
     assert st.pending, "an uncovered channel's arrival did not raise an SR"
     # ... unless the UE really is empty before it: rebuild with the camera
     # as the only backlog and no CG at all -> the classic trigger fires.
-    ua2 = UlAccessModel(sc.flows, 0.00025, sr_period_slots=10, sr_offset_slots=0,
-                        slots_per_frame=40)
+    ua2 = UlAccessModel(sc.flows, _dcell.SLOT_S, sr_period_slots=10, sr_offset_slots=0,
+                        slots_per_frame=_dcell.SLOTS_PER_FRAME)
     ua2.on_arrivals(arrived, _Buffers(), cg_covers=None)
     assert ua2._state[1].pending, "no CG, empty->non-empty arrival, no SR"
     # And with the restriction OFF the CG covers every channel on the UE.
-    ua3 = UlAccessModel(sc.flows, 0.00025, sr_period_slots=10, sr_offset_slots=0,
-                        slots_per_frame=40)
+    ua3 = UlAccessModel(sc.flows, _dcell.SLOT_S, sr_period_slots=10, sr_offset_slots=0,
+                        slots_per_frame=_dcell.SLOTS_PER_FRAME)
     ua3.on_arrivals(arrived, _Buffers(), cg_covers=lambda ue, qfi: ue == 1)
     assert not ua3._state[1].pending
 
@@ -101,7 +107,7 @@ def test_an_active_cg_suppresses_sr_only_for_the_channels_it_may_carry():
 # --- run level: reached, on the right slots, and the switch does what it says
 
 def test_cg_is_reached_and_every_occasion_lands_on_an_uplink_slot():
-    sc = _cell()
+    sc = _g3()
     pat = sc.tdd.pattern
     cg_slots, dyn_slots = [], 0
 
@@ -126,7 +132,7 @@ def test_cg_is_reached_and_every_occasion_lands_on_an_uplink_slot():
 
 
 def test_restriction_switch_decides_which_channels_ride_the_cg():
-    sc = _cell()
+    sc = _g3()
     carried = {True: set(), False: set()}
     for restricted in (True, False):
         def sink(g, r=restricted):
@@ -138,7 +144,7 @@ def test_restriction_switch_decides_which_channels_ride_the_cg():
 
 
 def test_an_empty_occasion_wastes_its_prbs_and_is_counted():
-    s = _run(_cell(), {"lcp_restriction": True})
+    s = _run(_g3(), {"lcp_restriction": True})
     t = s["configured_grant"]["totals"]
     assert t["skipped_empty"] > 0
     assert t["prb_wasted"] > 0
@@ -148,20 +154,21 @@ def test_an_empty_occasion_wastes_its_prbs_and_is_counted():
 
 
 def test_off_leaves_no_trace_in_the_summary():
-    s = _run(_cell(horizon=2_000), None)
+    s = _run(_g3(horizon=_dcell.slots(500.0)), None)
     assert "configured_grant" not in s
     assert "configured_grant" not in s.get("levers", {})
 
 
 # --- Build 2b: more than one CG on a UE -----------------------------------
 
-def _two_cg_cell(n_ues=2, horizon=8_000):
+def _two_cg_cell(n_ues=2, horizon=None):
     """G5's robot (telemetry) plus a second small periodic flow on the same
     robot, both first reporting in the same slot -- the case the probe of
     2026-09-15 showed colliding on every robot, every seed."""
     import dataclasses
     from scheduler.flow import LCG_UNASSIGNED, FlowConfig
     from sim.scenarios.g5 import QFI_TELEMETRY as G5_TEL, build_gt31_scenario
+    horizon = _dcell.slots(2_000.0) if horizon is None else horizon
     sc = build_gt31_scenario(seed=1, n_ues=n_ues, horizon_slots=horizon)
     qfi = max(f.qfi for f in sc.flows) + 1
     extra = [FlowConfig(ue_id=u, qfi=qfi, direction="UL", flow_class="GBR",
@@ -274,12 +281,12 @@ def test_descriptor_takes_period_and_phase_from_the_declared_traffic():
     only path."""
     from scripts.proto_arms import split_cg
     assert split_cg("PF+CGt") == ("PF", {"lcp_restriction": True, "traffic_descriptor": True})
-    sc = _cell()
+    sc = _g3()
     s_pdb = _run(sc, {"lcp_restriction": True})
     s_desc = _run(sc, {"lcp_restriction": True, "traffic_descriptor": True})
     pf = s_desc["configured_grant"]["per_flow"][f"ue1_qfi{QFI_TELEMETRY}"]
-    assert pf["period_slots"] == 400 and pf["descriptor_period"] == 400
-    assert s_pdb["configured_grant"]["per_flow"][f"ue1_qfi{QFI_TELEMETRY}"]["period_slots"] == 160
+    assert pf["period_slots"] == _dcell.slots(100.0) and pf["descriptor_period"] == _dcell.slots(100.0)
+    assert s_pdb["configured_grant"]["per_flow"][f"ue1_qfi{QFI_TELEMETRY}"]["period_slots"] < pf["period_slots"]
     t_pdb = s_pdb["configured_grant"]["totals"]
     t_desc = s_desc["configured_grant"]["totals"]
     assert t_desc["occasions"] < t_pdb["occasions"]

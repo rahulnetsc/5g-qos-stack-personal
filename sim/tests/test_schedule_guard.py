@@ -22,7 +22,8 @@ import pathlib
 
 import pytest
 
-from sim.scenarios import g9
+from sim.scenarios import g9
+from sim.scenarios import deployed_cell as _dcell
 from sim.scenarios.schedule_guard import (
     ScheduleTooLongForHorizon, require_horizon,
 )
@@ -95,11 +96,15 @@ def test_a_schedule_that_fits_is_accepted():
 
 # --- the four G9 sites, each at a horizon that used to truncate silently ---
 
+def _S(seconds: float) -> int:
+    return _dcell.slots(seconds * 1000.0)   # the schedules are in seconds; slots follow the cell
+
+
 @pytest.mark.parametrize("builder,kwargs,short", [
-    (g9.gt61_warm_rejoin, {}, 8_000),      # 6 of 10 events were past the end
-    (g9.gt61_warm_rejoin, {}, 4_000),      # 8 of 10
-    (g9.gt62_cold_attach, {}, 8_000),
-    (g9.gt63_rlf_recovery, {}, 4_000),     # the ENTIRE fade was outside
+    (g9.gt61_warm_rejoin, {}, _S(2.0)),      # 6 of 10 events were past the end
+    (g9.gt61_warm_rejoin, {}, _S(1.0)),      # 8 of 10
+    (g9.gt62_cold_attach, {}, _S(2.0)),
+    (g9.gt63_rlf_recovery, {}, _S(1.0)),     # the ENTIRE fade was outside
 ])
 def test_g9_builders_now_REFUSE_a_horizon_that_truncates(builder, kwargs, short):
     with pytest.raises(ScheduleTooLongForHorizon):

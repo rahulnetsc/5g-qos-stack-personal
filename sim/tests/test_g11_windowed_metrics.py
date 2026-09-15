@@ -19,12 +19,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from sim.baselines.pf import ProportionalFair
 from sim.driver import run
 from sim.parametric import sweep_scenario
+from sim.scenarios import deployed_cell as _dcell
 from sim.run_record import RunRecord
 from sim.scorecard import Scorecard
 from wp9_window import (Window, fixed_windows, windowed_flows_from_record,
                         windowed_metrics)
 
-H = 40_000            # 10 s
+H = _dcell.slots(10_000.0)   # 10 s at the deployed cell's slot
 
 
 @pytest.fixture(scope="module")
@@ -85,7 +86,7 @@ def test_M09w_over_the_whole_run_tracks_panel_M09(run_data):
     """Same statistic, same bucketing -- one window covering the run should
     land on the panel's worst second."""
     _, rec = run_data
-    whole = [Window(name="full", start_s=0.0, end_s=H * 0.00025)]
+    whole = [Window(name="full", start_s=0.0, end_s=H * _dcell.SLOT_S)]
     m09w = [r for r in _rows(run_data, whole) if r["metric"] == "M09w"][0]
     panel = Scorecard()._m09_per_second_jain(rec).value
     assert m09w["value"] is not None and panel is not None
@@ -148,7 +149,7 @@ def test_prebucketing_did_not_change_the_existing_metrics(run_data):
     """M01w/M02w/M07w/M08w must be unaffected by commit 6 -- the rewrite
     changed HOW completions reach them, not WHICH ones."""
     summary, rec = run_data
-    whole = [Window(name="full", start_s=0.0, end_s=H * 0.00025)]
+    whole = [Window(name="full", start_s=0.0, end_s=H * _dcell.SLOT_S)]
     m01w = [r for r in _rows(run_data, whole) if r["metric"] == "M01w"][0]
     panel = Scorecard()._m01_latency_percentiles(rec)
     # M-6 (2026-09-07) EXPOSED A LATENT ONE-QUANTUM DIVERGENCE between the

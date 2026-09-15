@@ -45,12 +45,13 @@ from analyse_stage6 import (ARMS, G6_BAR, G6_METRICS, _stable_seed,  # noqa: E40
 from regime_sweep import (arm_cost, bootstrap_ci, paired_seeds,  # noqa: E402
                           run_cells, sweep, write_csv)
 from sim.scorecard import Scorecard  # noqa: E402
+from sim.scenarios import deployed_cell as _dcell  # noqa: E402
 from sim.parametric import sweep_scenario  # noqa: E402
 from wp9_sweep import (BASE, _arms, _driver_kwargs,  # noqa: E402
                         _strip_timeseries)
 
 N_SEEDS = 40
-HORIZON = 20_000
+HORIZON = _dcell.slots(5_000.0)              # 5 s at the deployed cell's numerology
 CONTROL_N = 10          # the seeds stage 1 already ran
 CONTROL_TOL = 1e-9      # bit-for-bit: same scenario, same flags, same seed
 # 16 physical cores; 77 % measured efficiency at W=16 (wp9-g11-plan §1.3).

@@ -34,6 +34,11 @@ class CarrierConfig:
     bandwidth_hz: int = 30_000_000
     numerology: int = 1
     overhead_factor: float = 0.85
+    #: Transmission bandwidth in PRBs when the deployment states it (the
+    #: conf's `dl_carrierBandwidth = 106`). None derives it from
+    #: `bandwidth_hz` as before, which ignores guard bands -- kept so every
+    #: pre-2026-09-15 scenario and the regression corpus are byte-identical.
+    prb_count: int | None = None
     # WP6: real deployed centre frequency, not invented -- band 78, gNB
     # startup log's own frequency computation (calibration-logs/
     # twotier_startup_gnb.log: "nrarfcn 621312 => 3319680 KHz"). Only

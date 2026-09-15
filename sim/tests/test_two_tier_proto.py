@@ -20,7 +20,8 @@ import pytest
 from scheduler.two_tier import TwoTier, _Candidate
 from scheduler.two_tier_proto import PROTO_FLAGS, TwoTierProto
 from sim.driver import run as driver_run
-from sim.scenarios.g3 import build_gt22_scenario
+from sim.scenarios.g3 import build_gt22_scenario
+from sim.scenarios import deployed_cell as _dcell
 
 
 def _summary(sched, sc, cap=4):
@@ -197,22 +198,31 @@ def test_E1_changes_grant_sizing_and_NOT_the_ranking():
 
 def test_E1_gate_fires_only_when_the_reserve_cannot_fit():
     """`prb_count > min_rb * need` is the whole gate. Below the threshold it
-    must never fire, above it must; the boundary is 55/5 = 11 on this carrier.
+    must never fire, above it must; the boundary is prb_count / min_rb --
+    106 / 5 = 21 on the deployed cell -- DERIVED here from the scenario's own
+    grid, never restated (it was written as 55 / 5 = 11 for a cell that was
+    never the deployed one).
     """
+    from sim.resource import ResourceGrid
+    probe = build_gt22_scenario(seed=1, n_ues=4, horizon_slots=_dcell.slots(2_000.0))
+    boundary = ResourceGrid(probe.carrier, probe.tdd).prb_count // 5
+    below = [4, 8, boundary - 5]
+    above = [boundary + 3, boundary + 11]
     fired = {}
-    for n in (4, 6, 8, 16, 24):
-        sc = build_gt22_scenario(seed=1, n_ues=n, horizon_slots=8_000)
+    for n in below + above:
+        sc = build_gt22_scenario(seed=1, n_ues=n, horizon_slots=_dcell.slots(2_000.0))
         s = TwoTierProto(min_rb=5, gate_follower_reserve=True)
         c = _summary(s, sc)["scheduler_counters"]
         fired[n] = (c["e1_gate_fired"], c["e1_max_followers_need"])
-    for n in (4, 6, 8):
+    for n in below:
         assert fired[n][0] == 0, (
-            f"N={n}: gate fired with only {fired[n][1]} followers -- 55 PRB "
-            f"holds 11 reserves of 5, so it must not")
-    assert fired[16][0] > 0 and fired[24][0] > 0, fired
-    # ... and it fires because the follower count crossed 11, not for some
-    # other reason: the observed need must reach the threshold.
-    assert fired[24][1] >= 11, fired
+            f"N={n}: gate fired with only {fired[n][1]} followers -- "
+            f"{boundary * 5} PRB holds {boundary} reserves of 5, so it must not")
+    for n in above:
+        assert fired[n][0] > 0, fired
+    # ... and it fires because the follower count crossed the boundary, not
+    # for some other reason: the observed need must reach the threshold.
+    assert fired[above[-1]][1] >= boundary, fired
 
 
 def test_E2_keeps_the_reserve_for_a_UE_that_has_never_been_GRANTED():
@@ -392,8 +402,8 @@ def test_G_periodic_deadline_REFUSES_to_gate_a_reserve_that_never_fires():
 
 
 def test_G_periodic_deadline_threshold_is_DERIVED_from_the_TDD_pattern():
-    """Not a constant. DSUUU at 0.25 ms puts the longest wait to the next
-    uplink slot at 2 slots, and the threshold has to be that."""
+    """Not a constant: the longest wait to the next uplink-capable slot, from
+    the pattern the scenario actually runs -- so the test derives it too."""
     from sim.scenarios.g3 import build_gt22_scenario
     s = TwoTierProto(min_rb=5, periodic_reserve=True,
                      deadline_gated_periodic=True)
@@ -401,8 +411,15 @@ def test_G_periodic_deadline_threshold_is_DERIVED_from_the_TDD_pattern():
                              telemetry_gbr=True)
     _summary(s, sc)
     pat = "".join(s._grid.pattern)
-    assert pat == "DSUUU", f"pattern changed to {pat}; re-derive the threshold"
-    assert s._gpd_near_ms() == pytest.approx(0.5)
+    # The scheduler's own rule: the longest cyclic gap between slots that
+    # carry uplink symbols (U or S), in ms -- DDSUU on the deployed cell
+    # gives 3 slots (U4 -> D0 -> D1 -> S2) = 1.5 ms; DSUUU gave 2 slots = 0.5 ms.
+    ul = [i for i, k in enumerate(pat) if k in ("U", "S")]
+    gap = max((ul[(j + 1) % len(ul)] - ul[j]) % len(pat) for j in range(len(ul)))
+    assert gap >= 1
+    assert s._gpd_near_ms() == pytest.approx(gap * s.slot_duration_s * 1000.0)
+    if pat == "DDSUU":
+        assert gap == 3
 
 
 def test_G_periodic_deadline_SKIPS_slots_and_the_skip_is_counted():

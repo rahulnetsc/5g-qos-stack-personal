@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from sim.config import (CarrierConfig, FlowConfig, ScenarioConfig,
                         ScriptedFadeWindow, TDDConfig, UEConfig)
+from . import deployed_cell as _dcell
 from sim.workload import min_bytes_per_period_for_gfbr, scale_committed_load
 from sim.join import JoinConfig, JoinEvent
 from sim.scenarios.schedule_guard import require_horizon
@@ -175,9 +176,8 @@ def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
             traffic_params={"rate_bps": 50_000_000.0}))
 
     sc = ScenarioConfig(name=name, horizon_slots=horizon_slots,
-                        carrier=CarrierConfig(bandwidth_hz=40_000_000,
-                                              numerology=2),
-                        tdd=TDDConfig(pattern="DSUUU"), ues=ues, flows=flows,
+                        carrier=_dcell.carrier(),
+                        tdd=_dcell.tdd(), ues=ues, flows=flows,
                         seed=seed)
     # The occupancy axis's load half (sim/workload.py). Applied AFTER
     # validate_handshake_wiring so the wiring check sees the canonical flow
@@ -189,8 +189,8 @@ def _build(name: str, *, n_neighbours: int, join: JoinConfig, seed: int,
 
 
 def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
-                     n_cycles: int = 10, horizon_slots: int = 20_000,
-                     first_slot: int = 2000, period_slots: int = 1600,
+                     n_cycles: int = 10, horizon_slots: int = _dcell.slots(5_000.0),
+                     first_slot: int = _dcell.slots(500.0), period_slots: int = _dcell.slots(400.0),
                      bg: bool = True,
                      allow_partial_schedule: bool = False,
                      committed_mult: float = 1.0) -> ScenarioConfig:
@@ -215,8 +215,8 @@ def gt61_warm_rejoin(seed: int = 1, n_neighbours: int = 7,
 
 
 def gt62_cold_attach(seed: int = 1, n_neighbours: int = 7, n_cycles: int = 5,
-                     horizon_slots: int = 20_000, first_slot: int = 2000,
-                     off_slots: int = 800, period_slots: int = 3000,
+                     horizon_slots: int = _dcell.slots(5_000.0), first_slot: int = _dcell.slots(500.0),
+                     off_slots: int = _dcell.slots(200.0), period_slots: int = _dcell.slots(750.0),
                      bg: bool = True,
                      allow_partial_schedule: bool = False,
                      committed_mult: float = 1.0) -> ScenarioConfig:
@@ -256,12 +256,12 @@ def gt62_cold_attach(seed: int = 1, n_neighbours: int = 7, n_cycles: int = 5,
 # to defeat. At numerology 2 (0.25 ms slots) t310 alone is 8,000 SLOTS.
 _T310_MS = 2000.0
 _SLOT_MS_MU2 = 0.25
-T310_SLOTS_MU2 = int(_T310_MS / _SLOT_MS_MU2)   # 8,000
+T310_SLOTS = _dcell.slots(2000.0)   # t310 = 2 000 ms (sim/rlf.py), at the deployed cell's slot -- never a literal
 
 
 def gt63_rlf_recovery(seed: int = 1, n_neighbours: int = 7,
-                      horizon_slots: int = 30_000, fade_start_slot: int = 4000,
-                      fade_slots: int = 12_000, fade_extra_loss_db: float = 35.0,
+                      horizon_slots: int = _dcell.slots(7_500.0), fade_start_slot: int = _dcell.slots(1_000.0),
+                      fade_slots: int = _dcell.slots(3_000.0), fade_extra_loss_db: float = 35.0,
                       bg: bool = True,
                       allow_partial_schedule: bool = False,
                      committed_mult: float = 1.0) -> ScenarioConfig:
@@ -302,7 +302,7 @@ def gt63_rlf_recovery(seed: int = 1, n_neighbours: int = 7,
                     allow_partial=allow_partial_schedule,
                     detail=f"the fade runs slots {fade_start_slot}-"
                            f"{fade_start_slot + fade_slots} and must outlast "
-                           f"t310 ({T310_SLOTS_MU2} slots) to declare RLF. ")
+                           f"t310 ({T310_SLOTS} slots) to declare RLF. ")
     fade = ScriptedFadeWindow(start_slot=fade_start_slot,
                               end_slot=fade_start_slot + fade_slots,
                               extra_loss_db=fade_extra_loss_db)

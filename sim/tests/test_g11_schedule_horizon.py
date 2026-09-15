@@ -26,29 +26,34 @@ from sim.scenarios.g11 import (SLOT_S, FirmwareWindow, StopDrill,
 
 def test_a_horizon_too_short_for_the_schedule_is_REFUSED():
     with pytest.raises(ValueError, match="cannot contain GT-7.1's schedule"):
-        build_g11_scenario(seed=1, horizon_slots=400_000)
+        build_g11_scenario(seed=1, horizon_slots=_S(100))
 
 
 def test_the_refusal_names_the_minimum_and_the_event():
     with pytest.raises(ValueError) as exc:
-        build_g11_scenario(seed=1, horizon_slots=400_000)
+        build_g11_scenario(seed=1, horizon_slots=_S(100))
     msg = str(exc.value)
     assert "STOP drill" in msg and f"{minimum_horizon_slots():,}" in msg
 
 
 def test_a_short_run_is_available_but_must_SAY_SO():
-    sc = build_g11_scenario(seed=1, horizon_slots=400_000,
+    sc = build_g11_scenario(seed=1, horizon_slots=_S(100),
                             allow_partial_schedule=True)
     assert sc.flows
-    present = scripted_ingredients_present(400_000)
+    present = scripted_ingredients_present(_S(100))
     assert present == {"teleop": True, "pause": False,
                        "firmware": False, "stop": False}
 
 
+def _S(seconds: float) -> int:
+    """Slots for a duration at the deployed cell -- the soak is 1800 s, not a slot literal."""
+    return int(round(seconds / SLOT_S))
+
+
 def test_the_full_horizon_contains_every_ingredient():
-    assert scripted_ingredients_present(7_200_000) == {
+    assert scripted_ingredients_present(_S(1800)) == {
         "teleop": True, "pause": True, "firmware": True, "stop": True}
-    build_g11_scenario(seed=1, horizon_slots=7_200_000)      # must not raise
+    build_g11_scenario(seed=1, horizon_slots=_S(1800))      # must not raise
 
 
 def test_the_minimum_is_derived_from_the_schedule_not_restated():
@@ -59,7 +64,7 @@ def test_the_minimum_is_derived_from_the_schedule_not_restated():
         (late.at_s + late.period_ms / 1000.0) / SLOT_S + 0.999999)
 
 
-@pytest.mark.parametrize("horizon", [400_000, 800_000, 3_200_000, 7_200_000])
+@pytest.mark.parametrize("horizon", [_S(100), _S(200), _S(800), _S(1800)])
 def test_no_scripted_window_starts_after_it_ends(horizon):
     """The clip produced (812.0, 800.0) at 3.2 M slots -- a window outside
     the run, in a partition of the run."""
@@ -82,7 +87,7 @@ def test_no_scripted_window_lies_wholly_outside_the_horizon():
 
 
 def test_expected_counts_clips_to_the_horizon():
-    at_400k = expected_counts(400_000)
+    at_400k = expected_counts(_S(100))
     assert at_400k["firmware_windows"] == 0 and at_400k["stop_bursts"] == 0
-    at_full = expected_counts(7_200_000)
+    at_full = expected_counts(_S(1800))
     assert at_full["firmware_windows"] == 1 and at_full["stop_bursts"] == 1

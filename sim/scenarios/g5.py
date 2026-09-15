@@ -76,6 +76,7 @@ import dataclasses
 from typing import Optional, Sequence
 
 from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+from . import deployed_cell as _dcell
 from sim.workload import min_bytes_per_period_for_gfbr, scale_committed_load
 from scheduler.flow import DERIVE_PDB_FROM_5QI, LCG_UNASSIGNED, FlowConfig
 
@@ -136,9 +137,10 @@ BG_UL_BPS = 50_000_000.0
 #: count is computed, never restated (CLAUDE.md's derive-don't-restate rule).
 LOAD_STEPS = tuple(round(1.0 + 0.1 * i, 1) for i in range(6))
 
-_BANDWIDTH_HZ = 40_000_000
-_NUMEROLOGY = 2
-_TDD_PATTERN = "DSUUU"
+# The deployed cell (sim/scenarios/deployed_cell.py): numerology 1, 106 PRB, DDSUU.
+_BANDWIDTH_HZ = _dcell.BANDWIDTH_HZ
+_NUMEROLOGY = _dcell.NUMEROLOGY
+_TDD_PATTERN = _dcell.TDD_PATTERN
 _BASE_SNR_DB = 20.0
 _COHERENCE_SLOTS = 2000
 
@@ -298,9 +300,8 @@ def _cell(*, seed: int, n_ues: int, horizon_slots: int, name: str,
 
     sc = ScenarioConfig(
         name=name, horizon_slots=horizon_slots,
-        carrier=CarrierConfig(bandwidth_hz=_BANDWIDTH_HZ,
-                              numerology=_NUMEROLOGY),
-        tdd=TDDConfig(pattern=_TDD_PATTERN),
+        carrier=_dcell.carrier(),
+        tdd=_dcell.tdd(),
         ues=ues, flows=fleet, seed=seed,
     )
     scaled = scale_committed_load(sc, committed_mult)
@@ -331,7 +332,7 @@ def _cell(*, seed: int, n_ues: int, horizon_slots: int, name: str,
 
 
 def build_gt31_scenario(
-    *, seed: int, n_ues: int = 6, horizon_slots: int = 40_000,
+    *, seed: int, n_ues: int = 6, horizon_slots: int = _dcell.slots(10_000.0),
     committed_mult: float = 1.0, snr_db: float = _BASE_SNR_DB,
 ) -> ScenarioConfig:
     """GT-3.1 -- one camera's frames under lidar and background contention.
@@ -361,7 +362,7 @@ def build_gt31_scenario(
 
 def build_gt32_scenario(
     *, seed: int, load_mult: float, n_ues: int = 6,
-    horizon_slots: int = 40_000, snr_db: float = _BASE_SNR_DB,
+    horizon_slots: int = _dcell.slots(10_000.0), snr_db: float = _BASE_SNR_DB,
 ) -> ScenarioConfig:
     """GT-3.2 -- the committed portfolio, stepped. THE CELL CEILING.
 
@@ -390,7 +391,7 @@ def build_gt32_scenario(
 
 def build_gt33_scenario(
     *, seed: int, edge_snr_db: float, n_ues: int = 6,
-    horizon_slots: int = 40_000, committed_mult: float = 1.0,
+    horizon_slots: int = _dcell.slots(10_000.0), committed_mult: float = 1.0,
     snr_db: float = _BASE_SNR_DB, edge_ue: int = 2,
 ) -> ScenarioConfig:
     """GT-3.3 -- a cell-edge asset, and whether its degradation is contained.

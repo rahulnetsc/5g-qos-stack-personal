@@ -78,6 +78,7 @@ import dataclasses
 from typing import Any, Optional
 
 from sim.config import CarrierConfig, ScenarioConfig, TDDConfig, UEConfig
+from . import deployed_cell as _dcell
 from sim.workload import min_bytes_per_period_for_gfbr, scale_committed_load
 from scheduler.flow import DERIVE_PDB_FROM_5QI, LCG_UNASSIGNED, FlowConfig
 
@@ -154,9 +155,10 @@ N_DRIVEN = 2
 
 _BASE_SNR_DB = 20.0
 _COHERENCE_SLOTS = 2000
-_NUMEROLOGY = 2
-_BANDWIDTH_HZ = 40_000_000
-_TDD_PATTERN = "DSUUU"
+# The deployed cell (sim/scenarios/deployed_cell.py): numerology 1, 106 PRB, DDSUU.
+_NUMEROLOGY = _dcell.NUMEROLOGY
+_BANDWIDTH_HZ = _dcell.BANDWIDTH_HZ
+_TDD_PATTERN = _dcell.TDD_PATTERN
 
 
 def _camera(ue_id: int) -> FlowConfig:
@@ -179,7 +181,7 @@ def build_gt11_scenario(
     seed: int,
     n_ues: int = 8,
     committed_mult: float = 1.0,
-    horizon_slots: int = 40_000,
+    horizon_slots: int = _dcell.slots(10_000.0),
     n_driven: int = N_DRIVEN,
     firmware_pull_bps: float = FIRMWARE_PULL_BPS,
     snr_db: float = _BASE_SNR_DB,
@@ -242,8 +244,8 @@ def build_gt11_scenario(
     sc = ScenarioConfig(
         name=f"gt11_n{n_ues}_d{n_driven}_cm{committed_mult:g}",
         horizon_slots=horizon_slots,
-        carrier=CarrierConfig(bandwidth_hz=_BANDWIDTH_HZ, numerology=_NUMEROLOGY),
-        tdd=TDDConfig(pattern=_TDD_PATTERN),
+        carrier=_dcell.carrier(),
+        tdd=_dcell.tdd(),
         ues=ues, flows=fleet, seed=seed,
     )
     scaled = scale_committed_load(sc, committed_mult)
