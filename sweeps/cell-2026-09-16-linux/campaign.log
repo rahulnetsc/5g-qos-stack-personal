@@ -40,3 +40,5 @@ campaign start 2026-09-16 00:07:54  workers=31  H5=10000  HEAD=88d5bd0  OUT=swee
 === g12  start 2026-09-16 03:55:19
 === g12  end   2026-09-16 03:59:43  rc=0  264s
 === g12_cg  start 2026-09-16 03:59:43
+=== g12_cg  end   2026-09-16 04:08:34  rc=0  531s
+campaign end 2026-09-16 04:08:34

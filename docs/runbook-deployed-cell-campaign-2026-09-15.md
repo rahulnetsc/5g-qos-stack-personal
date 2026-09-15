@@ -49,7 +49,15 @@ commit on `feat/high-fidelity-sim`):
   overload. Three one-change fixes are named in
   `docs/config-scheduler-handoff.md` §8b.1 and are NOT built.
 
-**What is not done.** The full five-arm campaign (this runbook); the
+**Done 2026-09-16:** the full five-arm campaign with CG on for every
+guarantee ran on Linux (21 steps, 4 h 01, `sweeps/cell-2026-09-16-linux/`,
+running log `docs/campaign-cell-2026-09-16-linux.md`); every section of
+`docs/results-cell-2026-09-15.md` is written; the four faithful arms are
+byte-identical to the Windows run on G1/G3/G5. Two ConfigSched bugs were
+fixed first (`65d45ae`, `f6aa911`); its v2 formulation is designed
+(`docs/config-scheduler-handoff.md` §8c), not built.
+
+**What is not done.** The
 three ConfigSched fixes; an isolated timing of ConfigSched's Tier 1 and a
 greedy-versus-LP exactness test on captured instances; the three-CG-per-
 robot measurement (telemetry, monitoring, video floor); SR periodicity and

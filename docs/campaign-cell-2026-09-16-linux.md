@@ -112,7 +112,26 @@ and anything that needed a fix.
 | g9 | 0 | 708 | 1 800 runs. Axis top (7, ×1.5) and (8, ×2.0) "cell already broken" on every arm (derived from the OLD cell's G10 boundary). Informative cells passed: Proto 12, PF 11, Reservation 10, ConfigSched 9 (its cell breaks at (6, ×1.25)), TwoTier 4 |
 | g9_cg | 0 | 1 461 | 3 600 runs. TwoTier 4 → 11 / 11 (cold 1.0–3.8 s → 0.12–0.25 s); ConfigSched 9 → 12 / 12 (the broken incumbent at ×1.25 was the heartbeat); cold first service +100–200 ms on every arm |
 | g12 | 0 | 264 | 200 ramp sweeps (2 200 runs). Clause 4 10/10 everywhere; no arm matches `[9, 4, 2]`; TwoTier's telemetry PDB-violation 0.76 at ×1.0 (previous cell 0.000); ConfigSched 0.105 at ×1.4 → 0.82 |
+| g12_cg | 0 | 531 | 400 sweeps. Telemetry indicator TwoTier 0.76 → 0.01, ConfigSched 0.82 → 0.00; class orders unchanged |
+| **campaign** | 21 × rc=0 | **14 444 s = 4 h 01** | 00:07:54 → 04:08:34; 43 500 runs; no step re-run, no fix needed mid-campaign |
 
+## 7a. Expectations scored (from §5)
+
+| expectation | verdict | the number |
+|---|---|---|
+| G3 parts 1/1s/2 at 10/10 to N = 16; flood robot passes part 1 on most seeds at 24 | **hit**, and 10/10 at N = 24 on every seed; part 1s 8/10 at 24 (attach head) | §3.3 |
+| G3 part 3 at the expiry ceiling from N = 12 | **hit** (93.0 → 98.8–99.2 ms) | §3.3 |
+| G5 worse than PF on parts 1–2 at every N; admissible ≤ 8 | fleet bound **hit** (7); "every N" **miss** — 10/10 like PF at N = 4–7 | §5.4 |
+| G1/G2 no misses the deadline arms lack, except >4 due per slot (G2 STOPs, G1 cap 2) | G1 **hit** (0 breaches; cap-2 latency traced to one-visit-per-PDB + early order); G2 **hit** (cap 2: 1 390; cap 4 parity) | §1.4, §2.4 |
+| G7 clause 3 no worse than TwoTier; MFBR demand cap the only containment | **hit**, and best on every clause (0.92×, 9.0 ms) | §7.4 |
+| G9 joiner served later than PF under load (withdrawn "PF-like") | **hit at the margin** (cold (6) 0.24 vs 0.10 s); the loss is its own cell breaking at ×1.25 (the heartbeat) | §8.4 |
+| G10 admissible ≤ Proto's | **miss**, favourable: 10 (Proto 7, PF 8) | §9.4 |
+| G12 class order like Reservation's; degradation by declaration | order **hit** (`[]` 7–8/10); declaration part unscoreable at class level | §10.4 |
+| G4, G6 | no expectation; first measurements: PF-grade, G6 windowed floor 4/30 | §4, §6 |
+| ConfigSched+CG: G3 10/10 to 24; G5 unchanged by CG | **hit** / **hit** | §3.5, §5.5 |
+
+Ten registered, eight hits, two misses (one favourable). Every miss is
+recorded with its number; none is edited.
 ## 5. Expectations registered before the artefacts are read
 
 For ConfigSched (the prototype as committed plus the two fixes), extending
