@@ -21,9 +21,9 @@ every field, so the two runs are quoted interchangeably for those arms; the
 |---|---|---|---|
 | `aligned/g3.json` (Windows: 400 runs, 759 s; identical on the four arms) | 500 | 555 s | done |
 | `cg/g3_cg.json`, `cg/g3_cgt.json` | 500 + 500 | 562 s + 563 s | done |
-| `aligned/g5.json` (Windows: 880, 719 s) | | | running |
-| `cg/g5_cg.json`, `cg/g5_cgt.json` | | | pending |
-| `aligned/g7.json`, `cg/g7.json` | | | pending |
+| `aligned/g5.json` (Windows: 880, 719 s; identical on the four arms) | 1 100 | 496 s | done |
+| `cg/g5_cg.json`, `cg/g5_cgt.json` | 1 100 + 1 100 | 520 s + 519 s | done |
+| `aligned/g7.json`, `cg/g7.json` | | | running |
 | `aligned/g10.json`, `cg/g10.json` | | | pending |
 | `aligned/g1.json` (Windows: 1 280, 1 198 s), `cg/g1_cg.json` | | | pending |
 | `aligned/g2.json`, `cg/g2_cg.json` | | | pending |
@@ -421,6 +421,30 @@ overload (0.93 at N = 24 against PF's 0.45), which no arm's part 1–2 pass
 count shows because both parts are already 0/10 there. The prototype has
 a GFBR floor and no frame knowledge: the floor keeps frames complete, the
 absence keeps them late.
+
+### 5.5 With configured grants (`cg/g5_cg.json`, `cg/g5_cgt.json`, 1 100 runs each)
+
+The CG carries the heartbeat and never the camera, so the video statistics
+themselves barely move: on PF, the Proto arm and ConfigSched the fleet-axis
+frame age is within ±3 ms and completeness within 0.02 of the plain rows at
+every N, under `+CG` and `+CGt` alike. What moves is everything the
+heartbeat's place in the dynamic path was costing:
+
+| arm | admissible fleet: plain → +CG / +CGt | load knee: plain → +CG / +CGt | GT-3.3 parts 1–2, 0–15 dB: plain → +CG |
+|---|---|---|---|
+| PF | 8 → 8 / 8 | ×1.4 → ×1.4 / ×1.4 | pass → pass |
+| Reservation | 7 → **8 / 8** | ×1.2 → **×1.3 / ×1.3** | **fail → pass** (10/10 at every SNR) |
+| TwoTier | none → none / none | ×1.0 → ×1.0 / ×1.0 | fail → fail |
+| ProtoRRageD2 | 8 → **10 / 10** | none → none / none | pass → pass |
+| ConfigSched | 7 → 7 / 7 | ×1.1 → ×1.1 / ×1.1 | pass → pass |
+
+And **part 4 (the edge robot's own telemetry) goes 1/10 → 10/10 at −6 and
+−3 dB on every arm**: the CG occasion, sized from the reported CQI, still
+delivers a 300 B heartbeat at −6 dB where the dynamic path could not get
+the SR-grant-BSR chain through the flood. TwoTier+CG passes part 4 at
+every SNR and still fails parts 1–2 from 0 to 20 dB — G5 is the
+scheduler's to lose and the CG does not reach it, exactly as on the
+previous cell. ConfigSched's registered "G5 unchanged by CG" — hit.
 
 ## 6. G6 — "Background traffic can never impair the fleet"
 

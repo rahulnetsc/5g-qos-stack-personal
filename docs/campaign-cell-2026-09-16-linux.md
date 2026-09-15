@@ -96,6 +96,8 @@ and anything that needed a fix.
 | g3_cg | 0 | 562 | 500 runs, five `+CG` arms |
 | g3_cgt | 0 | 563 | 500 runs, five `+CGt` arms |
 | g5 | 0 | 496 | 1 100 runs. Determinism: all 880 four-arm rows identical to the Windows artefact (Windows 719 s) |
+| g5_cg | 0 | 520 | 1 100 runs |
+| g5_cgt | 0 | 519 | 1 100 runs |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -187,6 +189,13 @@ the best-effort filler, so the camera's above-GFBR offer waits). Edge axis:
 parts 1–2 at every SNR but 10 dB. Not registered and the arm's one clear
 win: PDU-set completeness 0.93–0.95 to N = 24 (PF 0.45, Proto 0.60) —
 frames whole but late, the GFBR floor's doing.
+
+**With CG** (`cg/g5_cg.json`, `cg/g5_cgt.json`): video statistics within
+±3 ms / 0.02 of plain on PF, Proto and ConfigSched (the CG never carries
+the camera); Reservation+CG admissible fleet 7 → 8, knee ×1.2 → ×1.3, and
+its GT-3.3 verdict fail → pass; Proto+CG 8 → 10; part 4 at −6/−3 dB
+1/10 → 10/10 on every arm. ConfigSched+CG = ConfigSched (registered: hit).
+Written into `docs/results-cell-2026-09-15.md` §5.5.
 
 ## 7. After the results: ConfigSched iteration
 

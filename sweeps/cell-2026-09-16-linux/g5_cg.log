@@ -1,0 +1,28 @@
+G5 video: 1100 driver runs, 22.0M slots
+  parts A,B,C  arms PF+CG,Reservation+CG,TwoTier+CG,ProtoRRageD2+CG,ConfigSched+CG  seeds 10 (base 0)  cap 4  fixed N=7
+  bounds: PDU sets >= 99% within 150 ms; frame age p95 <= 66.67 ms (2 frame periods at 30 fps); goodput >= GFBR in EVERY 2 s window
+  0 banked, 1100 to run
+    ... 50/1100 (15s)
+    ... 100/1100 (28s)
+    ... 150/1100 (40s)
+    ... 200/1100 (52s)
+    ... 250/1100 (67s)
+    ... 300/1100 (82s)
+    ... 350/1100 (97s)
+    ... 400/1100 (113s)
+    ... 450/1100 (139s)
+    ... 500/1100 (173s)
+    ... 550/1100 (207s)
+    ... 600/1100 (241s)
+    ... 650/1100 (277s)
+    ... 700/1100 (318s)
+    ... 750/1100 (357s)
+    ... 800/1100 (400s)
+    ... 850/1100 (443s)
+    ... 900/1100 (464s)
+    ... 950/1100 (478s)
+    ... 1000/1100 (492s)
+    ... 1050/1100 (504s)
+    ... 1100/1100 (520s)
+
+wrote sweeps/cell-2026-09-16-linux/cg/g5_cg.json  (520s, 1100 runs)
