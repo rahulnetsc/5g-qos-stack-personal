@@ -103,6 +103,7 @@ and anything that needed a fix.
 | g10 | 0 | 134 | 450 runs (N = 2 … 16, 5 s). No Windows artefact |
 | g10_cg | 0 | 269 | 900 runs. Reservation+CG: never-granted 94 → 0, admissible 4 → 8 |
 | g1 | 0 | 887 | 1 600 runs. Determinism: all 16 four-arm cells identical to Windows (Windows 1 198 s) |
+| g1_cg | 0 | 1 807 | 3 200 runs. CG changes nothing on G1 (downlink instrument); 0 breaches on every CG arm |
 
 ## 5. Expectations registered before the artefacts are read
 

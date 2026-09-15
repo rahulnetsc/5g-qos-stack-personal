@@ -26,8 +26,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `aligned/g7.json`, `cg/g7.json` | 50, 100 | 16 s, 28 s | done |
 | `aligned/g10.json`, `cg/g10.json` | 450, 900 | 134 s, 269 s | done |
 | `aligned/g1.json` (Windows: 1 280, 1 198 s; identical on the four arms) | 1 600 | 887 s | done |
-| `cg/g1_cg.json` | | | running |
-| `aligned/g2.json`, `cg/g2_cg.json` | | | pending |
+| `cg/g1_cg.json` | 3 200 | 1 807 s | done |
+| `aligned/g2.json`, `cg/g2_cg.json` | | | running |
 | `aligned/g6.json`, `cg/g6_cg.json` | | | pending |
 | `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
 | `aligned/g9.json`, `cg/g9_cg.json` | | | pending |
@@ -166,6 +166,18 @@ below the message period, and placement by table rather than by a
 next-due order in which a long-interval flow always sorts last. At cap 4
 it is 3.5–6.0 ms to N = 16 and 10.5 at N = 24, between PF and the
 deadline-tier arms.
+
+### 1.5 With configured grants (`cg/g1_cg.json`, 3 200 runs)
+
+**Nothing moves.** All ten CG arms are 10/10 on both parts in every cell
+at both caps (0 breaches of 3 200), and every arm's `cmd_vel` p98 is
+within one slot of its plain value on both axes — PF+CG 12.5 ms at N = 24
+cap 2 against PF's 12.5, ConfigSched+CG 20.5 against 20.5, the
+deadline-tier arms 3.0–3.5 throughout. G1 scores a downlink bearer and the
+CG is an uplink occasion on the heartbeat; the only path between them is
+the uplink's SR/BSR chain, which `cmd_vel` never uses. The one place a CG
+could reach the downlink is through the HARQ draw-order coupling
+(CLAUDE.md), and at this resolution it does not show.
 
 ## 2. G2 — "The master disconnects: does every robot stop in time?"
 
