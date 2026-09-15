@@ -43,9 +43,23 @@ class ConfigSched2:
     """See the module docstring. `min_rb` is the deployed grant floor."""
 
     def __init__(self, min_rb: int = 5, window_ms: float = 100.0,
-                 resolve_ms: float = 10.0) -> None:
+                 resolve_ms: float = 10.0, deadline_margin_slots: int = 6) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
+        # Increment 2 (2026-09-16): a contracted flow's visit interval is
+        # PDB - margin, not PDB. The prototype planned one visit per PDB
+        # (`ceil(W / PDB)`), so a source whose period equals its PDB (the
+        # 100 ms heartbeat) or exceeds it (cmd_vel: 50 ms period, 100 ms PDB,
+        # one visit per 100 ms) had every other message arrive with its flow
+        # "early", and an early visit is placed only after every due unit --
+        # G1 at cap 2 (10.5 ms from N = 4), G12's telemetry indicator, G9's
+        # incumbent heartbeat at x1.25. The margin is the DL HARQ retry gap
+        # `k1 + k2` = 6 slots of sim/driver.py -- CHOSEN to match the driver,
+        # the same constant that set G2's miss floor -- so a message that
+        # arrives just after a visit gets the next visit and one retry inside
+        # its PDB. The undeclared form: no message period is read (a declared
+        # period could cap the visits at one per period, the +CGt caveat).
+        self.deadline_margin_slots = int(deadline_margin_slots)
         self.resolve_ms = float(resolve_ms)
         self.counters: dict[str, int] = defaultdict(int)
         self._flows: list[FlowConfig] = []
@@ -140,7 +154,10 @@ class ConfigSched2:
                     continue
                 tb_max = (self._prb_count * se) // 8
                 pdb_slots = max(1, int(round(f.pdb_ms / 1000.0 / self._slot_s)))
-                floor_visits = int(math.ceil(self._window_slots / pdb_slots)) if contracted else 0
+                # Increment 2: a visit at least every PDB - margin slots (see
+                # __init__); the prototype used every PDB.
+                interval_bound = max(1, pdb_slots - self.deadline_margin_slots)
+                floor_visits = int(math.ceil(self._window_slots / interval_bound)) if contracted else 0
                 floor_bytes = int(math.ceil(f.gfbr_bps * w_s / 8.0)) if (contracted and f.gfbr_bps > 0) else 0
                 if contracted and f.flow_class == "Delay":
                     floor_bytes = max(floor_bytes, backlog)

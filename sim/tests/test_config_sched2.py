@@ -66,6 +66,35 @@ def test_inc1_an_unplanned_contracted_flow_is_due_now_and_placed_before_planned_
     assert s._due_key((2, bg.qfi), 2)[0] == 2
 
 
+def test_inc2_floor_visits_follow_pdb_minus_the_retry_margin():
+    """Every expected count is derived from the window, the flow's PDB and the
+    margin -- never written as a literal -- and the test asserts the counts
+    differ from the prototype's `ceil(W / PDB)` where they should (telemetry
+    and fleet DL) and coincide where they should (the camera)."""
+    import math
+    from sim.scenarios.g3 import QFI_CAMERA, QFI_FLEET_DL
+    sc = _cell(n_ues=2)
+    grid = ResourceGrid(sc.carrier, sc.tdd)
+    s = ConfigSched2(min_rb=5)
+    s.configure(sc.flows, grid.slot_duration_s, grid)
+    slot = grid.slot_grid(2)
+    table = {(f.ue_id, f.qfi): 5_000 for f in sc.flows}
+    s._resolve_tier1(slot, _Buffers(table), _Channel())
+    w, m = s._window_slots, s.deadline_margin_slots
+    assert m == 6
+    for qfi in (QFI_TELEMETRY, QFI_CAMERA, QFI_FLEET_DL):
+        f = next(x for x in sc.flows if x.ue_id == 1 and x.qfi == qfi)
+        pdb = max(1, int(round(f.pdb_ms / 1000.0 / grid.slot_duration_s)))
+        want = math.ceil(w / max(1, pdb - m))
+        proto = math.ceil(w / pdb)
+        got = s._plan[(1, qfi)].floor_visits
+        assert got == want, (qfi, got, want)
+        if qfi in (QFI_TELEMETRY, QFI_FLEET_DL):
+            assert want > proto, (qfi, want, proto)     # the increment changed these
+        else:
+            assert want == proto, (qfi, want, proto)    # and left the camera's floor alone
+
+
 def test_inc1_is_reached_at_scale_on_g2_and_no_planned_stop_expires_for_want_of_a_plan():
     """G2 at N = 12, two simultaneous STOPs, cap 2, 2 s: the mechanism fires
     (counted), and every STOP that arrives between re-solves is granted --
