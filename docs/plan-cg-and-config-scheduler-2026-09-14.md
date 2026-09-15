@@ -119,6 +119,13 @@ per-flow deficit carried forward (the window cannot be shorter than the
 longest period it reasons about; BSR-derived demand is the other limit).
 Every constraint gets a counter saying whether it bound in a window.
 
+**Standards inputs surveyed 2026-09-14** (`docs/standards-survey-beyond-cg-2026-09-14.md`):
+TSCAI / UE traffic info replace the CG period detector; multi-slot CG with
+UTO-UCI (Rel-18) is the CG for video; the Delay Status Report (Rel-18) and
+PDU-set deadlines (PSDB) are Tier-2 inputs; per-LCH SR configurations
+(Rel-15) are the cheapest next measurement; DL SPS is the only lever on
+G2's DCI count.
+
 ## 3. Still owed before either can be promoted
 G8 needs a scenario, a per-role statistic and a defined load level. The
 22 stale claim stamps are now every stamp (the driver is in every scope);
