@@ -240,6 +240,21 @@ the 20-slot fleet-DL flows always win; at cap 2 the two DCIs go to them
 rules L7 (interval below the period) and table placement are the fix.
 Written into `docs/results-cell-2026-09-15.md` §1.
 
+### 6.6 G2 — mechanism probe run BEFORE the artefact (one seed, N = 12, two STOPs)
+
+Scratch probe on the prototype, cap 4 and cap 2, instrumenting the two STOP
+flows (DL 5QI 85, PDB 5 ms = 10 slots) per DL slot. Every STOP that has a
+plan is granted within 1 slot (cap 4) or ≤ 3 slots (cap 2), all inside the
+PDB. The expiries are the arrivals that have **no plan**: a STOP arriving
+between Tier-1 re-solves is class "no share", sorts after every planned
+unit, and the DL flood's planned visit takes the slot's PRBs first; the
+next re-solve is up to 10 ms away. Cap 4: 10 of 11 expiries are no-plan
+arrivals; cap 2: 32 of 34. This is the registered mechanism (§5, G1/G2)
+seen directly; the expectation is unchanged and will be scored on the
+artefact. The one-change fix for the prototype is obvious (a contracted
+flow with backlog and no plan is due now, not leftover); v2 has no
+between-re-solve state to be caught in.
+
 ## 7. After the results: ConfigSched iteration
 
 The redesign to build once the table is complete, from the 2026-09-16
