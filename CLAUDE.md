@@ -139,6 +139,12 @@ bare `python` invocation that works.
   the pre-alignment record with a banner pointing there.
   `docs/plan-cg-and-config-scheduler-2026-09-14.md` is the agreed forward
   plan: configured grants (Type 2) first, the configuration scheduler after.
+  **`docs/conf/gnbx310.conf` is the gNB configuration in deployment (added
+  2026-09-15) and `docs/deployed-cell-2026-09-15.md` says what it
+  establishes: numerology 1, 106 PRB, `DDSUU` every 2.5 ms with a 6/2/6
+  special slot, two MIMO layers.** Every guarantee scenario before that
+  date ran `DSUUU` at numerology 2, and the calibration log ran
+  `DDDDDDDSUU`; the conf is the authority going forward.
 - `docs/ts_138{212,213,214,300,321,331}*.pdf` — the 3GPP **Rel-18** editions,
   and `docs/Rel 16/ts_138*.pdf` — the **Rel-16** editions (added 2026-09-15).
   **Rel-16 is the compliance baseline: the OAI gNB and the COTS UE are
