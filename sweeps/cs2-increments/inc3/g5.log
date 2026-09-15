@@ -1,0 +1,11 @@
+G5 video: 220 driver runs, 4.4M slots
+  parts A,B,C  arms ConfigSched2  seeds 10 (base 0)  cap 4  fixed N=7
+  bounds: PDU sets >= 99% within 150 ms; frame age p95 <= 66.67 ms (2 frame periods at 30 fps); goodput >= GFBR in EVERY 2 s window
+  0 banked, 220 to run
+    ... 50/220 (17s)
+    ... 100/220 (29s)
+    ... 150/220 (42s)
+    ... 200/220 (56s)
+    ... 220/220 (62s)
+
+wrote sweeps/cs2-increments/inc3/aligned/g5.json  (63s, 220 runs)
