@@ -280,6 +280,115 @@ undeclared), a BSR-confirmed stamp, and a floor-shortfall rule that is not
 declaration order. The prototype is left as measured so that commit has
 its before.
 
+## 8c. What the prototype measured about itself, and the v2 formulation (2026-09-16)
+
+### 8c.1 Two bugs, fixed before the campaign (each its own commit)
+
+| | what | measured, G3 part A, seed 1826701614, 10 s, cap 4 |
+|---|---|---|
+| B1 `65d45ae` | Tier 2 placed past the per-slot UE cap and let `cap_ues_per_slot` trim afterwards; a trimmed grant had already stamped its visit clock | N = 24: 46 of the flood robot's 94 heartbeat stamps and 70 % of all DL stamps were for grants never sent. Fixed: the cap is applied inside placement (`cap_skipped_*` counters). The flood robot's heartbeat then fell 45 → **12** of 100 — the mechanism the phantom stamps hid |
+| B2 `f6aa911` | Tier 1 counted the special slot as a full slot in both directions: 1 320 symbol-slots per window against the grid's 1 080 (+22 %) | Fixed: the PRB budget is symbol-weighted, the visit budget stays slot-counted. Flood robot 12 → **97** of 100; `visit_budget_bound` 2 045 → 0. A 22 % change in one budget flipped the outcome — the order has no priority or age term, so the heartbeat's fate depends on how many camera visits happen to be due |
+
+### 8c.2 Why the prototype is not the design §1–§2 describe
+
+Its Tier 1 is the port's LP with the log-utility replaced by floors-then-
+max-min and a visit count bolted on; §8a's "the cap becomes linear over a
+window, so no Dantzig–Wolfe is needed" is true for the *rate* region and
+discarded the configuration idea with it. Against the two reasons for the
+pivot: (1) it is greedy and fast but solves no stated problem exactly
+(three sequential stages, the visit budget never traded against the PRB
+budget, C5 soft); (2) delay enters only as "one visit per PDB", fairness is
+equal PRB shares, **frames do not exist** (`bytes_per_visit = r/n` has no
+relation to a frame), and **no active set is ever enumerated**. Its one
+measured gain — the instrument robot's heartbeat 100/100 where TwoTier
+fails — is rank removal, which `ProtoRRageD2` gets from one ordering
+change. Also, `_due_key` treats a never-visited flow as due *now*, the
+LEAST overdue of the due units, so under load a new or re-joined flow loses
+every tie (measured: 10 401 of 12 000 slots "never visited", 13 grants).
+
+### 8c.3 The v2 formulation: lifted variables that make the window constraints sufficient
+
+The deployed cell's numbers fix the shape: at 20 dB a robot's whole-slot
+TB is **6 121 B** (11 symbols), a camera frame is **16 500 B** — 2.7 slots
+— so a frame is never one visit, and the decisive variable is the trade
+between DCIs and PRBs per visit, invisible to a rate. Per direction, per
+100 ms window (`W` = 120 UL-carrying slots; 98.2 full-slot equivalents of
+PRB-time on `DDSUU`), re-solved every 10 ms:
+
+| variable | meaning | what the dimension buys |
+|---|---|---|
+| `T_i ∈ {2, 4, 8, …}` | visit period in direction-slots (`n_i = W/T_i`) | the cap becomes a **density** constraint that is sufficient, not only necessary |
+| `b_i` | bytes per visit | the DCI-vs-PRB trade, explicit |
+| `k_i` | visits per job (frame or message) | frame completion becomes linear; a frame is never split across a deadline |
+| `τ_i`, `P_τ` | the track a flow rides, and the track's PRB budget, `Σ_τ P_τ ≤ PRB` | per-slot PRB feasibility by construction |
+| `z_i ∈ {0,1}` | floors honoured this window | who loses under overload is a weighted decision, not a tie-break |
+| `e_i` | bytes above the floor | the fairness residual |
+
+| # | constraint | meaning |
+|---|---|---|
+| L1 | `k_i · T_i ≤ PDB_i − T_i` | a job released just after a visit still gets `k_i` visits before its deadline; the `−T_i` is phase slack and drops out with a declared phase (`+CGt`) |
+| L2 | `k_i · b_i ≥ F_i` | those visits carry the whole job — M05's rule, structural |
+| L3 | `GFBR_i·W/8 ≤ n_i·b_i ≤ MFBR_i·W/8` | the contract per window, both ends (G7's clamp as a constraint) |
+| L4 | `Σ_i z_i / T_i ≤ cap` | **the lifted cap.** Harmonic `T_i` ⇒ Kraft's inequality ⇒ `cap` prefix codes ⇒ every flow a residue class on one track, disjoint within a track ⇒ no slot holds more than `cap` flows. The prototype's C3 counted visits and could still bunch 24 due units into one slot; this cannot |
+| L5 | `8 b_i / se_i ≤ P_τ(i)` | a visit fits its track in every slot; the special slot's smaller `se` binds for a flow mapped there |
+| L6 | `Σ_τ P_τ ≤ PRB` | per-slot PRB feasibility, by construction |
+| L7 | `T_i ≤ PDB_i / 2` for a periodic source with PDB ≤ period | the heartbeat (PDB − period = 0): the cadence must beat the period or every message is served at its deadline |
+
+**Objective**, lexicographic: (1) `max Σ_i v_i z_i`, priority-weighted
+floors honoured — within a class, dropping the most expensive floors first
+maximises the count, which answers the `ue_id` tie-break from the objective;
+(2) α-fair over `e_i` on what is left (α = 1 PF, α → ∞ max-min; G8's clause
+chooses α).
+
+**Solve, and where it is exact.** Stage 1 is a lexicographic knapsack
+over classes: greedy by priority, then by resource cost within a class —
+exact for the lexicographic objective. Stage 2 per flow: `T_i` over ≤ 7
+powers of two, `k_i = ⌈F_i / b_i⌉` at the track budget — an enumeration of
+a handful of points, least density satisfying L1–L3. Stage 3: water-filling
+over two resources, exact when one binds (PRB from N ≥ 10 by the counters).
+Track packing of harmonic sizes is first-fit-decreasing and exact. No LP.
+
+**Realisability, from the literature rather than recalled:** periodic
+visits on one server with periods `T_i` need density `Σ 1/T_i ≤ 1`;
+Kawamura proved density ≤ 5/6 always sufficient ([STOC '24](https://dl.acm.org/doi/abs/10.1145/3618260.3649757),
+[PNAS 2026](https://www.pnas.org/doi/abs/10.1073/pnas.2530214123), [arXiv](https://arxiv.org/abs/2606.27104));
+for harmonic periods density ≤ 1 is sufficient by the Kraft construction
+above, and the schedule is a table.
+
+**Checked against the deployed cell, G3:** camera at 20 dB, whole-slot
+visits: `k = 3`, 3 frames per window → 9 visits per 120 slots → `T = 8`,
+density 1/8, PRB-time 9/98.2 = 0.092 per camera; heartbeat `T = 32` by L7;
+fleet DL `T = 16`. Camera floors fit while `0.092·N ≤ 1`: **N = 10, not
+11**, before HARQ's ~10 % — the G3 all-parts boundary PF and the Proto arm
+measured (10), recovered with no run. Density at N = 10 is 1.56 of a cap of
+4: on this cell PRB-time binds, not the cap, and the plan knows it before
+placing anything.
+
+**Tier 2 under v2:** a table (slot → per track, the flow whose residue
+class contains it); grant = `P_τ` PRBs to that flow's UE (an uplink UE whose
+flows share a slot gets one grant sized to their sum; its LCP serves them by
+priority — sized for, not predicted); an empty visit's PRBs go to the
+residual pool work-conservingly; a displaced visit (retransmission, RA)
+slips to the track's next slot and L1's slack absorbs it; **a configured
+grant is a pinned map entry** — `+CG` on a heartbeat fixes its track and
+phase and removes it from the density Tier 1 allocates. Max gap between
+visits is `T_i` exactly. The visit clock, EDF, the "due now" class and every
+ordering question of the prototype disappear.
+
+**What it gives up:** harmonic rounding up to 2× density on a badly placed
+period (Kawamura's bound says non-harmonic loses 1/6, but its construction
+is a search, not a table); tracks fixed within a window; uplink frames
+**inferred** from the BSR jump at the declared or estimated period — the
+same "conditional on" label as `+CGt`; DL PDU-set marking is Rel-18
+core-side.
+
+**Order of work, after the 2026-09-16 campaign's table is complete:** build
+as `ConfigSched v2` (a separate labelled arm, the prototype kept as the
+"before"), one fidelity change per commit, each probed on G3 N = 10 / 24
+and G2 against the campaign's artefacts on the same seeds. Open choice
+before building: L7's `PDB/2` against a phase estimate for undeclared
+periodic sources — the heartbeat decides it.
+
 ## 9. Open external inputs
 
 None specific to this work. The SRB capture and TS 22.104's survival-time
