@@ -23,8 +23,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `cg/g3_cg.json`, `cg/g3_cgt.json` | 500 + 500 | 562 s + 563 s | done |
 | `aligned/g5.json` (Windows: 880, 719 s; identical on the four arms) | 1 100 | 496 s | done |
 | `cg/g5_cg.json`, `cg/g5_cgt.json` | 1 100 + 1 100 | 520 s + 519 s | done |
-| `aligned/g7.json`, `cg/g7.json` | | | running |
-| `aligned/g10.json`, `cg/g10.json` | | | pending |
+| `aligned/g7.json`, `cg/g7.json` | 50, 100 | 16 s, 28 s | done |
+| `aligned/g10.json`, `cg/g10.json` | | | running |
 | `aligned/g1.json` (Windows: 1 280, 1 198 s), `cg/g1_cg.json` | | | pending |
 | `aligned/g2.json`, `cg/g2_cg.json` | | | pending |
 | `aligned/g6.json`, `cg/g6_cg.json` | | | pending |
@@ -452,7 +452,78 @@ previous cell. ConfigSched's registered "G5 unchanged by CG" — hit.
 
 ## 7. G7 — "One misconfigured robot cannot take down the fleet"
 
-*pending.*
+### 7.1 The experiment
+GT-4.3, *GBR-on-GBR containment*: Asset B's camera encoder is mis-set to
+offer **2.1× its MFBR** (achieved 2.10×, asserted ≥ 2.0×); Asset A runs a
+nominal full profile; six further robots carry committed profiles. N = 8,
+5 s (10 000 slots), 10 seeds. `scripts/g7_aggressor.py`, 50 runs plain,
+100 with CG. Unchanged from the previous campaign except for the cell.
+
+### 7.2 Tests run
+| clause | criterion |
+|---|---|
+| 1 | Asset A entirely within its SLOs (telemetry at the 24 000 bps contract with p98 ≤ 100 ms; camera ≥ GFBR with p98 ≤ 150 ms) |
+| 2 | B's camera delivered ≤ MFBR + tolerance — the tolerance is still an open specification input; ≤ 1.1× is read as "held at the ceiling" as before |
+| 3 | B's **own** other flows within SLO — containment inside the misbehaving asset |
+
+### 7.3 Results (medians over 10 seeds; previous cell in brackets)
+
+| metric | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
+|---|---|---|---|---|---|
+| clause 2 — B camera delivered ÷ MFBR | **0.67×** (1.04) | **1.87×** (2.00) | 1.05× (2.05) | **0.82×** (1.08) | **0.92×** |
+| clause 1 — A telemetry delivered (bps of 24 000) | 23 760 | 24 000 | **960** (7 101) | 24 000 | 24 000 |
+| clause 1 — A telemetry p98 (ms, PDB 100) | 78.8 (20.6) | 44.2 (28.0) | 29.5 (95.0) | 74.0 (18.6) | **31.5** |
+| clause 1 — A camera ÷ GFBR | 1.002 | 1.002 | 0.978 | 1.002 | 1.001 |
+| clause 1 — A camera p98 (ms, PDB 150) | 38.0 (21.8) | 35.2 (26.9) | **120.5** (127.4) | 32.8 (18.7) | **30.3** |
+| clause 3 — B telemetry delivered (bps) | 23 520 | 24 000 | 23 760 | 23 280 | 24 000 |
+| clause 3 — B telemetry p98 (ms) | 68.0 (19.2) | 15.5 (8.4) | 93.0 (26.0) | 73.0 (25.4) | **9.0** |
+| uplink PRB utilisation | 0.912 | 0.902 | 0.745 | 0.914 | 0.906 |
+
+**With CG** — the rows CG changes (`+CG` / `+CGt`):
+
+| metric | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
+|---|---|---|---|---|---|
+| clause 2 — B camera ÷ MFBR | 0.67 / 0.67 | **1.18 / 1.20** | 0.94 / 1.03 | 0.82 / 0.81 | 0.92 / 0.92 |
+| clause 1 — A telemetry (bps) · p98 (ms) | 24 000 · 22.0 / 4.5 | 24 000 · 43.8 / 14.2 | **24 000** · 61.0 / 19.0 | 24 000 · 36.2 / 19.0 | 24 000 · 23.0 / 15.0 |
+| clause 1 — A camera p98 (ms) | 37.7 / 36.6 | **84.4 / 81.8** | 93.2 / 98.2 | 32.7 / 33.2 | 30.8 / 30.5 |
+| clause 3 — B telemetry p98 (ms) | 26.2 / 4.5 | 16.8 / 11.5 | 47.8 / 43.0 | 38.5 / 18.2 | 15.2 / 6.0 |
+
+### 7.4 Conclusion
+**Clause 2 fails on Reservation (1.87×) and is at the line on TwoTier
+(1.05×); PF, the Proto arm and ConfigSched hold B under its ceiling.** The
+cell moved TwoTier's ratio from 2.05× to 1.05× and PF's from 1.04× to
+0.67×: with 64 % of the uplink, a fair share of visits no longer reaches
+B's MFBR at all, so PF's containment-by-fairness tightens by itself.
+Reservation's does not — its deficit tiers keep serving B's declared GBR
+flow past its ceiling, as on the previous cell: nothing in the C enforces
+an MFBR (`ia_p5g_scheduler.c:2663-2665` caps the *target*, not delivery).
+
+**Clause 1 fails on TwoTier, harder than before**: the victim's heartbeat
+is starved to **960 bps, 4 % of contract** (30 % on the previous cell),
+its camera p98 at 120 ms; the whole-cell uplink utilisation of 0.745
+against 0.90–0.91 on every other arm says the cell has room the scheduler
+is not using — the same cadence failure G3 shows. The other four arms
+pass clause 1; PF and the Proto arm now do so with A's telemetry p98 at
+74–79 ms against the 100 ms PDB (19–21 ms on the previous cell) — the
+tighter uplink puts the heartbeat closer to its deadline on the
+fairness-based arms. **Clause 3 passes everywhere**, TwoTier's B telemetry
+p98 at 93 ms the closest call.
+
+**ConfigSched is the best arm on this guarantee, on every clause**: B
+contained at 0.92× by the `MFBR × W` demand cap (the one containment
+mechanism it has, registered as such), A's telemetry at contract with
+p98 31.5 ms, A's camera p98 30.3 ms — the lowest of any arm — and B's own
+telemetry at 9.0 ms. The registered expectation ("clause 3 no worse than
+TwoTier") is a hit by a wide margin; containment was not expected to be
+better than PF's and is.
+
+**CG fixes TwoTier's clause 1** (A's heartbeat back to 24 000 bps at
+61 ms) as on the previous cell, and pulls Reservation's clause 2 from
+1.87× to 1.18× — at the price of A's camera p98 going 35 → 84 ms on
+Reservation, because the CG's reserved PRBs come out of the same uplink
+the camera needs. `+CGt` takes every arm's heartbeat p98 to 4.5–19 ms.
+Video containment is not the CG's to give: B's ratio moves only on the
+arms whose ranking the heartbeat was distorting.
 
 ## 8. G9 — "Does a robot joining a busy cell start working immediately?"
 

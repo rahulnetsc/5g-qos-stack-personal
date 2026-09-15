@@ -172,3 +172,18 @@
 | ProtoRRageD2 | 20.9 / 1.000 | 22.9 / 1.000 | 27.3 / 1.000 | 26.0 / 1.000 | 25.9 / 1.000 | 25.9 / 1.000 | 25.9 / 1.000 |
 | ConfigSched | 23.3 / 1.000 | 23.4 / 1.000 | 20.3 / 1.000 | 31.8 / 1.000 | 46.2 / 1.000 | 35.7 / 1.000 | 36.1 / 1.000 |
 
+## G7 table
+
+| metric (median of 10 seeds) | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
+|---|---|---|---|---|---|
+| clause 2 — B camera delivered ÷ MFBR | 0.67× | 1.87× | 1.05× | 0.82× | 0.92× |
+| clause 1 — A telemetry delivered (bps, contract 24 000) | 23760 | 24000 | 960 | 24000 | 24000 |
+| clause 1 — A telemetry p98 (ms, PDB 100) | 78.8 | 44.2 | 29.5 | 74.0 | 31.5 |
+| clause 1 — A camera ÷ GFBR | 1.002 | 1.002 | 0.978 | 1.002 | 1.001 |
+| clause 1 — A camera p98 (ms, PDB 150) | 38.0 | 35.2 | 120.5 | 32.8 | 30.3 |
+| clause 3 — B telemetry delivered (bps) | 23520 | 24000 | 23760 | 23280 | 24000 |
+| clause 3 — B telemetry p98 (ms) | 68.0 | 15.5 | 93.0 | 73.0 | 9.0 |
+| uplink PRB utilisation | 0.912 | 0.902 | 0.745 | 0.914 | 0.906 |
+
+offered: 2.10× MFBR achieved
+

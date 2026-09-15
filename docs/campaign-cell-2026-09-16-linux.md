@@ -98,6 +98,8 @@ and anything that needed a fix.
 | g5 | 0 | 496 | 1 100 runs. Determinism: all 880 four-arm rows identical to the Windows artefact (Windows 719 s) |
 | g5_cg | 0 | 520 | 1 100 runs |
 | g5_cgt | 0 | 519 | 1 100 runs |
+| g7 | 0 | 16 | 50 runs (N = 8, 5 s). No Windows artefact to check against |
+| g7_cg | 0 | 28 | 100 runs, `+CG` and `+CGt` in one file |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -196,6 +198,19 @@ the camera); Reservation+CG admissible fleet 7 → 8, knee ×1.2 → ×1.3, and
 its GT-3.3 verdict fail → pass; Proto+CG 8 → 10; part 4 at −6/−3 dB
 1/10 → 10/10 on every arm. ConfigSched+CG = ConfigSched (registered: hit).
 Written into `docs/results-cell-2026-09-15.md` §5.5.
+
+### 6.3 G7 (`aligned/g7.json`, `cg/g7.json`)
+
+First measurement on this cell. Clause 2: PF 0.67×, Reservation **1.87×**
+(fail), TwoTier 1.05×, Proto 0.82×, ConfigSched 0.92×. Clause 1: TwoTier
+fails (A's heartbeat 960 bps = 4 % of contract; camera p98 120 ms); the
+rest pass. Clause 3 passes everywhere. **ConfigSched best on every clause**
+(contained 0.92×, A telemetry 31.5 ms, A camera 30.3 ms, B telemetry
+9.0 ms). Registered ("clause 3 no worse than TwoTier; MFBR demand cap the
+only containment") — hit, and containment beats PF's. CG: TwoTier's
+clause 1 fixed (24 000 bps at 61 ms), Reservation's clause 2 1.87 → 1.18×
+with A's camera p98 35 → 84 ms as the cost. Written into
+`docs/results-cell-2026-09-15.md` §7.
 
 ## 7. After the results: ConfigSched iteration
 
