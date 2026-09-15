@@ -60,7 +60,7 @@ from sim.scenarios.g5 import (build_gt31_scenario,  # noqa: E402
 from sim.scenarios.g6 import (CONDITIONS, with_saturator,  # noqa: E402
                               without_background)
 from g5_video import _instrument_window_floor  # noqa: E402
-from proto_arms import resolve_arm  # noqa: E402
+from proto_arms import resolve_arm, split_cg  # noqa: E402
 
 HORIZON_SLOTS = _dcell.slots(10_000.0)      # 10 s at the deployed cell's numerology
 SLOT_S = _dcell.SLOT_S
@@ -153,11 +153,15 @@ def _one(task: dict[str, Any]) -> dict[str, Any]:
     t0 = time.time()
     sc = _condition(_base(task["instrument"], task["n_ues"], task["seed"]),
                     task["condition"])
-    sched = resolve_arm(task["arm"])
+    # "Product + CG": the suffix is the label, the base name the scheduler,
+    # the CG config the driver's (scripts/g3_stress.py's pattern).
+    base_arm, cg_cfg = split_cg(task["arm"])
+    sched = resolve_arm(base_arm)
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
     summ = driver_run(with_srb(sc), sched, cqi_delay_slots=CQI_DELAY_SLOTS,
                       max_sched_ues=CAP, random_access=ra,
-                      record_timeseries=(task["instrument"] == "g5"))
+                      record_timeseries=(task["instrument"] == "g5"),
+                      configured_grant=cg_cfg)
     rec = RunRecord.from_summary(
         scenario_name=sc.name, scheduler_name=task["arm"], seed=task["seed"],
         flow_configs=sc.flows, summary=summ, arm={}, meta={})

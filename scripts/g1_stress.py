@@ -61,7 +61,7 @@ from sim.scenarios.g1 import (GAP_BOUND_MS, N_DRIVEN, RAN_PDB_MS,  # noqa: E402
                               build_gt11_scenario, cmd_flow_keys)
 from sim.srb import with_srb                                     # noqa: E402
 from g11_campaign import _arm                                    # noqa: E402
-from proto_arms import resolve_arm                              # noqa: E402
+from proto_arms import resolve_arm, split_cg                    # noqa: E402
 
 #: `sim/scenarios/g9.py` and the G12 stress runner both run at 8, and every
 #: real study in this branch runs with a delayed CQI rather than the
@@ -122,14 +122,19 @@ def one(task: tuple) -> dict[str, Any]:
     driven_ues = sorted({int(k.split("_")[0][2:]) for k in keys})
     sc = with_srb(sc)
 
-    sched = resolve_arm(arm_name)
+    # "Product + CG": a `+CG` / `+CGt` suffix on the arm name is the label
+    # the record carries; the scheduler gets the base name and the driver
+    # the CG config (the pattern of scripts/g3_stress.py).
+    base_arm, cg_cfg = split_cg(arm_name)
+    sched = resolve_arm(base_arm)
     tally = LossPointTally(direction="DL")
     sched.rank_sink = tally
     ra = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
 
     t0 = time.time()
     summ = driver_run(sc, sched, cqi_delay_slots=CQI_DELAY_SLOTS,
-                      max_sched_ues=cap, random_access=ra)
+                      max_sched_ues=cap, random_access=ra,
+                      configured_grant=cg_cfg)
     wall = time.time() - t0
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm_name,
                                  seed=seed, flow_configs=sc.flows, summary=summ,

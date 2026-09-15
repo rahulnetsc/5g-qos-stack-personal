@@ -165,10 +165,32 @@ def _task(task: tuple) -> list[dict[str, Any]]:
         collected.extend(postsilence_rows(
             summary, axis_values, record.scheduler_name, record.seed))
 
-    sweep(axes={"duty_cycle": [duty]}, build_scenario=_build,
-          schedulers=_schedulers(), seeds=[seed], driver_kwargs=_driver_kwargs,
-          run_sink=sink)
+    # "Product + CG" (CLAUDE.md, 2026-09-14): every arm also runs with the
+    # restricted CG (+CG) and the descriptor-driven CG (+CGt). The suffix is
+    # the label the rows carry (`sweep()` names a run by the dict key); the
+    # driver gets the config. `sweep()` takes ONE driver-kwargs per call, so
+    # it is called once per suffix; "" passes configured_grant=None, the
+    # driver's default, so the plain arms are byte-identical to before.
+    from proto_arms import split_cg
+    for suffix in _CG_SUFFIXES:
+        cg_cfg = split_cg("PF" + suffix)[1]
+        arms = {name + suffix: factory for name, factory in _schedulers().items()}
+
+        def kwargs(**axis_values):
+            return {**_driver_kwargs(**axis_values), "configured_grant": cg_cfg}
+
+        sweep(axes={"duty_cycle": [duty]}, build_scenario=_build,
+              schedulers=arms, seeds=[seed], driver_kwargs=kwargs,
+              run_sink=sink)
     return collected
+
+
+#: The arm-name suffixes each cell runs: the plain arm, the restricted CG
+#: and the descriptor-driven CG. NOT derived from `proto_arms.CG_PRESETS`,
+#: which also holds `+CGu` (unrestricted) -- deliberately not run:
+#: docs/results-cg-2026-09-14.md settled that it breaks G5 on every arm,
+#: and the campaign's other runners take the same two suffixes.
+_CG_SUFFIXES = ("", "+CG", "+CGt")
 
 
 def collect_rows(duty_levels=DUTY_LEVELS, n_seeds=N_SEEDS, horizon=HORIZON,

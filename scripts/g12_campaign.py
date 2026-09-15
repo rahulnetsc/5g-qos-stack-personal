@@ -164,8 +164,13 @@ def _restricted(rec: RunRecord, qfis: set[int]) -> Optional[RunRecord]:
 def run_ramp(comp: str, n_ues: int, arm_name: str, arm_factory, seed: int,
              ramp: tuple[float, ...] = RAMP,
              perm_seed: Optional[int] = None,
-             max_sched_ues: Optional[int] = None) -> dict[str, Any]:
+             max_sched_ues: Optional[int] = None,
+             configured_grant: Optional[dict] = None) -> dict[str, Any]:
     """One (cell, arm, seed) swept across the whole ramp.
+
+    `configured_grant` (2026-09-16) is passed straight to the driver so a
+    `+CG` / `+CGt` arm (scripts/g12_stress.py) runs the ramp with the same
+    CG config at every point; None keeps every existing caller byte-identical.
 
     `perm_seed` applies the SAME permutation at every ramp point -- a
     permutation that varied along the ramp would not be a controlled
@@ -195,7 +200,8 @@ def run_ramp(comp: str, n_ues: int, arm_name: str, arm_factory, seed: int,
         # G9 experiment ran at -- so it is passed explicitly rather than
         # left to differ silently between two experiments' artefacts.
         summary = run(sc, arm_factory(), cqi_delay_slots=CQI_DELAY_SLOTS,
-                      record_timeseries=True, max_sched_ues=max_sched_ues)
+                      record_timeseries=True, max_sched_ues=max_sched_ues,
+                      configured_grant=configured_grant)
         rec = RunRecord.from_summary(
             scenario_name=sc.name, scheduler_name=arm_name, seed=seed,
             flow_configs=sc.flows, summary=summary, arm={},

@@ -255,11 +255,22 @@ def one(task: tuple) -> dict:
     skip = _handshake_qfis(sc)
     label = f"{case}/{arm}/n{total_ues}/cm{committed_mult:g}/seed{seed}"
     ra_cfg = {**RandomAccessConfig.deployed().to_dict(), "srb": True}
-    factory = _arms()[arm]
+    # "Product + CG": the suffix is the label, the base name the scheduler,
+    # the CG config the driver's, on the joiner run AND its paired control
+    # (scripts/g3_stress.py's pattern). NOTE: `sim/configured_grant.py` has
+    # no notion of a UE leaving and re-joining -- a CG configured before a
+    # radio-link failure persists through it (occasions reserved, skipped)
+    # and resumes on re-attach without a fresh activation. A real gNB
+    # releases it at RLF and re-activates after re-establishment. Recorded
+    # as a caveat on every G9 +CG row, not modelled here.
+    from proto_arms import split_cg
+    base_arm, cg_cfg = split_cg(arm)
+    factory = _arms()[base_arm]
 
     t0 = time.time()
     s = run(sc, factory(), cqi_delay_slots=CQI_DELAY_SLOTS, record_timeseries=True,
-            rejoin_seed_bsr=rejoin_seed, random_access=ra_cfg, max_sched_ues=cap)
+            rejoin_seed_bsr=rejoin_seed, random_access=ra_cfg, max_sched_ues=cap,
+            configured_grant=cg_cfg)
     wall_joiner = time.time() - t0
     rec = RunRecord.from_summary(scenario_name=sc.name, scheduler_name=arm, seed=seed,
                                  flow_configs=sc.flows, summary=s, arm={}, meta={})
@@ -287,7 +298,8 @@ def one(task: tuple) -> dict:
         name=sc.name + "_control")
     t1 = time.time()
     ctl_s = run(ctl_sc, factory(), cqi_delay_slots=CQI_DELAY_SLOTS, record_timeseries=True,
-                rejoin_seed_bsr=rejoin_seed, random_access=ra_cfg, max_sched_ues=cap)
+                rejoin_seed_bsr=rejoin_seed, random_access=ra_cfg, max_sched_ues=cap,
+            configured_grant=cg_cfg)
     wall_control = time.time() - t1
     ctl = RunRecord.from_summary(scenario_name=ctl_sc.name, scheduler_name=arm, seed=seed,
                                  flow_configs=ctl_sc.flows, summary=ctl_s, arm={}, meta={})

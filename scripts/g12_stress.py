@@ -116,10 +116,14 @@ def one(task: tuple) -> dict[str, Any]:
     comp, n_ues, arm_name, seed, tb_seed, cap = task
     # Divergence arms resolve through proto_arms (2026-09-14); the faithful
     # dict in g12_campaign is untouched so its artefacts' scope is too.
-    factory = _arms().get(arm_name)
+    # "Product + CG": the suffix is the label (kept on `arm_name` for the
+    # record), the base name the scheduler, the CG config the driver's.
+    from proto_arms import split_cg
+    base_arm, cg_cfg = split_cg(arm_name)
+    factory = _arms().get(base_arm)
     if factory is None:
         from proto_arms import resolve_arm
-        factory = lambda: resolve_arm(arm_name)  # noqa: E731
+        factory = lambda: resolve_arm(base_arm)  # noqa: E731
 
     def armed():
         a = factory()
@@ -128,7 +132,7 @@ def one(task: tuple) -> dict[str, Any]:
 
     t0 = time.time()
     ramped = run_ramp(comp, n_ues, arm_name, armed, seed, ramp=RAMP,
-                      max_sched_ues=cap)
+                      max_sched_ues=cap, configured_grant=cg_cfg)
     wall = time.time() - t0
 
     label = f"{comp}/N={n_ues}/{arm_name}/seed{seed}/tb={tb_seed}/cap{cap}"
