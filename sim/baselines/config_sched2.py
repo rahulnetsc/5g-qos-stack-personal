@@ -429,30 +429,39 @@ class ConfigSched2:
         return (tr[1] - now) % T
 
     def _rank(self, direction: str, key: tuple[int, int], now: int, mapped_now: set) -> tuple:
-        """The order a slot's DCIs are given out in (lower first):
-        0 mapped contracted · 1 owed contracted (oldest first) · 2 unplanned
-        contracted (increment 1: shortest PDB first) · 3 mapped or owed
-        best-effort · 4 leftover contracted (soonest next mapped slot first)
-        · 5 leftover best-effort (least recently served first).
-        Mapped BEFORE owed, deliberately: an owed flow fills a free DCI, it
-        never takes a slot from the flow mapped there -- the first build
-        ranked owed first and every missed visit displaced the next slot's
-        mapped visit, a cascade measured at 32 992 misses against 11 866
-        served on G3 at N = 24."""
+        """The order a slot's DCIs are given out in (lower first).
+
+        Increment 6 (2026-09-16): ONE rule for every contracted flow with
+        backlog -- **shortest PDB first**, and at equal PDB the flow mapped
+        here, then one owed a missed visit (oldest first), then one with no
+        plan, then one between its mapped slots -- ahead of every
+        best-effort unit; best-effort mapped or owed next; best-effort
+        leftover last, least recently served first. Increment 5 ranked by
+        claim (mapped, owed, unplanned, mapped best-effort, leftover
+        contracted, leftover best-effort) and measured two losses to that
+        list: a 5 ms STOP with no plan waited behind 10 ms fleet messages
+        mapped on their tracks (G2 cap 2: 1 390 -> 2 297 misses), and a
+        heartbeat between its mapped slots waited behind best-effort mapped
+        slots (G3 part 3 boundary 10 -> 8, G10 10 -> 8). The deadline is the
+        order; the map decides where a flow is CERTAIN of a DCI, not who wins
+        a free one. Mapped stays ahead of owed at equal PDB so a missed visit
+        fills a free DCI rather than displacing the next slot's visit (the
+        cascade of the first build, 32 992 misses)."""
         contracted = self._contracted.get(key, False)
         plan = self._plan.get(key)
         if contracted:
+            pdb = self._pdb_slots.get(key, 10 ** 9)
             if key in mapped_now:
-                return (0, 0, 0)
+                return (0, pdb, 0, 0)
             if key in self._owed:
-                return (1, self._owed[key], 0)
+                return (0, pdb, 1, self._owed[key])
             if plan is None or plan.n_visits <= 0:
                 self.counters["unplanned_contracted_due"] += 1
-                return (2, self._pdb_slots.get(key, 10 ** 9), 0)
-            return (4, self._next_mapped(direction, key, now), 0)
+                return (0, pdb, 2, 0)
+            return (0, pdb, 3, self._next_mapped(direction, key, now))
         if key in mapped_now or key in self._owed:
-            return (3, self._owed.get(key, now), 0)
-        return (5, self._last_visit.get(key, -1), 0)
+            return (1, self._owed.get(key, now), 0, 0)
+        return (2, self._last_visit.get(key, -1), 0, 0)
 
     def _place(self, slot: Any, buffers: Any, channel: Any, direction: str) -> list[Allocation]:
         symbols = slot.dl_symbols if direction == "DL" else slot.ul_symbols
@@ -531,7 +540,7 @@ class ConfigSched2:
                     want = min(reported, max(share, per_visit_cap))
                 elif key in mapped_now or key in self._owed:
                     want = min(reported, plan.bytes_per_visit if plan is not None and plan.n_visits > 0 else reported)
-                elif rank[0] >= 5:
+                elif rank[0] >= 2:
                     want = min(reported, plan.bytes_per_visit if plan is not None and plan.n_visits > 0 else per_visit_cap)
                 else:
                     continue    # a best-effort flow riding a contracted unit's grant: the UE's LCP decides
