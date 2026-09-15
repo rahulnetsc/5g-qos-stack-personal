@@ -25,7 +25,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `cg/g5_cg.json`, `cg/g5_cgt.json` | 1 100 + 1 100 | 520 s + 519 s | done |
 | `aligned/g7.json`, `cg/g7.json` | 50, 100 | 16 s, 28 s | done |
 | `aligned/g10.json`, `cg/g10.json` | 450, 900 | 134 s, 269 s | done |
-| `aligned/g1.json` (Windows: 1 280, 1 198 s), `cg/g1_cg.json` | | | running |
+| `aligned/g1.json` (Windows: 1 280, 1 198 s; identical on the four arms) | 1 600 | 887 s | done |
+| `cg/g1_cg.json` | | | running |
 | `aligned/g2.json`, `cg/g2_cg.json` | | | pending |
 | `aligned/g6.json`, `cg/g6_cg.json` | | | pending |
 | `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
@@ -114,6 +115,7 @@ everywhere. The figures behind the passes:
 | Reservation | 3.50 / 6.00 / 60 | 3.50 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.25 / 6.00 / 100 |
 | TwoTier | 3.50 / 6.00 / 60 | 3.00 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.50 / 6.00 / 100 | 6.00 / 6.00 / 60 |
 | ProtoRRageD2 | 4.50 / 6.00 / 100 | 3.00 / 6.00 / 100 | 3.50 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.25 / 6.00 / 60 |
+| ConfigSched | 3.50 / 6.00 / 60 | 5.00 / 7.50 / 62 | 5.50 / 8.00 / 98 | 6.00 / 8.50 / 100 | 10.50 / 11.00 / 60 |
 
 **cap 2, fleet axis — the same**
 
@@ -123,9 +125,11 @@ everywhere. The figures behind the passes:
 | Reservation | 3.25 / 6.00 / 103 | 3.25 / 6.00 / 60 | 3.50 / 6.00 / 97 | 3.50 / 6.00 / 60 | 3.25 / 7.50 / 60 |
 | TwoTier | 3.50 / 6.00 / 100 | 3.50 / 6.00 / 60 | 3.50 / 6.00 / 100 | 3.50 / 6.00 / 60 | 3.25 / 6.00 / 60 |
 | ProtoRRageD2 | 6.00 / 6.00 / 96 | 6.00 / 6.00 / 100 | 3.00 / 6.00 / 60 | 3.00 / 6.00 / 60 | 3.00 / 6.00 / 60 |
+| ConfigSched | **10.50 / 10.50 / 67** | 11.00 / 13.00 / 72 | 12.50 / 13.00 / 62 | 15.50 / 18.00 / 100 | **20.50 / 23.00 / 66** |
 
 On the load axis (N = 6) every arm sits at 3.0–5.5 ms p98 median and a
-worst gap ≤ 103 ms at both caps, ×0.5 through ×3.0.
+worst gap ≤ 103 ms at both caps, ×0.5 through ×3.0 — except ConfigSched
+at cap 2, which sits at 10.5–13.0 ms at every load level.
 
 ### 1.4 Conclusion
 **G1 passes on every arm with 0 breaches of 1 280 runs**, as on the
@@ -139,6 +143,18 @@ The larger downlink does not remove it, because the cap-2 mechanism is the
 DCI budget, not the PRBs: PF's single-term key demotes the driven robot
 behind the firmware download. `ProtoRRageD2` is TwoTier here, as it should
 be — its edits are uplink-only.
+
+**ConfigSched passes every cell (0 breaches) and is the slowest arm at
+cap 2**: 10.5 ms median already at N = 4 (three times PF's 3.5, and
+everyone else's), rising to 20.5 ms at N = 24, with the same 10.5–13 ms at
+every load level. Registered: a cap-2 loss was expected where more robots
+are due than the slot has DCIs; but N = 4 with two driven robots is not
+that case, and the value is flat across fleet size and load. That shape
+points at a fixed timer in the arm rather than contention — the 10 ms
+Tier-1 re-solve period is the obvious candidate (a `cmd_vel` message that
+arrives with its flow "early" waits for the next plan or the next free
+DCI) — **stated as a hypothesis, not traced**. At cap 4 it is 3.5–6.0 ms
+to N = 16 and 10.5 at N = 24, between PF and the deadline-tier arms.
 
 ## 2. G2 — "The master disconnects: does every robot stop in time?"
 

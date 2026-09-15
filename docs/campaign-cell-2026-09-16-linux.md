@@ -102,6 +102,7 @@ and anything that needed a fix.
 | g7_cg | 0 | 28 | 100 runs, `+CG` and `+CGt` in one file |
 | g10 | 0 | 134 | 450 runs (N = 2 … 16, 5 s). No Windows artefact |
 | g10_cg | 0 | 269 | 900 runs. Reservation+CG: never-granted 94 → 0, admissible 4 → 8 |
+| g1 | 0 | 887 | 1 600 runs. Determinism: all 16 four-arm cells identical to Windows (Windows 1 198 s) |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -223,6 +224,16 @@ Admissible fleet PF 8 / Reservation 4 / TwoTier 5 / Proto 7 /
 0.007 at N = 12 / 16 — whole robots' floors dropped by `ue_id`, the
 registered degradation-by-declaration mechanism, showing on G10 before
 G12. Written into `docs/results-cell-2026-09-15.md` §9.
+
+### 6.5 G1 (`aligned/g1.json`)
+
+Four arms identical to Windows. ConfigSched: 0 breaches at both caps and
+both axes (registered "no misses" — hit), but the slowest arm at cap 2:
+10.5 ms median at N = 4 (PF 3.5, deadline arms 3.0–3.5), 20.5 at N = 24,
+flat 10.5–13 across the load axis. Hypothesis (not traced): a fixed timer
+— the 10 ms re-solve — rather than contention, since it does not scale
+with N or load and appears at N = 4. To trace before the v2 build.
+Written into `docs/results-cell-2026-09-15.md` §1.
 
 ## 7. After the results: ConfigSched iteration
 
