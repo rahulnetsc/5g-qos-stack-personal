@@ -352,7 +352,8 @@ Order, by evidence weight from the campaign:
 
 | increment | commit | result | kept? |
 |---|---|---|---|
-| 0 copy | see git log | identical on G3 N = 10 (summaries, counters) | yes |
+| 0 copy | `592d587` | identical on G3 N = 10 (summaries, counters) | yes |
+| 1 unplanned contracted flow first, shortest PDB | see git log | "due now" (class 0) built first and refuted on the seed (32 of 34 expiries remained: the least overdue of the due units, the fleet's visits bunched); ahead-of-planned by PDB: G2 probe expiries 34 → 2, no-plan expiries 32 → 0. Full measurement `inc1/` running | pending |
 
 ## 7. After the results: ConfigSched iteration
 
