@@ -11,7 +11,7 @@ is labelled *previous cell* and given for the comparison only.
 | artefact | runs | wall | status |
 |---|---|---|---|
 | `sweeps/cell-2026-09-15/aligned/g3.json` | 400 | 759 s | done |
-| `…/aligned/g5.json` | | | pending |
+| `…/aligned/g5.json` | 880 | 719 s | done |
 | `…/aligned/g1.json` | | | pending |
 | `…/aligned/g2.json` | | | pending |
 | `…/aligned/g4.json` | | | pending |
@@ -175,7 +175,86 @@ all-parts boundary is **10 robots on PF and the Proto arm, 6 on TwoTier,
 
 ## 5. G5 — "Do operators and the AI always see fresh, complete video?"
 
-*pending — step `g5` running.*
+### 5.1 The experiment
+GT-3.1/3.2/3.3. Asset A's 30 fps, 4 Mbps camera (frames fragmented at the
+1 500 B MTU) is the instrument; Asset B carries a lidar plus a 50 Mbps UL
+saturator, every other robot its committed profile. A frame counts only
+when its last fragment lands, so the statistic sees grant *depth* as well
+as grant *timing*. Unchanged from the previous campaign except for the cell.
+
+### 5.2 Tests run
+Part 1 ≥ 99 % of PDU sets complete within 150 ms; part 2 frame age at the
+MEC p95 ≤ 66.67 ms (two frame periods); part 3 goodput ≥ GFBR in every 2 s
+window, denominator capped at what was offered; part 4 A's and B's
+telemetry unharmed. **Axes:** GT-3.1 fleet size N ∈ {4 … 24}; GT-3.2 the
+committed portfolio ×1.0 → ×1.5 at N = 7; GT-3.3 Asset B's SNR
+{20 … −6} dB at N = 7. 10 seeds each, 20 000 slots.
+`scripts/g5_video.py --parts A,B,C`, 880 runs.
+
+### 5.3 Results
+
+**GT-3.1 fleet axis — passes of 10 as part 1 / 2 / 3 / 4, and median frame-age p95 (ms, bound 66.67)**
+
+| arm | 4 | 6 | 7 | 8 | 10 | 12 | 14 | 16 | 24 |
+|---|---|---|---|---|---|---|---|---|---|
+| PF | 10/10/3/10 · 14.8 | 10/10/3/10 · 20.8 | 10/10/2/10 · 23.6 | 10/10/1/10 · 27.3 | 7/2/0/10 · 100.6 | 0/0/0/10 · 146.3 | 0/0/0/10 · 148.3 | 0/0/0/10 · 148.6 | 0/0/0/10 · 148.9 |
+| Reservation | 10/10/3/10 · 18.3 | 10/10/3/10 · 28.3 | 10/10/3/10 · 34.6 | 9/7/1/9 · 59.6 | 0/0/0/0 · 117.3 | 0/0/0/0 · 132.8 | 0/0/0/1 · 142.6 | 1/2/0/0 · 133.6 | 0/0/0/0 · 149.0 |
+| TwoTier | 10/0/1/10 · 94.2 | 3/0/0/10 · 125.2 | 2/0/0/9 · 128.9 | 0/0/0/1 · 141.0 | 0/0/0/0 · 139.8 | 0/0/0/0 · 148.5 | 0/0/0/0 · 149.1 | 0/0/0/0 · 148.9 | 0/1/0/0 · 149.1 |
+| ProtoRRageD2 | 10/10/5/10 · 17.4 | 10/10/2/10 · 22.5 | 10/10/2/10 · 25.9 | 10/10/2/10 · 29.7 | 10/9/3/10 · 42.1 | 9/4/2/10 · 74.5 | 2/0/0/10 · 134.0 | 0/0/0/10 · 145.2 | 0/0/0/10 · 148.6 |
+
+**Admissible fleet (parts 1 and 2 both 10/10):** PF **8** (previous cell
+14), Reservation 7 (10), TwoTier **none** (4; part 2 is 0/10 already at
+N = 4, frame age 94 ms), ProtoRRageD2 **8** (14). Beyond the boundary the
+Proto arm degrades later than PF — at N = 10 it holds 42 ms frame age
+(10/9) where PF is at 101 ms (7/2), and at N = 12 it is 9/4 where PF is
+0/0 — so on this cell it is the better of the two, where on the previous
+cell they tied.
+
+**GT-3.2 load ceiling (N = 7) — parts 1/2/3/4 and frame age**
+
+| arm | ×1.0 | ×1.1 | ×1.2 | ×1.3 | ×1.4 | ×1.5 |
+|---|---|---|---|---|---|---|
+| PF | 10/10/2/10 · 23.7 | 10/10/10/9 · 25.3 | 10/10/10/10 · 26.8 | 10/10/10/10 · 31.7 | **9/5/10/9 · 67.0** | 5/3/10/10 · 125.6 |
+| Reservation | 10/10/2/10 · 34.5 | 10/10/10/10 · 39.9 | **9/5/10/10 · 62.7** | 4/2/10/8 · 103.3 | 1/0/8/0 · 123.9 | 0/0/8/2 · 143.3 |
+| TwoTier | 3/0/0/10 · 126.1 | 0/0/2/10 · 138.7 | 1/0/4/4 · 141.2 | 0/0/0/1 · 144.2 | 0/0/1/0 · 147.2 | 0/0/0/0 · 148.1 |
+| ProtoRRageD2 | 10/10/5/10 · 25.9 | 10/10/10/10 · 27.5 | 10/10/10/10 · 29.7 | 10/10/10/10 · 33.5 | 10/10/10/10 · 40.5 | 10/10/10/10 · 47.2 |
+
+Load knee (first multiplier below 10/10 on parts 1–2): PF **×1.4**
+(previous cell: none to ×1.5), Reservation ×1.2 (none), TwoTier ×1.0
+(×1.2), ProtoRRageD2 **none to ×1.5** (none).
+
+**GT-3.3 cell edge (N = 7) — parts 1/2/3/4 and frame age**
+
+| arm | −6 dB | −3 | 0 | +5 | +10 | +15 | +20 |
+|---|---|---|---|---|---|---|---|
+| PF | 10/10/2/1 · 23.6 | 10/10/2/1 · 23.6 | 10/10/2/8 · 23.7 | 10/10/2/10 · 23.6 | 10/10/2/10 · 23.6 | 10/10/3/10 · 23.6 | 10/10/2/10 · 23.6 |
+| Reservation | 10/10/3/1 · 26.7 | 10/8/4/1 · 35.3 | 4/0/0/2 · 127.2 | 1/0/0/3 · 130.0 | 1/0/0/3 · 131.0 | 4/1/0/5 · 119.5 | 10/10/3/10 · 34.6 |
+| TwoTier | 10/10/4/1 · 20.1 | 9/8/0/1 · 39.3 | 0/0/0/1 · 145.1 | 0/0/0/2 · 147.5 | 0/0/0/2 · 148.8 | 0/0/0/2 · 146.7 | 2/0/0/9 · 128.9 |
+| ProtoRRageD2 | 10/10/5/1 · 20.9 | 10/10/4/1 · 22.9 | 10/10/3/8 · 27.3 | 10/10/3/10 · 26.0 | 10/10/2/10 · 25.9 | 10/10/3/10 · 25.9 | 10/10/2/10 · 25.9 |
+
+Both faithful arms now fail parts 1–2 across the middle of the SNR axis
+(Reservation 0–15 dB, TwoTier 0–20 dB) and pass at −6/−3 dB, where the
+edge robot's saturator can no longer flood the cell; part 4 (the edge
+robot's own telemetry) fails at −6/−3 dB on every arm alike. PF and the
+Proto arm hold parts 1–2 at every SNR.
+
+### 5.4 Conclusion
+**G5 fails on both faithful QoS arms and passes on PF and the Proto arm
+inside a smaller fleet.** The cell takes the admissible fleet from 14 to
+**8** on both passing arms — a capacity result, the uplink is 64 % of
+what it was — and TwoTier from 4 to **none**: its frame age is 94 ms at
+N = 4 with part 2 at 0/10, so on this cell the faithful two-tier arm never
+meets the video guarantee at any fleet size. Reservation, which passed to
+N = 10 before, now fails parts 1–2 from 0 dB to 15 dB on the edge axis and
+passes only at 20 dB, so its GT-3.3 verdict is a fail as well.
+
+**On this cell `ProtoRRageD2` separates from PF for the first time on
+G5:** same admissible fleet, but a later collapse on the fleet axis
+(42 ms at N = 10 against 101), no load knee to ×1.5 where PF knees at
+×1.4, and 26 ms frame age across the edge axis. With a tighter uplink the
+K = 2 trickle that keeps multi-fragment frames assembling is worth more
+than PF's rate-proportional share — the same mechanism as before, now
+with capacity to expose it.
 
 ## 6. G6 — "Background traffic can never impair the fleet"
 
