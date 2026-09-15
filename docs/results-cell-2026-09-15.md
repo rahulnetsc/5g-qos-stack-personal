@@ -531,7 +531,72 @@ arms whose ranking the heartbeat was distorting.
 
 ## 9. G10 — "How many robots does one cell honestly host?"
 
-*pending.*
+### 9.1 The experiment
+GT-5.2, *admissible fleet size*, on the parametric `factory` mix
+(`sim/parametric.py::sweep_scenario`): every robot carries its full
+committed profile; the fleet is swept and the worst GBR flow in the cell is
+scored. Unchanged from the previous campaign except for the cell.
+
+### 9.2 Tests run
+**M07** — count of GBR flows delivering ≥ 95 % of GFBR (a seed passes when
+every GBR flow does); **M08** — `min_f(delivered_f / GFBR_f)`, the max-min
+floor; and the count of UEs never granted. N ∈ {2, 4, 5, 6, 7, 8, 10, 12,
+16}, 10 seeds, 5 s (10 000 slots), RA + SRB on, cap 4. Admissible fleet =
+last N with 10/10 seeds passing M07 before the first failure.
+`scripts/g5_consolidation.py`, 450 runs plain.
+
+### 9.3 Results
+
+**Seeds with every GBR flow ≥ 95 % of GFBR, of 10** (previous cell's admissible fleet in brackets)
+
+| arm | 2 | 4 | 5 | 6 | 7 | 8 | 10 | 12 | 16 | **admissible** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PF | 10 | 10 | 10 | 10 | 10 | 10 | 7 | 0 | 0 | **8** (12) |
+| Reservation | 10 | 10 | 6 | 3 | 0 | 0 | 0 | 0 | 0 | 4 (6) |
+| TwoTier | 10 | 10 | 10 | 9 | 9 | 5 | 0 | 0 | 0 | 5 (7) |
+| ProtoRRageD2 | 10 | 10 | 10 | 10 | 10 | 2 | 0 | 0 | 0 | 7 (10) |
+| ConfigSched | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 0 | 0 | **10** |
+
+**Median worst-GBR-flow delivered ÷ GFBR (M08)**
+
+| arm | 6 | 7 | 8 | 10 | 12 | 16 |
+|---|---|---|---|---|---|---|
+| PF | 0.990 | 0.987 | 0.988 | 0.955 | 0.829 | 0.607 |
+| Reservation | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| TwoTier | 0.977 | 0.970 | 0.950 | 0.606 | 0.081 | 0.002 |
+| ProtoRRageD2 | 0.989 | 0.982 | 0.917 | 0.661 | 0.544 | 0.418 |
+| ConfigSched | 0.990 | 0.988 | 0.987 | **0.981** | 0.543 | 0.007 |
+
+**UEs never granted (sum over 10 seeds):** 0 at every N on PF, TwoTier,
+ProtoRRageD2 and ConfigSched; Reservation 6 / 15 / 26 / 43 / 54 / 94 at
+N = 6 … 16 (5 / 11 / 37 / 46 / 65 at N = 7 … 16 on the previous cell) —
+the cold-start lock-out is Reservation's alone on this axis, and it now
+starts one robot earlier.
+
+### 9.4 Conclusion
+**The admissible fleet is PF 8 / Reservation 4 / TwoTier 5 / ProtoRRageD2 7
+/ ConfigSched 10.** Every arm loses two to four robots to the cell (the
+uplink is 64 % of what it was): PF 12 → 8, the Proto arm 10 → 7. The
+ordering among the faithful arms and PF is the previous cell's.
+
+**ConfigSched hosts the largest fleet, two robots more than PF** — the
+registered expectation ("admissible fleet ≤ the Proto arm's") is a **miss**
+in the favourable direction. The reason is close to definitional: M07 asks
+that every GBR flow reach 95 % of its GFBR, and ConfigSched's Tier 1 plans
+exactly that floor for every contracted flow before anything else gets a
+byte; at N = 10 its worst flow is at 0.981 of contract where PF's
+rate-proportional share leaves one at 0.955 and the Proto arm's regular
+visiting one at 0.661.
+
+**And it fails past the boundary the way its floor rule says it will.** At
+N = 12 the floors no longer fit; they are dropped in `(priority, PDB,
+ue_id)` order, so whole robots at the end of the declaration lose their
+floors — M08 0.543 at N = 12 and **0.007 at N = 16**, a robot with
+essentially nothing, where PF degrades every robot a little (0.829, 0.607)
+and the Proto arm keeps the worst at 0.418. "Ordered degradation by
+declaration order" was registered for G12; it shows here first. The v2
+formulation's `z_i` (drop the most expensive floors first, or share the
+shortfall) is the change that addresses it.
 
 ## 10. G12 — "When the cell truly runs out, what breaks first — and does safety telemetry survive?"
 

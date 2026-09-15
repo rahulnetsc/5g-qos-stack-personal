@@ -100,6 +100,7 @@ and anything that needed a fix.
 | g5_cgt | 0 | 519 | 1 100 runs |
 | g7 | 0 | 16 | 50 runs (N = 8, 5 s). No Windows artefact to check against |
 | g7_cg | 0 | 28 | 100 runs, `+CG` and `+CGt` in one file |
+| g10 | 0 | 134 | 450 runs (N = 2 … 16, 5 s). No Windows artefact |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -211,6 +212,16 @@ only containment") — hit, and containment beats PF's. CG: TwoTier's
 clause 1 fixed (24 000 bps at 61 ms), Reservation's clause 2 1.87 → 1.18×
 with A's camera p98 35 → 84 ms as the cost. Written into
 `docs/results-cell-2026-09-15.md` §7.
+
+### 6.4 G10 (`aligned/g10.json`)
+
+Admissible fleet PF 8 / Reservation 4 / TwoTier 5 / Proto 7 /
+**ConfigSched 10** (previous cell 12 / 6 / 7 / 10 / —). Registered
+("≤ Proto's") — **miss**, favourable: the GFBR floors are M07's statistic
+(worst flow 0.981 at N = 10 vs PF 0.955). Past the boundary M08 0.543 /
+0.007 at N = 12 / 16 — whole robots' floors dropped by `ue_id`, the
+registered degradation-by-declaration mechanism, showing on G10 before
+G12. Written into `docs/results-cell-2026-09-15.md` §9.
 
 ## 7. After the results: ConfigSched iteration
 
