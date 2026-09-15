@@ -241,14 +241,22 @@ of 2 400 per cell).
 **G2 fails its clause on every arm, and the cell raised the floor ten-fold
 for all of them.** At cap 4 the four arms that were 16–45 misses apart on
 the previous cell sit within 203–224 of each other here, so the extra
-misses are the cell's, not a scheduler's. The reading that fits the
-numbers: a STOP's 5 ms budget is 10 slots of 0.5 ms with six DL-capable
-slots on `DDSUU`, room for **one** HARQ retry, where the previous cell's
-20 slots of 0.25 ms held two; with a 10 % BLER target the miss floor is
-then BLER² ≈ 1.0 % (measured 1.1–1.2 % at cap 4) instead of BLER³ ≈
-0.1 % (measured 0.09–0.25 %). **Arithmetic consistency, not a trace** —
-`scripts/g2_stress.py` records `bytes_dropped_pdb` per run and the
-HARQ-outcome counters would settle it.
+misses are the cell's, not a scheduler's. The reason is derivable from
+the driver's retry timing: a DL retransmission is due `k1 + k2` = 6 slots
+after the attempt, aligned to the next DL-capable slot
+(`sim/driver.py::align_due_slot`, `harq_rtt_dl`). A STOP's 5 ms budget is
+**10 slots** of 0.5 ms here, so the first attempt and **one** retry
+(at +6 to +8 slots) fit and a second (+12) does not; on the previous
+cell the budget was 20 slots of 0.25 ms with the same 6-slot gap, so
+**two** retries fit. With a 10 % BLER target the miss floor is therefore
+BLER² ≈ 1.0 % on this cell (measured 1.1–1.2 % at cap 4, the excess
+being retries that slip past the deadline when the first attempt itself
+waited for a DL slot) against BLER³ ≈ 0.1 % before (measured
+0.09–0.25 %). The slot count comes from the numerology, not the
+bandwidth: the deployed cell's 1.9× downlink buys the STOP nothing,
+because a 40 B message is bound by retry opportunities, not PRBs. The
+HARQ-outcome counters per STOP TB would confirm the attribution
+directly; the derivation above is from the constants and the pattern.
 
 **What decides beyond the floor is the same as before.** Misses rise with
 `n_stop` on every arm, steeply at cap 2 where two DCIs serve eight STOPs;
