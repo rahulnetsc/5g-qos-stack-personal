@@ -1,0 +1,194 @@
+
+==============================================================================
+G4 -- latency vs the SILENCE THAT PRECEDED the message (p98 ms)
+==============================================================================
+  No silence threshold is chosen; the gap axis IS the answer.
+
+   duty arm                      [0,1)          [10,100)        [100,1000)        [1000,inf)
+    1.0 ConfigSched     165.22/   964B     14.48/   633B     33.22/   300B                 -
+    1.0 ConfigSched+CG    165.36/   964B     11.99/   633B     26.69/   300B                 -
+    1.0 ConfigSched+CGt    165.40/   964B      7.51/   633B     16.74/   300B                 -
+    1.0 PF              170.82/   964B     28.72/   633B     71.84/   300B                 -
+    1.0 PF+CG           171.06/   964B     16.82/   633B     24.49/   300B                 -
+    1.0 PF+CGt          171.16/   964B     11.46/   633B     11.49/   300B                 -
+    1.0 ProtoRRageD2    169.35/   964B     26.70/   633B     70.07/   300B                 -
+    1.0 ProtoRRageD2+CG    169.71/   964B     14.65/   633B     26.06/   300B                 -
+    1.0 ProtoRRageD2+CGt    169.81/   964B      8.78/   633B     11.17/   300B                 -
+    1.0 Reservation     167.62/   964B     19.48/   570B     33.17/   300B                 -
+    1.0 Reservation+CG    177.20/   964B     26.42/   633B     30.27/   300B                 -
+    1.0 Reservation+CGt    174.88/   964B     19.32/   633B     14.72/   300B                 -
+    1.0 TwoTier         189.96/   964B     51.42/   633B     89.22/   300B                 -
+    1.0 TwoTier+CG      191.77/   964B     33.38/   633B     33.87/   300B                 -
+    1.0 TwoTier+CGt     189.85/   964B     25.65/   633B     14.62/   300B                 -
+
+    0.5 ConfigSched     177.84/   982B      6.71/   850B     28.37/   400B                 -
+    0.5 ConfigSched+CG    178.11/   982B      6.81/   850B     23.46/   400B                 -
+    0.5 ConfigSched+CGt    178.06/   982B      6.74/   850B     14.05/   400B                 -
+    0.5 PF              182.53/   983B     12.36/   850B     37.60/   400B                 -
+    0.5 PF+CG           183.07/   983B     12.53/   850B     24.49/   400B                 -
+    0.5 PF+CGt          182.84/   983B     12.25/   850B     11.86/   400B                 -
+    0.5 ProtoRRageD2    182.61/   983B     10.09/   850B     38.01/   400B                 -
+    0.5 ProtoRRageD2+CG    182.84/   983B     10.00/   850B     23.81/   400B                 -
+    0.5 ProtoRRageD2+CGt    182.52/   983B      9.88/   850B      6.69/   400B                 -
+    0.5 Reservation     177.61/   982B     20.61/   746B     17.62/   368B                 -
+    0.5 Reservation+CG    182.10/   983B     29.13/   850B     24.67/   400B                 -
+    0.5 Reservation+CGt    181.49/   982B     28.77/   850B      9.66/   400B                 -
+    0.5 TwoTier         194.25/   983B     30.90/   850B     47.69/   400B                 -
+    0.5 TwoTier+CG      197.75/   983B     34.13/   850B     17.22/   400B                 -
+    0.5 TwoTier+CGt     195.98/   983B     31.24/   850B      6.69/   400B                 -
+
+    0.1 ConfigSched     224.07/  1000B                 -      6.15/  1250B                 -
+    0.1 ConfigSched+CG    224.08/  1000B                 -      5.96/  1250B     64.99/  3000B
+    0.1 ConfigSched+CGt    224.08/  1000B                 -      5.96/  1250B     64.99/  3000B
+    0.1 PF              223.88/  1000B                 -      9.09/  1250B     82.11/  3000B
+    0.1 PF+CG           224.03/  1000B                 -      8.94/  1250B     65.58/  3000B
+    0.1 PF+CGt          224.03/  1000B                 -      8.94/  1250B     65.58/  3000B
+    0.1 ProtoRRageD2    224.07/  1000B                 -      5.68/  1250B     87.73/  3000B
+    0.1 ProtoRRageD2+CG    223.96/  1000B                 -      5.79/  1250B     62.94/  3000B
+    0.1 ProtoRRageD2+CGt    223.96/  1000B                 -      5.79/  1250B     62.94/  3000B
+    0.1 Reservation     222.70/   997B                 -     55.74/  1212B     53.98/  3000B
+    0.1 Reservation+CG    223.83/   998B                 -     69.42/  1250B     52.88/  3000B
+    0.1 Reservation+CGt    223.83/   998B                 -     69.42/  1250B     52.88/  3000B
+    0.1 TwoTier         223.63/  1000B                 -     18.13/  1250B     73.90/  3000B
+    0.1 TwoTier+CG      223.57/  1000B                 -     18.70/  1250B     68.68/  3000B
+    0.1 TwoTier+CGt     223.57/  1000B                 -     18.70/  1250B     68.68/  3000B
+
+  cells are  p98_ms / mean message size.  '-' = no message in that gap bucket.
+
+------------------------------------------------------------------------------
+ACROSS DUTY, within an arm -- CARRIES THE SIZE CONFOUND
+------------------------------------------------------------------------------
+  `_burstify` grows the burst by exactly 1/duty at constant mean
+  rate, so a size-proportional latency baseline IS 1/duty. The
+  excess over that baseline is the part access delay could explain.
+  ConfigSched  duty 0.1   p98   115.11 ms vs    67.85 at duty 1.0  ->  x  1.70   size baseline x10.0   excess x 0.17
+  ConfigSched  duty 0.5   p98    70.98 ms vs    67.85 at duty 1.0  ->  x  1.05   size baseline x2.0   excess x 0.52
+  ConfigSched+CG duty 0.1   p98   105.01 ms vs    65.56 at duty 1.0  ->  x  1.60   size baseline x10.0   excess x 0.16
+  ConfigSched+CG duty 0.5   p98    69.46 ms vs    65.56 at duty 1.0  ->  x  1.06   size baseline x2.0   excess x 0.53
+  ConfigSched+CGt duty 0.1   p98   105.01 ms vs    61.68 at duty 1.0  ->  x  1.70   size baseline x10.0   excess x 0.17
+  ConfigSched+CGt duty 0.5   p98    66.29 ms vs    61.68 at duty 1.0  ->  x  1.07   size baseline x2.0   excess x 0.54
+  PF           duty 0.1   p98   114.27 ms vs    83.27 at duty 1.0  ->  x  1.37   size baseline x10.0   excess x 0.14
+  PF           duty 0.5   p98    77.50 ms vs    83.27 at duty 1.0  ->  x  0.93   size baseline x2.0   excess x 0.47
+  PF+CG        duty 0.1   p98   106.30 ms vs    69.51 at duty 1.0  ->  x  1.53   size baseline x10.0   excess x 0.15
+  PF+CG        duty 0.5   p98    73.36 ms vs    69.51 at duty 1.0  ->  x  1.06   size baseline x2.0   excess x 0.53
+  PF+CGt       duty 0.1   p98   106.30 ms vs    64.70 at duty 1.0  ->  x  1.64   size baseline x10.0   excess x 0.16
+  PF+CGt       duty 0.5   p98    68.98 ms vs    64.70 at duty 1.0  ->  x  1.07   size baseline x2.0   excess x 0.53
+  ProtoRRageD2 duty 0.1   p98   113.97 ms vs    81.48 at duty 1.0  ->  x  1.40   size baseline x10.0   excess x 0.14
+  ProtoRRageD2 duty 0.5   p98    76.90 ms vs    81.48 at duty 1.0  ->  x  0.94   size baseline x2.0   excess x 0.47
+  ProtoRRageD2+CG duty 0.1   p98   104.49 ms vs    68.24 at duty 1.0  ->  x  1.53   size baseline x10.0   excess x 0.15
+  ProtoRRageD2+CG duty 0.5   p98    72.22 ms vs    68.24 at duty 1.0  ->  x  1.06   size baseline x2.0   excess x 0.53
+  ProtoRRageD2+CGt duty 0.1   p98   104.49 ms vs    62.86 at duty 1.0  ->  x  1.66   size baseline x10.0   excess x 0.17
+  ProtoRRageD2+CGt duty 0.5   p98    66.36 ms vs    62.86 at duty 1.0  ->  x  1.06   size baseline x2.0   excess x 0.53
+  Reservation  duty 0.1   p98   117.76 ms vs    67.89 at duty 1.0  ->  x  1.73   size baseline x10.0   excess x 0.17
+  Reservation  duty 0.5   p98    66.02 ms vs    67.89 at duty 1.0  ->  x  0.97   size baseline x2.0   excess x 0.49
+  Reservation+CG duty 0.1   p98   127.88 ms vs    77.32 at duty 1.0  ->  x  1.65   size baseline x10.0   excess x 0.17
+  Reservation+CG duty 0.5   p98    78.63 ms vs    77.32 at duty 1.0  ->  x  1.02   size baseline x2.0   excess x 0.51
+  Reservation+CGt duty 0.1   p98   127.88 ms vs    70.40 at duty 1.0  ->  x  1.82   size baseline x10.0   excess x 0.18
+  Reservation+CGt duty 0.5   p98    73.31 ms vs    70.40 at duty 1.0  ->  x  1.04   size baseline x2.0   excess x 0.52
+  TwoTier      duty 0.1   p98   118.12 ms vs   103.90 at duty 1.0  ->  x  1.14   size baseline x10.0   excess x 0.11
+  TwoTier      duty 0.5   p98    90.95 ms vs   103.90 at duty 1.0  ->  x  0.88   size baseline x2.0   excess x 0.44
+  TwoTier+CG   duty 0.1   p98   110.64 ms vs    86.26 at duty 1.0  ->  x  1.28   size baseline x10.0   excess x 0.13
+  TwoTier+CG   duty 0.5   p98    83.03 ms vs    86.26 at duty 1.0  ->  x  0.96   size baseline x2.0   excess x 0.48
+  TwoTier+CGt  duty 0.1   p98   110.64 ms vs    78.55 at duty 1.0  ->  x  1.41   size baseline x10.0   excess x 0.14
+  TwoTier+CGt  duty 0.5   p98    77.97 ms vs    78.55 at duty 1.0  ->  x  0.99   size baseline x2.0   excess x 0.50
+
+------------------------------------------------------------------------------
+ACROSS ARMS at one duty level -- CONFOUND-FREE (identical sizes)
+------------------------------------------------------------------------------
+
+  duty_cycle = 0.1
+    ConfigSched  p98   115.11 ms  [  114.92,   115.29]  n=10
+    ConfigSched+CG p98   105.01 ms  [  104.13,   105.83]  n=10
+    ConfigSched+CGt p98   105.01 ms  [  104.13,   105.83]  n=10
+    PF           p98   114.32 ms  [  113.27,   115.21]  n=10
+    PF+CG        p98   106.30 ms  [  105.73,   106.77]  n=10
+    PF+CGt       p98   106.30 ms  [  105.73,   106.77]  n=10
+    ProtoRRageD2 p98   113.98 ms  [  113.58,   114.29]  n=10
+    ProtoRRageD2+CG p98   104.49 ms  [  103.94,   105.08]  n=10
+    ProtoRRageD2+CGt p98   104.49 ms  [  103.94,   105.08]  n=10
+    Reservation  p98   116.59 ms  [  111.53,   122.32]  n=10
+    Reservation+CG p98   127.88 ms  [  126.54,   129.24]  n=10
+    Reservation+CGt p98   127.88 ms  [  126.54,   129.24]  n=10
+    TwoTier      p98   118.21 ms  [  116.46,   119.81]  n=10
+    TwoTier+CG   p98   110.64 ms  [  109.39,   111.91]  n=10
+    TwoTier+CGt  p98   110.64 ms  [  109.39,   111.91]  n=10
+      ConfigSched - PF:    +0.80 ms [   -0.01,    +1.72]  
+      ConfigSched+CG - PF:    -9.30 ms [  -10.21,    -8.33] *
+      ConfigSched+CGt - PF:    -9.30 ms [  -10.21,    -8.33] *
+      PF+CG - PF:    -8.01 ms [   -8.78,    -7.14] *
+      PF+CGt - PF:    -8.01 ms [   -8.78,    -7.14] *
+      ProtoRRageD2 - PF:    -0.34 ms [   -1.16,    +0.66]  
+      ProtoRRageD2+CG - PF:    -9.83 ms [  -10.82,    -8.82] *
+      ProtoRRageD2+CGt - PF:    -9.83 ms [  -10.82,    -8.82] *
+      Reservation - PF:    +2.28 ms [   -2.63,    +7.04]  
+      Reservation+CG - PF:   +13.56 ms [  +12.24,   +14.87] *
+      Reservation+CGt - PF:   +13.56 ms [  +12.24,   +14.87] *
+      TwoTier - PF:    +3.89 ms [   +1.86,    +6.06] *
+      TwoTier+CG - PF:    -3.67 ms [   -4.96,    -2.09] *
+      TwoTier+CGt - PF:    -3.67 ms [   -4.96,    -2.09] *
+
+  duty_cycle = 0.5
+    ConfigSched  p98    70.98 ms  [   70.46,    71.57]  n=10
+    ConfigSched+CG p98    69.46 ms  [   69.17,    69.82]  n=10
+    ConfigSched+CGt p98    66.29 ms  [   65.71,    66.85]  n=10
+    PF           p98    77.50 ms  [   75.98,    79.01]  n=10
+    PF+CG        p98    73.36 ms  [   72.60,    74.21]  n=10
+    PF+CGt       p98    68.98 ms  [   68.31,    69.77]  n=10
+    ProtoRRageD2 p98    76.90 ms  [   75.75,    78.06]  n=10
+    ProtoRRageD2+CG p98    72.22 ms  [   71.36,    73.19]  n=10
+    ProtoRRageD2+CGt p98    66.36 ms  [   65.62,    67.25]  n=10
+    Reservation  p98    65.44 ms  [   61.70,    69.85]  n=10
+    Reservation+CG p98    78.63 ms  [   78.13,    79.23]  n=10
+    Reservation+CGt p98    73.31 ms  [   72.78,    73.83]  n=10
+    TwoTier      p98    90.95 ms  [   89.64,    92.17]  n=10
+    TwoTier+CG   p98    83.03 ms  [   81.37,    84.82]  n=10
+    TwoTier+CGt  p98    77.97 ms  [   76.32,    79.81]  n=10
+      ConfigSched - PF:    -6.52 ms [   -7.80,    -5.41] *
+      ConfigSched+CG - PF:    -8.04 ms [   -9.38,    -6.80] *
+      ConfigSched+CGt - PF:   -11.21 ms [  -12.90,    -9.57] *
+      PF+CG - PF:    -4.14 ms [   -4.96,    -3.29] *
+      PF+CGt - PF:    -8.52 ms [   -9.87,    -7.27] *
+      ProtoRRageD2 - PF:    -0.60 ms [   -1.48,    +0.25]  
+      ProtoRRageD2+CG - PF:    -5.28 ms [   -6.23,    -4.31] *
+      ProtoRRageD2+CGt - PF:   -11.14 ms [  -12.24,   -10.12] *
+      Reservation - PF:   -12.06 ms [  -15.85,    -8.13] *
+      Reservation+CG - PF:    +1.14 ms [   -0.23,    +2.40]  
+      Reservation+CGt - PF:    -4.19 ms [   -5.75,    -2.77] *
+      TwoTier - PF:   +13.45 ms [  +11.03,   +15.59] *
+      TwoTier+CG - PF:    +5.53 ms [   +4.20,    +6.96] *
+      TwoTier+CGt - PF:    +0.47 ms [   -1.30,    +2.28]  
+
+  duty_cycle = 1.0
+    ConfigSched  p98    67.85 ms  [   66.93,    68.86]  n=10
+    ConfigSched+CG p98    65.56 ms  [   64.99,    66.26]  n=10
+    ConfigSched+CGt p98    61.68 ms  [   61.09,    62.19]  n=10
+    PF           p98    83.27 ms  [   81.64,    84.96]  n=10
+    PF+CG        p98    69.51 ms  [   68.89,    70.25]  n=10
+    PF+CGt       p98    64.70 ms  [   63.49,    66.22]  n=10
+    ProtoRRageD2 p98    81.48 ms  [   79.60,    83.29]  n=10
+    ProtoRRageD2+CG p98    68.24 ms  [   67.26,    69.55]  n=10
+    ProtoRRageD2+CGt p98    62.86 ms  [   62.08,    63.73]  n=10
+    Reservation  p98    67.08 ms  [   63.01,    71.55]  n=10
+    Reservation+CG p98    77.32 ms  [   75.76,    79.04]  n=10
+    Reservation+CGt p98    70.40 ms  [   68.90,    71.90]  n=10
+    TwoTier      p98   103.90 ms  [  102.15,   105.54]  n=10
+    TwoTier+CG   p98    86.26 ms  [   85.30,    87.19]  n=10
+    TwoTier+CGt  p98    78.55 ms  [   76.96,    80.41]  n=10
+      ConfigSched - PF:   -15.42 ms [  -16.80,   -14.01] *
+      ConfigSched+CG - PF:   -17.70 ms [  -19.13,   -16.09] *
+      ConfigSched+CGt - PF:   -21.59 ms [  -23.23,   -19.82] *
+      PF+CG - PF:   -13.76 ms [  -15.34,   -12.10] *
+      PF+CGt - PF:   -18.57 ms [  -20.09,   -17.09] *
+      ProtoRRageD2 - PF:    -1.79 ms [   -3.70,    -0.19] *
+      ProtoRRageD2+CG - PF:   -15.03 ms [  -16.50,   -13.69] *
+      ProtoRRageD2+CGt - PF:   -20.41 ms [  -21.57,   -19.16] *
+      Reservation - PF:   -16.19 ms [  -19.92,   -12.54] *
+      Reservation+CG - PF:    -5.95 ms [   -7.37,    -4.51] *
+      Reservation+CGt - PF:   -12.87 ms [  -14.65,   -11.14] *
+      TwoTier - PF:   +20.63 ms [  +19.35,   +22.24] *
+      TwoTier+CG - PF:    +2.99 ms [   +1.49,    +4.57] *
+      TwoTier+CGt - PF:    -4.72 ms [   -6.65,    -2.50] *
+
+  (* = paired bootstrap CI excludes zero)
+
+wrote sweeps/cell-2026-09-16-linux/aligned/g4.json  (19846 flow-bucket rows)

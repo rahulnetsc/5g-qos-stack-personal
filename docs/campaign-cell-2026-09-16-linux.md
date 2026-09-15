@@ -108,6 +108,7 @@ and anything that needed a fix.
 | g2_cg | 0 | 2 390 | 5 400 runs. CG changes nothing on G2 (downlink); every arm within ±15 % of plain |
 | g6 | 0 | 477 | 1 350 runs (2 s). No Windows artefact. Fails on every arm; ConfigSched = PF except the windowed GFBR floor |
 | g6_cg | 0 | 979 | 2 700 runs. Every CG arm's worst flood silence ~200 ms (Reservation from 6.5–8.9 s, TwoTier from 8.2–9.6 s); G5 half unchanged |
+| g4 | 0 | 131 | 450 runs, all fifteen arm names in one artefact. Every arm inside 300 ms on every bucket; PF/Proto's telemetry-after-period p98 24/20 → 72/70 ms on this cell; `+CGt` 11–17 ms on every arm |
 
 ## 5. Expectations registered before the artefacts are read
 
