@@ -109,6 +109,7 @@ and anything that needed a fix.
 | g6 | 0 | 477 | 1 350 runs (2 s). No Windows artefact. Fails on every arm; ConfigSched = PF except the windowed GFBR floor |
 | g6_cg | 0 | 979 | 2 700 runs. Every CG arm's worst flood silence ~200 ms (Reservation from 6.5–8.9 s, TwoTier from 8.2–9.6 s); G5 half unchanged |
 | g4 | 0 | 131 | 450 runs, all fifteen arm names in one artefact. Every arm inside 300 ms on every bucket; PF/Proto's telemetry-after-period p98 24/20 → 72/70 ms on this cell; `+CGt` 11–17 ms on every arm |
+| g9 | 0 | 708 | 1 800 runs. Axis top (7, ×1.5) and (8, ×2.0) "cell already broken" on every arm (derived from the OLD cell's G10 boundary). Informative cells passed: Proto 12, PF 11, Reservation 10, ConfigSched 9 (its cell breaks at (6, ×1.25)), TwoTier 4 |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -270,6 +271,18 @@ arms 247–263) — the registered cap-2 loss, **hit**; cap 4 at parity
 where more STOPs than DCIs are due" — **hit**. Every arm's cap-4 misses
 are ~10× the previous cell's (BLER² vs BLER³ reading, hypothesis in the
 results doc). Written into `docs/results-cell-2026-09-15.md` §2.
+
+### 6.7 G9 (`aligned/g9.json`)
+
+The axis's top two points are past this cell's capacity on every arm
+(7–10 broken seeds), so twelve cells are informative. ConfigSched passes
+9 of 12; its three losses are its own cell breaking at (6, ×1.25) on
+8–10 seeds (PF, Reservation, Proto: 0) — the G5 load knee from the
+joiner's side, not a join failure. Where its cell holds, the joiner is
+served like PF's (cold 0.10–0.13 s, RLF 1.04–1.05 s, warm 0.00).
+Registered ("joiner later than PF under load") — hit only at the margin
+(cold (6) 0.24 vs 0.10 s). Written into `docs/results-cell-2026-09-15.md`
+§8.
 
 ## 7. After the results: ConfigSched iteration
 
