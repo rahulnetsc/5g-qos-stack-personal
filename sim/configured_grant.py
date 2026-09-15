@@ -129,6 +129,38 @@ POLICY (the vendor part), stated so a reader can see what was chosen:
     (`skipped_same_slot`), and a UE that transmits a CG PUSCH is hidden
     from the dynamic scheduler for that slot.
 
+TRAFFIC DESCRIPTOR (Build 2d, 2026-09-15, arm label `+CGt`). The PERIOD
+rule above is what a gNB that knows only the QoS profile can do, and it is
+wasteful: for a 300 B / 100 ms heartbeat it picks 40 ms, so 2.5 occasions
+per message, 75 % of them empty and 79 % of the reserved PRBs unused
+(measured 2026-09-15, G5 N = 6), with a wait of up to one period for each
+message. The standard's answer is to TELL the gNB the pattern: TSCAI from
+the core at QoS-flow setup (burst arrival time, periodicity -- TS 38.300
+sec 16.8.1), or Rel-18 UE traffic info (`ul-TrafficInfo`, TS 38.331). With
+`traffic_descriptor` on, a flow that declares a single periodic pattern
+(`sim/traffic.py` periodic_control / condition_monitor: period, phase under
+a sync_group, jitter clip) gets
+  * PERIOD = the declared period in slots -- any integer up to the
+    `periodicityExt` bound (TS 38.331, transcribed above), 400 slots for
+    100 ms at mu = 2, not the nearest enumerated value;
+  * PHASE = the declared arrival + jitter bound + `descriptor_margin_slots`,
+    on an uplink slot, so one occasion follows each message;
+  * ACTIVATION at setup, without waiting for a first report, since the
+    descriptor arrives with the flow -- `setup_activations_per_slot` per
+    slot, because each activation is a DCI on the cap.
+Measured (G3 GT-2.2, 2026-09-15): occasions 400 -> 160, reserved PRBs
+wasted 2 346 -> 266; used occasions 76 % (G5: 88 %), not 100 %, because on
+a loaded robot the dynamic scheduler grants the UE before the occasion and
+the UE's LCP multiplexes the channel into any grant -- as a real UE does
+unless `allowedPHY-PriorityIndex` fences the channel off dynamic grants.
+The occasion is the message's floor, not its only path.
+Everything else (sizing, restriction, resize, release, multi-CG rules) is
+unchanged, and a flow without a declared pattern keeps the PDB rule. This
+is CONDITIONAL on the deployment -- free5GC's SMF and the OAI gNB carry no
+TSCAI today, and the OAI UE reports no traffic info -- which is why it is
+its own label rather than the `+CG` default: `+CG` is what an OAI + free5GC
+system could do now, `+CGt` what a core that sends TSCAI would allow.
+
 MORE THAN ONE CG ON A UE (Build 2b, 2026-09-15). One configuration per
 eligible flow was always the model; what the probe of 2026-09-15 showed is
 that two of them on one robot ALWAYS coincided -- both activated on the
@@ -172,10 +204,12 @@ from typing import Any, Optional
 
 from scheduler.link import bits_per_prb_for_mcs, cce_aggregation_level, mcs_index_for_snr
 
+from .cycle_clock import phase_offset_slots
 from .pre_sched import Occupancy
 
 __all__ = ["CgConfig", "CgOccasion", "CgSlotResult", "ConfiguredGrantModel",
-           "CG_PERIODICITY_N_BY_SCS_KHZ", "cg_periodicities_slots"]
+           "CG_PERIODICITY_N_BY_SCS_KHZ", "CG_PERIODICITY_EXT_MAX_BY_SCS_KHZ",
+           "cg_periodicities_slots"]
 
 #: TS 38.331 V18.10.0, `ConfiguredGrantConfig` field description,
 #: "periodicity": "The following periodicities are supported depending on
@@ -189,6 +223,16 @@ CG_PERIODICITY_N_BY_SCS_KHZ: dict[int, tuple[int, ...]] = {
     60: (1, 2, 4, 5, 8, 10, 16, 20, 32, 40, 64, 80, 128, 160, 256, 320, 512, 640, 1280, 2560),
     120: (1, 2, 4, 5, 8, 10, 16, 20, 32, 40, 64, 80, 128, 160, 256, 320, 512, 640, 1024, 1280, 2560, 5120),
 }
+
+
+#: TS 38.331 V18.10.0, `ConfiguredGrantConfig` field description,
+#: "periodicityExt": "used to calculate the periodicity for UL transmission
+#: without UL grant for type 1 and type 2 ... 15 kHz: periodicityExt*14,
+#: where periodicityExt has a value between 1 and 640. 30 kHz: ... 1 and
+#: 1280. 60 kHz with normal CP: ... 1 and 2560. 120 kHz: ... 1 and 5120."
+#: So with the extension ANY integer number of slots up to this bound is a
+#: lawful period -- the enumerated set above is only the pre-Rel-16 one.
+CG_PERIODICITY_EXT_MAX_BY_SCS_KHZ: dict[int, int] = {15: 640, 30: 1280, 60: 2560, 120: 5120}
 
 
 def cg_periodicities_slots(numerology: int) -> tuple[int, ...]:
@@ -218,6 +262,16 @@ class CgConfig:
     release_after_unused: int = 8
     resize_mcs_delta: int = 2
     k2_slots: int = 2
+    #: Build 2d: take period and phase from the flow's DECLARED traffic
+    #: pattern -- what TSCAI (TS 38.300 sec 16.8.1) or Rel-18 UE traffic
+    #: info would tell the gNB -- instead of the PDB rule. Conditional on
+    #: the deployment (free5GC / OAI carry neither today): arm label `+CGt`.
+    traffic_descriptor: bool = False
+    #: Slots after the declared arrival (plus its jitter bound) before the
+    #: occasion, so the data is in the UE's buffer when it fires.
+    descriptor_margin_slots: int = 4
+    #: Setup-time activations per slot (each is a DCI on the cap).
+    setup_activations_per_slot: int = 2
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "CgConfig":
@@ -294,6 +348,11 @@ class _CgState:
     phase_deferred: int = 0
     phase_deferred_slots: int = 0
     phase_collisions: int = 0
+    # Build 2d: the declared pattern (None = no descriptor, PDB rule).
+    desc_period: Optional[int] = None
+    desc_phase: int = 0
+    desc_jitter_slots: int = 0
+    ever_activated: bool = False
 
 
 class ConfiguredGrantModel:
@@ -307,6 +366,11 @@ class ConfiguredGrantModel:
         self._pattern_len = len(grid.pattern)
         self._numerology = int(round(math.log2(0.001 / grid.slot_duration_s)))
         self._allowed = cg_periodicities_slots(self._numerology)
+        try:
+            self._max_period_ext = CG_PERIODICITY_EXT_MAX_BY_SCS_KHZ[15 * (2 ** self._numerology)]
+        except KeyError:
+            raise ValueError(f"no transcribed periodicityExt bound for numerology "
+                             f"{self._numerology}") from None
         self._states: dict[tuple[int, int], _CgState] = {}
         for f in flows:
             if f.direction != "UL" or getattr(f, "is_srb", False):
@@ -322,10 +386,14 @@ class ConfiguredGrantModel:
             else:
                 continue                  # best-effort: never
             pdb_slots = int(f.pdb_ms / (grid.slot_duration_s * 1000.0))
+            desc = self._descriptor(f) if self.cfg.traffic_descriptor else None
             self._states[(f.ue_id, f.qfi)] = _CgState(
                 ue_id=f.ue_id, qfi=f.qfi, pdb_slots=pdb_slots,
                 message_bytes=message,
-                period_slots=self._choose_period(pdb_slots))
+                period_slots=(desc[0] if desc else self._choose_period(pdb_slots)),
+                desc_period=(desc[0] if desc else None),
+                desc_phase=(desc[1] if desc else 0),
+                desc_jitter_slots=(desc[2] if desc else 0))
         self._by_ue: dict[int, list[_CgState]] = {}
         for st in self._states.values():
             self._by_ue.setdefault(st.ue_id, []).append(st)
@@ -398,6 +466,41 @@ class ConfiguredGrantModel:
             return max(fits)
         return self._allowed[0]
 
+    def _descriptor(self, f) -> Optional[tuple[int, int, int]]:
+        """(period_slots, phase_slot, jitter_slots) from the flow's declared
+        periodic pattern -- the same slot arithmetic as
+        `sim/traffic.py::_gen_periodic_control` (truncating period; a phase
+        only under a sync_group; the jitter bound is the clip), so the
+        occasion is placed where the generator will put the data. None
+        when the flow declares no single period, or a period beyond what
+        `periodicityExt` can express at this numerology."""
+        if getattr(f, "traffic_kind", None) not in ("periodic_control", "condition_monitor"):
+            return None
+        p = getattr(f, "traffic_params", None) or {}
+        if "streams" in p or "period_ms" not in p:
+            return None
+        slot_s = self._grid.slot_duration_s
+        period = max(1, int(float(p["period_ms"]) / 1000.0 / slot_s))
+        if period > self._max_period_ext:
+            return None
+        phase = (phase_offset_slots(float(getattr(f, "phase_offset_ms", 0.0)), slot_s)
+                 if getattr(f, "sync_group", None) is not None else 0)
+        sigma = float(p.get("jitter_sigma_ms", 0.0))
+        clip = p.get("jitter_clip_ms")
+        clip_ms = float(clip) if clip is not None else 2.0 * sigma
+        jitter = int(math.ceil(clip_ms / 1000.0 / slot_s)) if clip_ms > 0 else 0
+        return period, phase % period, jitter
+
+    def _descriptor_first_occasion(self, st: _CgState, slot_index: int) -> int:
+        """The first slot >= now + k2 that is `margin + jitter` after a
+        declared arrival, on an uplink slot. With a pattern-multiple period
+        every later occasion keeps the same alignment."""
+        target = st.desc_phase + st.desc_jitter_slots + int(self.cfg.descriptor_margin_slots)
+        earliest = slot_index + int(self.cfg.k2_slots)
+        if target < earliest:
+            target += ((earliest - target + st.period_slots - 1) // st.period_slots) * st.period_slots
+        return self._next_ul_slot(target)
+
     def _next_ul_slot(self, slot: int) -> int:
         """First slot >= `slot` whose kind carries uplink symbols. Same rule
         as `sim/driver.py::align_due_slot` for UL, kept local because this
@@ -460,9 +563,16 @@ class ConfiguredGrantModel:
                 res.released.append(key)
                 continue
             if not st.active:
-                # Activate on the gNB's own evidence that this LCG has data.
+                # Activate on the gNB's own evidence that this LCG has data --
+                # or, with a descriptor and a contract-sized message, once at
+                # setup, as a gNB holding TSCAI would (a few per slot: each
+                # activation is a DCI on the cap). A re-activation after a
+                # release waits for a report either way.
                 reported = buffers.state(ue, qfi).bytes_reported
-                if reported <= 0:
+                at_setup = (st.desc_period is not None and st.message_bytes is not None
+                            and not st.ever_activated
+                            and occ.ue_counts.get("UL", 0) < int(self.cfg.setup_activations_per_slot))
+                if reported <= 0 and not at_setup:
                     continue
                 if st.message_bytes is None:
                     # Delay class: the first report sizes the CG, and a report
@@ -474,13 +584,17 @@ class ConfiguredGrantModel:
                 # The first occasion is k2 slots on, on a UL-capable slot; its
                 # symbol count sizes the TB (all occasions share the kind
                 # when the period is pattern-aligned).
-                first = self._next_ul_slot(slot_index + self.cfg.k2_slots)
+                if st.desc_period is not None:
+                    first = self._descriptor_first_occasion(st, slot_index)
+                else:
+                    first = self._next_ul_slot(slot_index + self.cfg.k2_slots)
                 first = self._free_phase(st, first)
                 sym = int(self._grid.slot_grid(first).ul_symbols)
                 st.prbs, st.tbs_bytes, st.mcs = self._size(st, snr, sym)
                 st.snr_used_db = snr
                 st.next_occasion = first
                 st.active = True
+                st.ever_activated = True
                 st.activations += 1
                 occ.cce += cce_aggregation_level(snr)
                 occ.ue_counts["UL"] = occ.ue_counts.get("UL", 0) + 1
@@ -570,6 +684,7 @@ class ConfiguredGrantModel:
                 "period_slots": s.period_slots, "message_bytes": s.message_bytes,
                 "prbs": s.prbs, "tbs_bytes": s.tbs_bytes, "mcs": s.mcs,
                 "active_at_end": s.active, "harq_pids": list(s.harq_pids),
+                "descriptor_period": s.desc_period, "descriptor_phase": s.desc_phase,
                 **{k: getattr(s, k) for k in keys}}
             for s in self._states.values()}
         return {"config": self.cfg.to_dict(), "eligible_flows": len(self._states),

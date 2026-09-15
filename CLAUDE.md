@@ -292,6 +292,20 @@ CG reaches them only as pre-scheduler occupancy (`sim/pre_sched.py`) plus
 a reduced buffer view, never as a scheduler mechanism. The UE-side LCP
 mapping restriction (`allowedCG-List`) is an explicit switch because the
 vendored OAI UE implements none (`docs/plan-cg-and-config-scheduler-2026-09-14.md` §1.2).
+**Three CG builds landed 2026-09-15, each its own commit:** (2b) every
+configuration owns a block of UL HARQ process IDs (`HarqProcessPool.
+reserve_ul`) and is activated on a phase no other CG of the UE uses — the
+probe that motivated it had two CGs on one robot coinciding on EVERY
+occasion; (2c) a RESTRICTED CG TB masks only its own channel
+(`HarqProcess.cg_qfi`, `HarqAwareBufferView`), the whole-UE mask staying
+for dynamic and unrestricted TBs, and one UL PUSCH per UE per slot is
+enforced explicitly (`skipped_same_slot`, `ul_busy_this_slot`); (2d) the
+**`+CGt`** label: period and phase from the flow's declared traffic
+pattern (TSCAI / UE traffic info), conditional on a core that sends it —
+free5GC and the OAI gNB do not — so `+CG` stays the PDB rule. `+CG` runs
+are byte-identical across 2b and moved by 2c (the 3 % of occasions the
+per-UE mask used to skip); reference dumps and diffs are in the commit
+messages.
 **Measured (`docs/results-cg-2026-09-14.md`): restricted CG takes G3 to
 10/10 at every fleet size on every arm and fixes TwoTier's G7 clause 1;
 UNRESTRICTED CG breaks G5 on every arm** (frame age +30–50 ms, PF's

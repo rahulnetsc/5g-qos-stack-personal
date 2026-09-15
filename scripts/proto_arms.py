@@ -25,6 +25,11 @@ __all__ = ["resolve_arm", "is_proto", "split_cg", "CG_PRESETS"]
 CG_PRESETS: dict[str, dict[str, Any]] = {
     "+CG": {"lcp_restriction": True},
     "+CGu": {"lcp_restriction": False},
+    # Build 2d: restricted, with the CG period and phase taken from the
+    # flow's declared traffic pattern (TSCAI / UE traffic info) instead of
+    # the PDB rule. Conditional on a core that sends TSCAI -- free5GC and
+    # the OAI gNB do not today -- hence its own label.
+    "+CGt": {"lcp_restriction": True, "traffic_descriptor": True},
 }
 
 

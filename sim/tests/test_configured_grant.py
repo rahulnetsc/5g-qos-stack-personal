@@ -259,3 +259,31 @@ def test_one_uplink_pusch_per_ue_per_slot_with_cg_and_dynamic_grants_mixed():
     assert t["used"] > 0 and t["occasions"] == (
         t["used"] + t["skipped_empty"] + t["skipped_harq_pending"]
         + t["skipped_same_slot"] + t["skipped_cg_busy"])
+
+
+# --- Build 2d: period and phase from the declared traffic pattern (+CGt) ---
+
+def test_descriptor_takes_period_and_phase_from_the_declared_traffic():
+    """`+CGt`: the telemetry's declared 100 ms cadence becomes the period --
+    400 slots, a `periodicityExt` value, not the PDB rule's 160 -- and the
+    occasion sits just after each arrival: one occasion per message instead
+    of 2.5, and the reserved PRBs stop being mostly wasted. Not every
+    occasion is used: on a loaded robot the dynamic scheduler grants the UE
+    first and its LCP multiplexes the telemetry into that grant (measured
+    76 % used here, 88 % on G5), so the occasion is the floor, not the
+    only path."""
+    from scripts.proto_arms import split_cg
+    assert split_cg("PF+CGt") == ("PF", {"lcp_restriction": True, "traffic_descriptor": True})
+    sc = _cell()
+    s_pdb = _run(sc, {"lcp_restriction": True})
+    s_desc = _run(sc, {"lcp_restriction": True, "traffic_descriptor": True})
+    pf = s_desc["configured_grant"]["per_flow"][f"ue1_qfi{QFI_TELEMETRY}"]
+    assert pf["period_slots"] == 400 and pf["descriptor_period"] == 400
+    assert s_pdb["configured_grant"]["per_flow"][f"ue1_qfi{QFI_TELEMETRY}"]["period_slots"] == 160
+    t_pdb = s_pdb["configured_grant"]["totals"]
+    t_desc = s_desc["configured_grant"]["totals"]
+    assert t_desc["occasions"] < t_pdb["occasions"]
+    assert t_desc["used"] / t_desc["occasions"] > 0.6 > 2 * t_pdb["used"] / t_pdb["occasions"]
+    assert t_desc["prb_wasted"] / t_desc["prb_reserved"] < 0.3 < t_pdb["prb_wasted"] / t_pdb["prb_reserved"]
+    assert t_desc["activations"] == s_desc["configured_grant"]["eligible_flows"]
+    assert s_desc["levers"]["configured_grant"]["traffic_descriptor"] is True

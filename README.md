@@ -1614,7 +1614,16 @@ these five, add a new tag rather than forcing it into an existing one.
   in its name and in every table; it is a divergence from the deployed C
   (which has no CG), and the scheduler files stay the port. The UE-side
   `allowedCG-List` restriction is modelled as an explicit switch because the
-  vendored OAI UE implements no LCP mapping restriction. Sequence and design:
+  vendored OAI UE implements no LCP mapping restriction (`+CGu` is that UE).
+  **`+CGt` (2026-09-15)** is restricted CG with the period and phase taken
+  from the flow's declared traffic pattern, what TSCAI (TS 38.300 §16.8.1)
+  or Rel-18 UE traffic info would give the gNB; it is its own label because
+  free5GC's SMF and the OAI gNB carry no TSCAI today, so `+CG` is what that
+  deployment could do now and `+CGt` what a TSCAI-sending core would allow.
+  Also 2026-09-15: a CG configuration owns its HARQ process block and its
+  own phase (two CGs on one robot no longer coincide), and a restricted CG
+  TB masks only its own channel (`sim/configured_grant.py` docstring,
+  "MORE THAN ONE CG ON A UE" and "IN FLIGHT"). Sequence and design:
   `docs/plan-cg-and-config-scheduler-2026-09-14.md`; baseline it is measured
   against: `docs/results-aligned-2026-09-14.md`.
 
