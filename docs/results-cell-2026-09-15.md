@@ -12,7 +12,7 @@ is labelled *previous cell* and given for the comparison only.
 |---|---|---|---|
 | `sweeps/cell-2026-09-15/aligned/g3.json` | 400 | 759 s | done |
 | `…/aligned/g5.json` | 880 | 719 s | done |
-| `…/aligned/g1.json` | | | pending |
+| `…/aligned/g1.json` | 1 280 | 1 198 s | done |
 | `…/aligned/g2.json` | | | pending |
 | `…/aligned/g4.json` | | | pending |
 | `…/aligned/g6.json` | | | pending |
@@ -64,7 +64,61 @@ them. Launch: `…/run_campaign.sh`, detached, 23 workers.
 
 ## 1. G1 — "Driving a robot feels immediate while the rest of the fleet works"
 
-*pending — step `g1` runs after `g5`.*
+### 1.1 The experiment
+GT-1.1, *teleop responsiveness under fleet load*: two robots are driven —
+each receives a 20 Hz `cmd_vel` stream on 5QI 1 **downlink** (the
+instrument) while uplinking its camera at nominal; the last robot pulls a
+saturating 5QI-9 DL firmware image; every other robot runs its committed
+profile. Unchanged from the previous campaign except for the cell — and
+this is the first guarantee measured on the cell's **larger** downlink
+(60.5 Mbps against 31.4).
+
+### 1.2 Tests run
+Part 1 `cmd_vel` one-way p98 ≤ 95 ms; part 2 zero command gaps ≥ 200 ms at
+the receiver. A driven robot with fewer than two completions fails both.
+**Axes:** fleet size N ∈ {4 … 24} at committed ×1.0; committed load
+×{0.5 … 3.0} at N = 6; each at cap 4 and cap 2. 10 seeds, 20 000 slots.
+`scripts/g1_stress.py --fixed-n 6 --caps 4,2`, 1 280 runs.
+
+### 1.3 Results
+
+**Every cell of every axis at both caps is 10/10 on both parts, on every
+arm** — 0 breaches of 1 280 runs; boundaries 24 (fleet) and ×3.0 (load)
+everywhere. The figures behind the passes:
+
+**cap 4, fleet axis — `cmd_vel` p98 median / p98 worst (ms) / worst command gap (ms)**
+
+| arm | 4 | 8 | 12 | 16 | 24 |
+|---|---|---|---|---|---|
+| PF | 3.50 / 6.00 / 100 | 3.25 / 6.00 / 100 | 5.50 / 7.50 / 62 | 6.00 / 7.50 / 63 | 8.00 / 8.50 / 100 |
+| Reservation | 3.50 / 6.00 / 60 | 3.50 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.25 / 6.00 / 100 |
+| TwoTier | 3.50 / 6.00 / 60 | 3.00 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.50 / 6.00 / 100 | 6.00 / 6.00 / 60 |
+| ProtoRRageD2 | 4.50 / 6.00 / 100 | 3.00 / 6.00 / 100 | 3.50 / 6.00 / 60 | 3.25 / 6.00 / 60 | 3.25 / 6.00 / 60 |
+
+**cap 2, fleet axis — the same**
+
+| arm | 4 | 8 | 12 | 16 | 24 |
+|---|---|---|---|---|---|
+| PF | 3.50 / 6.00 / 60 | 3.50 / 6.00 / 60 | 8.00 / 8.50 / 102 | 10.00 / 10.50 / 96 | **12.50 / 15.00 / 68** |
+| Reservation | 3.25 / 6.00 / 103 | 3.25 / 6.00 / 60 | 3.50 / 6.00 / 97 | 3.50 / 6.00 / 60 | 3.25 / 7.50 / 60 |
+| TwoTier | 3.50 / 6.00 / 100 | 3.50 / 6.00 / 60 | 3.50 / 6.00 / 100 | 3.50 / 6.00 / 60 | 3.25 / 6.00 / 60 |
+| ProtoRRageD2 | 6.00 / 6.00 / 96 | 6.00 / 6.00 / 100 | 3.00 / 6.00 / 60 | 3.00 / 6.00 / 60 | 3.00 / 6.00 / 60 |
+
+On the load axis (N = 6) every arm sits at 3.0–5.5 ms p98 median and a
+worst gap ≤ 103 ms at both caps, ×0.5 through ×3.0.
+
+### 1.4 Conclusion
+**G1 passes on every arm with 0 breaches of 1 280 runs**, as on the
+previous cell, with margins that are large: the worst p98 anywhere is
+15.0 ms against 95, the worst gap 103 ms against 200. The one
+arm-differentiating signal is the same as before and slightly larger: PF's
+command latency grows with fleet size at cap 2 (3.5 → 12.5 ms median,
+15.0 worst at N = 24; previous cell's worst anywhere 10.25) while the three
+arms with a downlink deadline tier stay at 3.0–3.5 ms at any fleet size.
+The larger downlink does not remove it, because the cap-2 mechanism is the
+DCI budget, not the PRBs: PF's single-term key demotes the driven robot
+behind the firmware download. `ProtoRRageD2` is TwoTier here, as it should
+be — its edits are uplink-only.
 
 ## 2. G2 — "The master disconnects: does every robot stop in time?"
 
