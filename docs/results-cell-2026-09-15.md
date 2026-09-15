@@ -327,14 +327,32 @@ committed portfolio ×1.0 → ×1.5 at N = 7; GT-3.3 Asset B's SNR
 | Reservation | 10/10/3/10 · 18.3 | 10/10/3/10 · 28.3 | 10/10/3/10 · 34.6 | 9/7/1/9 · 59.6 | 0/0/0/0 · 117.3 | 0/0/0/0 · 132.8 | 0/0/0/1 · 142.6 | 1/2/0/0 · 133.6 | 0/0/0/0 · 149.0 |
 | TwoTier | 10/0/1/10 · 94.2 | 3/0/0/10 · 125.2 | 2/0/0/9 · 128.9 | 0/0/0/1 · 141.0 | 0/0/0/0 · 139.8 | 0/0/0/0 · 148.5 | 0/0/0/0 · 149.1 | 0/0/0/0 · 148.9 | 0/1/0/0 · 149.1 |
 | ProtoRRageD2 | 10/10/5/10 · 17.4 | 10/10/2/10 · 22.5 | 10/10/2/10 · 25.9 | 10/10/2/10 · 29.7 | 10/9/3/10 · 42.1 | 9/4/2/10 · 74.5 | 2/0/0/10 · 134.0 | 0/0/0/10 · 145.2 | 0/0/0/10 · 148.6 |
+| ConfigSched | 10/10/2/10 · 24.4 | 10/10/4/10 · 31.8 | 10/10/3/10 · 36.1 | 10/2/1/10 · 78.7 | 1/0/0/10 · 146.3 | 0/0/0/10 · 146.7 | 1/0/0/10 · 146.9 | 0/0/0/10 · 147.1 | 0/0/0/10 · 147.3 |
 
 **Admissible fleet (parts 1 and 2 both 10/10):** PF **8** (previous cell
 14), Reservation 7 (10), TwoTier **none** (4; part 2 is 0/10 already at
-N = 4, frame age 94 ms), ProtoRRageD2 **8** (14). Beyond the boundary the
-Proto arm degrades later than PF — at N = 10 it holds 42 ms frame age
-(10/9) where PF is at 101 ms (7/2), and at N = 12 it is 9/4 where PF is
-0/0 — so on this cell it is the better of the two, where on the previous
-cell they tied.
+N = 4, frame age 94 ms), ProtoRRageD2 **8** (14), ConfigSched 7. Beyond
+the boundary the Proto arm degrades later than PF — at N = 10 it holds
+42 ms frame age (10/9) where PF is at 101 ms (7/2), and at N = 12 it is
+9/4 where PF is 0/0 — so on this cell it is the better of the two, where
+on the previous cell they tied.
+
+**Median PDU-set completeness at N = 10 / 12 / 16 / 24** — the statistic
+that separates ConfigSched from every other arm under overload:
+
+| arm | 10 | 12 | 16 | 24 |
+|---|---|---|---|---|
+| PF | 0.998 | 0.902 | 0.685 | 0.451 |
+| Reservation | 0.934 | 0.752 | 0.700 | 0.187 |
+| TwoTier | 0.934 | 0.138 | 0.128 | 0.037 |
+| ProtoRRageD2 | 1.000 | 1.000 | 0.904 | 0.601 |
+| ConfigSched | 0.955 | 0.945 | 0.939 | **0.930** |
+
+Past its boundary ConfigSched delivers frames **whole but late**: the
+GFBR floor (`r_i ≥ GFBR · W`) keeps every camera's bytes flowing, so
+completeness stays at 0.93–0.95 to N = 24 while frame age sits at the
+147 ms ceiling; PF and the Proto arm deliver fresher frames to fewer
+cameras and drop the rest.
 
 **GT-3.2 load ceiling (N = 7) — parts 1/2/3/4 and frame age**
 
@@ -344,10 +362,19 @@ cell they tied.
 | Reservation | 10/10/2/10 · 34.5 | 10/10/10/10 · 39.9 | **9/5/10/10 · 62.7** | 4/2/10/8 · 103.3 | 1/0/8/0 · 123.9 | 0/0/8/2 · 143.3 |
 | TwoTier | 3/0/0/10 · 126.1 | 0/0/2/10 · 138.7 | 1/0/4/4 · 141.2 | 0/0/0/1 · 144.2 | 0/0/1/0 · 147.2 | 0/0/0/0 · 148.1 |
 | ProtoRRageD2 | 10/10/5/10 · 25.9 | 10/10/10/10 · 27.5 | 10/10/10/10 · 29.7 | 10/10/10/10 · 33.5 | 10/10/10/10 · 40.5 | 10/10/10/10 · 47.2 |
+| ConfigSched | 10/10/5/10 · 32.9 | 10/4/10/10 · 73.4 | 4/0/10/10 · 141.1 | 0/0/10/10 · 147.5 | 0/0/10/10 · 148.5 | 0/0/10/10 · 148.7 |
 
 Load knee (first multiplier below 10/10 on parts 1–2): PF **×1.4**
 (previous cell: none to ×1.5), Reservation ×1.2 (none), TwoTier ×1.0
-(×1.2), ProtoRRageD2 **none to ×1.5** (none).
+(×1.2), ProtoRRageD2 **none to ×1.5** (none), ConfigSched **×1.1** — the
+sharpest knee of any arm that passes at ×1.0: frame age 33 → 73 → 141 ms
+across ×1.0 / ×1.1 / ×1.2 while part 3 (goodput ≥ GFBR) stays 10/10. The
+mechanism is stated as a hypothesis, not traced: above ×1.0 the camera
+offers more than its GFBR, the floor covers only the GFBR, and the residual
+is shared **equally in PRBs** among every flow with demand above its floor
+— the 8 Mbps best-effort filler included — so the camera's excess waits
+behind an equal share for the filler. PF's rate-proportional share and the
+Proto arm's regular visiting do not have that shape.
 
 **GT-3.3 cell edge (N = 7) — parts 1/2/3/4 and frame age**
 
@@ -357,12 +384,14 @@ Load knee (first multiplier below 10/10 on parts 1–2): PF **×1.4**
 | Reservation | 10/10/3/1 · 26.7 | 10/8/4/1 · 35.3 | 4/0/0/2 · 127.2 | 1/0/0/3 · 130.0 | 1/0/0/3 · 131.0 | 4/1/0/5 · 119.5 | 10/10/3/10 · 34.6 |
 | TwoTier | 10/10/4/1 · 20.1 | 9/8/0/1 · 39.3 | 0/0/0/1 · 145.1 | 0/0/0/2 · 147.5 | 0/0/0/2 · 148.8 | 0/0/0/2 · 146.7 | 2/0/0/9 · 128.9 |
 | ProtoRRageD2 | 10/10/5/1 · 20.9 | 10/10/4/1 · 22.9 | 10/10/3/8 · 27.3 | 10/10/3/10 · 26.0 | 10/10/2/10 · 25.9 | 10/10/3/10 · 25.9 | 10/10/2/10 · 25.9 |
+| ConfigSched | 10/10/3/1 · 23.3 | 10/10/3/1 · 23.4 | 10/10/4/8 · 20.3 | 10/10/4/10 · 31.8 | 10/8/1/10 · 46.2 | 10/10/3/10 · 35.7 | 10/10/3/10 · 36.1 |
 
 Both faithful arms now fail parts 1–2 across the middle of the SNR axis
 (Reservation 0–15 dB, TwoTier 0–20 dB) and pass at −6/−3 dB, where the
 edge robot's saturator can no longer flood the cell; part 4 (the edge
 robot's own telemetry) fails at −6/−3 dB on every arm alike. PF and the
-Proto arm hold parts 1–2 at every SNR.
+Proto arm hold parts 1–2 at every SNR; ConfigSched holds them at every
+SNR but 10 dB (part 2 8/10, frame age 46 ms).
 
 ### 5.4 Conclusion
 **G5 fails on both faithful QoS arms and passes on PF and the Proto arm
@@ -381,6 +410,17 @@ G5:** same admissible fleet, but a later collapse on the fleet axis
 K = 2 trickle that keeps multi-fragment frames assembling is worth more
 than PF's rate-proportional share — the same mechanism as before, now
 with capacity to expose it.
+
+**ConfigSched, against its registered expectation** ("worse than PF on
+parts 1–2 at every N; admissible fleet ≤ 8"): the fleet bound is a hit
+(7), "at every N" a miss — at N = 4–7 it passes parts 1–2 on every seed
+like PF, with 6–12 ms more frame age. Where it is clearly worse is the
+load axis (knee ×1.1) and the fleet axis just past its boundary (N = 8:
+part 2 at 2/10, 79 ms). Where it is clearly better is completeness under
+overload (0.93 at N = 24 against PF's 0.45), which no arm's part 1–2 pass
+count shows because both parts are already 0/10 there. The prototype has
+a GFBR floor and no frame knowledge: the floor keeps frames complete, the
+absence keeps them late.
 
 ## 6. G6 — "Background traffic can never impair the fleet"
 

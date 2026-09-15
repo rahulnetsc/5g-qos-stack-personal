@@ -95,6 +95,7 @@ and anything that needed a fix.
 | g3 | 0 | 555 | 500 runs. **Cross-platform determinism check passed:** the four faithful arms' `A/cap4/<arm>` cells are byte-identical to the Windows artefact (`sweeps/cell-2026-09-15/aligned/g3.json`) on every field of every fleet-size point, and the campaign-wide part-2 counts match exactly (PF 0 / 37 910, Reservation 3 / 30 219, TwoTier 30 / 35 075, Proto 0 / 38 106). Windows took 759 s for four arms on 23 workers |
 | g3_cg | 0 | 562 | 500 runs, five `+CG` arms |
 | g3_cgt | 0 | 563 | 500 runs, five `+CGt` arms |
+| g5 | 0 | 496 | 1 100 runs. Determinism: all 880 four-arm rows identical to the Windows artefact (Windows 719 s) |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -173,6 +174,19 @@ parts to N = 24, campaign part 2 PASS on all ten CG arms (0 of 38 192–
 protected uplink unchanged by CG on every arm (TwoTier 8.5 Mbps at N = 24
 under both). Registered expectation for ConfigSched+CG (§5) — hit.
 Written into `docs/results-cell-2026-09-15.md` §3.5.
+
+### 6.2 G5, plain arms (`aligned/g5.json`, 1 100 runs)
+
+Four arms identical to Windows; `docs/results-cell-2026-09-15.md` §5 gains
+the ConfigSched row. **Scored:** admissible fleet 7 (registered ≤ 8: hit);
+"worse than PF on parts 1–2 at every N" — miss at N = 4–7 (10/10 like PF,
+6–12 ms more age), hit from N = 8 (part 2 2/10, 79 ms). Load knee ×1.1,
+the sharpest of any arm passing at ×1.0 (PF ×1.4) — not registered;
+hypothesis in the results doc (the residual is shared equally in PRBs with
+the best-effort filler, so the camera's above-GFBR offer waits). Edge axis:
+parts 1–2 at every SNR but 10 dB. Not registered and the arm's one clear
+win: PDU-set completeness 0.93–0.95 to N = 24 (PF 0.45, Proto 0.60) —
+frames whole but late, the GFBR floor's doing.
 
 ## 7. After the results: ConfigSched iteration
 
