@@ -225,6 +225,43 @@ Sequencing agreed 2026-09-14: configured grants (Type 2, with the UE-side
 they remove the periodic flows from the dynamic path and change what Tier-2
 has left to order; this design is written after that measurement.
 
+## 8b. Prototype built 2026-09-15 — `sim/baselines/config_sched.py`, arm `ConfigSched`
+
+Built as the section-8a form while the deployed-cell campaign ran, as a
+labelled divergence arm (`ConfigSched`, resolved by `scripts/proto_arms.py`
+through `g11_campaign._arm`; `ConfigSched+CG` works like every other arm).
+Step 1 of section 8, answered in the module docstring:
+
+- **Tier 1** re-solves every 10 ms over a receding 100 ms window, per
+  direction, variables `(r_i, n_i)`: floors `n_i ≥ ceil(W / PDB_i)` (the
+  strong, visit-interval deadline) and `r_i ≥ GFBR_i · W` (or the backlog
+  for a Delay-class flow); budgets `Σ n_i ≤ cap · S_dir` (the M-6 cap over
+  the window's slots of that direction, linear) and `Σ r_i · 8 / se_i ≤
+  PRB · S_dir`; a visit at most a cap-th of a slot so `cap` due units share
+  one. Floors first in priority order, the residual by max-min fairness
+  over demand capped at MFBR · W — greedy, exact on the laminar family.
+  Counters: `floors_unmet`, `visit_budget_bound`, `rate_budget_bound`.
+- **Tier 2** places: EDF on the next due visit (`last_visit + W / n_i`),
+  contracted ahead of best-effort only as a tie-break, an early visit for
+  units not yet due when capacity remains, leftover-only for flows with no
+  share; sized at `bytes_per_visit`, never below `min_rb`; a grant smaller
+  than the visit is a crumb and does not stamp the clock
+  (`crumb_not_counted`); `visits_late` and `visits_late_qfi<n>` count a visit
+  served more than one interval late.
+- **Deliberately absent:** deficit carried across windows, per-role group
+  budgets, an MFBR ceiling beyond the demand cap, and any view of the UE's
+  LCP split (UL service is attributed to the UE's due flows in planned
+  order). Eligibility is the BSR-visible view like every other arm, so the
+  SR/BSR cold-start lock-out is configured grants' to fix, not this arm's —
+  what it removes is the rank.
+
+Measured on the deployed cell (`sim/tests/test_config_sched.py`): a due
+telemetry visit beats a 200 kB best-effort backlog at cap 1 and is not
+served again before its interval; at G3 N = 16 no telemetry visit is late
+while the camera floors do not all fit (16 × 4 Mbps exceeds this cell's
+uplink; `floors_unmet` reports it). Whether that turns into guarantee
+results is the campaign's question; nothing here is registered.
+
 ## 9. Open external inputs
 
 None specific to this work. The SRB capture and TS 22.104's survival-time

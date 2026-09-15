@@ -85,6 +85,11 @@ def _arm(name: str):
         return ProportionalFair(ewma_window_slots=200)
     if name == "Reservation":
         return Reservation(min_rb=5)
+    if name == "ConfigSched":
+        # The configuration-based divergence arm (sim/baselines/config_sched.py,
+        # docs/config-scheduler-handoff.md sec 8a) -- prototype 2026-09-15.
+        from sim.baselines.config_sched import ConfigSched
+        return ConfigSched(min_rb=5)
     return load_two_tier(_TT, min_rb=5)
 
 
