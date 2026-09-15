@@ -54,6 +54,7 @@ Direction = Literal["DL", "UL"]
 # reading that no longer applies here.
 DEFAULT_DL_CAPACITY = 8
 DEFAULT_UL_CAPACITY = 16
+_NO_PIDS: frozenset[int] = frozenset()
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +258,14 @@ class HarqProcessPool:
         # what `test_harq_pending_counters_track_the_scan` exists to catch.
         self._busy_ul: dict[int, int] = {}
         self._busy_dl: dict[tuple[int, int], int] = {}
+        # Build 2b (multi-CG, 2026-09-15): UL process IDs reserved per UE
+        # for configured-grant configurations. TS 38.321 sec 5.4.1 NOTE 5:
+        # a HARQ process is not shared between CG configurations; each
+        # owns `nrofHARQ-Processes` IDs from `harq-ProcID-Offset2`. A
+        # dynamic allocation skips reserved IDs; a CG allocation names its
+        # block (`allocate(pids=...)`). Empty for every UE without a CG, so
+        # the pre-2b path is byte-identical.
+        self._reserved_ul: dict[int, frozenset[int]] = {}
 
     def _capacity(self, direction: Direction) -> int:
         return self.dl_capacity if direction == "DL" else self.ul_capacity
@@ -272,6 +281,18 @@ class HarqProcessPool:
             self._pools[key] = pool
         return pool
 
+    def reserve_ul(self, ue_id: int, pids: tuple[int, ...]) -> None:
+        """Reserve UL process IDs for one CG configuration of this UE
+        (`sim/configured_grant.py` assigns the blocks). Refuses an ID
+        outside the pool or already reserved -- two configurations must
+        never share a process (TS 38.321 sec 5.4.1 NOTE 5)."""
+        block = frozenset(int(p) for p in pids)
+        have = self._reserved_ul.get(ue_id, frozenset())
+        if any(p < 0 or p >= self.ul_capacity for p in block) or (block & have):
+            raise ValueError(f"cannot reserve UL HARQ pids {sorted(block)} for UE {ue_id}: "
+                             f"capacity {self.ul_capacity}, already reserved {sorted(have)}")
+        self._reserved_ul[ue_id] = have | block
+
     def allocate(
         self,
         ue_id: int,
@@ -283,11 +304,17 @@ class HarqProcessPool:
         cce_cost: int = 0,
         snr_used_db: float = math.nan,
         ul_split: list[tuple[int, int]] | None = None,
+        pids: tuple[int, ...] | None = None,
     ) -> HarqProcess | None:
         """Claim a free process for a new TB. ``None`` if every process
-        for this (ue_id, direction) is already busy (harq_exhausted)."""
+        for this (ue_id, direction) is already busy (harq_exhausted).
+        ``pids`` (Build 2b): a CG TB may use only its configuration's
+        reserved IDs; a dynamic TB (``pids=None``) may use any ID that is
+        not reserved. First free ID in pid order either way."""
+        reserved = self._reserved_ul.get(ue_id, _NO_PIDS) if direction == "UL" else _NO_PIDS
         for proc in self._pool(ue_id, direction):
-            if not proc.busy:
+            eligible = (proc.pid in pids) if pids is not None else (proc.pid not in reserved)
+            if not proc.busy and eligible:
                 proc.busy = True
                 proc.qfi = qfi
                 if direction == "UL":

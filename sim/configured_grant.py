@@ -121,6 +121,28 @@ POLICY (the vendor part), stated so a reader can see what was chosen:
     is skipped here (`skipped_harq_pending`) where a real UE would
     transmit on a different HARQ process. Counted, so its size is visible.
 
+MORE THAN ONE CG ON A UE (Build 2b, 2026-09-15). One configuration per
+eligible flow was always the model; what the probe of 2026-09-15 showed is
+that two of them on one robot ALWAYS coincided -- both activated on the
+same first BSR, so both took the same phase, and a period that divides
+the other's (80 and 160 slots) then shares every occasion. Two rules from
+the standard fix that, and both are the gNB's to choose:
+  * PHASE: each configuration's phase is set by the gNB (Type 1
+    `timeDomainOffset`; Type 2 the slot of the activated PUSCH, TS 38.321
+    sec 5.8.2), so an activation is placed on the first uplink slot no
+    other active configuration of the UE ever uses (`_free_phase`, an
+    exact gcd test). Counted as `phase_deferred` / `phase_deferred_slots`;
+    a collision accepted for want of a free phase is `phase_collisions`.
+  * HARQ: each configuration owns a block of `nrof_harq_processes` UL
+    process IDs (`nrofHARQ-Processes` + `harq-ProcID-Offset2`, TS 38.321
+    sec 5.4.1, NOTE 5 no sharing), reserved in `HarqProcessPool` so a
+    dynamic TB never takes them and a CG TB never takes a dynamic one;
+    `dynamic_harq_min` IDs always stay dynamic and a configuration the
+    budget cannot afford is refused (`refused_harq_budget`).
+Neither rule reaches a run with at most one CG per UE: the phase test has
+no `others`, and the pid choice is unobservable (verified byte-identical
+on the 2026-09-15 reference runs).
+
 WHAT THE DRIVER DOES WITH AN OCCASION (`sim/driver.py`, "CG" block):
 the occasion's PRBs enter `Occupancy` whether or not the UE transmits; the
 UE transmits iff a channel the CG may carry has data (the skip rule), and
@@ -183,6 +205,9 @@ class CgConfig:
     header_bytes: int = 8
     size_margin: float = 0.25
     nrof_harq_processes: int = 2
+    #: UL HARQ process IDs a UE keeps for dynamic grants whatever its CG
+    #: count; a configuration that cannot be given its block is refused.
+    dynamic_harq_min: int = 4
     release_after_unused: int = 8
     resize_mcs_delta: int = 2
     k2_slots: int = 2
@@ -210,6 +235,8 @@ class CgOccasion:
     #: The logical channels (qfis) the UE may put in this TB. None = every
     #: channel of the UE (the restriction switch is off).
     allowed_qfis: Optional[tuple[int, ...]]
+    #: This configuration's reserved UL HARQ process IDs (Build 2b).
+    harq_pids: tuple[int, ...] = ()
 
 
 @dataclass
@@ -251,13 +278,22 @@ class _CgState:
     activations: int = 0
     resizes: int = 0
     releases: int = 0
+    # Build 2b: the configuration's UL HARQ process block, and the phase
+    # packing counters (an activation moved off a slot another CG of the
+    # same UE already uses; the slots it moved by; collisions accepted
+    # because no free phase existed within one period).
+    harq_pids: tuple[int, ...] = ()
+    phase_deferred: int = 0
+    phase_deferred_slots: int = 0
+    phase_collisions: int = 0
 
 
 class ConfiguredGrantModel:
     """One CG per eligible uplink flow; see the module docstring for the
     policy and the spec clauses each rule comes from."""
 
-    def __init__(self, flows, grid, cfg: Optional[CgConfig] = None) -> None:
+    def __init__(self, flows, grid, cfg: Optional[CgConfig] = None, *,
+                 ul_harq_capacity: int = 16) -> None:
         self.cfg = cfg or CgConfig()
         self._grid = grid
         self._pattern_len = len(grid.pattern)
@@ -285,6 +321,59 @@ class ConfiguredGrantModel:
         self._by_ue: dict[int, list[_CgState]] = {}
         for st in self._states.values():
             self._by_ue.setdefault(st.ue_id, []).append(st)
+        # Build 2b: one block of `nrof_harq_processes` UL HARQ process IDs
+        # per configuration, taken from the top of the UE's pool so the
+        # low IDs stay dynamic (TS 38.321 sec 5.4.1: `nrofHARQ-Processes`
+        # + `harq-ProcID-Offset2` per configuration, NOTE 5 no sharing).
+        # A configuration the budget cannot afford is refused, not
+        # squeezed: `dynamic_harq_min` IDs always remain for dynamic TBs.
+        self.refused_harq_budget = 0
+        block = max(1, int(self.cfg.nrof_harq_processes))
+        for ue, sts in list(self._by_ue.items()):
+            top, kept = int(ul_harq_capacity), []
+            for st in sts:
+                if top - block < int(self.cfg.dynamic_harq_min):
+                    self.refused_harq_budget += 1
+                    del self._states[(st.ue_id, st.qfi)]
+                    continue
+                st.harq_pids = tuple(range(top - block, top))
+                top -= block
+                kept.append(st)
+            if kept:
+                self._by_ue[ue] = kept
+            else:
+                del self._by_ue[ue]
+
+    def harq_reservations(self) -> list[tuple[int, tuple[int, ...]]]:
+        """(ue_id, pids) per configuration, for `HarqProcessPool.reserve_ul`."""
+        return [(st.ue_id, st.harq_pids) for st in self._states.values()]
+
+    def _free_phase(self, st: _CgState, first: int) -> int:
+        """First uplink slot >= `first` on which none of this UE's other
+        ACTIVE configurations ever has an occasion. Two periodic sequences
+        with periods P and Q and phases a and b share a slot somewhere iff
+        (a - b) % gcd(P, Q) == 0, so the test is exact, not a lookahead.
+        The standard leaves each configuration's phase to the gNB (Type 1
+        `timeDomainOffset`; Type 2 the activated PUSCH, TS 38.321 sec
+        5.8.2), and a UE transmits one PUSCH per slot -- measured before
+        this rule, two CGs on a robot coincided on every occasion because
+        both activated on the same first report. Bounded by one period;
+        if no free phase exists the collision is accepted and counted."""
+        others = [o for o in self._by_ue.get(st.ue_id, ()) if o is not st and o.active]
+        if not others:
+            return first
+        cand = first
+        while cand < first + st.period_slots:
+            if self._grid.slot_grid(cand).ul_symbols > 0 and not any(
+                    (cand - o.next_occasion) % math.gcd(st.period_slots, o.period_slots) == 0
+                    for o in others):
+                if cand != first:
+                    st.phase_deferred += 1
+                    st.phase_deferred_slots += cand - first
+                return cand
+            cand += 1
+        st.phase_collisions += 1
+        return first
 
     # ------------------------------------------------------------ policy
 
@@ -378,6 +467,7 @@ class ConfiguredGrantModel:
                 # symbol count sizes the TB (all occasions share the kind
                 # when the period is pattern-aligned).
                 first = self._next_ul_slot(slot_index + self.cfg.k2_slots)
+                first = self._free_phase(st, first)
                 sym = int(self._grid.slot_grid(first).ul_symbols)
                 st.prbs, st.tbs_bytes, st.mcs = self._size(st, snr, sym)
                 st.snr_used_db = snr
@@ -422,7 +512,7 @@ class ConfiguredGrantModel:
             res.occasions.append(CgOccasion(
                 ue_id=ue, qfi=qfi, prbs=st.prbs, tbs_bytes=st.tbs_bytes,
                 mcs=st.mcs, snr_used_db=st.snr_used_db,
-                allowed_qfis=self.allowed_qfis(ue, qfi)))
+                allowed_qfis=self.allowed_qfis(ue, qfi), harq_pids=st.harq_pids))
         return res
 
     def note_occasion(self, ue_id: int, qfi: int, outcome: str,
@@ -462,14 +552,16 @@ class ConfiguredGrantModel:
         unreachable-mechanism rule)."""
         keys = ("occasions", "used", "skipped_empty", "skipped_harq_pending",
                 "skipped_cg_busy", "invalid_slot", "prb_reserved", "prb_wasted",
-                "bytes_carried", "activations", "resizes", "releases")
+                "bytes_carried", "activations", "resizes", "releases",
+                "phase_deferred", "phase_deferred_slots", "phase_collisions")
         total = {k: sum(getattr(s, k) for s in self._states.values()) for k in keys}
         per_flow = {
             f"ue{s.ue_id}_qfi{s.qfi}": {
                 "period_slots": s.period_slots, "message_bytes": s.message_bytes,
                 "prbs": s.prbs, "tbs_bytes": s.tbs_bytes, "mcs": s.mcs,
-                "active_at_end": s.active,
+                "active_at_end": s.active, "harq_pids": list(s.harq_pids),
                 **{k: getattr(s, k) for k in keys}}
             for s in self._states.values()}
         return {"config": self.cfg.to_dict(), "eligible_flows": len(self._states),
-                "totals": total, "per_flow": per_flow}
+                "totals": total, "per_flow": per_flow,
+                "refused_harq_budget": self.refused_harq_budget}

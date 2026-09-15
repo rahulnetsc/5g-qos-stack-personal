@@ -9,7 +9,8 @@ from .channel import ChannelModel
 from .config import ScenarioConfig
 from .configured_grant import CgConfig, ConfiguredGrantModel
 from scheduler.link import cce_aggregation_level
-from .harq import HarqAwareBufferView, HarqProcessPool, ReducedSlotView, draw_harq_outcome
+from .harq import (DEFAULT_UL_CAPACITY, HarqAwareBufferView, HarqProcessPool, ReducedSlotView,
+                   draw_harq_outcome)
 from .pre_sched import Occupancy
 from .random_access import RandomAccessConfig, RandomAccessModel
 from .join import JoinAwareBufferView, JoinPhase, init_join_rng_streams, init_join_state, rrc_connected, srb_active
@@ -190,7 +191,8 @@ def run(
     if configured_grant is not None:
         cg_cfg = (configured_grant if isinstance(configured_grant, CgConfig)
                   else CgConfig.from_dict(dict(configured_grant)))
-        cg = ConfiguredGrantModel(scenario.flows, grid, cg_cfg)
+        cg = ConfiguredGrantModel(scenario.flows, grid, cg_cfg,
+                                  ul_harq_capacity=DEFAULT_UL_CAPACITY)
     # Build 1: 4-step CBRA (sim/random_access.py). None keeps every path
     # below byte-identical to pre-Build-1; a dict is accepted so a campaign
     # can pass the config through JSON-serialisable driver kwargs (the
@@ -264,6 +266,12 @@ def run(
     # reason DL/UL are separate directions in every other HARQ structure
     # in this module.
     harq_pool = HarqProcessPool()
+    if cg is not None:
+        # Build 2b: each CG configuration's UL HARQ process block is kept
+        # away from dynamic grants (sim/configured_grant.py, "MORE THAN
+        # ONE CG ON A UE").
+        for ue_id_, pids_ in cg.harq_reservations():
+            harq_pool.reserve_ul(ue_id_, pids_)
     harq_rng_dl = np.random.default_rng(scenario.seed ^ 0x48415251)
     harq_rng_ul = np.random.default_rng(scenario.seed ^ 0x48415251 ^ 0xFFFFFFFF)
     harq_rtt_dl = k1_slots + k2_slots
@@ -871,7 +879,7 @@ def run(
                 cg_proc = harq_pool.allocate(
                     occ_.ue_id, "UL", occ_.tbs_bytes, slot_index, qfi=-1,
                     prbs=occ_.prbs, cce_cost=cce_aggregation_level(occ_.snr_used_db),
-                    snr_used_db=occ_.snr_used_db,
+                    snr_used_db=occ_.snr_used_db, pids=occ_.harq_pids,
                 )
                 if cg_proc is None:
                     harq_exhausted_count += 1

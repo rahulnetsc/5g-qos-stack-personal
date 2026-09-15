@@ -151,3 +151,57 @@ def test_off_leaves_no_trace_in_the_summary():
     s = _run(_cell(horizon=2_000), None)
     assert "configured_grant" not in s
     assert "configured_grant" not in s.get("levers", {})
+
+
+# --- Build 2b: more than one CG on a UE -----------------------------------
+
+def _two_cg_cell(n_ues=2, horizon=8_000):
+    """G5's robot (telemetry) plus a second small periodic flow on the same
+    robot, both first reporting in the same slot -- the case the probe of
+    2026-09-15 showed colliding on every robot, every seed."""
+    import dataclasses
+    from scheduler.flow import LCG_UNASSIGNED, FlowConfig
+    from sim.scenarios.g5 import QFI_TELEMETRY as G5_TEL, build_gt31_scenario
+    sc = build_gt31_scenario(seed=1, n_ues=n_ues, horizon_slots=horizon)
+    qfi = max(f.qfi for f in sc.flows) + 1
+    extra = [FlowConfig(ue_id=u, qfi=qfi, direction="UL", flow_class="GBR",
+                        gfbr_bps=200 * 8 * 1000 / 50.0, mfbr_bps=2 * 200 * 8 * 1000 / 50.0,
+                        pdb_ms=50.0, lcg=LCG_UNASSIGNED, traffic_kind="periodic_control",
+                        traffic_params={"period_ms": 50.0, "bytes_per_period": 200})
+             for u in sorted({f.ue_id for f in sc.flows if f.qfi == G5_TEL})]
+    return with_srb(dataclasses.replace(sc, flows=list(sc.flows) + extra)), G5_TEL, qfi
+
+
+def test_two_cgs_on_one_ue_never_share_a_slot_and_own_disjoint_harq_processes():
+    sc, q_tel, q_mon = _two_cg_cell()
+    per_slot: dict[tuple[int, int], int] = {}
+
+    def sink(g):
+        if g.configured and not g.retx_count:
+            per_slot[(g.slot_index, g.ue_id)] = per_slot.get((g.slot_index, g.ue_id), 0) + 1
+    s = _run(sc, {"lcp_restriction": True}, sink)
+    c = s["configured_grant"]
+    assert c["eligible_flows"] == 4                      # 2 UEs x 2 flows
+    assert per_slot and max(per_slot.values()) == 1, "two CG PUSCHs of one UE in one slot"
+    assert c["totals"]["phase_deferred"] >= 2, "the second CG was not moved to a free phase"
+    assert c["totals"]["phase_collisions"] == 0
+    assert c["refused_harq_budget"] == 0
+    for ue in (1, 2):
+        a = tuple(c["per_flow"][f"ue{ue}_qfi{q_tel}"]["harq_pids"])
+        b = tuple(c["per_flow"][f"ue{ue}_qfi{q_mon}"]["harq_pids"])
+        assert a and b and not set(a) & set(b), (a, b)
+
+
+def test_dynamic_grants_stay_off_the_reserved_harq_processes():
+    from sim.harq import HarqProcessPool
+    pool = HarqProcessPool(ul_capacity=16)
+    pool.reserve_ul(1, (14, 15))
+    dyn = [pool.allocate(1, "UL", 100, 5) for _ in range(14)]
+    assert all(p is not None for p in dyn) and {p.pid for p in dyn} == set(range(14))
+    assert pool.allocate(1, "UL", 100, 5) is None            # the dynamic side is exhausted
+    assert pool.allocate(1, "UL", 100, 5, pids=(14, 15)).pid == 14
+    assert pool.allocate(1, "UL", 100, 5, pids=(14, 15)).pid == 15
+    assert pool.allocate(1, "UL", 100, 5, pids=(14, 15)) is None   # cg_busy
+    with pytest.raises(ValueError):
+        pool.reserve_ul(1, (15, 16))                          # overlap and out of range
+    assert pool.allocate(2, "UL", 100, 5).pid == 0             # another UE: nothing reserved
