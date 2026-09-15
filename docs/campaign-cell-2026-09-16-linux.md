@@ -105,6 +105,7 @@ and anything that needed a fix.
 | g1 | 0 | 887 | 1 600 runs. Determinism: all 16 four-arm cells identical to Windows (Windows 1 198 s) |
 | g1_cg | 0 | 1 807 | 3 200 runs. CG changes nothing on G1 (downlink instrument); 0 breaches on every CG arm |
 | g2 | 0 | 1 143 | 2 700 runs, 183 000 STOP events. No Windows artefact. Campaign miss-rate 2.2e-2 (previous cell 3.1e-3) — a cell effect on every arm |
+| g2_cg | 0 | 2 390 | 5 400 runs. CG changes nothing on G2 (downlink); every arm within ±15 % of plain |
 
 ## 5. Expectations registered before the artefacts are read
 

@@ -28,8 +28,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `aligned/g1.json` (Windows: 1 280, 1 198 s; identical on the four arms) | 1 600 | 887 s | done |
 | `cg/g1_cg.json` | 3 200 | 1 807 s | done |
 | `aligned/g2.json` | 2 700 | 1 143 s | done |
-| `cg/g2_cg.json` | | | running |
-| `aligned/g6.json`, `cg/g6_cg.json` | | | pending |
+| `cg/g2_cg.json` | 5 400 | 2 390 s | done |
+| `aligned/g6.json`, `cg/g6_cg.json` | | | running |
 | `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
 | `aligned/g9.json`, `cg/g9_cg.json` | | | pending |
 | `aligned/g12.json`, `cg/g12_cg.json` | | | pending |
@@ -284,6 +284,20 @@ timer cannot serve a bearer whose PDB is shorter than the timer — the
 prototype's one-change fix is to treat a contracted flow with backlog and
 no plan as due now; the v2 formulation has no between-re-solve state to
 be caught in.
+
+### 2.5 With configured grants (`cg/g2_cg.json`, 5 400 runs)
+
+**Nothing moves beyond seed noise.** Whole-campaign misses per arm, plain
+→ `+CG` / `+CGt`: PF 216 → 252 / 248 at cap 4 and 748 → 806 / 712 at
+cap 2; Reservation 203 → 187 / 200 and 251 → 269 / 302; TwoTier 219 →
+195 / 199 and 247 → 298 / 266; ProtoRRageD2 211 → 209 / 183 and 263 →
+265 / 257; ConfigSched 224 → 229 / 230 and 1 390 → 1 398 / 1 288. Every
+difference is within the ±15 % the cap-2 STOP-8 cell alone shows between
+seeds; the fleet-axis shape at cap 2 (PF's rise to ~290 at N = 16, the
+deadline-tier arms flat at 17–31, ConfigSched's 55 → 335) is the plain
+one on every CG arm. As on G1: a downlink instrument, an uplink
+mechanism, and the HARQ draw-order coupling is the only route between
+them.
 
 ## 3. G3 — "Can the network make a healthy robot look dead?"
 
