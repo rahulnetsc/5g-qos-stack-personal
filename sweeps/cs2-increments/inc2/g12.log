@@ -1,0 +1,8 @@
+40 ramp sweeps x 11 points = 440 driver runs (2 tie-break arms x 2 cells x 1 arms x 10 seeds)
+  0 banked, 40 to run
+    ... 10/40 (22s)
+    ... 20/40 (23s)
+    ... 30/40 (25s)
+    ... 40/40 (35s)
+
+wrote sweeps/cs2-increments/inc2/aligned/g12.json  (35s, 40 sweeps)

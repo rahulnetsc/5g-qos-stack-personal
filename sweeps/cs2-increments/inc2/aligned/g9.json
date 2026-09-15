@@ -1,0 +1,4432 @@
+{
+  "_axis": [
+    [
+      3,
+      0.5
+    ],
+    [
+      4,
+      0.75
+    ],
+    [
+      5,
+      1.0
+    ],
+    [
+      6,
+      1.25
+    ],
+    [
+      7,
+      1.5
+    ],
+    [
+      8,
+      2.0
+    ]
+  ],
+  "_seeds": 10,
+  "_intervals": 1.0,
+  "_cap": 4,
+  "_neighbour_epsilon_ms": [
+    0.5,
+    1.0,
+    2.0,
+    5.0
+  ],
+  "_wall_s": 83.6,
+  "_n_runs": 360,
+  "_mean_wall_s_per_run": 6.71,
+  "unseeded/warm/n3_cm0.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.5203,
+        "lo": -0.7713999999999999,
+        "hi": 2.3833999999999995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 34.8
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.5203,
+        "lo": -0.7713999999999999,
+        "hi": 2.3833999999999995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 34.8
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.5203,
+        "lo": -0.7713999999999999,
+        "hi": 2.3833999999999995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 34.8
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.5203,
+        "lo": -0.7713999999999999,
+        "hi": 2.3833999999999995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 34.8
+    }
+  },
+  "unseeded/warm/n4_cm0.75/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010125000000000078,
+      "nb_dp98_ci": {
+        "point": 0.23079999999999998,
+        "lo": -0.2968999999999998,
+        "hi": 0.8093,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 44.5
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010125000000000078,
+      "nb_dp98_ci": {
+        "point": 0.23079999999999998,
+        "lo": -0.2968999999999998,
+        "hi": 0.8093,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 44.5
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010125000000000078,
+      "nb_dp98_ci": {
+        "point": 0.23079999999999998,
+        "lo": -0.2968999999999998,
+        "hi": 0.8093,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 44.5
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010125000000000078,
+      "nb_dp98_ci": {
+        "point": 0.23079999999999998,
+        "lo": -0.2968999999999998,
+        "hi": 0.8093,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 44.5
+    }
+  },
+  "unseeded/warm/n5_cm1/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.016125000000000028,
+      "nb_dp98_ci": {
+        "point": 3.2,
+        "lo": -7.05,
+        "hi": 12.851249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 55.4
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.016125000000000028,
+      "nb_dp98_ci": {
+        "point": 3.2,
+        "lo": -7.05,
+        "hi": 12.851249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 55.4
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.016125000000000028,
+      "nb_dp98_ci": {
+        "point": 3.2,
+        "lo": -7.05,
+        "hi": 12.851249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 55.4
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.016125000000000028,
+      "nb_dp98_ci": {
+        "point": 3.2,
+        "lo": -7.05,
+        "hi": 12.851249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 55.4
+    }
+  },
+  "unseeded/warm/n6_cm1.25/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.331250000000001,
+      "attach_p50_s": 0.026125000000000065,
+      "nb_dp98_ci": {
+        "point": 0.6,
+        "lo": -0.65,
+        "hi": 1.8,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 60.1
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.331250000000001,
+      "attach_p50_s": 0.026125000000000065,
+      "nb_dp98_ci": {
+        "point": 0.6,
+        "lo": -0.65,
+        "hi": 1.8,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 60.1
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.331250000000001,
+      "attach_p50_s": 0.026125000000000065,
+      "nb_dp98_ci": {
+        "point": 0.6,
+        "lo": -0.65,
+        "hi": 1.8,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 60.1
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.331250000000001,
+      "attach_p50_s": 0.026125000000000065,
+      "nb_dp98_ci": {
+        "point": 0.6,
+        "lo": -0.65,
+        "hi": 1.8,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 60.1
+    }
+  },
+  "unseeded/warm/n7_cm1.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.07812499999999989,
+      "nb_dp98_ci": {
+        "point": -6.945200000000004,
+        "lo": -9.471959999999997,
+        "hi": -4.424927500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 75.1
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.07812499999999989,
+      "nb_dp98_ci": {
+        "point": -6.945200000000004,
+        "lo": -9.471959999999997,
+        "hi": -4.424927500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 75.1
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.07812499999999989,
+      "nb_dp98_ci": {
+        "point": -6.945200000000004,
+        "lo": -9.471959999999997,
+        "hi": -4.424927500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 75.1
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.07812499999999989,
+      "nb_dp98_ci": {
+        "point": -6.945200000000004,
+        "lo": -9.471959999999997,
+        "hi": -4.424927500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 75.1
+    }
+  },
+  "unseeded/warm/n8_cm2/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.09262499999999993,
+      "nb_dp98_ci": {
+        "point": -0.07390000000000044,
+        "lo": -0.24252249999998995,
+        "hi": 0.13560749999999647,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 84.0
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.09262499999999993,
+      "nb_dp98_ci": {
+        "point": -0.07390000000000044,
+        "lo": -0.24252249999998995,
+        "hi": 0.13560749999999647,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 84.0
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.09262499999999993,
+      "nb_dp98_ci": {
+        "point": -0.07390000000000044,
+        "lo": -0.24252249999998995,
+        "hi": 0.13560749999999647,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 84.0
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.09262499999999993,
+      "nb_dp98_ci": {
+        "point": -0.07390000000000044,
+        "lo": -0.24252249999998995,
+        "hi": 0.13560749999999647,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 84.0
+    }
+  },
+  "unseeded/cold/n3_cm0.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.10124999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0804999999999999,
+      "nb_dp98_ci": {
+        "point": 0.2396000000000001,
+        "lo": -0.2678299999999995,
+        "hi": 0.9248999999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 33.8
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.10124999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0804999999999999,
+      "nb_dp98_ci": {
+        "point": 0.2396000000000001,
+        "lo": -0.2678299999999995,
+        "hi": 0.9248999999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 33.8
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.10124999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0804999999999999,
+      "nb_dp98_ci": {
+        "point": 0.2396000000000001,
+        "lo": -0.2678299999999995,
+        "hi": 0.9248999999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 33.8
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.10124999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0804999999999999,
+      "nb_dp98_ci": {
+        "point": 0.2396000000000001,
+        "lo": -0.2678299999999995,
+        "hi": 0.9248999999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 33.8
+    }
+  },
+  "unseeded/cold/n4_cm0.75/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.11374999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08299999999999974,
+      "nb_dp98_ci": {
+        "point": -0.29460000000000014,
+        "lo": -1.693175,
+        "hi": 0.8822999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 42.8
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.11374999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08299999999999974,
+      "nb_dp98_ci": {
+        "point": -0.29460000000000014,
+        "lo": -1.693175,
+        "hi": 0.8822999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 42.8
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 0.11374999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08299999999999974,
+      "nb_dp98_ci": {
+        "point": -0.29460000000000014,
+        "lo": -1.693175,
+        "hi": 0.8822999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 42.8
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.11374999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08299999999999974,
+      "nb_dp98_ci": {
+        "point": -0.29460000000000014,
+        "lo": -1.693175,
+        "hi": 0.8822999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 42.8
+    }
+  },
+  "unseeded/cold/n5_cm1/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.16924999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08800000000000008,
+      "nb_dp98_ci": {
+        "point": 0.45,
+        "lo": -11.75,
+        "hi": 11.201249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.6
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.16924999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08800000000000008,
+      "nb_dp98_ci": {
+        "point": 0.45,
+        "lo": -11.75,
+        "hi": 11.201249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.6
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.16924999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08800000000000008,
+      "nb_dp98_ci": {
+        "point": 0.45,
+        "lo": -11.75,
+        "hi": 11.201249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.6
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.16924999999999996,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08800000000000008,
+      "nb_dp98_ci": {
+        "point": 0.45,
+        "lo": -11.75,
+        "hi": 11.201249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.6
+    }
+  },
+  "unseeded/cold/n6_cm1.25/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.23724999999999996,
+      "stable_cell_p50_s": 4.181,
+      "attach_p50_s": 0.12800000000000006,
+      "nb_dp98_ci": {
+        "point": -0.15,
+        "lo": -1.0,
+        "hi": 0.6,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 64.8
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.23724999999999996,
+      "stable_cell_p50_s": 4.181,
+      "attach_p50_s": 0.12800000000000006,
+      "nb_dp98_ci": {
+        "point": -0.15,
+        "lo": -1.0,
+        "hi": 0.6,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 64.8
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.23724999999999996,
+      "stable_cell_p50_s": 4.181,
+      "attach_p50_s": 0.12800000000000006,
+      "nb_dp98_ci": {
+        "point": -0.15,
+        "lo": -1.0,
+        "hi": 0.6,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 64.8
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.23724999999999996,
+      "stable_cell_p50_s": 4.181,
+      "attach_p50_s": 0.12800000000000006,
+      "nb_dp98_ci": {
+        "point": -0.15,
+        "lo": -1.0,
+        "hi": 0.6,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 64.8
+    }
+  },
+  "unseeded/cold/n7_cm1.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.7344999999999999,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.238,
+      "nb_dp98_ci": {
+        "point": -27.2337,
+        "lo": -33.5492525,
+        "hi": -19.90669,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 71.6
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.7344999999999999,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.238,
+      "nb_dp98_ci": {
+        "point": -27.2337,
+        "lo": -33.5492525,
+        "hi": -19.90669,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 71.6
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.7344999999999999,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.238,
+      "nb_dp98_ci": {
+        "point": -27.2337,
+        "lo": -33.5492525,
+        "hi": -19.90669,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 71.6
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.7344999999999999,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.238,
+      "nb_dp98_ci": {
+        "point": -27.2337,
+        "lo": -33.5492525,
+        "hi": -19.90669,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 71.6
+    }
+  },
+  "unseeded/cold/n8_cm2/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 5,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.512,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.1905000000000001,
+      "nb_dp98_ci": {
+        "point": -0.18940000000000623,
+        "lo": -0.5097125000000089,
+        "hi": 0.12204249999999388,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 359,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 24
+      },
+      "wall_s_total": 83.0
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 5,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.512,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.1905000000000001,
+      "nb_dp98_ci": {
+        "point": -0.18940000000000623,
+        "lo": -0.5097125000000089,
+        "hi": 0.12204249999999388,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 359,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 24
+      },
+      "wall_s_total": 83.0
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 5,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.512,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.1905000000000001,
+      "nb_dp98_ci": {
+        "point": -0.18940000000000623,
+        "lo": -0.5097125000000089,
+        "hi": 0.12204249999999388,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 359,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 24
+      },
+      "wall_s_total": 83.0
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 5,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.512,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.1905000000000001,
+      "nb_dp98_ci": {
+        "point": -0.18940000000000623,
+        "lo": -0.5097125000000089,
+        "hi": 0.12204249999999388,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 359,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 24
+      },
+      "wall_s_total": 83.0
+    }
+  },
+  "unseeded/rlf/n3_cm0.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.03775,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.08,
+      "nb_dp98_ci": {
+        "point": 0.13000000000000006,
+        "lo": -0.7875624999999999,
+        "hi": 0.9032224999999999,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 52.9
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.03775,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.08,
+      "nb_dp98_ci": {
+        "point": 0.13000000000000006,
+        "lo": -0.7875624999999999,
+        "hi": 0.9032224999999999,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 52.9
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.03775,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.08,
+      "nb_dp98_ci": {
+        "point": 0.13000000000000006,
+        "lo": -0.7875624999999999,
+        "hi": 0.9032224999999999,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 52.9
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.03775,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.08,
+      "nb_dp98_ci": {
+        "point": 0.13000000000000006,
+        "lo": -0.7875624999999999,
+        "hi": 0.9032224999999999,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 52.9
+    }
+  },
+  "unseeded/rlf/n4_cm0.75/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0430000000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1185,
+      "nb_dp98_ci": {
+        "point": -0.7143999999999998,
+        "lo": -1.9030924999999999,
+        "hi": 0.3582574999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 66.2
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.0430000000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1185,
+      "nb_dp98_ci": {
+        "point": -0.7143999999999998,
+        "lo": -1.9030924999999999,
+        "hi": 0.3582574999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 66.2
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.0430000000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1185,
+      "nb_dp98_ci": {
+        "point": -0.7143999999999998,
+        "lo": -1.9030924999999999,
+        "hi": 0.3582574999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 66.2
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.0430000000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1185,
+      "nb_dp98_ci": {
+        "point": -0.7143999999999998,
+        "lo": -1.9030924999999999,
+        "hi": 0.3582574999999998,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 66.2
+    }
+  },
+  "unseeded/rlf/n5_cm1/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0462500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1834999999999996,
+      "nb_dp98_ci": {
+        "point": -3.75,
+        "lo": -10.60125,
+        "hi": 3.1,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 80.2
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0462500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1834999999999996,
+      "nb_dp98_ci": {
+        "point": -3.75,
+        "lo": -10.60125,
+        "hi": 3.1,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 80.2
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.0462500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1834999999999996,
+      "nb_dp98_ci": {
+        "point": -3.75,
+        "lo": -10.60125,
+        "hi": 3.1,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 80.2
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.0462500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1834999999999996,
+      "nb_dp98_ci": {
+        "point": -3.75,
+        "lo": -10.60125,
+        "hi": 3.1,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 80.2
+    }
+  },
+  "unseeded/rlf/n6_cm1.25/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.0535,
+      "stable_cell_p50_s": 4.4517500000000005,
+      "attach_p50_s": 1.416,
+      "nb_dp98_ci": {
+        "point": -0.4,
+        "lo": -1.45125,
+        "hi": 0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 94.2
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.0535,
+      "stable_cell_p50_s": 4.4517500000000005,
+      "attach_p50_s": 1.416,
+      "nb_dp98_ci": {
+        "point": -0.4,
+        "lo": -1.45125,
+        "hi": 0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 94.2
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.0535,
+      "stable_cell_p50_s": 4.4517500000000005,
+      "attach_p50_s": 1.416,
+      "nb_dp98_ci": {
+        "point": -0.4,
+        "lo": -1.45125,
+        "hi": 0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 94.2
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.0535,
+      "stable_cell_p50_s": 4.4517500000000005,
+      "attach_p50_s": 1.416,
+      "nb_dp98_ci": {
+        "point": -0.4,
+        "lo": -1.45125,
+        "hi": 0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 94.2
+    }
+  },
+  "unseeded/rlf/n7_cm1.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 1.06975,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -5.4498000000000015,
+        "lo": -9.011382500000005,
+        "hi": -2.030362500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 113.9
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.06975,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -5.4498000000000015,
+        "lo": -9.011382500000005,
+        "hi": -2.030362500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 113.9
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.06975,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -5.4498000000000015,
+        "lo": -9.011382500000005,
+        "hi": -2.030362500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 113.9
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.06975,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -5.4498000000000015,
+        "lo": -9.011382500000005,
+        "hi": -2.030362500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 113.9
+    }
+  },
+  "unseeded/rlf/n8_cm2/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 8,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 2.15125,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.72225,
+      "nb_dp98_ci": {
+        "point": 0.03479999999999848,
+        "lo": -0.13350250000000066,
+        "hi": 0.22751999999999772,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 122.0
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 8,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 2.15125,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.72225,
+      "nb_dp98_ci": {
+        "point": 0.03479999999999848,
+        "lo": -0.13350250000000066,
+        "hi": 0.22751999999999772,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 122.0
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 8,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 2.15125,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.72225,
+      "nb_dp98_ci": {
+        "point": 0.03479999999999848,
+        "lo": -0.13350250000000066,
+        "hi": 0.22751999999999772,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 122.0
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 8,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 2.15125,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.72225,
+      "nb_dp98_ci": {
+        "point": 0.03479999999999848,
+        "lo": -0.13350250000000066,
+        "hi": 0.22751999999999772,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 122.0
+    }
+  },
+  "seeded/warm/n3_cm0.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.18419999999999986,
+        "lo": -0.6154400000000004,
+        "hi": 1.0705999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 35.5
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.18419999999999986,
+        "lo": -0.6154400000000004,
+        "hi": 1.0705999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 35.5
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.18419999999999986,
+        "lo": -0.6154400000000004,
+        "hi": 1.0705999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 35.5
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.006500000000000061,
+      "nb_dp98_ci": {
+        "point": 0.18419999999999986,
+        "lo": -0.6154400000000004,
+        "hi": 1.0705999999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 35.5
+    }
+  },
+  "seeded/warm/n4_cm0.75/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010625000000000218,
+      "nb_dp98_ci": {
+        "point": 1.7769,
+        "lo": -0.1,
+        "hi": 5.3269,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 43.7
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010625000000000218,
+      "nb_dp98_ci": {
+        "point": 1.7769,
+        "lo": -0.1,
+        "hi": 5.3269,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 43.7
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010625000000000218,
+      "nb_dp98_ci": {
+        "point": 1.7769,
+        "lo": -0.1,
+        "hi": 5.3269,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 43.7
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.010625000000000218,
+      "nb_dp98_ci": {
+        "point": 1.7769,
+        "lo": -0.1,
+        "hi": 5.3269,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 43.7
+    }
+  },
+  "seeded/warm/n5_cm1/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.01799999999999985,
+      "nb_dp98_ci": {
+        "point": 1.45,
+        "lo": -7.05,
+        "hi": 10.55,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 53.5
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.01799999999999985,
+      "nb_dp98_ci": {
+        "point": 1.45,
+        "lo": -7.05,
+        "hi": 10.55,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 53.5
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.01799999999999985,
+      "nb_dp98_ci": {
+        "point": 1.45,
+        "lo": -7.05,
+        "hi": 10.55,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 53.5
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.01799999999999985,
+      "nb_dp98_ci": {
+        "point": 1.45,
+        "lo": -7.05,
+        "hi": 10.55,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 53.5
+    }
+  },
+  "seeded/warm/n6_cm1.25/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.4785,
+      "attach_p50_s": 0.024875000000000036,
+      "nb_dp98_ci": {
+        "point": -0.1,
+        "lo": -1.6,
+        "hi": 1.35,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 64.6
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.4785,
+      "attach_p50_s": 0.024875000000000036,
+      "nb_dp98_ci": {
+        "point": -0.1,
+        "lo": -1.6,
+        "hi": 1.35,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 64.6
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.4785,
+      "attach_p50_s": 0.024875000000000036,
+      "nb_dp98_ci": {
+        "point": -0.1,
+        "lo": -1.6,
+        "hi": 1.35,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 64.6
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.0,
+      "stable_cell_p50_s": 4.4785,
+      "attach_p50_s": 0.024875000000000036,
+      "nb_dp98_ci": {
+        "point": -0.1,
+        "lo": -1.6,
+        "hi": 1.35,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 64.6
+    }
+  },
+  "seeded/warm/n7_cm1.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.08862500000000015,
+      "nb_dp98_ci": {
+        "point": -7.9359000000000055,
+        "lo": -11.589925000000008,
+        "hi": -4.4399225000000095,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 69.9
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.08862500000000015,
+      "nb_dp98_ci": {
+        "point": -7.9359000000000055,
+        "lo": -11.589925000000008,
+        "hi": -4.4399225000000095,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 69.9
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.08862500000000015,
+      "nb_dp98_ci": {
+        "point": -7.9359000000000055,
+        "lo": -11.589925000000008,
+        "hi": -4.4399225000000095,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 69.9
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.03150000000000003,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.08862500000000015,
+      "nb_dp98_ci": {
+        "point": -7.9359000000000055,
+        "lo": -11.589925000000008,
+        "hi": -4.4399225000000095,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 69.9
+    }
+  },
+  "seeded/warm/n8_cm2/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.0951249999999999,
+      "nb_dp98_ci": {
+        "point": -0.0906000000000006,
+        "lo": -0.25870500000000174,
+        "hi": 0.0705174999999984,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 82.8
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.0951249999999999,
+      "nb_dp98_ci": {
+        "point": -0.0906000000000006,
+        "lo": -0.25870500000000174,
+        "hi": 0.0705174999999984,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 82.8
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.0951249999999999,
+      "nb_dp98_ci": {
+        "point": -0.0906000000000006,
+        "lo": -0.25870500000000174,
+        "hi": 0.0705174999999984,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 82.8
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.039500000000000035,
+      "stable_cell_p50_s": 4.4995,
+      "attach_p50_s": 0.0951249999999999,
+      "nb_dp98_ci": {
+        "point": -0.0906000000000006,
+        "lo": -0.25870500000000174,
+        "hi": 0.0705174999999984,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 0,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 0,
+        "srb_dialogues_completed": 0
+      },
+      "wall_s_total": 82.8
+    }
+  },
+  "seeded/cold/n3_cm0.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.10149999999999992,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.07674999999999987,
+      "nb_dp98_ci": {
+        "point": 0.3259,
+        "lo": -0.5893999999999998,
+        "hi": 1.2451199999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 35.9
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 0.10149999999999992,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.07674999999999987,
+      "nb_dp98_ci": {
+        "point": 0.3259,
+        "lo": -0.5893999999999998,
+        "hi": 1.2451199999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 35.9
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.10149999999999992,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.07674999999999987,
+      "nb_dp98_ci": {
+        "point": 0.3259,
+        "lo": -0.5893999999999998,
+        "hi": 1.2451199999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 35.9
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.10149999999999992,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.07674999999999987,
+      "nb_dp98_ci": {
+        "point": 0.3259,
+        "lo": -0.5893999999999998,
+        "hi": 1.2451199999999996,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 35.9
+    }
+  },
+  "seeded/cold/n4_cm0.75/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.10199999999999998,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0779999999999999,
+      "nb_dp98_ci": {
+        "point": -0.5834000000000004,
+        "lo": -1.8116950000000005,
+        "hi": 0.4107999999999997,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 44.0
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 0.10199999999999998,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0779999999999999,
+      "nb_dp98_ci": {
+        "point": -0.5834000000000004,
+        "lo": -1.8116950000000005,
+        "hi": 0.4107999999999997,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 44.0
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.10199999999999998,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0779999999999999,
+      "nb_dp98_ci": {
+        "point": -0.5834000000000004,
+        "lo": -1.8116950000000005,
+        "hi": 0.4107999999999997,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 44.0
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.10199999999999998,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.0779999999999999,
+      "nb_dp98_ci": {
+        "point": -0.5834000000000004,
+        "lo": -1.8116950000000005,
+        "hi": 0.4107999999999997,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 44.0
+    }
+  },
+  "seeded/cold/n5_cm1/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.12649999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08549999999999969,
+      "nb_dp98_ci": {
+        "point": 3.65,
+        "lo": -7.3,
+        "hi": 14.351249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.5
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.12649999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08549999999999969,
+      "nb_dp98_ci": {
+        "point": 3.65,
+        "lo": -7.3,
+        "hi": 14.351249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.5
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.12649999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08549999999999969,
+      "nb_dp98_ci": {
+        "point": 3.65,
+        "lo": -7.3,
+        "hi": 14.351249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.5
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 0.12649999999999995,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 0.08549999999999969,
+      "nb_dp98_ci": {
+        "point": 3.65,
+        "lo": -7.3,
+        "hi": 14.351249999999993,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 54.5
+    }
+  },
+  "seeded/cold/n6_cm1.25/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.22149999999999992,
+      "stable_cell_p50_s": 4.116,
+      "attach_p50_s": 0.12675000000000008,
+      "nb_dp98_ci": {
+        "point": 0.0,
+        "lo": -0.7,
+        "hi": 0.65,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 61.3
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.22149999999999992,
+      "stable_cell_p50_s": 4.116,
+      "attach_p50_s": 0.12675000000000008,
+      "nb_dp98_ci": {
+        "point": 0.0,
+        "lo": -0.7,
+        "hi": 0.65,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 61.3
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.22149999999999992,
+      "stable_cell_p50_s": 4.116,
+      "attach_p50_s": 0.12675000000000008,
+      "nb_dp98_ci": {
+        "point": 0.0,
+        "lo": -0.7,
+        "hi": 0.65,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 61.3
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 7,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.22149999999999992,
+      "stable_cell_p50_s": 4.116,
+      "attach_p50_s": 0.12675000000000008,
+      "nb_dp98_ci": {
+        "point": 0.0,
+        "lo": -0.7,
+        "hi": 0.65,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 700,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
+      },
+      "wall_s_total": 61.3
+    }
+  },
+  "seeded/cold/n7_cm1.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.6815,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.25125000000000003,
+      "nb_dp98_ci": {
+        "point": -28.402600000000007,
+        "lo": -33.5473025,
+        "hi": -22.535657500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 672,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 48
+      },
+      "wall_s_total": 75.7
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.6815,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.25125000000000003,
+      "nb_dp98_ci": {
+        "point": -28.402600000000007,
+        "lo": -33.5473025,
+        "hi": -22.535657500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 672,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 48
+      },
+      "wall_s_total": 75.7
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.6815,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.25125000000000003,
+      "nb_dp98_ci": {
+        "point": -28.402600000000007,
+        "lo": -33.5473025,
+        "hi": -22.535657500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 672,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 48
+      },
+      "wall_s_total": 75.7
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.6815,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 0.25125000000000003,
+      "nb_dp98_ci": {
+        "point": -28.402600000000007,
+        "lo": -33.5473025,
+        "hi": -22.535657500000003,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 672,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 48
+      },
+      "wall_s_total": 75.7
+    }
+  },
+  "seeded/cold/n8_cm2/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 6,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.3295,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.094875,
+      "nb_dp98_ci": {
+        "point": -0.31080000000000607,
+        "lo": -0.6226550000000028,
+        "hi": -0.051570000000007804,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 348,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 4,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 22
+      },
+      "wall_s_total": 78.9
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 6,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.3295,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.094875,
+      "nb_dp98_ci": {
+        "point": -0.31080000000000607,
+        "lo": -0.6226550000000028,
+        "hi": -0.051570000000007804,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 348,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 4,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 22
+      },
+      "wall_s_total": 78.9
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 6,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.3295,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.094875,
+      "nb_dp98_ci": {
+        "point": -0.31080000000000607,
+        "lo": -0.6226550000000028,
+        "hi": -0.051570000000007804,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 348,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 4,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 22
+      },
+      "wall_s_total": 78.9
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 6,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.3295,
+      "stable_cell_p50_s": 4.2995,
+      "attach_p50_s": 1.094875,
+      "nb_dp98_ci": {
+        "point": -0.31080000000000607,
+        "lo": -0.6226550000000028,
+        "hi": -0.051570000000007804,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 348,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 4,
+        "srb_dialogues_started": 26,
+        "srb_dialogues_completed": 22
+      },
+      "wall_s_total": 78.9
+    }
+  },
+  "seeded/rlf/n3_cm0.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.0372500000000002,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.0812499999999998,
+      "nb_dp98_ci": {
+        "point": 0.12429999999999986,
+        "lo": -0.7216800000000008,
+        "hi": 0.8688349999999988,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 55.3
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.0372500000000002,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.0812499999999998,
+      "nb_dp98_ci": {
+        "point": 0.12429999999999986,
+        "lo": -0.7216800000000008,
+        "hi": 0.8688349999999988,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 55.3
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.0372500000000002,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.0812499999999998,
+      "nb_dp98_ci": {
+        "point": 0.12429999999999986,
+        "lo": -0.7216800000000008,
+        "hi": 0.8688349999999988,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 55.3
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.0372500000000002,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.0812499999999998,
+      "nb_dp98_ci": {
+        "point": 0.12429999999999986,
+        "lo": -0.7216800000000008,
+        "hi": 0.8688349999999988,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 55.3
+    }
+  },
+  "seeded/rlf/n4_cm0.75/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.0385,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1135000000000002,
+      "nb_dp98_ci": {
+        "point": -0.9079,
+        "lo": -2.0090700000000004,
+        "hi": 0.08814999999999976,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 67.1
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.0385,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1135000000000002,
+      "nb_dp98_ci": {
+        "point": -0.9079,
+        "lo": -2.0090700000000004,
+        "hi": 0.08814999999999976,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 67.1
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.0385,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1135000000000002,
+      "nb_dp98_ci": {
+        "point": -0.9079,
+        "lo": -2.0090700000000004,
+        "hi": 0.08814999999999976,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 67.1
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.0385,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1135000000000002,
+      "nb_dp98_ci": {
+        "point": -0.9079,
+        "lo": -2.0090700000000004,
+        "hi": 0.08814999999999976,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 67.1
+    }
+  },
+  "seeded/rlf/n5_cm1/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 1.0422500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1550000000000002,
+      "nb_dp98_ci": {
+        "point": -1.4,
+        "lo": -11.051250000000001,
+        "hi": 8.95,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 82.8
+    },
+    "eps1ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 1.0422500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1550000000000002,
+      "nb_dp98_ci": {
+        "point": -1.4,
+        "lo": -11.051250000000001,
+        "hi": 8.95,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 82.8
+    },
+    "eps2ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 1.0422500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1550000000000002,
+      "nb_dp98_ci": {
+        "point": -1.4,
+        "lo": -11.051250000000001,
+        "hi": 8.95,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 82.8
+    },
+    "eps5ms": {
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.0422500000000001,
+      "stable_cell_p50_s": 0.0,
+      "attach_p50_s": 1.1550000000000002,
+      "nb_dp98_ci": {
+        "point": -1.4,
+        "lo": -11.051250000000001,
+        "hi": 8.95,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 2,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 82.8
+    }
+  },
+  "seeded/rlf/n6_cm1.25/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.0477500000000002,
+      "stable_cell_p50_s": 4.433,
+      "attach_p50_s": 1.38225,
+      "nb_dp98_ci": {
+        "point": -1.85,
+        "lo": -3.15,
+        "hi": -0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 91.9
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.0477500000000002,
+      "stable_cell_p50_s": 4.433,
+      "attach_p50_s": 1.38225,
+      "nb_dp98_ci": {
+        "point": -1.85,
+        "lo": -3.15,
+        "hi": -0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 91.9
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.0477500000000002,
+      "stable_cell_p50_s": 4.433,
+      "attach_p50_s": 1.38225,
+      "nb_dp98_ci": {
+        "point": -1.85,
+        "lo": -3.15,
+        "hi": -0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 91.9
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 9,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.0477500000000002,
+      "stable_cell_p50_s": 4.433,
+      "attach_p50_s": 1.38225,
+      "nb_dp98_ci": {
+        "point": -1.85,
+        "lo": -3.15,
+        "hi": -0.7,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 91.9
+    }
+  },
+  "seeded/rlf/n7_cm1.5/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 1.0505,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -3.9723999999999933,
+        "lo": -6.545794999999991,
+        "hi": -1.64995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 97.5
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0505,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -3.9723999999999933,
+        "lo": -6.545794999999991,
+        "hi": -1.64995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 97.5
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.0505,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -3.9723999999999933,
+        "lo": -6.545794999999991,
+        "hi": -1.64995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 97.5
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 10,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.0505,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": null,
+      "nb_dp98_ci": {
+        "point": -3.9723999999999933,
+        "lo": -6.545794999999991,
+        "hi": -1.64995,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 97.5
+    }
+  },
+  "seeded/rlf/n8_cm2/ConfigSched2": {
+    "eps0.5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 7,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 2.09875,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.8635,
+      "nb_dp98_ci": {
+        "point": 0.011099999999999,
+        "lo": -0.15802000000000122,
+        "hi": 0.218112500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 85.8
+    },
+    "eps1ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 7,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 2.09875,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.8635,
+      "nb_dp98_ci": {
+        "point": 0.011099999999999,
+        "lo": -0.15802000000000122,
+        "hi": 0.218112500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 85.8
+    },
+    "eps2ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 7,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 2.09875,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.8635,
+      "nb_dp98_ci": {
+        "point": 0.011099999999999,
+        "lo": -0.15802000000000122,
+        "hi": 0.218112500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 85.8
+    },
+    "eps5ms": {
+      "outcome": "CELL ALREADY BROKEN",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 10,
+      "catastrophic_seeds": 7,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 2.09875,
+      "stable_cell_p50_s": 4.495,
+      "attach_p50_s": 2.8635,
+      "nb_dp98_ci": {
+        "point": 0.011099999999999,
+        "lo": -0.15802000000000122,
+        "hi": 0.218112500000004,
+        "n": 10
+      },
+      "checks_total": {
+        "sched_inactive_fired": 0,
+        "srb_floor_fired": 0,
+        "cp_floor_fired": 0,
+        "has_srb_decisive": 0,
+        "srb_steps": 30,
+        "ra_failed": 0,
+        "ra_active_at_end": 0,
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
+      },
+      "wall_s_total": 85.8
+    }
+  }
+}
