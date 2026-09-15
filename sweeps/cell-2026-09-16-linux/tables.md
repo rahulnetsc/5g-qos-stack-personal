@@ -303,3 +303,57 @@ offered: 2.10× MFBR achieved
 
 runs: 1600  horizon 20000  driven robots 2  PDB 95.0  gap bound 200.0
 
+## G2 tables
+
+**campaign:** 3972 missed of 183000 STOP events; miss-rate 2.17e-02; 95 % upper bound 2.23e-02 (Clopper-Pearson upper)
+
+**per arm and cap, whole campaign** — missed / STOP events, worst delivered STOP latency (ms)
+
+| arm | cap 4 missed/events | cap 4 worst ms | cap 2 missed/events | cap 2 worst ms |
+|---|---|---|---|---|
+| PF | 216/18300 | 5.50 | 748/18300 | 5.50 |
+| Reservation | 203/18300 | 5.50 | 251/18300 | 5.50 |
+| TwoTier | 219/18300 | 5.50 | 247/18300 | 5.50 |
+| ProtoRRageD2 | 211/18300 | 5.50 | 263/18300 | 5.50 |
+| ConfigSched | 224/18300 | 5.50 | 1390/18300 | 5.50 |
+
+**cap 4, simultaneous-STOP axis (N = 12)** — missed / STOP events
+
+| arm | 1 | 2 | 4 | 8 |
+|---|---|---|---|---|
+| PF | 3/300 | 3/600 | 13/1200 | 33/2400 |
+| Reservation | 5/300 | 3/600 | 14/1200 | 34/2400 |
+| TwoTier | 2/300 | 7/600 | 13/1200 | 37/2400 |
+| ProtoRRageD2 | 1/300 | 3/600 | 18/1200 | 36/2400 |
+| ConfigSched | 3/300 | 3/600 | 18/1200 | 34/2400 |
+
+**cap 4, fleet axis (STOP = 2)** — missed / STOP events
+
+| arm | 4 | 6 | 7 | 8 | 12 | 16 |
+|---|---|---|---|---|---|---|
+| PF | 26/2400 | 27/2400 | 29/2400 | 23/2400 | 19/2400 | 43/2400 |
+| Reservation | 22/2400 | 35/2400 | 22/2400 | 24/2400 | 16/2400 | 31/2400 |
+| TwoTier | 34/2400 | 34/2400 | 28/2400 | 24/2400 | 27/2400 | 20/2400 |
+| ProtoRRageD2 | 26/2400 | 23/2400 | 34/2400 | 23/2400 | 18/2400 | 32/2400 |
+| ConfigSched | 32/2400 | 20/2400 | 19/2400 | 30/2400 | 23/2400 | 45/2400 |
+
+**cap 2, simultaneous-STOP axis (N = 12)** — missed / STOP events
+
+| arm | 1 | 2 | 4 | 8 |
+|---|---|---|---|---|
+| PF | 16/300 | 28/600 | 72/1200 | 176/2400 |
+| Reservation | 4/300 | 2/600 | 14/1200 | 109/2400 |
+| TwoTier | 5/300 | 5/600 | 16/1200 | 87/2400 |
+| ProtoRRageD2 | 2/300 | 4/600 | 12/1200 | 106/2400 |
+| ConfigSched | 22/300 | 78/600 | 124/1200 | 318/2400 |
+
+**cap 2, fleet axis (STOP = 2)** — missed / STOP events
+
+| arm | 4 | 6 | 7 | 8 | 12 | 16 |
+|---|---|---|---|---|---|---|
+| PF | 32/2400 | 29/2400 | 28/2400 | 33/2400 | 109/2400 | 253/2400 |
+| Reservation | 25/2400 | 25/2400 | 20/2400 | 16/2400 | 19/2400 | 19/2400 |
+| TwoTier | 29/2400 | 20/2400 | 23/2400 | 19/2400 | 23/2400 | 25/2400 |
+| ProtoRRageD2 | 21/2400 | 22/2400 | 29/2400 | 26/2400 | 14/2400 | 31/2400 |
+| ConfigSched | 58/2400 | 72/2400 | 114/2400 | 130/2400 | 295/2400 | 257/2400 |
+

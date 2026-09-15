@@ -104,6 +104,7 @@ and anything that needed a fix.
 | g10_cg | 0 | 269 | 900 runs. Reservation+CG: never-granted 94 → 0, admissible 4 → 8 |
 | g1 | 0 | 887 | 1 600 runs. Determinism: all 16 four-arm cells identical to Windows (Windows 1 198 s) |
 | g1_cg | 0 | 1 807 | 3 200 runs. CG changes nothing on G1 (downlink instrument); 0 breaches on every CG arm |
+| g2 | 0 | 1 143 | 2 700 runs, 183 000 STOP events. No Windows artefact. Campaign miss-rate 2.2e-2 (previous cell 3.1e-3) — a cell effect on every arm |
 
 ## 5. Expectations registered before the artefacts are read
 
@@ -248,12 +249,23 @@ plan is granted within 1 slot (cap 4) or ≤ 3 slots (cap 2), all inside the
 PDB. The expiries are the arrivals that have **no plan**: a STOP arriving
 between Tier-1 re-solves is class "no share", sorts after every planned
 unit, and the DL flood's planned visit takes the slot's PRBs first; the
-next re-solve is up to 10 ms away. Cap 4: 10 of 11 expiries are no-plan
-arrivals; cap 2: 32 of 34. This is the registered mechanism (§5, G1/G2)
-seen directly; the expectation is unchanged and will be scored on the
-artefact. The one-change fix for the prototype is obvious (a contracted
-flow with backlog and no plan is due now, not leftover); v2 has no
-between-re-solve state to be caught in.
+next re-solve is up to 10 ms away. Cap 2: 32 of 34 expiries are no-plan
+arrivals. **Correction after the artefact:** the probe also reported 11
+expiries at cap 4, but the artefact shows ConfigSched at parity with every
+arm at cap 4 (224 vs 203–224 campaign-wide; 3/600 vs 3/600 in the probed
+cell), so the probe's expiry detector over-counts — a HARQ-masked gap in
+the flow's reported backlog (TB pending, then a retry) reads as an
+expiry to it. What the probe measures reliably is the *state at arrival*;
+its expiry counts are not quotable. The one-change fix for the prototype
+stands (a contracted flow with backlog and no plan is due now, not
+leftover); v2 has no between-re-solve state to be caught in.
+
+**Scored (artefact):** ConfigSched cap 2 1 390 misses (PF 748, deadline
+arms 247–263) — the registered cap-2 loss, **hit**; cap 4 at parity
+(224), the registered "no misses the deadline arms do not have except
+where more STOPs than DCIs are due" — **hit**. Every arm's cap-4 misses
+are ~10× the previous cell's (BLER² vs BLER³ reading, hypothesis in the
+results doc). Written into `docs/results-cell-2026-09-15.md` §2.
 
 ## 7. After the results: ConfigSched iteration
 

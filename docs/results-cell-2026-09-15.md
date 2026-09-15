@@ -27,7 +27,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `aligned/g10.json`, `cg/g10.json` | 450, 900 | 134 s, 269 s | done |
 | `aligned/g1.json` (Windows: 1 280, 1 198 s; identical on the four arms) | 1 600 | 887 s | done |
 | `cg/g1_cg.json` | 3 200 | 1 807 s | done |
-| `aligned/g2.json`, `cg/g2_cg.json` | | | running |
+| `aligned/g2.json` | 2 700 | 1 143 s | done |
+| `cg/g2_cg.json` | | | running |
 | `aligned/g6.json`, `cg/g6_cg.json` | | | pending |
 | `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
 | `aligned/g9.json`, `cg/g9_cg.json` | | | pending |
@@ -181,7 +182,100 @@ could reach the downlink is through the HARQ draw-order coupling
 
 ## 2. G2 — "The master disconnects: does every robot stop in time?"
 
-*pending.*
+### 2.1 The experiment
+GT-1.2, *emergency STOP under saturation*: a scripted STOP (40 B on DL 5QI
+85, PDB 5 ms) is sent to `n_stop` robots in the same slot, 30 trials per
+run; the last robot saturates both directions with 5QI 9; every other
+robot runs its committed profile. A miss is a STOP not delivered whole
+within the bound (a late STOP is discarded at its PDB and never enters a
+latency statistic). Unchanged from the previous campaign except for the
+cell.
+
+### 2.2 Tests run
+Sub-experiment A: `n_stop` ∈ {1, 2, 4, 8} at N = 12; B: N ∈ {4 … 16} at
+`n_stop` = 2, each at four load levels; caps 4 and 2; 10 seeds, 20 000
+slots. `scripts/g2_stress.py --fixed-n 12 --fixed-stop 2 --caps 4,2`,
+2 700 runs, 183 000 STOP events.
+
+### 2.3 Results
+
+**Campaign:** 3 972 missed of 183 000 STOP events; miss-rate 2.17 × 10⁻²,
+95 % upper bound 2.23 × 10⁻² (previous cell 451 of 146 400, 3.08 × 10⁻³).
+Every delivered STOP arrived within 5.50 ms on every arm — nothing is late,
+things are missing.
+
+**Missed / STOP events, whole campaign per arm** (previous cell in brackets)
+
+| arm | cap 4 | cap 2 |
+|---|---|---|
+| PF | 216 / 18 300 (45) | **748** / 18 300 (219) |
+| Reservation | 203 (28) | 251 (49) |
+| TwoTier | 219 (20) | 247 (28) |
+| ProtoRRageD2 | 211 (16) | 263 (46) |
+| ConfigSched | 224 | **1 390** |
+
+**Simultaneous-STOP axis at N = 12 (missed / events)**
+
+| arm | cap 4: 1 | 2 | 4 | 8 | · | cap 2: 1 | 2 | 4 | 8 |
+|---|---|---|---|---|---|---|---|---|---|
+| PF | 3/300 | 3/600 | 13/1200 | 33/2400 | · | 16/300 | 28/600 | 72/1200 | 176/2400 |
+| Reservation | 5/300 | 3/600 | 14/1200 | 34/2400 | · | 4/300 | 2/600 | 14/1200 | 109/2400 |
+| TwoTier | 2/300 | 7/600 | 13/1200 | 37/2400 | · | 5/300 | 5/600 | 16/1200 | 87/2400 |
+| ProtoRRageD2 | 1/300 | 3/600 | 18/1200 | 36/2400 | · | 2/300 | 4/600 | 12/1200 | 106/2400 |
+| ConfigSched | 3/300 | 3/600 | 18/1200 | 34/2400 | · | **22**/300 | **78**/600 | **124**/1200 | **318**/2400 |
+
+**Fleet axis at STOP = 2, cap 2 (missed / events; 4 loads × 10 seeds per cell)**
+
+| arm | N=4 | 6 | 7 | 8 | 12 | 16 |
+|---|---|---|---|---|---|---|
+| PF | 32/2400 | 29/2400 | 28/2400 | 33/2400 | 109/2400 | **253**/2400 |
+| Reservation | 25 | 25 | 20 | 16 | 19 | 19 |
+| TwoTier | 29 | 20 | 23 | 19 | 23 | 25 |
+| ProtoRRageD2 | 21 | 22 | 29 | 26 | 14 | 31 |
+| ConfigSched | **58** | **72** | **114** | **130** | **295** | **257** |
+
+At cap 4 the fleet axis is flat on every arm, ConfigSched included (16–45
+of 2 400 per cell).
+
+### 2.4 Conclusion
+**G2 fails its clause on every arm, and the cell raised the floor ten-fold
+for all of them.** At cap 4 the four arms that were 16–45 misses apart on
+the previous cell sit within 203–224 of each other here, so the extra
+misses are the cell's, not a scheduler's. The reading that fits the
+numbers: a STOP's 5 ms budget is 10 slots of 0.5 ms with six DL-capable
+slots on `DDSUU`, room for **one** HARQ retry, where the previous cell's
+20 slots of 0.25 ms held two; with a 10 % BLER target the miss floor is
+then BLER² ≈ 1.0 % (measured 1.1–1.2 % at cap 4) instead of BLER³ ≈
+0.1 % (measured 0.09–0.25 %). **Arithmetic consistency, not a trace** —
+`scripts/g2_stress.py` records `bytes_dropped_pdb` per run and the
+HARQ-outcome counters would settle it.
+
+**What decides beyond the floor is the same as before.** Misses rise with
+`n_stop` on every arm, steeply at cap 2 where two DCIs serve eight STOPs;
+and on PF alone, fleet size at cap 2: 32 → 253 per 2 400 across the axis
+while the three arms with a DL deadline tier stay at 14–31. The
+flood-robot demotion (`docs/flood-robot-demotion-2026-09-09.md`) survives
+the cell change unchanged: PF's single-term key demotes the robot that
+just received the download, and its STOP with it. `ProtoRRageD2` is
+TwoTier here to within seed noise, as it should be.
+
+**ConfigSched fails G2 at cap 2, worse than any arm** — 1 390 misses
+campaign-wide, 1.9× PF's and 5.5× the deadline-tier arms', on both axes
+(22/300 with a single STOP, 318/2 400 with eight; 58 → 295 across the
+fleet axis) — and is at parity with the others at cap 4 (224; the
+simultaneous-STOP cells within 1–5 of PF's). The registered expectation
+was exactly this split (a cap-2 loss; the cap-4 cells with more STOPs
+than DCIs at parity) and it is a **hit**. The mechanism, seen directly on
+one seed before the artefact was read (`docs/campaign-cell-2026-09-16-linux.md`
+§6.6): a STOP that arrives between two Tier-1 re-solves has **no plan**,
+sorts after every planned unit, and at cap 2 the slot's two DCIs go to
+the flood's and the fleet's planned visits; the next re-solve is up to
+10 ms away and the STOP's budget is 5. At cap 4 a fourth DCI is free and
+the same STOP is placed from the leftover. A plan that is re-solved on a
+timer cannot serve a bearer whose PDB is shorter than the timer — the
+prototype's one-change fix is to treat a contracted flow with backlog and
+no plan as due now; the v2 formulation has no between-re-solve state to
+be caught in.
 
 ## 3. G3 — "Can the network make a healthy robot look dead?"
 
