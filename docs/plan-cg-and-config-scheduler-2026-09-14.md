@@ -124,7 +124,11 @@ TSCAI / UE traffic info replace the CG period detector; multi-slot CG with
 UTO-UCI (Rel-18) is the CG for video; the Delay Status Report (Rel-18) and
 PDU-set deadlines (PSDB) are Tier-2 inputs; per-LCH SR configurations
 (Rel-15) are the cheapest next measurement; DL SPS is the only lever on
-G2's DCI count.
+G2's DCI count. **Re-scoped 2026-09-15 to the Rel-16 baseline**
+(`docs/rel16-baseline-2026-09-15.md` §4.3): multi-slot CG, the Delay Status
+Report and PDU-set deadlines are out on the UE side; the camera CG's
+Rel-16 form is several staggered configurations with dynamic top-up, and
+Tier-2's uplink deadline stays the LCG-clock inference.
 
 ## 3. Still owed before either can be promoted
 G8 needs a scenario, a per-role statistic and a defined load level. The

@@ -92,7 +92,10 @@ class UeLcp:
         same flows in strict priority order, ignoring buckets. Returns
         [(qfi, bytes), ...].
 
-        Checked against TS 38.321 V18.10.0 sec 5.4.3.1.3 (2026-09-14): the
+        Checked against TS 38.321 V18.10.0 sec 5.4.3.1.3 (2026-09-14) and
+        against V16.22.0 (2026-09-15, the Rel-16 compliance baseline --
+        the procedure is unchanged between the editions, only the MAC CE
+        priority list grew): the
         two rounds, the `Bj > 0` gate on round 1, PBR = infinity serving all
         data, and round 2 "regardless of the value of Bj" all match. ONE
         stated deviation: the spec serves a whole MAC SDU in round 1 even

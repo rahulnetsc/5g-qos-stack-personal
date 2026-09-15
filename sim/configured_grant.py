@@ -22,14 +22,14 @@ for `scheduler/`).
 
 WHAT THE STANDARD FIXES (transcribed, cited) AND WHAT IS VENDOR.
 
-  * TS 38.321 V18.10.0 sec 5.8.2: Type 2's grant is provided by PDCCH
+  * TS 38.321 V16.22.0 / V18.10.0 sec 5.8.2: Type 2's grant is provided by PDCCH
     (activation / deactivation DCI, CS-RNTI) and stored as a configured
     uplink grant; RRC configures `periodicity`, `nrofHARQ-Processes` and
     `configuredGrantTimer`; the Nth occasion recurs every `periodicity`.
-  * TS 38.331 V18.10.0 `ConfiguredGrantConfig.periodicity`: the allowed
+  * TS 38.331 V16.22.0 / V18.10.0 `ConfiguredGrantConfig.periodicity`: the allowed
     set per subcarrier spacing is transcribed below in
     `CG_PERIODICITY_N_BY_SCS_KHZ` -- never recalled, never derived.
-  * TS 38.214 V18.10.0 sec 6.1.2.3: for Type 2 the time/frequency
+  * TS 38.214 V16.17.0 / V18.10.0 sec 6.1.2.3: for Type 2 the time/frequency
     allocation and MCS come from the activation DCI; the occasion is a
     PUSCH like any other (same MCS/TBS determination).
   * TS 38.321 sec 5.4.3.1.3: a configured uplink grant whose MAC PDU would
@@ -136,7 +136,8 @@ per message, 75 % of them empty and 79 % of the reserved PRBs unused
 (measured 2026-09-15, G5 N = 6), with a wait of up to one period for each
 message. The standard's answer is to TELL the gNB the pattern: TSCAI from
 the core at QoS-flow setup (burst arrival time, periodicity -- TS 38.300
-sec 16.8.1), or Rel-18 UE traffic info (`ul-TrafficInfo`, TS 38.331). With
+sec 16.8.1, a Rel-16 NGAP input), or Rel-18 UE traffic info (`ul-TrafficInfo`,
+TS 38.331 -- NOT available from a Rel-16 UE, so only the core route counts). With
 `traffic_descriptor` on, a flow that declares a single periodic pattern
 (`sim/traffic.py` periodic_control / condition_monitor: period, phase under
 a sync_group, jitter clip) gets
@@ -160,6 +161,19 @@ is CONDITIONAL on the deployment -- free5GC's SMF and the OAI gNB carry no
 TSCAI today, and the OAI UE reports no traffic info -- which is why it is
 its own label rather than the `+CG` default: `+CG` is what an OAI + free5GC
 system could do now, `+CGt` what a core that sends TSCAI would allow.
+
+REL-16 BASELINE (2026-09-15). The OAI gNB and the COTS UE are Rel-16, so
+every UE-side rule this module relies on was re-read in TS 38.321 V16.22.0,
+38.331 V16.22.0 and 38.214 V16.17.0 by clause diff against the V18 editions
+cited above (`docs/rel16-baseline-2026-09-15.md` sec 2): Type 2 activation
+and release, `periodicityExt`, `allowedCG-List`, `harq-ProcID-Offset2` and
+one process block per configuration (sec 5.4.1 NOTE 5), the SR-suppression
+conditions of sec 5.4.5 and the phase-per-configuration recurrence of sec
+5.8.2 are all Rel-16. What is NOT: multi-PUSCH CG (`nrofSlotsInCG-Period`),
+UTO-UCI, `intraCG-Prioritization`, the refined BSR table, the Delay Status
+Report. Rel-16 bounds that cap this module's knobs: `nrof_harq_processes`
+<= 16 per UE in total, `repK` <= 8, `configuredGrantTimer` <= 64 periods,
+12 configurations per BWP.
 
 MORE THAN ONE CG ON A UE (Build 2b, 2026-09-15). One configuration per
 eligible flow was always the model; what the probe of 2026-09-15 showed is
@@ -211,8 +225,8 @@ __all__ = ["CgConfig", "CgOccasion", "CgSlotResult", "ConfiguredGrantModel",
            "CG_PERIODICITY_N_BY_SCS_KHZ", "CG_PERIODICITY_EXT_MAX_BY_SCS_KHZ",
            "cg_periodicities_slots"]
 
-#: TS 38.331 V18.10.0, `ConfiguredGrantConfig` field description,
-#: "periodicity": "The following periodicities are supported depending on
+#: TS 38.331 V16.22.0 (identical in V18.10.0), `ConfiguredGrantConfig` field
+#: description, "periodicity": "The following periodicities are supported depending on
 #: the configured subcarrier spacing [symbols]" -- the `n` of `n*14`
 #: symbols (one slot is 14 symbols with normal CP), transcribed from the
 #: spec text. The 2- and 7-symbol entries are sub-slot and are not
@@ -225,7 +239,8 @@ CG_PERIODICITY_N_BY_SCS_KHZ: dict[int, tuple[int, ...]] = {
 }
 
 
-#: TS 38.331 V18.10.0, `ConfiguredGrantConfig` field description,
+#: TS 38.331 V16.22.0 (identical bounds in V18.10.0 up to 120 kHz),
+#: `ConfiguredGrantConfig` field description,
 #: "periodicityExt": "used to calculate the periodicity for UL transmission
 #: without UL grant for type 1 and type 2 ... 15 kHz: periodicityExt*14,
 #: where periodicityExt has a value between 1 and 640. 30 kHz: ... 1 and
@@ -263,7 +278,7 @@ class CgConfig:
     resize_mcs_delta: int = 2
     k2_slots: int = 2
     #: Build 2d: take period and phase from the flow's DECLARED traffic
-    #: pattern -- what TSCAI (TS 38.300 sec 16.8.1) or Rel-18 UE traffic
+    #: pattern -- what TSCAI (TS 38.300 sec 16.8.1, Rel-16) or Rel-18 UE traffic
     #: info would tell the gNB -- instead of the PDB rule. Conditional on
     #: the deployment (free5GC / OAI carry neither today): arm label `+CGt`.
     traffic_descriptor: bool = False

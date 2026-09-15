@@ -21,6 +21,13 @@ here generally (so it isn't dead code and can be swept), but at the real
 deployed default it is a no-op -- see `docs/oai-port-map.md`'s worked trace
 for a suppression example using an explicit non-zero illustrative value.
 
+Rel-16 note (2026-09-15, `docs/rel16-baseline-2026-09-15.md` sec 4.2): TS
+38.331 V16.22.0 `SchedulingRequestResourceConfig` allows an SR period of 10
+slots at 30 kHz (the deployed cell: numerology 1, 106 PRB per the
+calibration log) but NOT at 60 kHz (the guarantee scenarios' numerology 2),
+where Rel-16 offers 8, 16 or 20 slots and 10 arrives only with Rel-17.
+Recorded, not changed: the default below moves every run, and the deployed
+value is not in the vendored files or the log.
 SR periodicity (`sr_period_slots`) has no ground truth anywhere -- not in
 the calibration banner, not in either vendored or live OAI repo's config
 for this deployment. It's a first-class parameter here, swept explicitly

@@ -6,6 +6,13 @@ says what a mechanism would do, never what the deployed product does. The
 deployed C has none of them (CLAUDE.md: SPS/CG were deferred to a Phase 2
 that was never built; `grep` results per item in §4).
 
+**Re-scoped 2026-09-15 — Rel-16 is the compliance baseline** for the OAI
+gNB and the COTS UE. Rows whose `rel.` column reads 17 or 18 are UE-side
+features the deployment cannot use (B1, C1, C2, C3, A2, A3, the Rel-17
+half of D3); gNB-internal ideas survive regardless of release. The verdict
+per row and the clause-by-clause delta between the editions are in
+`docs/rel16-baseline-2026-09-15.md` §3 and §2.
+
 **Question asked:** configured grants were invisible from the default
 dynamic-grant path and turned out to fix every uplink liveness failure
 (`docs/results-cg-2026-09-14.md`). What else in the standard is like that?
@@ -346,6 +353,12 @@ either way from these files.
 ---
 
 ## 5. What this changes in the agreed plan
+
+> **Re-scoped 2026-09-15** (`docs/rel16-baseline-2026-09-15.md` §4.3): item 2
+> (multi-slot CG with UTO-UCI) and the DSR / PDU-set halves of item 3 are
+> Rel-18 UE features and are out; the camera CG's Rel-16 form is several
+> staggered single-occasion configurations with dynamic top-up, and the
+> uplink deadline stays an inference from the LCG clock.
 
 1. **CG allocator (plan §1.3):** TSCAI (A1) and UE traffic info (A2) become
    the primary source of period, size and phase; the BSR-interval detector

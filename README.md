@@ -1627,6 +1627,18 @@ these five, add a new tag rather than forcing it into an existing one.
   `docs/plan-cg-and-config-scheduler-2026-09-14.md`; baseline it is measured
   against: `docs/results-aligned-2026-09-14.md`.
 
+- `[DECIDED 2026-09-15 — Rel-16 is the compliance baseline]` **The OAI gNB
+  and the COTS UE are Rel-16.** UE-side behaviour is taken from the Rel-16
+  editions in `docs/Rel 16/` and cited there; a gNB-internal idea may
+  follow a later release if it needs nothing from the UE. The
+  clause-by-clause delta from the Rel-18 editions read on 2026-09-14, the
+  re-scoped survey and the plan changes are in
+  `docs/rel16-baseline-2026-09-15.md`. Everything built on 2026-09-14/15
+  (restricted CG Type 2, `+CGt`, per-configuration HARQ blocks and
+  phases, per-channel masking) is inside Rel-16; UTO-UCI, multi-slot CG,
+  the Delay Status Report, the refined BSR table, PDU sets and UE traffic
+  info are out for the UE.
+
 ## 9. Repository layout (this branch)
 
 ```

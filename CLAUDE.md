@@ -139,15 +139,21 @@ bare `python` invocation that works.
   the pre-alignment record with a banner pointing there.
   `docs/plan-cg-and-config-scheduler-2026-09-14.md` is the agreed forward
   plan: configured grants (Type 2) first, the configuration scheduler after.
-- `docs/ts_138{212,214,300,321,331}*.pdf` — 3GPP Rel-18 specs (multiplexing
-  & coding, PHY data procedures, overall description, MAC, RRC), added
-  2026-09-14 as the fidelity references. **Spec-derived behaviour is read
-  from these, never recalled**: extract text with
+- `docs/ts_138{212,213,214,300,321,331}*.pdf` — the 3GPP **Rel-18** editions,
+  and `docs/Rel 16/ts_138*.pdf` — the **Rel-16** editions (added 2026-09-15).
+  **Rel-16 is the compliance baseline: the OAI gNB and the COTS UE are
+  Rel-16.** Anything the UE must do is taken from the Rel-16 text and cited
+  there; a gNB-internal idea may come from a later release if it needs
+  nothing from the UE. `docs/rel16-baseline-2026-09-15.md` is the
+  clause-by-clause delta between the editions for every clause the model
+  relies on, with the verdict per survey row. **Spec-derived behaviour is
+  read from these, never recalled**: extract text with
   `uv run --with pypdf python` (no poppler on this box; the Read tool cannot
-  render them) and cite the clause. Checked so far: TS 38.214 §6.1.2.1 (K2)
-  against the retry alignment; TS 38.321 §5.4.3.1 against `sim/ue_lcp.py`.
-  TS 38.213 (K1 / PUCCH timing, slot-direction rule §11.1) and TS 38.322
-  (RLC segmentation) are not in the set yet.
+  render them), diff editions with `scripts/spec_clause_diff.py`, and cite
+  the clause AND the edition. Checked so far: TS 38.214 §6.1.2.1 (K2)
+  against the retry alignment; TS 38.321 §5.4.3.1 against `sim/ue_lcp.py`;
+  the CG, LCP, SR, BSR, SPS and TSC clauses against both editions
+  (2026-09-15). TS 38.322 (RLC segmentation) is in neither set.
 
 ## Non-obvious invariants
 
@@ -305,7 +311,11 @@ pattern (TSCAI / UE traffic info), conditional on a core that sends it —
 free5GC and the OAI gNB do not — so `+CG` stays the PDB rule. `+CG` runs
 are byte-identical across 2b and moved by 2c (the 3 % of occasions the
 per-UE mask used to skip); reference dumps and diffs are in the commit
-messages.
+messages. **All three are inside Rel-16** (`docs/rel16-baseline-2026-09-15.md`
+§4.1); the Rel-18 UE features the survey named — UTO-UCI, multi-slot CG,
+the Delay Status Report, the refined BSR table, PDU sets, UE traffic
+info — are out for the UE, and the camera CG's Rel-16 form is several
+staggered configurations with dynamic top-up.
 **Measured (`docs/results-cg-2026-09-14.md`): restricted CG takes G3 to
 10/10 at every fleet size on every arm and fixes TwoTier's G7 clause 1;
 UNRESTRICTED CG breaks G5 on every arm** (frame age +30–50 ms, PF's
