@@ -230,9 +230,13 @@ G12. Written into `docs/results-cell-2026-09-15.md` §9.
 Four arms identical to Windows. ConfigSched: 0 breaches at both caps and
 both axes (registered "no misses" — hit), but the slowest arm at cap 2:
 10.5 ms median at N = 4 (PF 3.5, deadline arms 3.0–3.5), 20.5 at N = 24,
-flat 10.5–13 across the load axis. Hypothesis (not traced): a fixed timer
-— the 10 ms re-solve — rather than contention, since it does not scale
-with N or load and appears at N = 4. To trace before the v2 build.
+flat 10.5–13 across the load axis. First hypothesis (a fixed timer, the
+10 ms re-solve) **refuted by a one-seed probe**: the wait is spent
+*early* (922 of 924 slots) because the plan gives a 50 ms source one visit
+per 100 ms window (`⌈W/PDB⌉`), and early units sort by next-due, where
+the 20-slot fleet-DL flows always win; at cap 2 the two DCIs go to them
+(514 of 831) or the firmware download takes the PRBs first (317). The v2
+rules L7 (interval below the period) and table placement are the fix.
 Written into `docs/results-cell-2026-09-15.md` §1.
 
 ## 7. After the results: ConfigSched iteration

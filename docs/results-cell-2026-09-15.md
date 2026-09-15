@@ -149,12 +149,23 @@ cap 2**: 10.5 ms median already at N = 4 (three times PF's 3.5, and
 everyone else's), rising to 20.5 ms at N = 24, with the same 10.5–13 ms at
 every load level. Registered: a cap-2 loss was expected where more robots
 are due than the slot has DCIs; but N = 4 with two driven robots is not
-that case, and the value is flat across fleet size and load. That shape
-points at a fixed timer in the arm rather than contention — the 10 ms
-Tier-1 re-solve period is the obvious candidate (a `cmd_vel` message that
-arrives with its flow "early" waits for the next plan or the next free
-DCI) — **stated as a hypothesis, not traced**. At cap 4 it is 3.5–6.0 ms
-to N = 16 and 10.5 at N = 24, between PF and the deadline-tier arms.
+that case, and the value is flat across fleet size and load. **Traced on
+one seed (N = 4, cap 2, 20 000 slots, scratch probe):** the flow's
+wait-to-grant is p98 13 slots (6.5 ms) at cap 2 against 2 slots at cap 4,
+and in 922 of 924 waiting slots the flow's class is *early*, not due. The
+plan gives `cmd_vel` **one visit per 100 ms window** (`⌈W / PDB⌉` with
+PDB 100 ms; 200 B, interval 200 slots) for a source that sends every
+50 ms, so every second message arrives with the flow not due. Early units
+are ordered by next-due slot, and the fleet-DL flows (interval 20 slots)
+are always due sooner, so at cap 2 the slot's two DCIs go to early
+fleet-DL visits (514 of 831 blocked slots: "0 due of 2 placed") or the
+firmware download, placed ahead, takes the PRBs (317: "cap not full, not
+placed"). The 10 ms re-solve period, the first guess, plays no part. Two
+of the v2 formulation's rules address exactly this — L7's visit interval
+below the message period, and placement by table rather than by a
+next-due order in which a long-interval flow always sorts last. At cap 4
+it is 3.5–6.0 ms to N = 16 and 10.5 at N = 24, between PF and the
+deadline-tier arms.
 
 ## 2. G2 — "The master disconnects: does every robot stop in time?"
 
