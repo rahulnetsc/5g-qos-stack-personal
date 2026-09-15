@@ -29,7 +29,8 @@ every field, so the two runs are quoted interchangeably for those arms; the
 | `cg/g1_cg.json` | 3 200 | 1 807 s | done |
 | `aligned/g2.json` | 2 700 | 1 143 s | done |
 | `cg/g2_cg.json` | 5 400 | 2 390 s | done |
-| `aligned/g6.json`, `cg/g6_cg.json` | | | running |
+| `aligned/g6.json` | 1 350 | 477 s | done |
+| `cg/g6_cg.json` | | | running |
 | `aligned/g4.json` (all fifteen arm names in one file) | | | pending |
 | `aligned/g9.json`, `cg/g9_cg.json` | | | pending |
 | `aligned/g12.json`, `cg/g12_cg.json` | | | pending |
@@ -603,7 +604,80 @@ previous cell. ConfigSched's registered "G5 unchanged by CG" — hit.
 
 ## 6. G6 — "Background traffic can never impair the fleet"
 
-*pending.*
+### 6.1 The experiment
+GT-4.1/4.2, *isolation from a non-GBR flood*: the G1, G3 and G5
+instruments are each run with no flood, an uplink 5QI-9 flood and a
+downlink one, at N ∈ {4, 7, 12}, and every instrument statistic is
+compared **within seed** against its own no-flood run. Unchanged from the
+previous campaign except for the cell.
+
+### 6.2 Tests run
+Part A: the statistic stays within its own bound under the flood. Part B:
+it shifts by no more than +20 % in the direction of harm (absolute for
+zero-baseline counts). 3 instruments × 3 fleet sizes × 10 seeds ×
+statistics = 270 paired deltas per arm and direction. 2 s (4 000 slots),
+cap 4. `scripts/g6_isolation.py`, 1 350 runs plain.
+
+### 6.3 Results
+
+**Pass counts over 270 paired deltas per arm and direction — part A / part B** (previous cell in brackets)
+
+| arm | UL flood | DL flood |
+|---|---|---|
+| PF | 229 / 255 (259 / 251) | 222 / 240 (261 / 250) |
+| Reservation | 204 / 227 (225 / 241) | 204 / 233 (233 / 246) |
+| TwoTier | **143 / 182** (176 / 176) | 175 / 225 (207 / 233) |
+| ProtoRRageD2 | **240 / 256** (255 / 258) | **238 / 253** (257 / 246) |
+| ConfigSched | 225 / 254 | 229 / 255 |
+
+**UL flood, per statistic (part A / part B of 30)**
+
+| statistic | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
+|---|---|---|---|---|---|
+| G1 `cmd_vel` p98 | 30 / 25 | 30 / 27 | 30 / 29 | 30 / 30 | 30 / 29 |
+| G3 telemetry worst gap | 30 / 26 | 20 / 24 | **11 / 11** | 30 / 28 | 30 / 26 |
+| G3 gaps ≥ 2 s | 30 / 30 | 24 / 26 | 20 / 22 | 30 / 30 | 30 / 30 |
+| G5 frame age p95 | 20 / 30 | 20 / 21 | **0 / 17** | 23 / 24 | 20 / 26 |
+| G5 frame completeness | 20 / 30 | 20 / 28 | 6 / 15 | 28 / 30 | 21 / 30 |
+| G5 windowed GFBR floor | 9 / 30 | 6 / 24 | 0 / 11 | 9 / 30 | **4 / 30** |
+| G5 telemetry gap | 30 / 24 | 24 / 17 | 19 / 20 | 30 / 24 | 30 / 23 |
+
+Under the DL flood the pattern is the same with smaller effects; G1's
+`cmd_vel` p98 is again the statistic every arm fails part B on (21–27 of
+30 pass) while staying inside its bound on every cell.
+
+**Worst absolute telemetry gap under flood, any cell (ms)**
+
+| arm | G3 instrument | G5 instrument |
+|---|---|---|
+| PF | 300 | 498 |
+| Reservation | 6 538 | 8 907 |
+| TwoTier | 8 160 | 9 592 |
+| ProtoRRageD2 | **300** | **397** |
+| ConfigSched | 399 | **395** |
+
+### 6.4 Conclusion
+**G6 fails on every arm, as on the previous cell, and the cell lowers
+every arm's part-A count by 15–30 through one instrument.** The G5 camera
+already fails its own frame-age and completeness bounds at N = 12 on
+every arm (§5), so those cells fail part A whether or not the flood is
+on — PF's G5 frame age goes 30/30 → 20/30 with no change to what the
+flood does to it. Part B, the shift test that G6 exists for, is nearly
+unchanged (PF 251 → 255 under the UL flood). The shared failure is the
+same: G1's command p98 stays inside its bound on every cell and still
+shifts by more than 20 % on a fifth of them on every arm.
+
+The arms separate as before. **TwoTier loses part A outright** on the G3
+and G5 statistics under the UL flood (telemetry worst gap 11/30, frame
+age 0/30) with worst silences of 8.2–9.6 s; Reservation less so
+(6.5–8.9 s). PF, `ProtoRRageD2` and ConfigSched hold every G3 statistic
+on every cell with worst silences of 300–500 ms. **ConfigSched is PF
+here**, to within a handful of cells on every statistic, with one
+exception in PF's favour: the windowed GFBR floor (goodput ≥ GFBR in every
+2 s window) at 4/30 against PF's 9 — the same shape as its G5 load knee
+(§5.4), the camera's above-floor demand waiting behind an equal PRB share
+for the flood. No expectation was registered for G6; this is its first
+measurement.
 
 ## 7. G7 — "One misconfigured robot cannot take down the fleet"
 

@@ -1,0 +1,20 @@
+G6 isolation: 1350 runs, 27.0M slots
+  instruments g1,g3,g5  conditions none,ul,dl  arms PF,Reservation,TwoTier,ProtoRRageD2,ConfigSched  seeds 10  N [4, 7, 12]  cap 4
+  part A: each statistic within its own bound; part B: shift <= +20% IN THE DIRECTION OF HARM, absolute for zero-baseline counts
+  0 banked, 1350 to run
+    ... 100/1350 (20s)
+    ... 200/1350 (38s)
+    ... 300/1350 (57s)
+    ... 400/1350 (81s)
+    ... 500/1350 (102s)
+    ... 600/1350 (146s)
+    ... 700/1350 (198s)
+    ... 800/1350 (248s)
+    ... 900/1350 (309s)
+    ... 1000/1350 (372s)
+    ... 1100/1350 (423s)
+    ... 1200/1350 (445s)
+    ... 1300/1350 (465s)
+    ... 1350/1350 (476s)
+
+wrote sweeps/cell-2026-09-16-linux/aligned/g6.json  (476s, 1350 runs)

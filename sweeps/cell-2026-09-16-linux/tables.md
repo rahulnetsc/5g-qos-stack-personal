@@ -357,3 +357,53 @@ runs: 1600  horizon 20000  driven robots 2  PDB 95.0  gap bound 200.0
 | ProtoRRageD2 | 21/2400 | 22/2400 | 29/2400 | 26/2400 | 14/2400 | 31/2400 |
 | ConfigSched | 58/2400 | 72/2400 | 114/2400 | 130/2400 | 295/2400 | 257/2400 |
 
+## G6 tables
+
+**pass counts over all paired deltas (3 instruments x 3 fleet sizes x 10 seeds x statistics)** — part A (within its own bound) / part B (shift <= +20 % toward harm)
+
+| arm | UL flood: A / B of n | DL flood: A / B of n |
+|---|---|---|
+| PF | 229 / 255 of 270 | 222 / 240 of 270 |
+| Reservation | 204 / 227 of 270 | 204 / 233 of 270 |
+| TwoTier | 143 / 182 of 270 | 175 / 225 of 270 |
+| ProtoRRageD2 | 240 / 256 of 270 | 238 / 253 of 270 |
+| ConfigSched | 225 / 254 of 270 | 229 / 255 of 270 |
+
+**UL flood — per statistic, part A / part B passes of 30 (3 fleet sizes x 10 seeds)**
+
+| statistic | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
+|---|---|---|---|---|---|
+| g1_cmd_gaps_over | 30/30 | 30/30 | 30/30 | 30/30 | 30/30 |
+| g1_cmd_p98_ms | 30/25 | 30/27 | 30/29 | 30/30 | 30/29 |
+| g3_tele_gap_worst_ms | 30/26 | 20/24 | 11/11 | 30/28 | 30/26 |
+| g3_tele_over_tlive | 30/30 | 24/26 | 20/22 | 30/30 | 30/30 |
+| g3_tele_silent | 30/30 | 30/30 | 27/27 | 30/30 | 30/30 |
+| g5_cam_age_p95_ms | 20/30 | 20/21 | 0/17 | 23/24 | 20/26 |
+| g5_cam_complete | 20/30 | 20/28 | 6/15 | 28/30 | 21/30 |
+| g5_cam_window_floor | 9/30 | 6/24 | 0/11 | 9/30 | 4/30 |
+| g5_tele_gap_worst_ms | 30/24 | 24/17 | 19/20 | 30/24 | 30/23 |
+
+**DL flood — per statistic, part A / part B passes of 30 (3 fleet sizes x 10 seeds)**
+
+| statistic | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
+|---|---|---|---|---|---|
+| g1_cmd_gaps_over | 30/30 | 30/30 | 30/30 | 30/30 | 30/30 |
+| g1_cmd_p98_ms | 30/21 | 30/22 | 30/27 | 30/22 | 30/22 |
+| g3_tele_gap_worst_ms | 30/27 | 21/25 | 20/24 | 30/27 | 30/27 |
+| g3_tele_over_tlive | 30/30 | 24/25 | 23/27 | 30/30 | 30/30 |
+| g3_tele_silent | 20/20 | 30/30 | 30/30 | 30/30 | 30/30 |
+| g5_cam_age_p95_ms | 20/30 | 20/29 | 10/28 | 23/27 | 20/30 |
+| g5_cam_complete | 22/30 | 20/27 | 11/21 | 29/30 | 20/30 |
+| g5_cam_window_floor | 10/30 | 7/23 | 4/18 | 6/30 | 9/30 |
+| g5_tele_gap_worst_ms | 30/22 | 22/22 | 17/20 | 30/27 | 30/26 |
+
+**worst absolute telemetry gap under flood, any cell (ms)** — the G6 slide's own headline beside the pass count
+
+| arm | G3 instrument | G5 instrument |
+|---|---|---|
+| PF | 300 | 498 |
+| Reservation | 6538 | 8907 |
+| TwoTier | 8160 | 9592 |
+| ProtoRRageD2 | 300 | 397 |
+| ConfigSched | 399 | 395 |
+
