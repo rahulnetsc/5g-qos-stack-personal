@@ -1,0 +1,9 @@
+G6 isolation: 270 runs, 5.4M slots
+  instruments g1,g3,g5  conditions none,ul,dl  arms ConfigSched2  seeds 10  N [4, 7, 12]  cap 4
+  part A: each statistic within its own bound; part B: shift <= +20% IN THE DIRECTION OF HARM, absolute for zero-baseline counts
+  0 banked, 270 to run
+    ... 100/270 (23s)
+    ... 200/270 (43s)
+    ... 270/270 (58s)
+
+wrote sweeps/cs2-increments/inc1/aligned/g6.json  (58s, 270 runs)

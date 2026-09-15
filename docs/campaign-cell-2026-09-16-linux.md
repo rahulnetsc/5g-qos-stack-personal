@@ -353,7 +353,7 @@ Order, by evidence weight from the campaign:
 | increment | commit | result | kept? |
 |---|---|---|---|
 | 0 copy | `592d587` | identical on G3 N = 10 (summaries, counters) | yes |
-| 1 unplanned contracted flow first, shortest PDB | see git log | "due now" (class 0) built first and refuted on the seed (32 of 34 expiries remained: the least overdue of the due units, the fleet's visits bunched); ahead-of-planned by PDB: G2 probe expiries 34 → 2, no-plan expiries 32 → 0. Full measurement `inc1/` running | pending |
+| 1 unplanned contracted flow first, shortest PDB | `10efeb6` | "due now" (class 0) built first and refuted on the seed (32 of 34 expiries remained: the least overdue of the due units, the fleet's visits bunched); ahead-of-planned by PDB: G2 probe expiries 34 → 2. **Measured (`inc1/`, 9 steps, all rc 0):** G2 cap 2 **1 390 → 317** (deadline arms 247–263, PF 748; registered "within ~2×" — hit), cap 4 224 → 192; STOP axis cap 2 22/78/124/318 → 1/8/20/108; fleet axis 58–295 → 22–47. G3, G5 (bar one seed's part 3 at −6 dB), G7, G10, G6, G9, G12 identical. G1 cap 2: N = 14 13.25 → 13.0 ms, N = 16 15.5 → 16.75 (fleet-DL messages now ahead of `cmd_vel`'s early visit); boundaries unchanged | **yes** |
 
 ## 7. After the results: ConfigSched iteration
 

@@ -1,0 +1,18 @@
+360 runs = 2 seed-columns x 3 cases x 6 occupancy levels x 1 arms x 10 seeds (each run also builds its paired control)
+  0 banked, 360 to run
+    ... 25/360 (6s)
+    ... 50/360 (12s)
+    ... 75/360 (16s)
+    ... 100/360 (22s)
+    ... 125/360 (27s)
+    ... 150/360 (35s)
+    ... 175/360 (41s)
+    ... 200/360 (46s)
+    ... 225/360 (52s)
+    ... 250/360 (55s)
+    ... 275/360 (61s)
+    ... 300/360 (66s)
+    ... 325/360 (73s)
+    ... 350/360 (81s)
+
+wrote sweeps/cs2-increments/inc1/aligned/g9.json  (83s wall, 360 runs)
