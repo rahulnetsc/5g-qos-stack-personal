@@ -9,10 +9,11 @@ import json, statistics as st
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+import sys
+ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent  # a campaign directory, e.g. the Linux run's
 BASE = ROOT / "aligned"
 HERE = ROOT / "cg"
-ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2")
+ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2", "ConfigSched")
 SUFFIXES = ("", "+CG", "+CGt")
 
 

@@ -285,7 +285,9 @@ def _schedulers() -> dict:
     added HERE rather than in wp9_sweep so that module's scope -- shared by
     every WP9 artefact -- is untouched."""
     from proto_arms import resolve_arm
-    return {**_arms(), "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2")}
+    return {**_arms(), "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2"),
+            # the configuration-based divergence arm (2026-09-15)
+            "ConfigSched": lambda: resolve_arm("ConfigSched")}
 
 
 def main(argv: list[str]) -> int:

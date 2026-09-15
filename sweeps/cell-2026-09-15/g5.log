@@ -1,0 +1,24 @@
+G5 video: 880 driver runs, 17.6M slots
+  parts A,B,C  arms PF,Reservation,TwoTier,ProtoRRageD2  seeds 10 (base 0)  cap 4  fixed N=7
+  bounds: PDU sets >= 99% within 150 ms; frame age p95 <= 66.67 ms (2 frame periods at 30 fps); goodput >= GFBR in EVERY 2 s window
+  0 banked, 880 to run
+    ... 50/880 (22s)
+    ... 100/880 (40s)
+    ... 150/880 (58s)
+    ... 200/880 (77s)
+    ... 250/880 (100s)
+    ... 300/880 (123s)
+    ... 350/880 (147s)
+    ... 400/880 (172s)
+    ... 450/880 (209s)
+    ... 500/880 (259s)
+    ... 550/880 (310s)
+    ... 600/880 (371s)
+    ... 650/880 (420s)
+    ... 700/880 (481s)
+    ... 750/880 (548s)
+    ... 800/880 (614s)
+    ... 850/880 (672s)
+    ... 880/880 (718s)
+
+wrote sweeps\cell-2026-09-15\aligned\g5.json  (718s, 880 runs)

@@ -7,18 +7,24 @@
 # cell's numerology. Each runner is internally parallel (23 workers) and banks
 # its own artefact; this script only sequences them and records timing.
 #
-# Launch detached (CLAUDE.md: a multi-hour campaign must not die with a session):
-#   powershell -Command "Start-Process -WindowStyle Hidden bash -ArgumentList '-lc','cd \"<repo>\" && bash sweeps/cell-2026-09-15/run_campaign.sh'"
+# Launch detached (CLAUDE.md: a multi-hour campaign must not die with a session).
+# Linux (fresh run, its own output directory, all cores but one):
+#   OUT=sweeps/cell-2026-09-16-linux setsid nohup bash sweeps/cell-2026-09-15/run_campaign.sh > /dev/null 2>&1 &
+# Windows: a Python subprocess.Popen with DETACHED_PROCESS (a hidden Start-Process bash dies silently).
+# OUT must be a directory with no earlier artefacts, or the runners RESUME from
+# the banked rows they find there (regime_sweep.RunLedger) instead of running fresh.
+# Arms: the four of docs/results-aligned-2026-09-14.md plus ConfigSched
+# (sim/baselines/config_sched.py, added 2026-09-15); +CG / +CGt on every arm.
 set -u
 export PATH="$HOME/.local/bin:$PATH"
 export PYTHONIOENCODING=utf-8
 cd "$(dirname "$0")/../.." || exit 1
-OUT=sweeps/cell-2026-09-15
+OUT=${OUT:-sweeps/cell-2026-09-15}
 mkdir -p "$OUT/aligned" "$OUT/cg"
-W=${WORKERS:-23}
-ARMS="PF,Reservation,TwoTier,ProtoRRageD2"
-CG="PF+CG,Reservation+CG,TwoTier+CG,ProtoRRageD2+CG"
-CGT="PF+CGt,Reservation+CGt,TwoTier+CGt,ProtoRRageD2+CGt"
+W=${WORKERS:-$(( $(nproc 2>/dev/null || echo 24) - 1 ))}
+ARMS="PF,Reservation,TwoTier,ProtoRRageD2,ConfigSched"
+CG="PF+CG,Reservation+CG,TwoTier+CG,ProtoRRageD2+CG,ConfigSched+CG"
+CGT="PF+CGt,Reservation+CGt,TwoTier+CGt,ProtoRRageD2+CGt,ConfigSched+CGt"
 H5=$(uv run python -c "from sim.scenarios import deployed_cell as c; print(c.slots(5000))")
 G9_OCC="${G9_OCCUPANCY:-}"
 LOG="$OUT/campaign.log"
@@ -30,7 +36,7 @@ step() {  # name, then the command
   local rc=$?
   echo "=== $name  end   $(date '+%F %T')  rc=$rc  $((SECONDS - t0))s" | tee -a "$LOG"
 }
-echo "campaign start $(date '+%F %T')  workers=$W  H5=$H5  HEAD=$(git rev-parse --short HEAD)" | tee -a "$LOG"
+echo "campaign start $(date '+%F %T')  workers=$W  H5=$H5  HEAD=$(git rev-parse --short HEAD)  OUT=$OUT  ARMS=$ARMS" | tee -a "$LOG"
 
 step g3   uv run python scripts/g3_stress.py --arms "$ARMS" --parts A --fixed-n 6 --caps 4 --seeds 10 --workers "$W" --out "$OUT/aligned/g3.json"
 step g5   uv run python scripts/g5_video.py --arms "$ARMS" --parts A,B,C --seeds 10 --workers "$W" --out "$OUT/aligned/g5.json"

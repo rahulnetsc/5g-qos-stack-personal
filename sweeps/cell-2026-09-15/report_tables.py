@@ -8,8 +8,9 @@ import json, statistics as st
 from collections import defaultdict
 from pathlib import Path
 
-D = Path(__file__).parent / "aligned"
-ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2")
+import sys
+D = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent) / "aligned"  # a campaign directory, e.g. the Linux run's
+ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2", "ConfigSched")
 
 
 def load(name):

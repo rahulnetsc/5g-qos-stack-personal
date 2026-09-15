@@ -92,7 +92,8 @@ def _arms():
     return {"PF": lambda: ProportionalFair(ewma_window_slots=200),
             "Reservation": lambda: Reservation(min_rb=5),
             "TwoTier": lambda: load_two_tier(_TT, min_rb=5),
-            "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2")}
+            "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2"),
+            "ConfigSched": lambda: resolve_arm("ConfigSched")}
 
 
 def _availability_budget_s(fr) -> float:
