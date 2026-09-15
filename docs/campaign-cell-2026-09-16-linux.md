@@ -78,8 +78,12 @@ step, and the CG steps roughly triple each guarantee. Budget **5–8 h**.
 This is an estimate from a different configuration (four arms, 23 workers,
 Windows) and is quoted as such.
 
-Launch record: see `sweeps/cell-2026-09-16-linux/campaign.log` (first line
-carries HEAD, workers, H5).
+Launch record (`sweeps/cell-2026-09-16-linux/campaign.log`, line 1):
+`campaign start 2026-09-16 00:07:54  workers=31  H5=10000  HEAD=88d5bd0`.
+Liveness at +13 s by process state, not by the file: one parent
+`g3_stress.py` and 31 spawn workers (107–191 MB each), 20 GB available.
+G3's own projection: 500 runs, 19.0 M slots, ~5 min wall at 31 workers,
+peak ~15 GB.
 
 ## 4. Step log
 

@@ -1,21 +1,67 @@
 """Tables for the deployed-cell campaign (docs/deployed-cell-2026-09-15.md):
-G3, G5, G7, G10, then G1, G2, G6, G9, G12, G4, from THIS directory's
-aligned/ artefacts only. The two 2026-09-14 scripts joined; table shapes
+G3, G5, G7, G10, then G1, G2, G6, G9, G12, G4, from a campaign directory's
+aligned/ artefacts. The two 2026-09-14 scripts joined; table shapes
 unchanged so the two campaigns read side by side.
-Run: uv run python sweeps/cell-2026-09-15/report_tables.py
+Run: uv run python sweeps/cell-2026-09-15/report_tables.py [campaign-dir] [--cg]
+
+--cg (2026-09-16): every table also carries the +CG and +CGt rows, read from
+the campaign's cg/ artefacts and merged into the plain one -- the CG runners
+write the same row shapes under suffixed arm names, so no table needs its
+own CG logic. Without the flag the output is byte-identical to before.
+G4's runner takes no --arms and writes all fifteen arm names into
+aligned/g4.json itself, so it has no cg/ file to merge.
 """
 import json, statistics as st
 from collections import defaultdict
 from pathlib import Path
 
 import sys
-D = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent) / "aligned"  # a campaign directory, e.g. the Linux run's
-ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2", "ConfigSched")
+_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+ROOT = Path(_args[0]) if _args else Path(__file__).parent  # a campaign directory, e.g. the Linux run's
+D = ROOT / "aligned"
+CG = "--cg" in sys.argv[1:]
+BASE_ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2", "ConfigSched")
+SUFFIXES = ("", "+CG", "+CGt") if CG else ("",)
+ARMS = tuple(a + s for a in BASE_ARMS for s in SUFFIXES)
+# Which cg/ artefacts hold a guarantee's CG rows. G3 and G5 were run as two
+# files (+CG, +CGt), the rest with both suffixes in one -- the paths the
+# 2026-09-16 campaign script writes.
+CG_FILES = {"g3.json": ("g3_cg.json", "g3_cgt.json"), "g5.json": ("g5_cg.json", "g5_cgt.json"),
+            "g7.json": ("g7.json",), "g10.json": ("g10.json",), "g1.json": ("g1_cg.json",),
+            "g2.json": ("g2_cg.json",), "g6.json": ("g6_cg.json",), "g9.json": ("g9_cg.json",),
+            "g12.json": ("g12_cg.json",), "g4.json": ()}
+
+
+def _merge(base, extra):
+    """Fold a CG artefact into the plain one: new keys (per-arm cells) are
+    added, lists (rows, deltas) concatenated, dicts recursed, `_n_*` counts
+    summed; any other scalar (bounds, axes, the plain campaign totals) keeps
+    the plain artefact's value."""
+    if isinstance(base, list) and isinstance(extra, list):
+        return base + extra
+    if isinstance(base, dict) and isinstance(extra, dict):
+        out = dict(base)
+        for k, v in extra.items():
+            if k not in out:
+                out[k] = v
+            elif isinstance(out[k], (list, dict)):
+                out[k] = _merge(out[k], v)
+            elif isinstance(k, str) and k.startswith("_n_") and isinstance(v, (int, float)):
+                out[k] = out[k] + v
+        return out
+    return base
 
 
 def load(name):
     p = D / name
-    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    base = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    if not CG or base is None:
+        return base
+    for cg_name in CG_FILES.get(name, ()):
+        q = ROOT / "cg" / cg_name
+        if q.exists():
+            base = _merge(base, json.loads(q.read_text(encoding="utf-8")))
+    return base
 
 
 def md(header, rows):
