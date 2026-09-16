@@ -1293,3 +1293,58 @@ is a losing trade, and every class pays for it. The cost was invisible for nine
 increments because G4 sits in no regression group, best-effort throughput is not
 a scored statistic, and the effect vanishes at the low duty the guarantee's name
 suggests you should look at.
+
+---
+
+## 28. GROUP B RE-FRAMED — every arm PASSES, and a "FAIL" of mine is withdrawn
+
+Prompted by the user asking whether the recommended arms were really performing
+badly. They are not, and the framing that suggested otherwise was mine.
+
+### 28.1 The withdrawn FAIL
+
+I scored G4's `[0,1)` gap bucket against GT-2.3's *"first-packet one-way p99 <=
+300 ms"* and reported **every arm failing** at 300–301 ms. That is wrong twice:
+
+* **The statistic is censored.** Of 17 148 values in that bucket, **8 572 (50.0 %)
+  are >= 295 ms**, with 5 167 piled on exactly 300.0, 3 360 on 300.5, and a hard
+  maximum of **300.50**. Seven arms landing within 1 ms of each other is a
+  ceiling, not seven independent failures.
+* **It is the wrong population.** `[0,1)` is messages whose preceding
+  *generation* gap was under 1 ms — for a fragmented `xr_video` flow these are
+  **in-burst fragments**, not post-silence first packets. `g4_postsilence`'s own
+  docstring states it deliberately picks no silence threshold, because "choosing
+  a 'this counts as silence' threshold would be choosing where the answer comes
+  from". And the runner emits **no pass/fail field at all** — which should have
+  told me it was not scoring a verdict.
+
+### 28.2 Group B against its bounds
+
+| statistic | `ConfigSched2X7+CG` | bound | budget used |
+|---|---|---|---|
+| G3 worst p98, worst of 100 runs | 42.0 ms | 95 ms | **44 %** |
+| G3 worst silence | 220.0 ms | 500 ms | **44 %** |
+| G3 part 3 | **100/100** | — | pass |
+| G4 median, `[10,100)` bucket | 23.7 ms | 300 ms | **8 %** |
+
+**Every arm passes G3 at every fleet size, and the recommended arm never exceeds
+44 % of any G3 bound.** The "3x worse than Proto" figure is 22 ms against 42 ms
+*inside a 95 ms budget*; `TwoTier+CG` sits at the same 41 ms. G4's +8.97 ms delta
+is ~3 % of its bound.
+
+### 28.3 The reporting error, which has now happened twice
+
+I ran paired comparisons because they are statistically clean, then let **relative
+deltas stand in for a verdict** without checking absolutes against the clause.
+That is the same failure as the G2 table, where sorting by point estimate invited
+a ranking the statistics did not support. Two consecutive instalments, same shape.
+
+**Standing format from instalment 3 onward: pass/fail against the clause first,
+then margin against the bound, then paired deltas** — in that order.
+
+### 28.4 What survives
+
+E1's cost is real and traced (+17.24 ms on G4, DCI→PRB inversion, §26–27), but on
+this cell it is **headroom, not failure**. It matters for hardware, where a real
+link is less forgiving than a 20 dB simulated SNR — and it is not a group-B
+failure on the deployed cell.
