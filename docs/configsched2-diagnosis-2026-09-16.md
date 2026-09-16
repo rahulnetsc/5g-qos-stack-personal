@@ -634,3 +634,64 @@ credited to the density budget.
 **Expectation 5 is the one that protects the arm of record.** `ConfigSched2` is
 currently the recommended arm; a change that improves the stack but damages the
 baseline is not a fix, and the standalone measurement is what separates them.
+
+---
+
+## 18. X6 = E5 STANDALONE, MEASURED (`sweeps/cs2-increments/e6/`)
+
+9 steps rc 0, `ConfigSched2X6` (unit-total cap on the OTHERWISE UNTOUCHED
+baseline) against `inc9`. This is the arm that tests whether E5 is a fix in its
+own right, so that it cannot be credited to the density budget.
+
+| # | registered (§17.1) | outcome |
+|---|---|---|
+| 1 | PRBs/grant ~26, units/slot ~3.3 | **MET** — 25.5 and **3.59**, checked before the run |
+| 5 | the baseline does not regress on any group | **NOT MET** — see below |
+
+### 18.1 It is by far the closest any variant has come, and it still trades
+
+**Wins**
+
+| group | statistic | baseline | X6 |
+|---|---|---|---|
+| C (G5) | admissible fleet | 6 | **7** |
+| C (G5) | load knee | 1.0 | 1.1 |
+| C (G5) | gt33 ×5 / ×10 / ×15 frame age | 98 / 142 / 139 ms | **31 / 36 / 35 ms** |
+| C (G5) | gt32 ×1.1 | 3/0/4 at 137 ms | **9/6/10 at 60 ms** |
+| B (G3) | p98 median, first axis point | 8.5 ms | **3.75 ms** |
+| B (G3) | short messages at N ≤ 12 | 1,0,0,2,1,0 | **all 0** |
+| A (G2) | cap-2 missed STOPs | 291 | **266** |
+| D (G6) | UL / DL part A/B | 217/216, 217/212 | **221/219, 223/219** |
+| E (G10) | admissible fleet | 10 | **10 held** |
+| F (G9) | informative cells | 12 | **12 held** |
+
+**Regressions**
+
+| group | statistic | baseline | X6 |
+|---|---|---|---|
+| B (G3) | part-3 boundary | **10** | 8 |
+| B (G3) | worst silence at N = 14 | 297 ms | 479 ms |
+| C (G5) | gt31 N = 8 | 10/9/4 at 42 ms | **6/1/0 at 122 ms** |
+| D (G7) | clause 1 A telemetry p98 | 57.8 ms | 75.2 ms |
+| E (G12) | telemetry M02 at ×1.8/×2.0, N=6 | 0.025/0.071 | **0.106/0.250** |
+| E (G10) | M08 at N = 12 | 0.781 | 0.754 |
+| A (G2) | cap-4 missed STOPs | 202 | 210 |
+
+### 18.2 What separates it from the density-budget family
+
+**E5 does not starve throughput the way E1 did.** G7's A-telemetry throughput
+holds at **24 000 bps**, exactly the baseline, where every density-budget arm
+dropped it to 18 240–18 960. That is the direct signature of the grants-per-slot
+fix: the cell serves as many units as before, and more of them than the
+baseline (3.59/slot against 3.29).
+
+**So E5 is a real and independent improvement to the realisation** — it restores
+an invariant the outer problem already assumes — and it is NOT a clean win:
+it buys group C's fleet and G5's whole load ramp with G3's boundary (10 → 8),
+one G5 fleet point, and G12's telemetry PDB rate.
+
+**Verdict pending X7.** E5 standalone does not displace `ConfigSched2` as the
+arm of record on its own. Whether the stack (E1+E3+E4+E5) does is exactly what
+X7 measures: E5 restores the grant count that E1 destroyed, so the stack is the
+first variant where the density budget's group-C gain and a working grant rate
+coexist.
