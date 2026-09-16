@@ -14,7 +14,11 @@ from pathlib import Path
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 INC = Path(args[0])
 BEFORE = Path(sys.argv[sys.argv.index("--before") + 1]) if "--before" in sys.argv else Path("sweeps/cell-2026-09-16-linux")
-ARM_B = "ConfigSched"
+# `--arm-before` is needed whenever BEFORE is another INCREMENT rather than the
+# campaign: an increment's artefacts hold only `ConfigSched2`, so the default
+# `ConfigSched` finds nothing and every section raises a KeyError that a
+# caller's grep can hide (it did, 2026-09-16). Defaults to the campaign's arm.
+ARM_B = sys.argv[sys.argv.index("--arm-before") + 1] if "--arm-before" in sys.argv else "ConfigSched"
 ARM_A = sys.argv[sys.argv.index("--arm") + 1] if "--arm" in sys.argv else "ConfigSched2"
 
 
