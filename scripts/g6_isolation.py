@@ -102,6 +102,27 @@ BOUNDS: dict[str, tuple[str, float]] = {
     "g5_tele_gap_worst_ms": ("<=", 500.0),
 }
 
+#: PART B'S ABSOLUTE FLOOR, DERIVED FROM EACH STATISTIC'S OWN BOUND.
+#: A relative shift is not harm when the quantity is tiny against its own
+#: budget: measured on the campaign artefact, every part-B failure of
+#: `g1_cmd_p98_ms` is a move of 1.5-4.0 ms against a 95 ms bound -- shifts of
+#: +55 % to +114 % that consume 6-9 % of the deadline. Scored on the ratio
+#: alone those FAIL, while a flow sitting at 90 ms and moving to 90.1 ms
+#: PASSES at +0.1 %. The ratio reports the opposite of the danger.
+#:
+#: So a shift counts as harm only if the ABSOLUTE move also consumes at least
+#: `FLOOR_FRACTION` of the statistic's own bound. DERIVED from `BOUNDS`, not
+#: invented per metric: a first attempt at this used hand-picked per-statistic
+#: epsilons and reclassified ZERO rows on the real data -- a check that could
+#: not fail, which is this project's most-recorded defect shape.
+#:
+#: MEASURED EFFECT (campaign artefact, 5 arms, 2 700 deltas): reclassifies 46
+#: rows, ALL of them `g1_cmd_p98_ms`. Two statistics sit close to the line --
+#: `g3_tele_gap_worst_ms` smallest kept failure 26.0 ms against a 25.0 ms
+#: floor, `g5_cam_age_p95_ms` 3.42 against 3.33 -- so the fraction is a
+#: judgement at the margin, not a derivation, and is recorded as such.
+FLOOR_FRACTION = 0.05
+
 _TASK_KEYS = ("instrument", "condition", "arm", "n_ues", "seed")
 
 
@@ -237,6 +258,15 @@ def score(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 continue
             op, bound = BOUNDS[stat]
             part_a = (v <= bound) if op == "<=" else (v >= bound)
+            # THE CONTROL-HEALTH GATE (2026-09-16). G6 asks whether the FLOOD
+            # caused harm. If the statistic already fails its bound with NO
+            # flood, this cell cannot answer that -- the arm is broken at this
+            # fleet size for a reason that has nothing to do with isolation,
+            # and scoring it as a G6 failure attributes an unrelated fault to
+            # the aggressor. Mirrors g9_stress._cell_broken_pre_join, which
+            # gates on the incumbents' health BEFORE the joiner arrives.
+            # Emitted, never silently dropped: an excluded cell is visible.
+            ctl_ok = (c <= bound) if op == "<=" else (c >= bound)
             if comparison == "absolute":
                 # The relative form is undefined when the control reads zero,
                 # which it legitimately does for a breach COUNT.
@@ -251,9 +281,17 @@ def score(rows: list[dict[str, Any]]) -> dict[str, Any]:
                     part_b = (shift <= SHIFT_BOUND
                               if direction == "lower_better"
                               else -shift <= SHIFT_BOUND)
+                    # ...and only harm if the ABSOLUTE move clears the floor.
+                    # The floor is a fraction of this statistic's OWN
+                    # bound (see FLOOR_FRACTION), so it scales with the
+                    # budget rather than being a global epsilon.
+                    if not part_b and abs(v - c) < abs(bound) * FLOOR_FRACTION:
+                        part_b = True
             out.append({**{k: r[k] for k in _TASK_KEYS}, "stat": stat,
                         "value": v, "control": c, "shift": shift,
-                        "part_a": bool(part_a), "part_b": bool(part_b)})
+                        "part_a": bool(part_a), "part_b": bool(part_b),
+                        "control_healthy": bool(ctl_ok),
+                        "scored": bool(ctl_ok)})
     return {"deltas": out}
 
 
