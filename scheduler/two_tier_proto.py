@@ -1246,8 +1246,17 @@ class TwoTierProto(TwoTier):
             if total > 0:
                 self._d1_deficit[c.ue_id] = total
         if self._d1_deficit:
-            self.counters["d1_slots_with_deficit"] += 1
-            self.counters["d1_candidates_with_deficit"] += len(self._d1_deficit)
+            # CREATED ON FIRST USE, not seeded in `two_tier.py`'s counter
+            # dict. Seeding them there put two extra keys on EVERY TwoTier
+            # run including the faithful arm, which moved 10 regression-corpus
+            # records (`MISSING in baseline -> 0`) for a divergence the
+            # faithful arm never runs. `.get` keeps the plain-dict container
+            # unchanged -- switching it to a defaultdict would alter behaviour
+            # for every arm.
+            c = self.counters
+            c["d1_slots_with_deficit"] = c.get("d1_slots_with_deficit", 0) + 1
+            c["d1_candidates_with_deficit"] = (
+                c.get("d1_candidates_with_deficit", 0) + len(self._d1_deficit))
 
     def _gslack_key(self, ue_id: int) -> tuple[int, float, int]:
         """(already_late, remaining_ms, -denial_slots) for one UE."""
