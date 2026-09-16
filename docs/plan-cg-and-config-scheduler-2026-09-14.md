@@ -137,3 +137,12 @@ registration restarts from the aligned model once G8 exists. Held-out
 seeds under the aligned model. Reservation's edit list (R1–R4) stays
 unbuilt, so Proto-vs-Reservation compares an improved arm with an
 unimproved one.
+
+## 4. DL SPS is still NOT IMPLEMENTED (2026-09-16)
+
+Configured grants landed; **their downlink analogue did not.** DL SPS
+(TS 38.321 §5.8.1, TS 38.331 `SPS-Config`, 8 configurations per BWP) is inside
+the Rel-16 baseline and remains unbuilt, with no code and no measurement. It is
+registered as future exploration for downlink performance — the full statement,
+including what it would NOT fix (G2's failure is the retry budget, and SPS adds
+no retries), is in `docs/config-scheduler-handoff.md`, section "DL SPS".

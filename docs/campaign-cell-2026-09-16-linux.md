@@ -417,3 +417,149 @@ SUFFICIENT by harmonic periods (Kraft), per-slot PRB feasibility by track
 budgets, frame completion linear in `(k_i, b_i)`; placement a table.
 Measured first on G3 N = 10 / 24 and G2, one fidelity change per commit,
 against this campaign's artefacts on the same seeds.
+
+
+
+### 8.x  D1 (`ProtoRRageD2X1`) — MEASURED AND REJECTED, 2026-09-16
+
+**The change.** `ProtoRRageD2` plus a GBR-deficit tie-break *beneath* the age
+order (`deficit_tiebreak=True`). Registered against group E (G10), whose
+diagnosis said the age order alone cannot tell two equally-stale UEs apart when
+one is further behind its contract.
+
+**Two runner bugs had to be fixed before the result was valid**, and they are
+recorded because they voided a result that was briefly reported as eight-of-nine
+clean: `g3_stress._resolve_arm` and `g9_stress._arms` each kept a PRIVATE copy
+of the arm table and raised on a name only `proto_arms` knew. Both steps died
+in ~1 s while the other seven scored — a partial result under an arm name the
+log still carried. Both now delegate to `proto_arms.resolve_arm`, verified
+identical on all 19 pre-existing arm names.
+
+**It hits its target and loses four other groups.**
+
+| group | statistic | ProtoRRageD2 | D1 | verdict |
+|---|---|---|---|---|
+| **E (G10)** | admissible fleet | 7 | **8** | **win** |
+| **E (G10)** | M08 median at N=10 | 0.661 | **0.933** | **win** |
+| **B (G3)** | part-3 passes per N | 10 10 10 10 10 9 9 6 0 | 10 10 10 10 10 **7 2 1** 0 | **regression** |
+| **B (G3)** | worst silence | 494 ms | 499.5 ms (mid-N 199→297) | regression |
+| **C (G5)** | gt31 N=10 | 10/9/3/10, 42 ms | **5/2/0/10, 125 ms** | **severe regression** |
+| **C (G5)** | gt31 N=12 | 9/4/2/10, 74 ms | **0/0/0/10, 146 ms** | **severe regression** |
+| **C (G5)** | load knee | none | 1.3 | regression |
+| **D (G7)** | clause 2 camera/MFBR | 0.82x | 0.66x | regression |
+| **D (G7)** | A telemetry p98 | 74.0 ms | 86.8 ms | regression |
+| **A (G2)** | cap-2 missed STOPs | 263/18300 | 305/18300 | regression |
+| **F (G9)** | informative cells passed | 12 of 12 | **11 of 12** | regression |
+| **E (G12)** | order agreement | 8/10 | 6/10 | regression |
+| **E (G12)** | telemetry M02 at x1.8/x2.0 | 0.066/0.077 | 0.020/0.020 | win |
+
+**Verdict: REJECTED under the regression contract.** With all nine steps now
+valid (G3 and G9 re-run after the registry fix), D1 wins **one** group and
+regresses **five**: it buys group E's admissible fleet by spending B, C, D, F
+and the cap-2 half of A. The G5 collapse is the
+decisive one — at N=10 the camera goes from 3 of 10 seeds passing part 3 to 0,
+with frame age tripling.
+
+**Independently confirmed on a second observable.** G6's *control* condition
+(same seed, same fleet, **no flood**) was re-scored: 38 cells that were healthy
+on `ProtoRRageD2` are broken on D1 against only 2 the other way, with camera
+completeness falling 0.994 → 0.820 and frame-age p95 61 → 144 ms at N=12. That
+is the same group-C damage seen through a different runner, so it is not a G5
+artefact.
+
+**The flag and the arm STAY in the tree**, default off, exactly as the AGE / C3
+/ C4 variants did — the result has to stay reproducible. `ProtoRRageD2` remains
+the divergence candidate, unchanged.
+
+---
+
+## DL SPS — the downlink analogue of CG, NOT IMPLEMENTED (registered 2026-09-16)
+
+**Status: not built, not measured, no code. This is a registered candidate,
+not a result.** Recorded here so it is not rediscovered as a new idea, and so
+the next person knows what is already settled about it.
+
+### What it is, from the Rel-16 text (read, not recalled)
+
+Semi-Persistent Scheduling is the downlink's configured grant: a periodic
+**downlink assignment** the UE keeps without a PDCCH per occasion.
+
+* **TS 38.321 V16.22.0 §5.8.1** — SPS is configured by RRC per Serving Cell
+  per BWP; *"Multiple assignments can be active simultaneously in the same
+  BWP"*; a DL assignment is provided by PDCCH and stored or cleared on L1
+  signalling (activation / deactivation); activation is independent per
+  Serving Cell. RRC supplies `cs-RNTI`, `nrofHARQ-Processes`,
+  `harq-ProcID-Offset`, `periodicity`, and the N-th assignment lands at
+  `(numberOfSlotsPerFrame x SFN + slot) = (... start time ...) + N x periodicity
+  x numberOfSlotsPerFrame / 10` modulo `1024 x numberOfSlotsPerFrame`.
+* **TS 38.331 V16.22.0 `SPS-Config`** — `periodicity` ENUMERATED
+  {ms10, ms20, ms32, ms40, ms64, ms80, ms128, ms160, ms320, ms640};
+  `nrofHARQ-Processes` INTEGER (1..8); Rel-16 extensions `sps-ConfigIndex-r16`,
+  `harq-ProcID-Offset-r16` (0..15), `periodicityExt-r16` (1..5120 **slots**),
+  `pdsch-AggregationFactor-r16`. `BWP-DownlinkDedicated` carries
+  `sps-ConfigToAddModList-r16` / `-ToReleaseList-r16` /
+  `sps-ConfigDeactivationStateList-r16`.
+* **The bound that differs from CG:** `maxNrofSPS-Config-r16 = 8` SPS
+  configurations per BWP, against `maxNrofConfiguredGrantConfig-r16 = 12` for
+  CG. A staged-configuration design on the downlink therefore has **8**
+  phases to play with, not 12.
+
+So **SPS is fully inside the Rel-16 compliance baseline** — the constraint the
+deployment imposes is satisfied, and `docs/rel16-baseline-2026-09-15.md`
+§2.1/§2.2 already carries the clause rows (survey row B2, *"Rel-16, keep as a
+candidate"*).
+
+### Why it is worth exploring: CG moved uplink and left downlink untouched
+
+The 2026-09-16 campaign measured configured grants on every arm. **CG closed
+the entire uplink heartbeat class on every arm, and nothing in the downlink
+moved** — G1 and G2 are where they were without it. That is not a surprise
+(CG is an uplink mechanism), but it does mean the downlink has had **no
+equivalent intervention at all**, on any arm. SPS is the one Rel-16 lever that
+is structurally the same shape.
+
+### What it would and would NOT fix — stated before building, so it can be wrong
+
+* **It attacks the DCI / per-slot-cap axis, not the retry axis.** SPS removes
+  the PDCCH for the *initial* transmission only; **TS 38.300 §10.2 is explicit
+  that retransmissions are scheduled on PDCCH**. So the honest expectation is
+  that SPS relieves the M-6 per-slot UE cap (4 at 106 PRB) and the DCI budget.
+* **It is therefore NOT an obvious fix for G2.** G2 fails on every arm on the
+  **retry budget** (the BLER^2 floor inside a 5 ms PDB), and SPS adds no
+  retries. Anyone picking this up should not expect G2 to move, and should
+  register that expectation before measuring rather than after.
+* **G1 passes today**, so SPS there is a *margin* measurement, not a fix.
+* The real candidate is the one the survey already names: a standing DL lane
+  for a periodic downlink flow, freeing DCI for the download and for retries.
+
+### Where it would be built — `sim/`, not `scheduler/`
+
+**CLAUDE.md's invariant "Do not add SPS / Configured Grant to the schedulers"
+governs `scheduler/` files and is NOT a ban on this work.** Configured grants
+were built as a **MAC feature in `sim/`** (`sim/configured_grant.py`) that runs
+*ahead of* every scheduler and reaches them only as pre-scheduler occupancy
+(`sim/pre_sched.py::Occupancy`) plus a reduced buffer view. SPS follows that
+same pattern exactly:
+
+* a `sim/` module owning the SPS configurations and their phases;
+* occasions added to the ONE `Occupancy` map, so the DL path cannot diverge
+  from the CG path;
+* every arm — faithful ports included — runs it through one driver flag, and
+  any arm with it on is **labelled in its name and in every table**, exactly as
+  `+CG` is;
+* `scheduler/two_tier.py` and `scheduler/reservation.py` stay the port, with
+  no SPS mechanism re-added (the deleted `_SPSReservation` / `_allocate_sps`
+  must not come back).
+
+### Open questions to settle before building
+
+1. **Does the HARQ mask compose?** `HarqAwareBufferView` fully masks a flow
+   with a pending process; a standing DL assignment interacts with that the
+   way a restricted CG TB did (`HarqProcess.cg_qfi`, build 2c). The DL analogue
+   is unbuilt and is the first thing to get right.
+2. **Does an SPS occasion suppress anything the way CG suppressed SR?** The
+   unrestricted-CG result (it broke G5 on every arm by suppressing SR for every
+   channel) is the cautionary precedent. The downlink has no SR, so the naive
+   answer is no — which is exactly the kind of naive answer this project has
+   been wrong about before, and it should be measured, not assumed.
+3. **8 configurations per BWP** is the budget for any staged design.

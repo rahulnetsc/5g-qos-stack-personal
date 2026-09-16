@@ -150,3 +150,140 @@ That is exactly the shape of ConfigSched2's increment 10 (a contracted
 flow over its planned bytes for the window drops to best-effort rank), so
 group D is carried by that increment on the ConfigSched side, and on the
 Proto side there is no new evidence to justify retrying M1.
+
+
+
+## 7. Degradation must be ordered by importance (standing requirement, 2026-09-16)
+
+**When the cell cannot satisfy everything, the scheduler must fail in a
+chosen order, not an arbitrary one: critical flows stay satisfied as far as
+capacity allows, and non-critical flows degrade gracefully rather than
+cliff-edge.** This is a requirement on every arm and every increment from here
+on, and it is the standing lens for reading any result past the admissible
+boundary.
+
+**Why it is a separate requirement and not implied by the guarantees.** Each
+guarantee is scored PASS/FAIL at its own bound, so a scheduler that holds
+every bound until capacity runs out and then loses *the safety flow first*
+scores identically, at the boundary, to one that sheds the video first. The
+guarantees say what must hold *inside* the boundary; they say almost nothing
+about the ORDER things break in outside it. G12 (GT-7.3) is the only procedure
+that looks at break order directly, which makes it load-bearing rather than a
+tail-end check.
+
+**What this implies for the checklist, per increment:**
+
+1. **Past the boundary, report WHICH class degraded first**, not only that the
+   fleet failed. M07 / M08 at N beyond the admissible point already carry this
+   if read per class instead of as a scalar.
+2. **A tuning change that improves an aggregate by sacrificing a critical
+   class is a REGRESSION**, even when the headline number improves. The
+   protected population (`Population.protected_fleet()`) is the set that must
+   not be traded.
+3. **Graceful means monotone and proportional**: a non-critical flow should
+   lose throughput progressively as load rises, not collapse to zero at one
+   step. A cliff in a best-effort class is a finding, not an acceptable
+   outcome.
+4. **Safety / STOP traffic (5QI 85) is never the shed candidate**, at any load,
+   on any arm.
+
+**Where it bites first.** G6 and G7 are the isolation procedures — they ask
+whether a bad actor's harm is contained — and G10/G12 are where the ordering
+past capacity is visible. The config scheduler's formulation is the natural
+place to make this explicit rather than emergent: an active-set decomposition
+already ranks by contract, so the shed order is a property that can be
+*designed* instead of observed.
+
+---
+
+## DL SPS — the downlink analogue of CG, NOT IMPLEMENTED (registered 2026-09-16)
+
+**Status: not built, not measured, no code. This is a registered candidate,
+not a result.** **It belongs to group A (Downlink deadline)** as a candidate mechanism,
+alongside the staged camera CG in group C. Recorded here so it is not rediscovered as a new idea, and so
+the next person knows what is already settled about it.
+
+### What it is, from the Rel-16 text (read, not recalled)
+
+Semi-Persistent Scheduling is the downlink's configured grant: a periodic
+**downlink assignment** the UE keeps without a PDCCH per occasion.
+
+* **TS 38.321 V16.22.0 §5.8.1** — SPS is configured by RRC per Serving Cell
+  per BWP; *"Multiple assignments can be active simultaneously in the same
+  BWP"*; a DL assignment is provided by PDCCH and stored or cleared on L1
+  signalling (activation / deactivation); activation is independent per
+  Serving Cell. RRC supplies `cs-RNTI`, `nrofHARQ-Processes`,
+  `harq-ProcID-Offset`, `periodicity`, and the N-th assignment lands at
+  `(numberOfSlotsPerFrame x SFN + slot) = (... start time ...) + N x periodicity
+  x numberOfSlotsPerFrame / 10` modulo `1024 x numberOfSlotsPerFrame`.
+* **TS 38.331 V16.22.0 `SPS-Config`** — `periodicity` ENUMERATED
+  {ms10, ms20, ms32, ms40, ms64, ms80, ms128, ms160, ms320, ms640};
+  `nrofHARQ-Processes` INTEGER (1..8); Rel-16 extensions `sps-ConfigIndex-r16`,
+  `harq-ProcID-Offset-r16` (0..15), `periodicityExt-r16` (1..5120 **slots**),
+  `pdsch-AggregationFactor-r16`. `BWP-DownlinkDedicated` carries
+  `sps-ConfigToAddModList-r16` / `-ToReleaseList-r16` /
+  `sps-ConfigDeactivationStateList-r16`.
+* **The bound that differs from CG:** `maxNrofSPS-Config-r16 = 8` SPS
+  configurations per BWP, against `maxNrofConfiguredGrantConfig-r16 = 12` for
+  CG. A staged-configuration design on the downlink therefore has **8**
+  phases to play with, not 12.
+
+So **SPS is fully inside the Rel-16 compliance baseline** — the constraint the
+deployment imposes is satisfied, and `docs/rel16-baseline-2026-09-15.md`
+§2.1/§2.2 already carries the clause rows (survey row B2, *"Rel-16, keep as a
+candidate"*).
+
+### Why it is worth exploring: CG moved uplink and left downlink untouched
+
+The 2026-09-16 campaign measured configured grants on every arm. **CG closed
+the entire uplink heartbeat class on every arm, and nothing in the downlink
+moved** — G1 and G2 are where they were without it. That is not a surprise
+(CG is an uplink mechanism), but it does mean the downlink has had **no
+equivalent intervention at all**, on any arm. SPS is the one Rel-16 lever that
+is structurally the same shape.
+
+### What it would and would NOT fix — stated before building, so it can be wrong
+
+* **It attacks the DCI / per-slot-cap axis, not the retry axis.** SPS removes
+  the PDCCH for the *initial* transmission only; **TS 38.300 §10.2 is explicit
+  that retransmissions are scheduled on PDCCH**. So the honest expectation is
+  that SPS relieves the M-6 per-slot UE cap (4 at 106 PRB) and the DCI budget.
+* **It is therefore NOT an obvious fix for G2.** G2 fails on every arm on the
+  **retry budget** (the BLER^2 floor inside a 5 ms PDB), and SPS adds no
+  retries. Anyone picking this up should not expect G2 to move, and should
+  register that expectation before measuring rather than after.
+* **G1 passes today**, so SPS there is a *margin* measurement, not a fix.
+* The real candidate is the one the survey already names: a standing DL lane
+  for a periodic downlink flow, freeing DCI for the download and for retries.
+
+### Where it would be built — `sim/`, not `scheduler/`
+
+**CLAUDE.md's invariant "Do not add SPS / Configured Grant to the schedulers"
+governs `scheduler/` files and is NOT a ban on this work.** Configured grants
+were built as a **MAC feature in `sim/`** (`sim/configured_grant.py`) that runs
+*ahead of* every scheduler and reaches them only as pre-scheduler occupancy
+(`sim/pre_sched.py::Occupancy`) plus a reduced buffer view. SPS follows that
+same pattern exactly:
+
+* a `sim/` module owning the SPS configurations and their phases;
+* occasions added to the ONE `Occupancy` map, so the DL path cannot diverge
+  from the CG path;
+* every arm — faithful ports included — runs it through one driver flag, and
+  any arm with it on is **labelled in its name and in every table**, exactly as
+  `+CG` is;
+* `scheduler/two_tier.py` and `scheduler/reservation.py` stay the port, with
+  no SPS mechanism re-added (the deleted `_SPSReservation` / `_allocate_sps`
+  must not come back).
+
+### Open questions to settle before building
+
+1. **Does the HARQ mask compose?** `HarqAwareBufferView` fully masks a flow
+   with a pending process; a standing DL assignment interacts with that the
+   way a restricted CG TB did (`HarqProcess.cg_qfi`, build 2c). The DL analogue
+   is unbuilt and is the first thing to get right.
+2. **Does an SPS occasion suppress anything the way CG suppressed SR?** The
+   unrestricted-CG result (it broke G5 on every arm by suppressing SR for every
+   channel) is the cautionary precedent. The downlink has no SR, so the naive
+   answer is no — which is exactly the kind of naive answer this project has
+   been wrong about before, and it should be measured, not assumed.
+3. **8 configurations per BWP** is the budget for any staged design.

@@ -457,9 +457,156 @@ Built as a flag on `ConfigSched2` (default off, so the arm stays
 byte-identical when unset) under its own arm name, exactly as `D1` was for
 the Proto side.
 
+
+## 8e. THE STANDING DESIGN RULE: encode the requirement in the outer problem first (2026-09-16)
+
+**When ConfigSched struggles on an operational requirement, the FIRST attempt
+must be to express that requirement as a CONSTRAINT or an OBJECTIVE TERM in the
+outer (Tier-1) problem — not as a heuristic in the inner realisation.**
+
+**Why this is the rule and not a preference.** The outer problem separates by
+direction into a continuous knapsack, and on that structure the greedy is
+**exact**, not approximate — verified against `ia_p5g_scheduler.c:1027-1038`,
+and standard for a polymatroid (Federgruen & Groenevelt 1986). That is the
+whole reason for pivoting to a configuration scheduler in the first place: a
+requirement expressed *inside* the optimisation is solved **optimally and
+fast**, while the same requirement bolted onto the realisation as a tie-break
+or a special case is an unverifiable heuristic that interacts with everything
+else in the slot loop.
+
+**D1 is the cautionary measurement.** It encoded "serve the UE furthest behind
+its contract" as a tie-break *beneath* an existing order — the realisation
+route. It won its target group (G10 admissible 7 -> 8) and regressed five
+others. A deficit term inside the objective would have been traded against
+every other claim by the solver; as a tie-break it could only displace
+whatever sat below it, with no visibility of the cost.
+
+**The discipline that must travel with the rule.** Adding a constraint can
+DESTROY the structure that makes the greedy exact. So every encoding states,
+before it is built, which of these it is:
+
+1. **Preserves separability + the polymatroid feasible region** — greedy stays
+   exact, no solver change. This is the target.
+2. **Preserves a knapsack per direction but changes the ranking quantity** —
+   still exact, but the ordering derivation has to be re-stated.
+3. **Breaks the structure** (couples directions, introduces integrality, or a
+   non-matroid feasible set) — then it needs a different solver, and the
+   performance and determinism arguments of section 7 are re-opened. Do not
+   pretend a type-3 constraint is a type-1 one.
+
+**The open requirements to encode, in this order:**
+
+| requirement | where it is failing now | natural encoding |
+|---|---|---|
+| **delay / PDB** | groups A, B | a deadline term in the objective, or a per-flow visit-interval constraint (already partly present as the PDB rank) |
+| **importance-ordered degradation** | past the admissible boundary | objective weights by class, with safety (5QI 85) as a hard constraint rather than a weight — see `docs/guarantee-groups-2026-09-16.md` section 7 |
+| **fairness** | group E (G10 M08) | a max-min or proportional term over the contracted set; the polymatroid form is the one to check first |
+| **video frame knowledge** | group C (G5) | PDU-set completeness: the marginal value of a frame's LAST fragment is the whole frame, so the value function is **not** linear in bytes — this is the one most likely to be type 2 or 3 |
+
+**And the diagnosis comes first.** `ConfigSched2.decision_sink` (2026-09-16)
+records, per slot and direction, every unit considered, its rank, and its
+outcome (`granted` / `cap_skipped` / `cce_short` / `prb_exhausted` /
+`mapped_visit_missed` / `no_target`). Use it to establish WHICH term is
+binding before adding one — a constraint added against a guess is how the
+realisation accumulated heuristics in the first place.
+
 ## 9. Open external inputs
 
 None specific to this work. The SRB capture and TS 22.104's survival-time
 table are outstanding for the guarantee campaign generally, and the test
 plan owes three specification answers — G6's estimator, G7 c1's tolerance,
 G9's neighbour ε.
+
+
+---
+
+## DL SPS — the downlink analogue of CG, NOT IMPLEMENTED (registered 2026-09-16)
+
+**Status: not built, not measured, no code. This is a registered candidate,
+not a result.** Recorded here so it is not rediscovered as a new idea, and so
+the next person knows what is already settled about it.
+
+### What it is, from the Rel-16 text (read, not recalled)
+
+Semi-Persistent Scheduling is the downlink's configured grant: a periodic
+**downlink assignment** the UE keeps without a PDCCH per occasion.
+
+* **TS 38.321 V16.22.0 §5.8.1** — SPS is configured by RRC per Serving Cell
+  per BWP; *"Multiple assignments can be active simultaneously in the same
+  BWP"*; a DL assignment is provided by PDCCH and stored or cleared on L1
+  signalling (activation / deactivation); activation is independent per
+  Serving Cell. RRC supplies `cs-RNTI`, `nrofHARQ-Processes`,
+  `harq-ProcID-Offset`, `periodicity`, and the N-th assignment lands at
+  `(numberOfSlotsPerFrame x SFN + slot) = (... start time ...) + N x periodicity
+  x numberOfSlotsPerFrame / 10` modulo `1024 x numberOfSlotsPerFrame`.
+* **TS 38.331 V16.22.0 `SPS-Config`** — `periodicity` ENUMERATED
+  {ms10, ms20, ms32, ms40, ms64, ms80, ms128, ms160, ms320, ms640};
+  `nrofHARQ-Processes` INTEGER (1..8); Rel-16 extensions `sps-ConfigIndex-r16`,
+  `harq-ProcID-Offset-r16` (0..15), `periodicityExt-r16` (1..5120 **slots**),
+  `pdsch-AggregationFactor-r16`. `BWP-DownlinkDedicated` carries
+  `sps-ConfigToAddModList-r16` / `-ToReleaseList-r16` /
+  `sps-ConfigDeactivationStateList-r16`.
+* **The bound that differs from CG:** `maxNrofSPS-Config-r16 = 8` SPS
+  configurations per BWP, against `maxNrofConfiguredGrantConfig-r16 = 12` for
+  CG. A staged-configuration design on the downlink therefore has **8**
+  phases to play with, not 12.
+
+So **SPS is fully inside the Rel-16 compliance baseline** — the constraint the
+deployment imposes is satisfied, and `docs/rel16-baseline-2026-09-15.md`
+§2.1/§2.2 already carries the clause rows (survey row B2, *"Rel-16, keep as a
+candidate"*).
+
+### Why it is worth exploring: CG moved uplink and left downlink untouched
+
+The 2026-09-16 campaign measured configured grants on every arm. **CG closed
+the entire uplink heartbeat class on every arm, and nothing in the downlink
+moved** — G1 and G2 are where they were without it. That is not a surprise
+(CG is an uplink mechanism), but it does mean the downlink has had **no
+equivalent intervention at all**, on any arm. SPS is the one Rel-16 lever that
+is structurally the same shape.
+
+### What it would and would NOT fix — stated before building, so it can be wrong
+
+* **It attacks the DCI / per-slot-cap axis, not the retry axis.** SPS removes
+  the PDCCH for the *initial* transmission only; **TS 38.300 §10.2 is explicit
+  that retransmissions are scheduled on PDCCH**. So the honest expectation is
+  that SPS relieves the M-6 per-slot UE cap (4 at 106 PRB) and the DCI budget.
+* **It is therefore NOT an obvious fix for G2.** G2 fails on every arm on the
+  **retry budget** (the BLER^2 floor inside a 5 ms PDB), and SPS adds no
+  retries. Anyone picking this up should not expect G2 to move, and should
+  register that expectation before measuring rather than after.
+* **G1 passes today**, so SPS there is a *margin* measurement, not a fix.
+* The real candidate is the one the survey already names: a standing DL lane
+  for a periodic downlink flow, freeing DCI for the download and for retries.
+
+### Where it would be built — `sim/`, not `scheduler/`
+
+**CLAUDE.md's invariant "Do not add SPS / Configured Grant to the schedulers"
+governs `scheduler/` files and is NOT a ban on this work.** Configured grants
+were built as a **MAC feature in `sim/`** (`sim/configured_grant.py`) that runs
+*ahead of* every scheduler and reaches them only as pre-scheduler occupancy
+(`sim/pre_sched.py::Occupancy`) plus a reduced buffer view. SPS follows that
+same pattern exactly:
+
+* a `sim/` module owning the SPS configurations and their phases;
+* occasions added to the ONE `Occupancy` map, so the DL path cannot diverge
+  from the CG path;
+* every arm — faithful ports included — runs it through one driver flag, and
+  any arm with it on is **labelled in its name and in every table**, exactly as
+  `+CG` is;
+* `scheduler/two_tier.py` and `scheduler/reservation.py` stay the port, with
+  no SPS mechanism re-added (the deleted `_SPSReservation` / `_allocate_sps`
+  must not come back).
+
+### Open questions to settle before building
+
+1. **Does the HARQ mask compose?** `HarqAwareBufferView` fully masks a flow
+   with a pending process; a standing DL assignment interacts with that the
+   way a restricted CG TB did (`HarqProcess.cg_qfi`, build 2c). The DL analogue
+   is unbuilt and is the first thing to get right.
+2. **Does an SPS occasion suppress anything the way CG suppressed SR?** The
+   unrestricted-CG result (it broke G5 on every arm by suppressing SR for every
+   channel) is the cautionary precedent. The downlink has no SR, so the naive
+   answer is no — which is exactly the kind of naive answer this project has
+   been wrong about before, and it should be measured, not assumed.
+3. **8 configurations per BWP** is the budget for any staged design.
