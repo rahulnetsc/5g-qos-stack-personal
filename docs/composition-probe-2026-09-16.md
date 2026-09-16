@@ -106,3 +106,57 @@ project's most-recorded defect shape.
 
 **Expectation 5 is therefore downgraded to a one-sided observation** — a rise is
 informative, flatness is not — and it must not be reported as a passed check.
+
+---
+
+## 7. FIRST ATTEMPT CRASHED — `sensor_dense` is unusable, and my viability check was wrong
+
+The probe died after 90 of 280 sweeps with
+`ValueError: min() iterable argument is empty`, raised at
+`g12_campaign.py:236` — `min()` over the flows of a GBR class that has **no
+flows**.
+
+**The cause is the vacuity §3 tried to design out, one cell further along than I
+guarded.** `GBR_CLASSES` is `(2, 4)` and the ramp needs both to produce an
+ordering. Census:
+
+| cell | GBR census | verdict |
+|---|---|---|
+| `mixed:4`, `mixed:6` | `{4:1, 2:3}` | scoreable |
+| `ugv_heavy:4`, `ugv_heavy:6` | `{4:2, 2:3}` / `{4:2, 2:5}` | scoreable |
+| `drone_heavy:4`, `drone_heavy:6` | `{4:1, 2:3}` / `{4:1, 2:5}` | scoreable |
+| `sensor_dense:4` | `{}` | vacuous |
+| **`sensor_dense:6`** | `{2:1}`, **missing 5QI-4** | **vacuous — this raised** |
+
+**§3's viability check was wrong, and the error is instructive.** It confirmed
+`sensor_dense:6` *gains a camera* relative to N=4 and concluded it was
+scoreable. It never checked the thing that actually matters: whether the cell
+still has **no UGV**, hence no 5QI-4. At a 3 % UGV share `sensor_dense` does not
+acquire one at N=8 either, so **it is unusable for G12's ordering test at any
+practical fleet size** — not merely at N=4.
+
+**Corrected cell set: 6 cells** — `mixed`, `ugv_heavy`, `drone_heavy` at N=4 and
+N=6. 6 x 2 arms x 10 seeds x 2 tie-break = 240 ramp sweeps, 2 640 driver runs.
+
+**The 90 completed sweeps are DISCARDED, not salvaged**, under the standing
+fresh-runs rule: they are a self-selected subset (whatever happened to schedule
+before the crash) and re-entering them would publish a result over a population
+nobody chose.
+
+**Consequence for the probe's reach.** `sensor_dense` was the composition
+furthest from `mixed` — the one most likely to stress a per-flow density budget,
+since it is many small periodic flows and almost no video. Losing it means the
+probe now spans a narrower range (`ugv_heavy` and `drone_heavy` both still carry
+UGVs, drones and a camera), so **a null result is weaker evidence than §4
+assumed**: it would say composition does not matter *across the compositions
+G12 can actually score*, not across the deployment's plausible range.
+
+## 8. A LATENT GUARD GAP, recorded separately
+
+`sim/scenarios/g12.py` defines `assert_cell_is_scoreable` precisely for this —
+its docstring names the `sensor_dense` case and says such a cell "must be
+EXCLUDED by name, not scored to a one-element order that reads like a result".
+**It did not fire**, because the ramp path reaches `min()` in
+`g12_campaign.py:run_ramp` without calling it. A vacuous cell therefore raises
+deep inside a worker and kills the whole pool, instead of being excluded by name
+at task-build time. Worth fixing on its own merits; not bundled here.
