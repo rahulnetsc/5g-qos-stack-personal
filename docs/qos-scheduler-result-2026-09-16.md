@@ -39,6 +39,26 @@ order, at a small cost in downlink STOP latency.
 **It is not a strict dominator.** It loses on G2 (both caps) and on a few G1
 percentile points. Everything else is a win or a tie.
 
+**Against the faithful ports, like-for-like** (every arm with the same
+restricted CG, from the campaign's own `cg/` artefacts):
+
+| arm, all `+CG` | G5 admissible fleet | G10 admissible |
+|---|---|---|
+| `TwoTier+CG` | none | 7 |
+| `ConfigSched+CG` (v1) | 7 | 10 |
+| `ConfigSched2+CG` | 7 | 8 |
+| `PF+CG` | 8 | 8 |
+| `Reservation+CG` | 8 | 8 |
+| **`ProtoRRageD2+CG`** | **10** | 7 |
+| **`ConfigSched2X7+CG`** | **24** | 8 |
+
+**`ProtoRRageD2+CG` is the second-strongest arm on group C** — a single ordering
+change plus a tie-break on the deployed two-tier port, reaching fleet 10 where
+both PF and Reservation reach 8. It is the conservative choice if a new
+scheduler architecture is unwelcome, and it has the best G7 camera containment
+of any arm measured (−1.1 ms, i.e. indistinguishable from no aggressor).
+`ConfigSched+CG` holds the best G10 boundary (10).
+
 **The single most important finding is not about the scheduler.** Configured
 grants are worth more than every scheduler change measured here combined, and
 CG is a MAC feature that runs ahead of the scheduler — not the scheduler's to
@@ -184,7 +204,15 @@ Recorded because the corrections are the evidence that the method worked.
   `rlf` — never in `warm` — and 12 events in 720 runs cannot separate two
   mechanisms. **No verdict drawn**; the 31/5 tie is a coincidence of counts, not
   of behaviour.
-* **G4, G8 and G11 are not measured.**
+* **G4 is measured for the faithful arms but NOT for the recommended one.**
+  `sweeps/cell-2026-09-16-linux/aligned/g4.json` holds 19 846 rows across all
+  fifteen campaign arm/CG combinations (`rc=0`, "real grid"), so GT-2.3 is
+  answered for PF, Reservation, TwoTier, `ProtoRRageD2` and `ConfigSched` v1 —
+  **but for no `ConfigSched2` variant**, because `run_increment.sh` skips it by
+  design (its runner takes no `--arms` and would re-run every arm). Closing that
+  gap is a single targeted run, not a campaign.
+* **G8 and G11 are not measured on this cell at all** — the only artefacts are
+  from the 2026-09-04/05 directories, a different radio.
 * **DL SPS is not implemented.** It is the downlink analogue of CG, inside the
   Rel-16 baseline (TS 38.321 §5.8.1; 8 configurations per BWP against CG's 12),
   and the downlink has had no intervention equivalent to the one that dominated
