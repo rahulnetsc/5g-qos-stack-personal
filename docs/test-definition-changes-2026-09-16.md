@@ -188,3 +188,49 @@ and its own re-measurement of G7 across the arms. It is deliberately NOT bundled
 with the config-scheduler increments: bundling a test-definition change with a
 scheduler change makes every moved number uninterpretable, which is the whole
 point of the one-change-per-commit rule.
+
+### 3.5 MEASURED, first run with the control (ConfigSched2, N = 8, 10 seeds)
+
+| seed | A telemetry p98 (treatment) | control | A camera p98 (treatment) | control |
+|---|---|---|---|---|
+| 35492826 | 86.5 | 58.5 | 65.7 | 39.7 |
+| 87989972 | 67.0 | 41.0 | 47.9 | 36.6 |
+| 1097657231 | 99.5 | 57.0 | 66.2 | 40.2 |
+| 1367864806 | 46.0 | 44.0 | 46.0 | 37.6 |
+| *(all 10 seeds; PDBs: telemetry 100 ms, camera 150 ms)* | | | | |
+
+**Expectation 1 is FALSIFIED.** It predicted a non-zero number of cells would
+come back unscoreable. **0 of 10 are gated** — Asset A's control is inside its
+SLO on every seed at N = 8 on this arm. The gate is kept anyway, exactly as
+§3.3 said it would be, and for the same reason G12 keeps its own: a gate that
+does not fire here still separates capacity from containment the moment an arm
+or a fleet size makes the victim pre-broken. What is now established is that
+**on `ConfigSched2` at N = 8 it does not**, so clause 1's failures on this arm
+are real containment effects, not capacity artefacts.
+
+**Expectation 2 is supported, and it is the consequential one.** The
+aggressor's OWN contribution — treatment minus its paired control — is:
+
+* A telemetry p98: **median +7.8 ms**, max +42.5 ms
+* A camera p98: **median +9.7 ms**, max +26.0 ms
+
+against raw treatment values of 46.0–99.5 ms. **So roughly four fifths of
+clause 1's raw number is load that is present with no aggressor at all.**
+Reporting the raw p98 as containment harm overstates it several-fold.
+
+### 3.6 What this obliges, and what is NOT yet claimed
+
+Every E-series G7 clause-1 figure in `docs/configsched2-diagnosis-2026-09-16.md`
+was measured **without** controls, since the controls did not exist until this
+commit. The reported regressions there (A telemetry p98 57.8 → 96.5/98.0 ms)
+therefore mix the arm's own latency under load with containment harm, and
+**cannot be decomposed retrospectively** — the control runs were never made.
+
+**Not claimed:** that those regressions are artefacts. The control measured
+here is `ConfigSched2`'s, and an arm that serves half as many grants may well
+have a worse control too, which would mean MORE of its raw number is
+capacity — or less. It has to be run per arm.
+
+**Owed:** re-measure G7 with controls across the arms before any G7 clause-1
+comparison between them is quoted again. Until that lands, the upper-bound
+caveat in §2.1 stands for every arm except `ConfigSched2` at N = 8.
