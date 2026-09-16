@@ -164,17 +164,17 @@ Recorded because the corrections are the evidence that the method worked.
 * **Group A deficit is real and unexplained.** The recommended arm misses 10
   more STOPs at cap 4 and 12 more at cap 2 than the fallback. It has not been
   traced.
-* **G9's join failures are real, and the recommended arm has fewer of them.**
-  The occupancy axis was mis-anchored (derived from the *previous* cell's G10
+* **G9's join failures are real, and neither arm has an advantage.** The
+  occupancy axis was mis-anchored (derived from the *previous* cell's G10
   boundary) and has been re-anchored to this cell's measured boundary, taking
   unscoreable cells from 12 of 36 to **0 of 36**. The failures survive that fix:
   the recommended arm fails one join at 0.25× the boundary — two UEs at nominal
-  load — which is not a capacity effect and is **untraced**. Re-measured on the anchored axis the two arms are
-  **exactly tied at 31 PASS / 5 failures** — an earlier claim that they
-  separated came from an artefact whose verdict grouping omitted
+  load — which is not a capacity effect and is **untraced**. On the anchored
+  axis the two arms are **exactly tied at 31 PASS / 5 failures**; an earlier
+  claim that they separated came from an artefact whose verdict grouping omitted
   `committed_mult`, now fixed. Their *distributions* differ (the fallback is
-  clean below the boundary and fails 4 of 5 at 1.5×; the recommended arm
-  spreads one across nearly every level), but neither has a G9 advantage.
+  clean below the boundary and fails 4 of 5 at 1.5×; the recommended arm spreads
+  one across nearly every level), but neither leads on G9.
   Separately, **"JOIN FAILURE" is largely not about joins here**: all 17 failing
   cells met the 90 % join-yield rule and 16 were caused by an SRB dialogue still
   in flight at the horizon. Tested against load, the stall-versus-artefact
@@ -213,4 +213,24 @@ through `scripts/proto_arms.py`, the single registry.
 
 **Known suite state:** three tests fail (`test_verify_claims` ×2,
 `test_wp9_sweep_memory` ×1) and **pre-date this work** — verified by running
-them at HEAD with the changes stashed. `regression_corpus.py --check` is clean.
+them at HEAD with the changes stashed. `regression_corpus.py --check` is clean,
+and `verify_claims --check` reads 8/22, identical to the baseline measured
+before any of this work began.
+
+**Two runner bugs were found and fixed while producing these results**, and any
+earlier artefact is affected by them:
+
+1. **Three runners kept private copies of the arm table** (`g3_stress`,
+   `g9_stress`, `g4_postsilence`). Two raised on a newly registered arm name, so
+   an increment's G3 and G9 steps died in ~1 s while the other seven scored — a
+   partial result reported under an arm name the log still carried. The first
+   two now delegate to `scripts/proto_arms.py`, verified identical on all 19
+   pre-existing arm names.
+2. **`g9_stress`'s verdict grouping omitted `committed_mult`**, so every
+   occupancy level sharing a UE count was pooled and written three times under
+   three keys — an artefact that *looked* per-level and was not. Invisible on
+   the old axis, where every level had a unique UE count. The per-run ledger was
+   always correct, so fixing it required no re-simulation.
+
+**G9 results produced before 2026-09-16 carry the old, mis-anchored axis** and
+should be re-read against §5 rather than quoted directly.
