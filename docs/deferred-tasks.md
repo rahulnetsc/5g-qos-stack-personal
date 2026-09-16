@@ -177,7 +177,46 @@ original is preserved beside it as `.PRE-M23.json`.
 
 ---
 
-## Guarantee status, as of 2026-09-11
+## Guarantee status — UPDATED 2026-09-16 (supersedes the 2026-09-11 table below)
+
+| status | guarantees |
+|---|---|
+| **measured per increment**, in groups A–F | G1, G2, G3, G5, G6, G7, G9, G10, G12 |
+| **measured for all 24 arm/CG combinations, NOT in the increment runner** | **G4** (GT-2.3) |
+| **runner exists, deferred for TIME** | **G11** |
+| **no runner exists, deferred for want of a DEFINITION** | **G8** |
+
+**The two deferrals are not the same kind of thing, and were being treated as
+one bucket.** `scripts/g11_*.py` is a complete suite (`g11_campaign`,
+`g11_soak`, `g11_c345`, `g11_drift`, `g11_score`) — G11 is a run nobody has
+spent the hours on. **G8 has no runner at all**: no `g8_*.py` exists, and
+`docs/plan-cg-and-config-scheduler-2026-09-14.md` §3 records that it "needs a
+scenario, a per-role statistic and a defined load level". G8 is not a deferred
+measurement; it is an undefined test.
+
+**Corrections to the old table, each checkable:** G6 was listed "not started"
+and has been measured on five arms, had two test-definition defects fixed, and
+ten stored artefacts rescored (`docs/test-definition-changes-2026-09-16.md` §1).
+G4 was listed deferred and is now measured, with a monotone regression across
+the ConfigSched family (§25 of the diagnosis doc). G7 and G10 were listed
+"runners only" and are scored per increment, G7 with a paired no-aggressor
+control added today.
+
+**THE STANDING REGRESSION RULE IS REPLACED.** It read *"G1 through Gn, minus
+anything deferred"* — and that phrasing is exactly how a deferral becomes a
+silent exemption: G4 was dropped from scoring by a schedule decision and
+regressed through nine increments unobserved. The rule is now
+`docs/guarantee-groups-2026-09-16.md` §3a: **every guarantee is either in a
+group or named exempt with a reason, and "deferred" is not a reason to stop
+scoring a guarantee that has a runner.**
+
+**What is NOT known:** G8 and G11 have no result for any arm on this cell.
+Statements about an arm's overall standing are claims over **nine of twelve**
+guarantees, plus G4 where separately measured.
+
+---
+
+## Guarantee status, as of 2026-09-11 (HISTORICAL — see above)
 
 | rebuilt as a stress experiment | G1, G2, G3, G5, G9, G12 |
 |---|---|
@@ -185,6 +224,6 @@ original is preserved beside it as `.PRE-M23.json`.
 | **runners only, used as regression checks** | G7, G10 |
 | **not started** | G6, G8, G11 |
 
-**The standing rule for regression:** at guarantee *n*, the scheduler is scored
-against **G1 through G*n*, minus anything deferred**. At n = 5 that is G1, G2,
-G3 and G5.
+**The standing rule for regression** (superseded, kept for the record): at
+guarantee *n*, the scheduler is scored against **G1 through G*n*, minus anything
+deferred**. At n = 5 that is G1, G2, G3 and G5.
