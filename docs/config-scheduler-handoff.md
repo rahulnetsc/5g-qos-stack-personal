@@ -389,6 +389,74 @@ and G2 against the campaign's artefacts on the same seeds. Open choice
 before building: L7's `PDB/2` against a phase estimate for undeclared
 periodic sources — the heartbeat decides it.
 
+## 8d. The time-sharing alternative — and why configuration enumeration collapses into it (2026-09-16)
+
+Asked for: build the recommended outer stage (enumerate configurations,
+solve the time-shares by the exact greedy, realise with the Kraft
+schedule), and/or the "other time-sharing mechanism" — the Birkhoff–von
+Neumann style optimal time-share — to see whether either helps the
+deadline-driven failures.
+
+### 8d.1 The check that comes first: enumeration is vacuous here
+
+A *configuration* is a set of flows servable in one slot. Ours must satisfy
+two constraints: at most `cap` DCIs, and the PRBs must fit. **Increment 7
+sizes every visit at most a cap-th of the slot's PRBs, so `cap` visits
+always fit and the PRB constraint never binds within a slot.** What remains
+is a pure cardinality constraint, and the feasible set is then *every*
+subset of size ≤ cap — the base polytope of a **uniform matroid**.
+
+Every visit-fraction vector `x` with `Σ x_i ≤ cap`, `0 ≤ x_i ≤ 1` is a
+convex combination of such subsets. So enumerating configurations and
+solving for their time-shares `φ` **cannot reach any rate vector that
+choosing `x` directly cannot reach**. The decomposition is not where the
+value is; the **realisation** — which slots each flow actually gets — is.
+
+This is why the BvN framing, though structurally correct (an admissible
+rate matrix decomposes into configurations held for fractions of time),
+buys nothing *as machinery* in our setting. It would stop being vacuous
+only if a visit were allowed to exceed a cap-th of a slot, because then
+subsets would have to fit in PRBs too and the polytope would no longer be
+a uniform matroid. That is a sizing decision we deliberately made the
+other way (increment 7, after crumbs at 95 % of grants).
+
+### 8d.2 What is therefore worth building: exact shares, smooth realisation
+
+| | how the visit rate is chosen | how it is realised | max gap | density cost |
+|---|---|---|---|---|
+| **A — today** | `n_i` from the greedy, then period `T_i` = largest power of two ≤ `W/n_i` | Kraft tracks, residue classes | **exactly `T_i`** | rounding the period DOWN visits more often than needed — up to **2×** the necessary density |
+| **B — the alternative** | the exact fraction `x_i = n_i / W` (the greedy is provably exact here: Federgruen–Groenevelt 1986, separable concave over a polymatroid) | a divisor / smoothing schedule — serve whichever flow is furthest behind `x_i · t`; Tijdeman's chairman-assignment bound keeps every flow's cumulative deviation below 1 | `≈ 1/x_i`, bounded deviation, **not** constant | none — the harmonic waste disappears |
+
+**The trade is explicit, and it is the reason to measure rather than
+argue.** A is *stronger per flow* (a gap that is exactly `T_i`, by
+construction). B is *stronger in aggregate* (no wasted density, so more
+flows get a share at all). Our failures at high load are density failures —
+`floors_unmet` reads 13 029 at N = 24, and G5's admissible fleet and G10's
+behaviour past the boundary are both "who gets a share" questions — which
+is why B is worth a run even though it weakens the per-flow guarantee that
+made increments 5–9 work.
+
+### 8d.3 Registered before building
+
+- **Density:** `floors_unmet` at N = 24 falls substantially; that is B's
+  whole mechanism and if it does not move, B did nothing.
+- **Group C (G5):** admissible fleet 6 → 7 or better, load knee ×1.0 →
+  ×1.1 or better — the recovered density is exactly what the camera floors
+  need.
+- **Group E (G10):** admissible 10 held; M08 past the boundary improves on
+  increment 9's 0.781 / 0.175.
+- **Group B (G3):** part-1s boundary stays 24 and the campaign part 2 stays
+  PASS. Worst silences may rise (gaps are no longer constant) but must stay
+  at or under the Proto arm's 199–494 ms.
+- **Group A (G1, G2) and F (G9):** unchanged within noise.
+- **Falsified by:** G3's boundary dropping below 10, or the silences
+  exceeding Proto's — either would say the fixed-period guarantee was
+  load-bearing and that A's harmonic construction should stay.
+
+Built as a flag on `ConfigSched2` (default off, so the arm stays
+byte-identical when unset) under its own arm name, exactly as `D1` was for
+the Proto side.
+
 ## 9. Open external inputs
 
 None specific to this work. The SRB capture and TS 22.104's survival-time
