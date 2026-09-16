@@ -133,7 +133,8 @@ class ConfigSched2:
                  min_period_slots: int = 2, density_budget: bool = False,
                  plan_share_sizing: bool = False,
                  importance_order: bool = False,
-                 byte_sized_visits: bool = False) -> None:
+                 byte_sized_visits: bool = False,
+                 unit_share_cap: bool = False) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
         self.resolve_ms = float(resolve_ms)
@@ -186,6 +187,18 @@ class ConfigSched2:
         #: a whole message. REQUIRES `importance_order`, which is what creates
         #: the deadline-driven visits in the first place.
         self.byte_sized_visits = bool(byte_sized_visits)
+        #: E5 (2026-09-16, diagnosis doc sec 17). Bound the UNIT's total
+        #: request to a cap-th of the slot, not each flow's share.
+        #: `per_visit_cap` is applied per FLOW, but a UL unit is
+        #: `(ue_id, -1)` -- every uplink flow of a UE shares ONE grant, sized
+        #: from their SUM -- so a UE carrying telemetry + camera + best-effort
+        #: can request three cap-ths and nothing bounds the total. Measured at
+        #: gt22 N=6: PRBs per grant 26 (baseline) -> 52 under E1, and units
+        #: granted per slot 3.29 -> 1.71 on the SAME offered units.
+        #: LATENT IN THE BASELINE TOO -- E1 only made it bind -- which is why
+        #: this is measured standalone as well as stacked.
+        #: Independent of the other flags: no guard.
+        self.unit_share_cap = bool(unit_share_cap)
         if self.byte_sized_visits and not self.importance_order:
             raise ValueError(
                 "byte_sized_visits requires importance_order: without it no "
@@ -731,6 +744,11 @@ class ConfigSched2:
                 planned += want
                 served.append((f, want))
             target = planned if planned > 0 else backlog
+            if self.unit_share_cap:
+                # The bound the clamp was always meant to give: `cap` UNITS
+                # share a slot, so a unit's whole request -- not each of its
+                # flows' shares -- is what a cap-th must bound.
+                target = min(target, per_visit_cap)
             if target <= 0:
                 _note(unit, rank, "no_target", backlog=backlog)
                 continue

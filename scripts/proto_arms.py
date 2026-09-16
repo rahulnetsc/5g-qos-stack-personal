@@ -74,6 +74,18 @@ def resolve_arm(name: str, min_rb: int = 5):
         from sim.baselines.config_sched2 import ConfigSched2
         return ConfigSched2(min_rb=min_rb, density_budget=True,
                             importance_order=True)
+    if name == "ConfigSched2X6":
+        # E5 STANDALONE, on the untouched baseline: does bounding the unit's
+        # total help by itself? If it does, it is a fix in its own right and
+        # must not be credited to the density budget.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, unit_share_cap=True)
+    if name == "ConfigSched2X7":
+        # E1 + E3 + E4 + E5 stacked.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, density_budget=True,
+                            importance_order=True, byte_sized_visits=True,
+                            unit_share_cap=True)
     if name == "ConfigSched2X5":
         # E1 + E3 + E4 (2026-09-16). Deliberately WITHOUT E2, which cost
         # group E (G10 admissible 10 -> 8) while E3 holds it at 10.

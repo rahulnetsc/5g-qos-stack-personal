@@ -563,3 +563,74 @@ to diagnose first.
 **Standing recommendation until then:** `ConfigSched2` (baseline) remains the
 arm of record. The E-series flags stay in the tree, default off, each with its
 measured result, exactly as the D1 flag did.
+
+---
+
+## 16. THE PRB MECHANISM, TRACED TO THE LINE (2026-09-16)
+
+§15.3 established that the E-variants issue half the grants. This is why.
+gt22 N=6, 3 600 UL slots, from the decision trace:
+
+| | `ConfigSched2` | E1+E3 |
+|---|---|---|
+| units OFFERED per slot | 5.73 | 5.86 |
+| units **GRANTED** per slot | **3.29** | **1.71** |
+| PRBs used per slot | 92.85 | 95.92 |
+| **PRBs per GRANT** (mean / median) | **28.2 / 26** | **56.1 / 52** |
+| bytes per GRANT (median) | 1 443 | 2 100 |
+| slots granting **zero** units | 13 | **151** |
+
+**A cap-th of the 106-PRB slot is ~26 PRBs.** The baseline's grants sit exactly
+there, so `cap` = 4 of them fit. Under E1 each grant takes ~52 — half a slot —
+so only two fit. The same units are offered and the slot is equally saturated;
+the cell simply serves half as many.
+
+### 16.1 The defect: the clamp bounds a FLOW, the grant belongs to a UNIT
+
+`per_visit_cap = (prb_count // cap) * se // 8` is applied per flow:
+
+    want = min(reported, plan.bytes_per_visit, per_visit_cap)
+
+but a **UL unit is `(ue_id, -1)` — every uplink flow of a UE shares ONE grant**
+(`_place` groups them), and the grant is sized from their SUM:
+
+    target = planned          # sum of `want` over the unit's flows
+    prbs_needed = (target * 8 + se - 1) // se
+
+So a UE carrying telemetry + camera + best-effort can legitimately request
+**three cap-ths of the slot**, and nothing bounds the total. The baseline hides
+this because its per-flow shares are small; E1 enlarges every share, so the sum
+doubles and the arithmetic surfaces.
+
+**This is latent in the baseline too**, not an artefact E1 introduced — E1 only
+made it bind. It is the same family as the denominator rule in CLAUDE.md: the
+quantity being bounded is not the quantity that is spent.
+
+---
+
+## 17. Encoding E5 REGISTERED BEFORE BUILDING
+
+**The encoding.** Bound the **unit's total** request to a cap-th of the slot,
+not each flow's share, so that `cap` units fit by construction — which is what
+the clamp was always meant to guarantee.
+
+**Structure class: TYPE 1**, and note it is independent of E1: it is a
+realisation-side bound restoring the invariant the outer problem already
+assumes (`cap` units share a slot). It is therefore measured BOTH standalone on
+the baseline (`ConfigSched2X6`) and stacked (`ConfigSched2X7` = E1+E3+E4+E5),
+because if it helps standalone it is a fix in its own right and must not be
+credited to the density budget.
+
+### 17.1 Registered expectations and falsifiers
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | PRBs per grant returns to ~26 median, units granted per slot to ~3.3 | no movement — then unit aggregation is not what inflates the grant and §16.1 is wrong |
+| 2 | on the STACKED arm, G3 part-3 boundary recovers materially toward 10 | no recovery — then grant count is not what costs group B either, and the E-series should be closed for good |
+| 3 | the stacked arm retains group C at admissible fleet 8 | falling back to 6 |
+| 4 | G10 admissible stays 10 | regressing |
+| 5 | on the STANDALONE arm, the baseline does not regress on any group | any regression — then the clamp is load-bearing as written and must not be changed |
+
+**Expectation 5 is the one that protects the arm of record.** `ConfigSched2` is
+currently the recommended arm; a change that improves the stack but damages the
+baseline is not a fix, and the standalone measurement is what separates them.

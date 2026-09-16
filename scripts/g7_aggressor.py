@@ -79,12 +79,13 @@ TOLERANCES = (0.05, 0.10, 0.25)
 ATTACH_SEED = None
 
 def build(seed: int, n_ues: int, horizon: int, offer_x_mfbr: float,
-          load_mult: float = 1.0):
+          load_mult: float = 1.0, scale_camera: bool = True):
     sc = sweep_scenario(seed=seed, n_ues=n_ues, horizon_slots=horizon,
                         load_mult=load_mult)
     flows = []
     for f in sc.flows:
-        if f.ue_id == ASSET_B and f.qfi == CAMERA_QFI and f.direction == "UL":
+        if (scale_camera and f.ue_id == ASSET_B and f.qfi == CAMERA_QFI
+                and f.direction == "UL"):
             p = dict(f.traffic_params)
             # Scale the SOURCE rate. `avg_bytes` is the per-period frame
             # size, so multiplying it is exactly "the encoder bitrate is set
@@ -125,6 +126,36 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, offer: float,
            "M02_all": _m02a.value if _m02a else None,
            "M02_prot": _m02p.value if _m02p else None}
 
+    _fill_roles(rec, out, "")
+
+    # THE PAIRED CONTROL (2026-09-16, docs/test-definition-changes-2026-09-16.md
+    # sec 3). GT-4.3 clause 1 is "Asset A entirely within SLO", judged while
+    # Asset B is over-driven -- with no no-aggressor run it cannot separate
+    # "the aggressor harmed Asset A" from "Asset A was already outside SLO at
+    # this fleet size". Same seed, same fleet, same everything, camera at its
+    # NOMINAL rate. Emitted as raw `ctl_` statistics, never as a verdict: the
+    # runner reports, the scorer decides (G6's lesson, same file's sec 1).
+    ctl_sc = build(seed, n_ues, horizon, offer, load_mult, scale_camera=False)
+    ctl_s = driver_run(ctl_sc, resolve_arm(base_arm), cqi_delay_slots=8,
+                       record_timeseries=True,
+                       attach_seed_slots=("all" if attach else None),
+                       max_sched_ues=max_sched_ues, configured_grant=cg_cfg)
+    ctl_rec = RunRecord.from_summary(scenario_name=ctl_sc.name + "_control",
+                                     scheduler_name=arm, seed=seed,
+                                     flow_configs=ctl_sc.flows,
+                                     summary=ctl_s, arm={}, meta={})
+    _fill_roles(ctl_rec, out, "ctl_")
+    out["ctl_ul_prb_util"] = ctl_rec.system.ul_prb_utilization
+    # utilisation is the discriminating second read registered for clause 2:
+    # excess that vanishes as the cell saturates confirms BE-path delivery.
+    out["dl_prb_util"] = rec.system.dl_prb_utilization
+    out["ul_prb_util"] = rec.system.ul_prb_utilization
+    return out
+
+
+def _fill_roles(rec, out: dict, prefix: str) -> None:
+    """Per-role uplink statistics into `out`, under `prefix`. Shared by the
+    treatment and its paired control so the two cannot drift apart."""
     for fr in rec.flows.values():
         if fr.direction != "UL":
             continue
@@ -139,21 +170,16 @@ def one(arm: str, seed: int, n_ues: int, horizon: int, offer: float,
             role = "A_telemetry"
         if role is None:
             continue
-        out[f"{role}_throughput_bps"] = fr.throughput_bps
-        out[f"{role}_offered_bps"] = fr.offered_bps
-        out[f"{role}_mfbr_bps"] = fr.gfbr_bps * 2.0 if fr.gfbr_bps else 0.0
-        out[f"{role}_gfbr_bps"] = fr.gfbr_bps
-        out[f"{role}_p98_ms"] = fr.delay_p98_ms
-        out[f"{role}_pdb_ms"] = fr.pdb_ms
+        out[f"{prefix}{role}_throughput_bps"] = fr.throughput_bps
+        out[f"{prefix}{role}_offered_bps"] = fr.offered_bps
+        out[f"{prefix}{role}_mfbr_bps"] = fr.gfbr_bps * 2.0 if fr.gfbr_bps else 0.0
+        out[f"{prefix}{role}_gfbr_bps"] = fr.gfbr_bps
+        out[f"{prefix}{role}_p98_ms"] = fr.delay_p98_ms
+        out[f"{prefix}{role}_pdb_ms"] = fr.pdb_ms
         if fr.frame_completions["total"]:
             ok = sum(1 for a in fr.frame_completions["complete_ages_ms"]
                      if a <= fr.pdb_ms)
-            out[f"{role}_m05"] = ok / fr.frame_completions["total"]
-    # utilisation is the discriminating second read registered for clause 2:
-    # excess that vanishes as the cell saturates confirms BE-path delivery.
-    out["dl_prb_util"] = rec.system.dl_prb_utilization
-    out["ul_prb_util"] = rec.system.ul_prb_utilization
-    return out
+            out[f"{prefix}{role}_m05"] = ok / fr.frame_completions["total"]
 
 
 def _task(t):
