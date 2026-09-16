@@ -129,6 +129,15 @@ def resolve_arm(name: str, min_rb: int = 5):
                             reserve_period_mult=0.0,
                             reserve_depth_under_periodic=(
                                 2 if name.endswith("D2") else None))
+    # D1 (2026-09-16, group E): RRageD2 plus a GBR-deficit tie-break BENEATH
+    # the age order. The tuned arm is its own name so `ProtoRRageD2` stays
+    # frozen as the campaign measured it.
+    if name == "ProtoRRageD2X1":
+        return TwoTierProto(min_rb=min_rb, periodic_reserve=True,
+                            denial_ordered_periodic=True,
+                            reserve_period_mult=0.0,
+                            reserve_depth_under_periodic=2,
+                            deficit_tiebreak=True)
     if name not in _FLAGS:
         raise ValueError(
             f"unknown Proto arm {name!r}; known: {sorted(_FLAGS)} plus the "

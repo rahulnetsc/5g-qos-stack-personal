@@ -964,6 +964,11 @@ class TwoTier:
         self.counters: dict[str, int] = {
             "sched_inactive_fired": 0, "srb_floor_fired": 0,
             "cp_floor_fired": 0, "control_plane_grants": 0,
+            # D1 (scheduler/two_tier_proto.py, group E). Seeded here because
+            # this dict is a plain dict, not a defaultdict -- every `+=` site
+            # in both files relies on its key existing, and switching the
+            # container would change behaviour for every arm.
+            "d1_slots_with_deficit": 0, "d1_candidates_with_deficit": 0,
         }
         # mac->min_grant_prb, ia_p5g_scheduler.c:2210 -- confirmed the
         # SAME deployment-configured field reservation.py's own follower

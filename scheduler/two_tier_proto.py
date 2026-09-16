@@ -613,6 +613,7 @@ PROTO_FLAGS: tuple[str, ...] = (
     "age_gated_ordering",         # AGE
     "clear_gated_stamp",          # C3
     "urgency_contract_only",      # C4
+    "deficit_tiebreak",           # D1, group E
     "deadline_sizing",            # E3, not implemented
 )
 
@@ -645,6 +646,7 @@ class TwoTierProto(TwoTier):
                  age_gated_ordering: bool = False,
                  clear_gated_stamp: bool = False,
                  urgency_contract_only: bool = False,
+                 deficit_tiebreak: bool = False,
                  deadline_sizing: bool = False,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -669,6 +671,7 @@ class TwoTierProto(TwoTier):
         self.age_gated_ordering = bool(age_gated_ordering)
         self.clear_gated_stamp = bool(clear_gated_stamp)
         self.urgency_contract_only = bool(urgency_contract_only)
+        self.deficit_tiebreak = bool(deficit_tiebreak)
         #: lcg -> the gNB's own per-LCG estimate at the most recent
         #: `_ul_served_split`, read by C3's stamp gate for the same grant.
         self._c3_avail: dict[int, int] = {}
@@ -800,6 +803,13 @@ class TwoTierProto(TwoTier):
         #: ue_id -> age in slots, for candidates the AGE tier holds this slot.
         #: Rebuilt per slot in `_apply_age_gate`; read by `_ul_rank_key`.
         self._age_overdue: dict[int, int] = {}
+        #: D1 (group E): ue_id -> the port's own accumulated UL GBR deficit,
+        #: summed across the UE's LCGs. Filled per slot in `_finalize_ul_coef`
+        #: (before the sort) and read by `_ul_rank_key` (during it), the same
+        #: pattern as `_age_overdue` -- `_Candidate` carries no deficit, and
+        #: the port keeps it in `_ue_state[ue].ul_lcg_deficit_bytes` keyed by
+        #: LCG, which the key function cannot reach on its own.
+        self._d1_deficit: dict[int, int] = {}
         #: ue_id -> largest age over its active CONTRACTED LCGs, from the
         #: port's per-LCG clock; captured in `_ul_gbr_and_pdb` this slot.
         self._age_lcg_age: dict[int, int] = {}
@@ -1011,6 +1021,8 @@ class TwoTierProto(TwoTier):
             self._apply_gperiodic(candidates)
         if self.age_gated_ordering:
             self._apply_age_gate(candidates)
+        if self.deficit_tiebreak:
+            self._apply_d1(candidates)
         if not self.gate_follower_reserve:
             return
 
@@ -1185,6 +1197,24 @@ class TwoTierProto(TwoTier):
             # longest-denied first under the same ascending sort, and the
             # composite is not consulted at all. See the module docstring for
             # why negating `coef` does not express this.
+            if self.deficit_tiebreak:
+                # D1 (2026-09-16), group E. Age alone equalises VISITS, and
+                # bytes then diverge: on G10 at N = 8 every protected GBR flow
+                # is the same 4 Mbps camera, and this arm spreads them 0.096
+                # median / 0.230 max (PF 0.023 / 0.030), worst flow 0.917
+                # median against PF's 0.988 -- measured, gated on reproducing
+                # the artefact, docs/guarantee-groups-2026-09-16.md sec 5.
+                # Sizing cannot separate identical contracts and the channel
+                # is identical too (`snr_spread_db = 0`), so the missing term
+                # is the GBR deficit the port already accumulates.
+                # A TIE-BREAK BENEATH THE AGE, not a tier above it: the
+                # deficit's median sample is 0 bytes (37 450 samples, 3 848
+                # distinct values, none pinned at the cap), so a term placed
+                # above the age would carry no signal on most slots and would
+                # reorder the arm on the few where it does.
+                return (key[0], key[1], key[2],
+                        (-self._gdo_age(candidate.ue_id),
+                         -self._d1_deficit.get(candidate.ue_id, 0)), key[4])
             return (key[0], key[1], key[2],
                     -self._gdo_age(candidate.ue_id), key[4])
         # key[3] is `-coef`; negating it sorts the LOWEST composite first.
@@ -1193,6 +1223,31 @@ class TwoTierProto(TwoTier):
         # untouched: equal values stay equal under negation, and `list.sort` is
         # stable, so a fully tied slot is ordered exactly as the port orders it.
         return (key[0], key[1], key[2], -key[3], key[4])
+
+    def _apply_d1(self, candidates: list[_Candidate]) -> None:
+        """D1, group E: snapshot each candidate's accumulated UL GBR deficit.
+
+        The port accumulates it per LCG in `_ue_state[ue].ul_lcg_deficit_bytes`
+        (`two_tier.py:1858-1861`) and the deployed rule is LCG = DRB, so each
+        of G10's eight identical cameras owns one. Summed per UE because the
+        uplink grant is per UE -- the quantity the tie-break needs is "how far
+        behind its contracts is this robot", not which bearer is behind.
+
+        Read-only: nothing here writes the port's state, so the arm stays a
+        pure ordering divergence.
+        """
+        self._d1_deficit = {}
+        for c in candidates:
+            state = self._ue_state.get(c.ue_id)
+            if state is None:
+                continue
+            total = sum(state.ul_lcg_deficit_bytes.get(f.lcg, 0)
+                        for f in c.flows if f.direction == "UL")
+            if total > 0:
+                self._d1_deficit[c.ue_id] = total
+        if self._d1_deficit:
+            self.counters["d1_slots_with_deficit"] += 1
+            self.counters["d1_candidates_with_deficit"] += len(self._d1_deficit)
 
     def _gslack_key(self, ue_id: int) -> tuple[int, float, int]:
         """(already_late, remaining_ms, -denial_slots) for one UE."""
