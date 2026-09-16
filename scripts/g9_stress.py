@@ -97,6 +97,23 @@ def _arms():
             "ConfigSched2": lambda: resolve_arm("ConfigSched2")}
 
 
+def _factory(name: str):
+    """The arm's factory. A name this dict does not list falls through to
+    `proto_arms.resolve_arm` rather than raising `KeyError` (2026-09-16).
+
+    The literal dict above went stale the first time a tuned arm was added:
+    `ProtoRRageD2X1` raised here and in `g3_stress`, so an increment's G9 and
+    G3 steps died in 1 s while the other seven scored -- a partial result for
+    an arm the log still named. `resolve_arm` is the ONE registry; an unknown
+    `Proto` name still raises there, so a typo cannot reach the faithful arm.
+    """
+    try:
+        return _arms()[name]
+    except KeyError:
+        from proto_arms import resolve_arm as _r
+        return lambda: _r(name)
+
+
 def _availability_budget_s(fr) -> float:
     """TS 122 261 sec3.1: max allowed end-to-end latency + survival time."""
     return (fr.pdb_ms + fr.survival_time_ms) / 1000.0
@@ -266,7 +283,7 @@ def one(task: tuple) -> dict:
     # as a caveat on every G9 +CG row, not modelled here.
     from proto_arms import split_cg
     base_arm, cg_cfg = split_cg(arm)
-    factory = _arms()[base_arm]
+    factory = _factory(base_arm)
 
     t0 = time.time()
     s = run(sc, factory(), cqi_delay_slots=CQI_DELAY_SLOTS, record_timeseries=True,

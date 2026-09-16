@@ -133,105 +133,32 @@ from sim.scenarios.g3 import (                                   # noqa: E402
 )
 from sim.srb import with_srb                                     # noqa: E402
 from g11_campaign import _arm                                    # noqa: E402
-from proto_arms import split_cg                                  # noqa: E402
+from proto_arms import resolve_arm, split_cg                     # noqa: E402
 
 
 def _resolve_arm(name: str):
     """The three faithful arms, plus `TwoTierProto`'s flagged divergences.
 
-    WHY THIS IS HERE AND NOT IN `g11_campaign._arm`. That function is inside the
-    published artefacts' own `code_state` scope (every G1/G2/G3/G10/G12 stamp
-    reaches it), so adding an import of `scheduler/two_tier_proto.py` there
-    would stale every claim in `config/published_claims.yml` for a file those
-    campaigns never ran. Resolving Proto arms in the runner instead leaves the
-    faithful scopes untouched -- checked with `verify_claims --check`, not
-    assumed.
+    DELEGATES to `proto_arms.resolve_arm` (2026-09-16). This function used to
+    carry its OWN copy of the flag table, and the copy went stale: `D1`
+    (`ProtoRRageD2X1`) was registered in `proto_arms` and this runner raised
+    on it, voiding group B's regression check for that increment. `g9_stress`
+    held a third copy and failed the same way in the same run.
 
-    Names are `Proto` + the flags, so an artefact's `arm` column says which
-    divergence produced it. `ProtoOff` exists to make "off is the port"
-    checkable from a campaign as well as from the unit tests.
+    WHY A COPY EXISTED AT ALL, and why removing it is free. The separation
+    that matters is from `g11_campaign._arm`, which sits inside the stored
+    `code_state` scope of every published G1/G2/G3/G10/G12 artefact -- adding
+    a `scheduler/two_tier_proto.py` import THERE would stale every claim in
+    `config/published_claims.yml`. `proto_arms` is a different module and this
+    runner ALREADY imports it (`split_cg`, above), so delegating adds no file
+    to this scope that is not in it already. Checked with
+    `verify_claims --check`, not assumed.
+
+    A name that starts with `Proto` and is unknown still RAISES, in
+    `proto_arms` -- a typo must not fall through to the faithful arm and be
+    reported under a divergence's name.
     """
-    if not name.startswith("Proto"):
-        return _arm(name)
-    from scheduler.two_tier_proto import TwoTierProto
-    flags = {
-        "ProtoOff": {},
-        "ProtoE1": {"gate_follower_reserve": True},
-        "ProtoE2": {"stale_bsr_reserve": True},
-        "ProtoE1E2": {"gate_follower_reserve": True, "stale_bsr_reserve": True},
-    }
-    # G-depth's swept points. The bound is part of the arm's identity, so it
-    # is in the NAME -- an artefact's `arm` column has to say which K produced
-    # it, or two points of one sweep are indistinguishable in the ledger.
-    # G-periodic's swept points, named by the multiplier on the DERIVED P*
-    # (100 = 1.00x) so an artefact's `arm` column carries the sweep point.
-    if name.startswith("ProtoGslack"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  deadline_gated_periodic=True, slack_ordered_periodic=True,
-                  reserve_period_mult=int(name[11:]) / 100.0)
-    # M1: MFBR enforcement layered on the current candidate.
-    if name == "ProtoM1":
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  deadline_gated_periodic=True, kpi_ordered_periodic=True,
-                  reserve_depth_under_periodic=2, mfbr_enforced=True)
-    if name.startswith("ProtoGkpiD"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  deadline_gated_periodic=True, kpi_ordered_periodic=True,
-                  reserve_depth_under_periodic=int(name[10:]),
-                  reserve_period_mult=1.0)
-    if name.startswith("ProtoGkpi"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  deadline_gated_periodic=True, kpi_ordered_periodic=True,
-                  reserve_period_mult=int(name[9:]) / 100.0)
-    if name.startswith("ProtoGdenial"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  deadline_gated_periodic=True, denial_ordered_periodic=True,
-                  reserve_period_mult=int(name[12:]) / 100.0)
-    if name.startswith("ProtoGperD"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  deadline_gated_periodic=True,
-                  reserve_period_mult=int(name[len("ProtoGperD"):]) / 100.0)
-    if name.startswith("ProtoGper"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True,
-                  reserve_period_mult=int(name[len("ProtoGper"):]) / 100.0)
-    if name.startswith("ProtoGdepth"):
-        tail = name[len("ProtoGdepth"):]
-        k = None if tail == "" else int(tail)
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, depth_bounded_reserve=True, reserve_depth=k)
-    # RR-age (probe, 2026-09-13): every slot ordered by slots-since-last-UL-
-    # grant (P forced to 1), spatial reserve removed / kept for K=2. Mirrors
-    # scripts/proto_arms.py; existing flags only.
-    if name in ("ProtoAge", "ProtoAgeD2"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, age_gated_ordering=True,
-                  reserve_depth_under_periodic=(2 if name.endswith("D2") else None))
-    if name == "ProtoC34D2":
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, clear_gated_stamp=True, urgency_contract_only=True,
-                  depth_bounded_reserve=True, reserve_depth=2)
-    if name == "ProtoAgeC34D2":
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, age_gated_ordering=True, reserve_depth_under_periodic=2,
-                  clear_gated_stamp=True, urgency_contract_only=True)
-    if name in ("ProtoRRage", "ProtoRRageD2"):
-        from scheduler.two_tier_proto import TwoTierProto as _T
-        return _T(min_rb=5, periodic_reserve=True, denial_ordered_periodic=True,
-                  reserve_period_mult=0.0,
-                  reserve_depth_under_periodic=(2 if name.endswith("D2") else None))
-    if name not in flags:
-        raise ValueError(
-            f"unknown Proto arm {name!r}; known: {sorted(flags)}. A typo must "
-            f"not silently fall through to the faithful arm and be reported "
-            f"under a divergence name.")
-    return TwoTierProto(min_rb=5, **flags[name])
+    return resolve_arm(name, min_rb=5)
 
 #: Every real study in this branch runs with a delayed CQI rather than the
 #: driver's bare 0 (CLAUDE.md's `cqi_delay_slots` invariant).

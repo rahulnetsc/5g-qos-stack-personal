@@ -307,7 +307,13 @@ def _schedulers() -> dict:
     added HERE rather than in wp9_sweep so that module's scope -- shared by
     every WP9 artefact -- is untouched."""
     from proto_arms import resolve_arm
+    # ENUMERATED, not resolved on demand, because the caller iterates
+    # `.items()` to build the suffixed arm set -- so a new tuned arm has to be
+    # listed here by name. The two runners that resolve a SINGLE name
+    # (`g3_stress`, `g9_stress`) delegate to `proto_arms` instead; this one
+    # cannot, and that is the reason it is the remaining copy.
     return {**_arms(), "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2"),
+            "ProtoRRageD2X1": lambda: resolve_arm("ProtoRRageD2X1"),
             # the configuration-based divergence arm (2026-09-15)
             "ConfigSched": lambda: resolve_arm("ConfigSched"),
             "ConfigSched2": lambda: resolve_arm("ConfigSched2")}
