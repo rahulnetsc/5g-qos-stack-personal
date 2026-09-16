@@ -174,3 +174,73 @@ when building the task list and drop the cell by name with a reason. Not bundled
 into this probe: it is a runner change, it would land mid-run, and the probe's
 own correctness does not depend on it now that the vacuous cells are excluded by
 hand. Registered as owed.
+
+---
+
+## 9. RESULT — composition does not change the winner, and it exposed a deficit one fleet mix was hiding
+
+240 sweeps, 2 640 driver runs, 6 cells x 2 arms x 10 seeds x 2 tie-break.
+
+| # | registered (§4) | outcome |
+|---|---|---|
+| 1 | `mixed` reproduces the campaign artefacts | **MET** — all four control cells identical (`10/0/0`, `[[4,2]]`, `10/10`) |
+| 2 | clause 4 holds on every composition | **MET** — `10/0/0` on **all 24 cells**; no composition-dependent safety failure |
+| 3 | the degradation order differs by composition | **MET, strongly** — see §9.1 |
+| 4 | arm ranking unchanged across compositions | **MET** — neither arm inverts |
+| 5 | telemetry M02 varies by composition (one-sided) | **fired** — M02 lifts off the floor to 0.020 on `ugv_heavy:6`, 0.007 on `drone_heavy:6` |
+
+### 9.1 Expectation 3: the cell-level view HID the effect
+
+Scored paired within-seed, as §6.1 required — same seed, same fleet size, same
+tie-break, composition the only thing that moves:
+
+| arm | `mixed` → `ugv_heavy` | `mixed` → `drone_heavy` |
+|---|---|---|
+| `ConfigSched2X7+CG` | **18/40 (45 %)** | **22/40 (55 %)** |
+| `ProtoRRageD2+CG` | 20/40 (50 %) | 24/40 (60 %) |
+
+**Composition changes the degradation order in roughly half of all seeds, on
+both arms** — including `ConfigSched2X7+CG`, which reads a perfectly stable
+`10/10` with `orders_seen [[4,2]]` at cell level. A set-based comparison cannot
+see this: the same order set is consistent with the order flipping in half the
+seeds and flipping back. **The §6.1 confound was concealing the effect, not
+manufacturing one** — the opposite of what was feared.
+
+### 9.2 THE FINDING, and a correction to a first reading of it
+
+First read from the x2.0 column alone, this looked like a background *collapse*
+specific to UGV/drone-heavy fleets. **The full ramp shows that is wrong.**
+
+`bg_mbps_median` across the ramp (x0.5 → x2.0), tie-break off, N=6:
+
+| cell | `ConfigSched2X7+CG` | `ProtoRRageD2+CG` |
+|---|---|---|
+| `mixed` | 10.0 → 8.2 | 29.7 → 9.8 |
+| `ugv_heavy` | 9.1 → **1.0** | 21.9 → 4.3 |
+| `drone_heavy` | 8.2 → **1.3** | 23.6 → 4.2 |
+
+**X7+CG starts below Proto at EVERY composition and at the very first ramp
+point** — `mixed` at x0.5 is 10.0 against 29.7 Mbps, a 3x gap under no load
+stress whatever. It is a **uniform best-effort throughput deficit**, not a
+composition-triggered collapse. What composition changes is whether that deficit
+becomes *visible*: on `mixed` it stays at ~8 Mbps and telemetry never violates;
+on `ugv_heavy`/`drone_heavy` it walks down to 0.8–1.3 Mbps and M02 lifts off the
+floor.
+
+**This is the answer to whether the axis is worth keeping.** It does not change
+who wins. It exposes a standing property of the recommended arm that the single
+`mixed` composition kept below the threshold where any guarantee notices it.
+
+### 9.3 What this does and does not license
+
+**Licensed:** adopting composition as a standing axis, and recording that
+`ConfigSched2X7+CG` carries roughly a third of `ProtoRRageD2+CG`'s best-effort
+throughput. That belongs in the recommendation.
+
+**NOT licensed:** any claim about G5's admissible fleet across compositions.
+G5's builder has no composition parameter (§2), so the fleet-24 headline is still
+measured on one mix only. This probe raises the prior that it would move; it is
+not evidence that it does.
+
+**Also unlicensed:** reading the M02 rise as a safety finding. Clause 4 passed
+10/0/0 everywhere, and M02 0.020 is a PDB-violation *rate*, not a starvation.
