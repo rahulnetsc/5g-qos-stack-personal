@@ -1099,3 +1099,41 @@ advantage to either arm on G9.**
 And the label is largely not about joins: of the 17 failing cells, all met the
 90 % join-yield rule and **16 were caused by an SRB dialogue still in flight at
 the horizon** (§4.7 there).
+
+---
+
+## 25. G4 — the guarantee the E-series never measured, and it regressed throughout
+
+`run_increment.sh` skips G4 (GT-2.3, prompt resume after silence) because its
+runner takes no `--arms`. So **no increment in this document was ever scored on
+it**, and the campaign's G4 artefact predated `ConfigSched2`'s registration in
+that runner by 57 minutes. Re-run across all 24 arm/CG combinations
+(`sweeps/cs2-increments/g4_all_arms_2026-09-16.json`):
+
+| arm, all `+CG` | duty 1.0 | duty 0.5 | duty 0.1 |
+|---|---|---|---|
+| `ConfigSched+CG` (v1) | **22.00** | **25.00** | 48.50 |
+| `ProtoRRageD2+CG` | 22.00 | 41.00 | **51.00** |
+| `ConfigSched2+CG` | 29.47 | 43.09 | 103.71 |
+| **`ConfigSched2X7+CG`** | **47.25** | **56.39** | **103.88** |
+
+**The regression is monotone across this work's own lineage:** 22.00 → 29.47 →
+47.25 ms at duty 1.0 for `ConfigSched` → `ConfigSched2` → `ConfigSched2X7`.
+Against PF the recommended arm is significantly slower at duty 0.5 and 0.1;
+`ProtoRRageD2+CG` is significantly *faster* at all three.
+
+**This is the cost of nine increments that nobody was scoring.** The regression
+contract in `guarantee-groups-2026-09-16.md` §3 lists the groups an increment
+must not damage, and G4 is in none of them — it was deferred early and the
+deferral silently became an exemption. Every "no regression elsewhere"
+expectation registered in this document was scored over eight guarantees, not
+nine.
+
+**Untraced.** The obvious candidate is the same fewer-larger-grants mechanism
+that §15.3 found (grants nearly halved, PRBs per grant doubled): a flow resuming
+after silence waits for a visit that is now rarer. That is a hypothesis, not a
+finding, and it should be registered and tested rather than assumed — this
+document has been wrong three times by doing otherwise.
+
+**Owed:** add G4 to the increment runner, or state in the regression contract
+that it is exempt and why.

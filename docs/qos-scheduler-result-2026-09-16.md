@@ -36,8 +36,9 @@ order, at a small cost in downlink STOP latency.
 | G2 missed STOPs, cap 4 | **181** / 18 300 | 191 / 18 300 |
 | G2 missed STOPs, cap 2 | **263** / 18 300 | 275 / 18 300 |
 
-**It is not a strict dominator.** It loses on G2 (both caps) and on a few G1
-percentile points. Everything else is a win or a tie.
+**It is not a strict dominator.** It loses on G2 (both caps), on a few G1
+percentile points, and — newly measured — it is **the worst arm on G4**,
+post-silence resume (§5). Everything else is a win or a tie.
 
 **Against the faithful ports, like-for-like** (every arm with the same
 restricted CG, from the campaign's own `cg/` artefacts):
@@ -52,12 +53,20 @@ restricted CG, from the campaign's own `cg/` artefacts):
 | **`ProtoRRageD2+CG`** | **10** | 7 |
 | **`ConfigSched2X7+CG`** | **24** | 8 |
 
-**`ProtoRRageD2+CG` is the second-strongest arm on group C** — a single ordering
-change plus a tie-break on the deployed two-tier port, reaching fleet 10 where
-both PF and Reservation reach 8. It is the conservative choice if a new
-scheduler architecture is unwelcome, and it has the best G7 camera containment
-of any arm measured (−1.1 ms, i.e. indistinguishable from no aggressor).
-`ConfigSched+CG` holds the best G10 boundary (10).
+**`ProtoRRageD2+CG` is the serious alternative, and stronger than this document
+first implied.** It is a single ordering change plus a tie-break on the deployed
+two-tier port, and it holds: **second-best group C** (fleet 10, against PF and
+Reservation at 8); the **best G7 camera containment of any arm** (−1.1 ms,
+indistinguishable from no aggressor); and the **best G4 post-silence resume of
+any arm**, significantly faster than PF at all three duty levels. It gives up
+G10 (boundary 7, the lowest) and does not approach X7+CG's camera fleet.
+
+**So the choice is not one-sided.** Take `ConfigSched2X7+CG` for camera capacity
+— 24 against 10 — and accept a G2, G1 and G4 deficit plus a new scheduler
+architecture. Take `ProtoRRageD2+CG` for a minimal, auditable divergence from
+the deployed port with the best isolation and resume behaviour, at less than
+half the camera fleet. `ConfigSched+CG` holds the best G10 boundary (10) and the
+best G4 at duty 1.0.
 
 **The single most important finding is not about the scheduler.** Configured
 grants are worth more than every scheduler change measured here combined, and
@@ -204,13 +213,33 @@ Recorded because the corrections are the evidence that the method worked.
   `rlf` — never in `warm` — and 12 events in 720 runs cannot separate two
   mechanisms. **No verdict drawn**; the 31/5 tie is a coincidence of counts, not
   of behaviour.
-* **G4 is measured for the faithful arms but NOT for the recommended one.**
-  `sweeps/cell-2026-09-16-linux/aligned/g4.json` holds 19 846 rows across all
-  fifteen campaign arm/CG combinations (`rc=0`, "real grid"), so GT-2.3 is
-  answered for PF, Reservation, TwoTier, `ProtoRRageD2` and `ConfigSched` v1 —
-  **but for no `ConfigSched2` variant**, because `run_increment.sh` skips it by
-  design (its runner takes no `--arms` and would re-run every arm). Closing that
-  gap is a single targeted run, not a campaign.
+* **G4 IS NOW MEASURED FOR EVERY ARM, AND THE RECOMMENDED ARM IS THE WORST ON
+  IT.** GT-2.3 (prompt resume after silence) had never been run for any
+  `ConfigSched2` variant, because `run_increment.sh` skips it by design. Re-run
+  across all 24 arm/CG combinations
+  (`sweeps/cs2-increments/g4_all_arms_2026-09-16.json`), post-silence resume p98
+  in ms, lower better:
+
+  | arm, all `+CG` | duty 1.0 | duty 0.5 | duty 0.1 |
+  |---|---|---|---|
+  | `ConfigSched+CG` (v1) | **22.00** | **25.00** | **48.50** |
+  | `PF+CG` | 22.00 | 40.00 | 53.50 |
+  | **`ProtoRRageD2+CG`** | 22.00 | 41.00 | 51.00 |
+  | `TwoTier+CG` | 49.31 | 42.00 | 71.87 |
+  | `ConfigSched2+CG` | 29.47 | 43.09 | 103.71 |
+  | **`ConfigSched2X7+CG`** | **47.25** | **56.39** | **103.88** |
+  | `Reservation+CG` | 41.00 | 51.50 | 138.51 |
+
+  Against PF, paired bootstrap: the recommended arm is **significantly slower**
+  at duty 0.5 (+10.59 ms) and 0.1 (+8.45 ms), CIs excluding zero; at duty 1.0
+  (+1.92) the CI includes zero. **`ProtoRRageD2+CG` is significantly FASTER than
+  PF at all three** (−15.03, −5.28, −9.83).
+
+  **The regression is progressive across the configuration-scheduler family** —
+  22.00 → 29.47 → 47.25 at duty 1.0 for `ConfigSched` → `ConfigSched2` →
+  `ConfigSched2X7`. Every step of this work made post-silence resume worse, and
+  the E-series could not see it because G4 is not in the increment runner. It is
+  **untraced**, and it is a second group-A-adjacent deficit alongside G2.
 * **G8 and G11 are not measured on this cell at all** — the only artefacts are
   from the 2026-09-04/05 directories, a different radio.
 * **DL SPS is not implemented.** It is the downlink analogue of CG, inside the

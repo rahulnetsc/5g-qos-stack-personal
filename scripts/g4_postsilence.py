@@ -314,6 +314,10 @@ def _schedulers() -> dict:
     # cannot, and that is the reason it is the remaining copy.
     return {**_arms(), "ProtoRRageD2": lambda: resolve_arm("ProtoRRageD2"),
             "ProtoRRageD2X1": lambda: resolve_arm("ProtoRRageD2X1"),
+            # The recommended arm (2026-09-16). G4 is the one guarantee the
+            # increment runner skips -- its runner takes no --arms -- so the
+            # ConfigSched2 family had no GT-2.3 result at all until this.
+            "ConfigSched2X7": lambda: resolve_arm("ConfigSched2X7"),
             # the configuration-based divergence arm (2026-09-15)
             "ConfigSched": lambda: resolve_arm("ConfigSched"),
             "ConfigSched2": lambda: resolve_arm("ConfigSched2")}
