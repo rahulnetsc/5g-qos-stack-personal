@@ -419,6 +419,40 @@ the outcome**, so it is not implicated.
 docstring argues that past the admissible boundary "a mechanism that fired and
 did not finish is the answer, not a defect". That argument does not obviously
 hold at **0.25×B, two UEs on nominal load**, where a dialogue merely straddling
-the horizon is as good an explanation. **Untraced, and flagged rather than
-asserted:** whether `srb_active_at_end` is a real stall or a horizon-edge effect
-decides whether G9 has any join finding here at all.
+the horizon is as good an explanation.
+
+### 4.8 Tested, and the dichotomy does not hold — the two arms differ
+
+Rate of `srb_active_at_end > 0` per run, 60 runs per cell, from the ledger:
+
+| ×B | `ConfigSched2+CG` | `ConfigSched2X7+CG` |
+|---|---|---|
+| 0.25 | 0.00 | **0.02** |
+| 0.50 | 0.00 | 0.00 |
+| 0.75 | 0.00 | 0.00 |
+| 1.00 | 0.02 | 0.02 |
+| 1.25 | 0.00 | 0.02 |
+| 1.50 | **0.13** | **0.00** |
+
+The test was registered as a dichotomy — flat rate means a horizon artefact,
+rising means a stall — and **the data refuses it.** The fallback behaves like a
+stall: clean below the boundary, then 0.13 at 1.50×B. The recommended arm
+behaves like neither: ~0.02 scattered across the axis *including the lightest
+level*, and **zero at the highest load.**
+
+By case, across both arms: **`warm` 0 of 240, `cold` 8 of 240, `rlf` 4 of 240.**
+It occurs only in the two cases that run an attach or re-establishment dialogue
+— which is exactly what the counter tracks — and never in the case that does
+not.
+
+**No verdict is drawn.** Twelve events in 720 runs is one event per 60 at the
+0.02 levels; that cannot separate two mechanisms, and asserting either would be
+the could-not-fail reasoning this document has corrected three times already.
+What IS established: the two arms' G9 failures do not share an obvious common
+cause, so the tie at 31/5 in §4.6 is a coincidence of counts rather than of
+behaviour.
+
+**Owed, and out of scope here:** a per-slot trace of the twelve affected
+(seed, case, level) runs, checking whether the dialogue began within one
+dialogue-duration of the horizon. That is instrumentation on named seeds, not a
+campaign, and it decides whether G9 reports a join finding at all.

@@ -177,7 +177,13 @@ Recorded because the corrections are the evidence that the method worked.
   spreads one across nearly every level), but neither has a G9 advantage.
   Separately, **"JOIN FAILURE" is largely not about joins here**: all 17 failing
   cells met the 90 % join-yield rule and 16 were caused by an SRB dialogue still
-  in flight at the horizon — untraced, and it may be a horizon-edge effect.
+  in flight at the horizon. Tested against load, the stall-versus-artefact
+  dichotomy **does not hold**: the fallback looks load-driven (0 below the
+  boundary, 0.13 at 1.5×) while the recommended arm looks load-independent
+  (~0.02 scattered, **zero** at the highest load). It occurs only in `cold` and
+  `rlf` — never in `warm` — and 12 events in 720 runs cannot separate two
+  mechanisms. **No verdict drawn**; the 31/5 tie is a coincidence of counts, not
+  of behaviour.
 * **G4, G8 and G11 are not measured.**
 * **DL SPS is not implemented.** It is the downlink analogue of CG, inside the
   Rel-16 baseline (TS 38.321 §5.8.1; 8 configurations per BWP against CG's 12),
