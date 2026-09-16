@@ -143,6 +143,16 @@ class ConfigSched2:
         self.deadline_margin_slots = int(deadline_margin_slots)
         self.min_period_slots = max(1, int(min_period_slots))
         self.counters: dict[str, int] = defaultdict(int)
+        #: DIAGNOSIS HOOK (2026-09-16). `None` -- and therefore inert --
+        #: unless a caller sets it at construction, exactly as
+        #: `scheduler/two_tier.py` declares `rank_sink`. ConfigSched2 is a
+        #: `sim/baselines/` scheduler and inherits NO rank trace, so before
+        #: this there was no way to ask why a given flow went unserved in a
+        #: given slot -- only aggregate counters, which cannot answer a
+        #: per-slot question (CLAUDE.md: binding is a property of the worst
+        #: slot). Every recording site below is guarded on this being set,
+        #: so an unhooked instance runs the identical code path.
+        self.decision_sink = None
         self._flows: list[FlowConfig] = []
         self._plan: dict[tuple[int, int], FlowPlan] = {}
         self._last_visit: dict[tuple[int, int], int] = {}
@@ -500,8 +510,18 @@ class ConfigSched2:
         cap = int(slot.max_sched_ues)
         granted_ues: set[int] = set()
         out: list[Allocation] = []
+        trace: list[dict] = []
+        def _note(unit, rank, outcome, **kw):
+            if self.decision_sink is not None:
+                trace.append({"unit": unit, "rank": rank, "outcome": outcome, **kw})
         for rank, unit, flows in scored:
             if prbs_left <= 0:
+                # MUST stay a `break`. Turning it into a `continue` to record
+                # the remaining units changes behaviour: later units would
+                # then reach the cap-skip and `_owed` paths they never reach
+                # today, moving counters and scheduler state. The trace records
+                # the stop and leaves the control flow alone.
+                _note(unit, rank, "prb_exhausted", prbs_left=prbs_left)
                 break
             ue_id = unit[0]
             keys = [(f.ue_id, f.qfi) for f in flows]
@@ -513,15 +533,18 @@ class ConfigSched2:
                 for k in promised:
                     self._owed.setdefault(k, now)
                 self.counters["cap_skipped_" + ("promised" if promised else "leftover")] += 1
+                _note(unit, rank, "cap_skipped", promised=bool(promised))
                 continue
             snr = channel.get_reported_snr_db(ue_id)
             se, _bler = bits_per_prb(snr, symbols=symbols)
             if se <= 0:
+                _note(unit, rank, "se_zero", snr=float(snr))
                 continue
             cce_cost = cce_aggregation_level(snr)
             if cce_left < cce_cost:
                 for k in promised:
                     self._owed.setdefault(k, now)
+                _note(unit, rank, "cce_short", need=cce_cost, left=cce_left)
                 continue
             per_visit_cap = max(1, ((int(slot.prb_count) // max(1, cap)) * se) // 8)   # PRBs first (see Tier 1)
             # size: what this grant is for. A PLANNED contracted flow carries
@@ -562,11 +585,13 @@ class ConfigSched2:
                 served.append((f, want))
             target = planned if planned > 0 else backlog
             if target <= 0:
+                _note(unit, rank, "no_target", backlog=backlog)
                 continue
             prbs_needed = (target * 8 + se - 1) // se
             prbs_used = min(prbs_left, max(self.min_rb, prbs_needed))
             tbs = min(backlog, (prbs_used * se) // 8)
             if tbs <= 0:
+                _note(unit, rank, "tbs_zero", prbs_used=prbs_used)
                 continue
             prbs_left -= prbs_used
             cce_left -= cce_cost
@@ -594,6 +619,8 @@ class ConfigSched2:
                     self.counters[f"crumb_qfi{f.qfi}"] += 1
                     self.counters[f"crumb_short_bytes_qfi{f.qfi}"] += max(0, want - room)
             self.counters["grants_" + direction.lower()] += 1
+            _note(unit, rank, "granted", prbs=prbs_used, tbs=tbs,
+                  promised=bool(promised), backlog=backlog)
             granted_ues.add(ue_id)
             out.extend(emit_grant(ue_id, direction, prbs_used, tbs, flows, buffers,
                                   cce_cost=cce_cost, snr_used_db=snr))
@@ -602,4 +629,11 @@ class ConfigSched2:
             if buffers.state(key[0], key[1]).bytes_reported > 0 and key[0] not in granted_ues:
                 self._owed.setdefault(key, now)
                 self.counters["mapped_visit_missed"] += 1
+                _note(key, None, "mapped_visit_missed")
+        if self.decision_sink is not None:
+            self.decision_sink({"slot_index": int(slot.slot_index),
+                                "direction": direction, "dir_index": now,
+                                "cap": cap, "n_units": len(scored),
+                                "mapped_now": sorted(mapped_now),
+                                "decisions": trace})
         return out
