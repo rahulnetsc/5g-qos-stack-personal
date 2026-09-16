@@ -857,3 +857,56 @@ that is the first variant in this entire series to dominate**, and it would
 displace the baseline as the arm of record. If expectation 1 fails, the §19.2
 recommendation stands unchanged: the frontier is real and the choice is a
 product decision.
+
+---
+
+## 22. X7+CG vs X7 MEASURED — CG closes group B, and two costs appear that are NOT yet attributable
+
+9 steps rc 0 (`sweeps/cs2-increments/e8/`). **CG plumbing verified live before
+reading any result**: arm label recorded as `ConfigSched2X7+CG`, and 88 of 90
+shared G3 cells differ from `e7` — had that been 0, the suffix would have been
+inert and the whole experiment void.
+
+Scored against §21.2:
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | G3 part-3 boundary >= 10 | **MET** — **6 → 24** (top of the axis), part-3 **90/90**, p98 median ~95 → ~22 ms, short messages at N=24 **325 → 0** |
+| 2 | group C retained at fleet 8 | **EXCEEDED** — admissible fleet **8 → 24**, knee 1.3 → 1.4; gt31 at N = 12/14/16/24 goes 0/0/0 at ~145 ms → **10/10/3 at ~30 ms** |
+| 3 | G10 admissible stays 10 | **FAILED** — **10 → 8**; M07 at N=10 10 → 1; M08 at N=12 0.778 → 0.336 |
+| 4 | group A unchanged within noise | **marginal** — G2 cap-4 176 → 191, cap-2 293 → 275; G1 p98 up a little at some N |
+| 5 | G7 clause 2 no worse | **FAILED** — 1.02x → **1.08x** |
+
+Also strongly improved: G6 (UL 222/221 of 226 → **243/248 of 249**, worst
+telemetry gaps 238 → 199 and 299 → 202), G12 telemetry M02 → **0.000 at every
+load**, G12 order agreement 10/10, and G7 **clause 1** (A telemetry p98
+97.8 → **48.0 ms**, throughput 20 400 → **24 000 bps**).
+
+### 22.1 What CANNOT be concluded yet, and why
+
+**CG improves every arm it is applied to.** Two of the results above are costs —
+G10's admissible fleet 10 → 8, and clause 2's 1.02x → 1.08x — and **nothing here
+attributes them to X7 rather than to CG itself.** `docs/results-cg-2026-09-14.md`
+already records that CG changes behaviour well outside the heartbeat class
+(unrestricted CG breaks G5 on every arm; this run is restricted `+CG`, but the
+principle stands).
+
+So the comparison that decides the arm of record is **X7+CG against
+`ConfigSched2+CG`**, registered in §21.3 before any of this was read, and that
+run (`e9`) is still executing. If `ConfigSched2+CG` shows the same G10 drop,
+the cost is CG's and X7+CG dominates; if it holds 10, the cost is X7's.
+
+**No dominance claim is made here.** The valid statement from `e8` alone is:
+*for this arm, CG converts group B from its weakest result to a perfect one and
+transforms group C, at the price of group E's boundary and a little containment
+headroom — with the attribution of that price still open.*
+
+### 22.2 One flag for the next reader
+
+G9's per-cell verdict codes change character under CG: cells that read `P…`/`B…`
+on `X7` now include `F…` entries (`Fc1b1`, `Fc2b1`, `Fc1b2`) even though
+"informative cells passed of 12" stays **12 of 12** on both arms. The headline
+is unchanged and is the scored quantity, but the letter change is a qualitative
+difference that has not been traced. **Recorded as unexplained, not as fine** —
+the standing rule is that a count holding while its composition moves is exactly
+where a partially degenerate result hides.
