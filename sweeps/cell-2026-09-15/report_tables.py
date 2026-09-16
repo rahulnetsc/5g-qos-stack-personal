@@ -16,13 +16,23 @@ from collections import defaultdict
 from pathlib import Path
 
 import sys
-_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+_argv = sys.argv[1:]
+# `--extra DIR:ARM` (repeatable) merges another campaign-shaped directory's
+# `aligned/` artefacts as one more arm column. A tuned arm measured by
+# sweeps/cs2-increments/run_increment.sh uses the same runners, flags and
+# seeds as the campaign, so its rows drop straight into these tables and a
+# five-arm comparison needs no re-run. The value is not a campaign
+# directory, so it is skipped when looking for that.
+EXTRA = [(Path(v.partition(":")[0]), v.partition(":")[2] or "ConfigSched2")
+         for f, v in zip(_argv, _argv[1:]) if f == "--extra"]
+_skip = {i + 1 for i, a in enumerate(_argv) if a == "--extra"}
+_args = [a for i, a in enumerate(_argv) if not a.startswith("--") and i not in _skip]
 ROOT = Path(_args[0]) if _args else Path(__file__).parent  # a campaign directory, e.g. the Linux run's
 D = ROOT / "aligned"
-CG = "--cg" in sys.argv[1:]
+CG = "--cg" in _argv
 BASE_ARMS = ("PF", "Reservation", "TwoTier", "ProtoRRageD2", "ConfigSched")
 SUFFIXES = ("", "+CG", "+CGt") if CG else ("",)
-ARMS = tuple(a + s for a in BASE_ARMS for s in SUFFIXES)
+ARMS = tuple(a + s for a in BASE_ARMS for s in SUFFIXES) + tuple(arm for _, arm in EXTRA)
 # Which cg/ artefacts hold a guarantee's CG rows. G3 and G5 were run as two
 # files (+CG, +CGt), the rest with both suffixes in one -- the paths the
 # 2026-09-16 campaign script writes.
@@ -55,10 +65,15 @@ def _merge(base, extra):
 def load(name):
     p = D / name
     base = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
-    if not CG or base is None:
-        return base
-    for cg_name in CG_FILES.get(name, ()):
-        q = ROOT / "cg" / cg_name
+    if base is None:
+        return None
+    if CG:
+        for cg_name in CG_FILES.get(name, ()):
+            q = ROOT / "cg" / cg_name
+            if q.exists():
+                base = _merge(base, json.loads(q.read_text(encoding="utf-8")))
+    for d, _arm in EXTRA:
+        q = d / "aligned" / name
         if q.exists():
             base = _merge(base, json.loads(q.read_text(encoding="utf-8")))
     return base
