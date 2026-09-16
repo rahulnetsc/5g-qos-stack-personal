@@ -1257,3 +1257,39 @@ So E1 relieves the DCI cap and immediately re-binds on PRBs — the same
 DCI→PRB inversion §15.3 found, here costing a third of all grants. **The cell
 does less total work, and every class pays.** That is the mechanism; it is a
 property of the design choice, not a modelling defect.
+
+### 27.5 Two confirmations that complete the mechanism
+
+**Zero slack on BOTH arms.** Density used 4.0000 of cap 4, `SLACK = 0.0000`, and
+only `qfi2` flows hold tracks — on the parent and on E1 alike. So "the cameras
+take the whole budget" is a property of the *design*, not of E1, confirming
+§27.1's correction rather than reopening it.
+
+**And telemetry cannot get a track by construction.** Its `pdb_slots = 200`
+against `W_dir = 120`: the deadline is LONGER than the planning window, so
+`_deadline_visits` is satisfied by a single visit and no periodic track is ever
+warranted. `n_visits=1, bpv=339` on both arms. Telemetry was never a density
+claimant, which is why E1 could not have taken its track away.
+
+**The grant drop is PRB-bound, confirmed directly** (duty 1.0, N=8, 3 600 UL
+slots):
+
+| | `ConfigSched2` | `ConfigSched2X1` |
+|---|---|---|
+| units granted per slot | **3.52** | **2.46** |
+| PRBs per slot (of 106) | 92.5 | 95.6 |
+| slots at >= 100 PRB | 2 219 | **2 798** |
+| slots granting **nothing** | **2** | **75** |
+
+PRBs per slot barely moves because the slot was already ~87 % occupied. E1 does
+not free capacity — it spends the **same** PRBs on fewer, larger grants, and
+37× more slots end up granting nothing at all.
+
+**Final statement of the diagnosis.** The regression is not a modelling error and
+not a missing simulator feature. E1 is correct about what binds *before* it acts
+(the DCI cap) and its own construction was verified by trace when built; but on a
+cell whose PRBs are already ~87 % occupied, trading DCI pressure for PRB pressure
+is a losing trade, and every class pays for it. The cost was invisible for nine
+increments because G4 sits in no regression group, best-effort throughput is not
+a scored statistic, and the effect vanishes at the low duty the guarantee's name
+suggests you should look at.
