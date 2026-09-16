@@ -317,7 +317,11 @@ class ConfigSched2:
                 # a visit may take at most a cap-th of a slot, so `cap` due units
                 # can share one slot -- otherwise four due cameras each wanting a
                 # whole slot turn three of them into crumbs
-                per_visit_max = max(1, tb_max // max(1, cap))
+                # a visit may take at most a cap-th of a slot, in PRBs FIRST and
+                # bytes second, so that `cap` visits fit after each is rounded
+                # up to whole PRBs (bytes-first gave 4 x 27 = 108 PRBs on a
+                # 106-PRB slot: every mapped camera visit a 29 B crumb)
+                per_visit_max = max(1, ((self._prb_count // max(1, cap)) * se) // 8)
                 need = int(math.ceil(r_i / per_visit_max)) if per_visit_max > 0 else 0
                 extra = max(0, need - n_i)
                 if extra > 0:
@@ -519,7 +523,7 @@ class ConfigSched2:
                 for k in promised:
                     self._owed.setdefault(k, now)
                 continue
-            per_visit_cap = max(1, ((int(slot.prb_count) * se) // 8) // max(1, cap))
+            per_visit_cap = max(1, ((int(slot.prb_count) // max(1, cap)) * se) // 8)   # PRBs first (see Tier 1)
             # size: what this grant is for. A promised contracted flow carries
             # what it reports up to a cap-th of the slot; a best-effort visit
             # its r/n share; an unplanned contracted flow what it reports; a
@@ -550,13 +554,6 @@ class ConfigSched2:
             if target <= 0:
                 continue
             prbs_needed = (target * 8 + se - 1) // se
-            if promised and cap > 0:
-                # a promised unit takes at most a cap-th of the slot's PRBs, so
-                # `cap` promised units always fit: sizing them in bytes and
-                # rounding each up to PRBs let four of them exceed the slot,
-                # the fourth was missed and owed, and the owed backlog
-                # displaced the next slot's mapped visits (see `_rank`)
-                prbs_needed = min(prbs_needed, max(self.min_rb, int(slot.prb_count) // cap))
             prbs_used = min(prbs_left, max(self.min_rb, prbs_needed))
             tbs = min(backlog, (prbs_used * se) // 8)
             if tbs <= 0:
@@ -584,6 +581,8 @@ class ConfigSched2:
                         self.counters["mapped_visits_served"] += 1
                 else:
                     self.counters["crumb_not_counted"] += 1
+                    self.counters[f"crumb_qfi{f.qfi}"] += 1
+                    self.counters[f"crumb_short_bytes_qfi{f.qfi}"] += max(0, want - room)
             self.counters["grants_" + direction.lower()] += 1
             granted_ues.add(ue_id)
             out.extend(emit_grant(ue_id, direction, prbs_used, tbs, flows, buffers,
