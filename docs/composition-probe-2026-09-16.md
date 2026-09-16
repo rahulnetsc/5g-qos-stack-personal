@@ -64,3 +64,45 @@ It tests composition-sensitivity on **G12 only** — degradation ordering under 
 load ramp. It says nothing directly about G5's admissible fleet (24 vs 10), which
 is the headline capacity claim and whose scenario has no composition axis. A
 positive result here is grounds to build that axis, not a substitute for it.
+
+---
+
+## 6. TWO CONFOUNDS FOUND IN THE CONTROL, BEFORE THE PROBE RETURNED
+
+Captured from the existing artefacts while the probe ran. Both weaken
+expectations registered in §4, and both are recorded now rather than discovered
+in the output.
+
+### 6.1 One arm is already order-unstable on a FIXED composition
+
+Control cells, `mixed:4` and `mixed:6`, both tie-break settings:
+
+| arm | `orders_seen` | `order_agreement` |
+|---|---|---|
+| `ConfigSched2X7+CG` | `[[4, 2]]` in all four cells | **10/10, 10/10, 10/10, 10/10** |
+| `ProtoRRageD2+CG` | `[[], [4], [4,2]]` / `[[2,4],[4,2]]` / `[[], [4], [4,2]]` / `[[4],[4,2]]` | **8/10, 8/10, 7/10, 6/10** |
+
+**`ProtoRRageD2+CG`'s degradation order already varies seed-to-seed with
+composition held constant.** So expectation 3 — "the degradation ORDER differs
+by composition" — cannot be scored on that arm by comparing `orders_seen` sets
+between compositions: a difference there is the arm's own baseline instability,
+not the axis. It must be a **paired within-seed** comparison (same seed, same
+tie-break, composition the only thing that moves), or it attributes noise to
+composition. Same decompose-before-attributing failure this work has already
+made three times.
+
+`ConfigSched2X7+CG` has no such confound (10/10 everywhere), so expectation 3 is
+scoreable on that arm directly.
+
+### 6.2 Expectation 5 has no dynamic range on the control
+
+Telemetry M02 reads **0.000 at x1.0, x1.4, x1.8 and x2.0, on both arms, in all
+four control cells.** Expectation 5 predicted it would "vary materially by
+composition" — but on `mixed` it is pinned at the floor, so it can only move
+upward. If it stays 0.000 across every composition, that is **not** a
+confirmation that composition does not stress the density budget; it is an
+expectation that had no room to be contradicted on the control, which is this
+project's most-recorded defect shape.
+
+**Expectation 5 is therefore downgraded to a one-sided observation** — a rise is
+informative, flatness is not — and it must not be reported as a passed check.
