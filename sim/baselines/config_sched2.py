@@ -131,7 +131,8 @@ class ConfigSched2:
     def __init__(self, min_rb: int = 5, window_ms: float = 100.0,
                  resolve_ms: float = 10.0, deadline_margin_slots: int = 6,
                  min_period_slots: int = 2, density_budget: bool = False,
-                 plan_share_sizing: bool = False) -> None:
+                 plan_share_sizing: bool = False,
+                 importance_order: bool = False) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
         self.resolve_ms = float(resolve_ms)
@@ -159,6 +160,24 @@ class ConfigSched2:
         #: leftover service take the slot is what over-fed the over-driven
         #: camera past its MFBR in increment 5 (G7 clause 2 0.92 -> 1.04x).
         self.plan_share_sizing = bool(plan_share_sizing)
+        #: E3 (2026-09-16, diagnosis doc sec 12). When the density budget
+        #: binds, claim it in IMPORTANCE order: every contracted flow first
+        #: gets enough visits to meet its OWN deadline bound, shortest PDB
+        #: first, and only the remainder goes to best-effort.
+        #: WHY IT IS NEEDED AT ALL. Measured at gt22 N=6: E1 makes the plan
+        #: exactly feasible, which removes the overcommit that
+        #: `_assign_periods_and_tracks` used to repair -- and that repair was
+        #: the only thing doing importance-ordered shedding (it lengthens
+        #: best-effort periods densest-first, then spends spare density
+        #: shortening contracted periods). Without it a single best-effort
+        #: flow held density 0.5, the same share as a contracted camera,
+        #: while every heartbeat sat at T=64 against a 100 ms PDB.
+        #: REQUIRES `density_budget` -- it orders claims against that budget.
+        self.importance_order = bool(importance_order)
+        if self.importance_order and not self.density_budget:
+            raise ValueError(
+                "importance_order requires density_budget: it orders claims "
+                "against the density budget, which only E1 introduces.")
         if self.plan_share_sizing and not self.density_budget:
             raise ValueError(
                 "plan_share_sizing requires density_budget: without E1 the plan "
@@ -284,6 +303,16 @@ class ConfigSched2:
             T = min(T, _pow2_floor(pdb_dir))
         return 1.0 / max(1, T)
 
+    def _deadline_visits(self, key, W_dir: int) -> int:
+        """Visits needed for this contracted flow's period to meet its own
+        deadline bound -- the SAME bound `_assign_periods_and_tracks` applies
+        as `T = min(T, _pow2_floor(pdb_dir))`. Stated as a visit count so it
+        can be claimed against the density budget before best-effort bids."""
+        W = self._window_slots
+        pdb_dir = max(1, (self._pdb_slots.get(key, W) - self.deadline_margin_slots) * W_dir // W)
+        dl = _pow2_floor(pdb_dir)
+        return max(1, int(math.ceil(W_dir / max(1, dl))))
+
     def _fit_visits(self, key, contracted: bool, have: int, want: int,
                     used: float, cap: int, W_dir: int) -> tuple[int, float]:
         """Largest `n` in [have, want] whose density still fits under `cap`.
@@ -389,8 +418,13 @@ class ConfigSched2:
                     break
             if prb_left <= 0 and any(d > 0 for d in residual.values()):
                 self.counters["rate_budget_bound"] += 1
-            # visits for the residual: enough that a visit never exceeds a slot
-            for f, contracted, fv, fb, demand, se, tb_max in rows:
+            # visits for the residual: enough that a visit never exceeds a slot.
+            # E3: contracted flows bid FIRST, so best-effort can only take the
+            # density they leave -- `rows` is already contract-then-PDB sorted,
+            # so this is a stable partition of it, not a re-sort.
+            residual_order = ([r for r in rows if r[1]] + [r for r in rows if not r[1]]
+                              if self.importance_order else rows)
+            for f, contracted, fv, fb, demand, se, tb_max in residual_order:
                 key = (f.ue_id, f.qfi)
                 r_i = grant_bytes[key]
                 n_i = grant_visits[key]
@@ -403,6 +437,12 @@ class ConfigSched2:
                 # 106-PRB slot: every mapped camera visit a 29 B crumb)
                 per_visit_max = max(1, ((self._prb_count // max(1, cap)) * se) // 8)
                 need = int(math.ceil(r_i / per_visit_max)) if per_visit_max > 0 else 0
+                # E3: a contracted flow's claim is the LARGER of what its
+                # bytes need and what its DEADLINE needs. Telemetry asks for
+                # one visit on bytes alone (a single 300 B message), which is
+                # why its period drifted to 64 once the repair path was gone.
+                if self.importance_order and contracted:
+                    need = max(need, self._deadline_visits(key, W_dir))
                 extra = max(0, need - n_i)
                 if self.density_budget:
                     if extra > 0:

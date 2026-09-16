@@ -67,6 +67,18 @@ def resolve_arm(name: str, min_rb: int = 5):
         # published artefact's `code_state` scope.
         from sim.baselines.config_sched2 import ConfigSched2
         return ConfigSched2(min_rb=min_rb, density_budget=True)
+    if name == "ConfigSched2X3":
+        # E1 + E3 (2026-09-16): the density budget, claimed in importance
+        # order. Deliberately WITHOUT E2 -- E2 cost group E (G10 admissible
+        # 10 -> 8), so it is not carried forward until E3 is judged.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, density_budget=True,
+                            importance_order=True)
+    if name == "ConfigSched2X4":
+        # E1 + E2 + E3, measured only if E3 earns its keep on its own.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, density_budget=True,
+                            plan_share_sizing=True, importance_order=True)
     if name == "ConfigSched2X2":
         # E1 + E2 stacked (2026-09-16). E2 requires E1 by construction -- the
         # constructor refuses the combination otherwise -- because the clamp

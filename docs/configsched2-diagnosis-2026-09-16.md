@@ -240,3 +240,130 @@ If G3 stays broken under E1+E2, the density budget is starving short-period
 contracted flows directly and E1 needs importance-ordered shedding instead —
 which is the `degrade-by-importance` requirement in
 `guarantee-groups-2026-09-16.md` §7 expressed inside the constraint.
+
+---
+
+## 10. E1+E2 MEASURED — the registered hypothesis is REFUTED (`sweeps/cs2-increments/e2/`)
+
+9 steps rc 0, `ConfigSched2X2` against `inc9` (baseline) and against `e1`.
+
+**§9 predicted:** *"If that is right, E1+E2 should restore G3 while keeping E1's
+group-C gain. If G3 stays broken under E1+E2, the density budget is starving
+short-period contracted flows directly."*
+
+**G3 stays broken.** part-3 `10 10 10 10 10 7 0 0 0` → `9 1 1 2 1 1 0 0 0`,
+boundary **10 → None**, telemetry p98 8.5 → 87.25 ms. Against E1 *alone* it is
+marginally WORSE (part-3 `9 3 2 3 3 1` → `9 1 1 2 1 1`). **So the crumb
+explanation is refuted**, even though E2 does what it was built to do — camera
+crumb short-bytes fell 902 kB → 192 kB on the short run, and G5's load ramp is
+transformed.
+
+By the registration's own terms the surviving explanation is that **the density
+budget starves short-period contracted flows directly**, and the fix is
+importance-ordered shedding *inside* the constraint rather than more sizing work.
+
+### 10.1 E2's own scorecard (§8.3), against E1
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | camera crumbs fall below the ConfigSched2 baseline | **MET** — short-bytes 902 760 → 191 510 at N=10, 618 068 → 44 172 at N=8 |
+| 2 | group C improves | **MET in the load ramp, MIXED on the fleet axis** — gt32 ×1.1 3/0/4 at 137 ms → 10/10/10 at 35 ms, ×1.5 0/0/2 → 3/0/10; gt33 15 2/0/0 at 139 ms → 10/9/4 at 37 ms; but gt31 N=8 10/9/4 at 42 ms → 9/4/1 at 68 ms and N=10 1/0/0 → 0/0/0 |
+| 3 | the per-slot cap assertion never fires | **MET** — E1's concurrency guarantee holds in the realisation |
+| 4 | `granted` does not fall materially | **NOT MET** — `mapped_visits_served` 8 962 → 5 143, `visits_stamped` 15 901 → 12 247 |
+| 5 | no regression in A/B/D/E/F | **FAILED** — G3 as above; G7 clause 1 p98 57.8 → 99.0 ms and clause 3 6.0 → 49.2 ms; **G10 admissible 10 → 8**, which E1 alone did NOT cost |
+
+### 10.2 Verdict
+
+**Neither E1 nor E1+E2 is keepable under the regression contract.** Both are
+judged exactly as D1 was. What is established, and worth keeping as knowledge
+rather than code:
+
+* The binding constraint really is the per-slot DCI cap, and encoding it in the
+  outer problem really does move group C — G5's admissible fleet 6 → 7 and its
+  load knee 1.0 → 1.3 are the largest group-C gains any increment has produced.
+* The cost is group B, and it is not a sizing artefact.
+* E2 additionally costs group E (G10 admissible 10 → 8), so the two changes are
+  not independent and E2 must not be carried forward on its own.
+
+**Next, registered:** E3 — when the density budget binds, shed in IMPORTANCE
+order (best-effort first, then longest-PDB contracted), never uniformly in row
+order. That is `guarantee-groups-2026-09-16.md` §7's degrade-by-importance
+requirement expressed inside the constraint, and it is the first encoding whose
+motivation is a measured starvation rather than a structural argument.
+
+---
+
+## 11. WHY E1 BREAKS GROUP B — measured, and it is not starvation by demand
+
+Traced at the real axis point (gt22, **N = 6**, UL; `W_dir` = 120, cap 4). An
+earlier attempt at this ran at N = 2, which is **not on G3's axis**
+(`[4, 6, 7, 8, 10, 12, 14, 16, 24]`) and where E1 is provably inert
+(`visit_density_bound` = 0, byte-identical counters); that run was discarded.
+
+**The heartbeat gets ONE visit per window on both arms. What changes is its
+PERIOD.**
+
+| flow | baseline `ConfigSched2` | E1 `ConfigSched2X1` |
+|---|---|---|
+| telemetry `qfi1` x2 | **T = 32** (density 0.031) | T = 64 (0.016) |
+| telemetry `qfi1` x4 | T = 64 | T = 64 |
+| camera `qfi2` x6 | T = 2 (0.5 each) | T = 2 (0.5 each) |
+| best-effort `qfi9` | T = 8 each (0.125) | **T = 2 (0.5), 4, 8, 32, none** |
+| **total density** | **4.000** | **4.000** |
+
+Both saturate the cap exactly. The difference is **who holds it**: under E1 a
+single best-effort `qfi9` flow occupies **density 0.5 — the same share as a
+contracted camera** — while every contracted heartbeat sits at T = 64 (~53 ms
+between visits against a 100 ms PDB, and a measured p98 of 87–97 ms).
+
+### 11.1 The mechanism, and it is the opposite of what §9 assumed
+
+Telemetry never *asks* for more: its `r_i` is one 300 B message, so
+`need = ceil(r_i / per_visit_max)` = 1 visit, and the residual loop gives it
+one. Its period is then `_pow2_floor(W_dir // 1)` = 64.
+
+What shortened it on the baseline was **the repair path E1 removed**. The
+baseline deliberately overcommits, and `_assign_periods_and_tracks` then
+(a) lengthens periods **best-effort first, densest first**, and (b) spends any
+spare density **shortening contracted periods, shortest PDB first** — halving
+the heartbeat 64 → 32. E1 makes the plan exactly feasible, so there is no
+overcommit to repair, **and the repair was the only thing doing
+importance-ordered shedding.**
+
+**E1 did not starve the heartbeat by taking its bytes. It deleted the mechanism
+that was protecting its deadline.**
+
+---
+
+## 12. Encoding E3 REGISTERED BEFORE BUILDING
+
+**The encoding.** When the density budget binds, allocate in IMPORTANCE order:
+every contracted flow first receives enough visits that its period meets its
+own deadline bound (`T <= pow2_floor(pdb - margin)`), shortest PDB first; only
+the density left over goes to best-effort. Best-effort is shed first, by
+construction, instead of by a repair pass that E1 removed.
+
+This is `guarantee-groups-2026-09-16.md` §7 — *critical flows held as far as
+capacity allows, non-critical degraded gracefully* — expressed as a constraint
+rather than left to emerge. It is the first encoding here motivated by a
+measured starvation rather than a structural argument.
+
+**Structure class: TYPE 1.** Still one additive density budget with a
+non-decreasing per-flow cost; only the ORDER of claims changes, which is what a
+greedy over a polymatroid is already free to choose. Greedy stays exact.
+
+### 12.1 Registered expectations and falsifiers
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | at gt22 N=6, contracted telemetry period returns to **T <= 32**, and no best-effort flow holds density 0.5 | telemetry still at T = 64 — then the period is not set where §11 says it is |
+| 2 | G3 part-3 boundary returns to **>= 10** and telemetry p98 back under ~35 ms | no recovery — then the period is not what drives telemetry p98, and §11's mechanism is wrong |
+| 3 | E1's group-C gain is RETAINED: G5 admissible fleet 7, load knee >= 1.3 | falling back to 6 / 1.0 — then the group-C gain was bought by the heartbeat and the two cannot be had together |
+| 4 | best-effort throughput FALLS (this is the intended trade, not a regression) | it rising — the shed order would not be taking effect |
+| 5 | G10 admissible stays 10, G7 clause 1 no worse than baseline | either regressing |
+
+**Expectation 3 is the one that decides whether this whole line of work
+survives.** If group C's gain cannot coexist with group B's deadline, then the
+per-slot cap is a genuine capacity wall on this cell and the honest answer is
+that the camera and the heartbeat are competing for a resource neither
+scheduling nor encoding can create.
