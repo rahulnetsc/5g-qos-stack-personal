@@ -1022,15 +1022,40 @@ G7 clause 3 (17.8 → **12.0 ms**).
 **Tied:** G3 (boundary 24 on both, all 10/10), G10 admissible, G7 clause 2.
 
 **Behind, and stated plainly:** G2 (cap-4 181 → 191, cap-2 263 → 275), G1 cap-4
-p98 at three axis points, G7 clause 1 A-camera p98 (48.1 → 80.8 ms — being
-re-measured with controls, since raw p98 was already shown to overstate
-containment harm several-fold), and G10's M08 **past** its boundary (N=12
+p98 at three axis points, and G10's M08 **past** its boundary (N=12
 0.583 → 0.336).
+
+**G7 clause 1 is NOT on that list — correcting what this section first said.**
+Re-measured with paired controls
+(`sweeps/cs2-increments/g7_controls_cg_2026-09-16.json`):
+
+| arm | A-camera p98 | control | **attributable** | A-telemetry p98 | control | **attributable** |
+|---|---|---|---|---|---|---|
+| `ConfigSched2` | 46.9 | 36.2 | +10.7 | 57.8 | 48.8 | +9.0 |
+| `ConfigSched2+CG` | 48.1 | 36.5 | **+11.5** | 41.0 | 25.5 | **+15.5** |
+| `ConfigSched2X7+CG` | 80.8 | 73.9 | **+6.9** | 48.0 | 42.0 | **+6.0** |
+
+X7+CG's raw 80.8 ms is almost entirely its OWN load — its control alone reads
+73.9 ms. On the containment question G7 actually asks, **X7+CG is better than
+the baseline with CG on both statistics** (+6.9 against +11.5, +6.0 against
++15.5). 0 of 10 cells gated on every arm, so all rows are scoreable.
+
+What IS worse is its standalone latency under load (control 73.9 against 36.5),
+which is the same capacity property group A's deficit reflects — not a failure
+to contain a bad actor.
+
+**This is the third verdict in this document that a raw p98 got backwards**
+(§20 corrected the E-series arms, §22.2/§22.2a corrected G9, this corrects
+clause 1). The pattern is now unambiguous: **a statistic measured under an
+aggressor sums the cell's own load and the aggressor's marginal harm, and only
+the paired control separates them.** No clause-1 figure should be quoted in this
+project without its control.
 
 ### 23.3 Verdict
 
-**X7+CG is not a strict dominator — it loses a little on group A and on G7
-clause 1 — but it is the strongest arm this work has produced**, and the
+**X7+CG is not a strict dominator — it loses a little on group A — but it is
+the strongest arm this work has produced**, and on containment (G7 with
+controls) it is ahead of the baseline with CG rather than behind it, and the
 heartbeat-versus-camera frontier of §19.2 **dissolves under CG**: G3 sits at its
 axis top (24) on both arms, so group B is no longer the price of group C.
 
