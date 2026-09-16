@@ -981,3 +981,65 @@ is unchanged and is the scored quantity, but the letter change is a qualitative
 difference that has not been traced. **Recorded as unexplained, not as fine** —
 the standing rule is that a count holding while its composition moves is exactly
 where a partially degenerate result hides.
+
+---
+
+## 23. THE DOMINANCE QUESTION, ANSWERED — all three costs are CG's, and group C is transformed
+
+`ConfigSched2+CG` (`e9`, 9 steps rc 0) is the like-for-like comparator
+registered in §21.3 before any CG result was read. It settles every open
+attribution.
+
+### 23.1 The three costs belong to CG, not to X7
+
+| | `ConfigSched2+CG` | `ConfigSched2X7+CG` | attribution |
+|---|---|---|---|
+| G9 outcomes (36 cells) | 31 PASS, **5 JOIN FAILURE**, 0 unscoreable | 31 PASS, **5 JOIN FAILURE**, 0 unscoreable | **identical — CG's** |
+| G9 failure severity | catastrophic **10** and **9** seeds | catastrophic **2** and **1** | X7+CG **milder** |
+| G9 informative cells passed | **11** of 12 | **12** of 12 | X7+CG **better** |
+| G10 admissible fleet | **8** | **8** | **identical — CG's** |
+| G7 clause 2 | 1.07x | 1.08x | **identical — CG's** |
+
+Every cost §22 could not attribute is CG's price, paid by the baseline equally.
+Two of them X7 actually *mitigates*: the join failures are far less severe and
+one more informative cell passes.
+
+### 23.2 Like-for-like, X7+CG wins group C by a wide margin
+
+| statistic | `ConfigSched2+CG` | `ConfigSched2X7+CG` |
+|---|---|---|
+| **G5 admissible fleet** | 7 | **24** |
+| **G5 load knee** | 1.1 | **1.4** |
+| gt31 N = 12 | 0/0/0 at 147 ms | **10/10/3 at 30 ms** |
+| gt31 N = 16 | 5/0/0 at 137 ms | **10/10/3 at 30 ms** |
+| gt32 ×1.3 | 1/0/6 at 145 ms | **10/10/10 at 29 ms** |
+| gt32 ×1.5 | 0/0/8 at 147 ms | **10/7/10 at 35 ms** |
+
+Also ahead: **G6** (UL 221/219 of 224 → **243/248 of 249**; camera window floor
+3/4 → **3/9**), **G12** order agreement (8/10 and 9/10 → **10/10** both), and
+G7 clause 3 (17.8 → **12.0 ms**).
+
+**Tied:** G3 (boundary 24 on both, all 10/10), G10 admissible, G7 clause 2.
+
+**Behind, and stated plainly:** G2 (cap-4 181 → 191, cap-2 263 → 275), G1 cap-4
+p98 at three axis points, G7 clause 1 A-camera p98 (48.1 → 80.8 ms — being
+re-measured with controls, since raw p98 was already shown to overstate
+containment harm several-fold), and G10's M08 **past** its boundary (N=12
+0.583 → 0.336).
+
+### 23.3 Verdict
+
+**X7+CG is not a strict dominator — it loses a little on group A and on G7
+clause 1 — but it is the strongest arm this work has produced**, and the
+heartbeat-versus-camera frontier of §19.2 **dissolves under CG**: G3 sits at its
+axis top (24) on both arms, so group B is no longer the price of group C.
+
+Against the arm of record with the same CG configuration, it carries **more than
+three times the admissible camera fleet (24 against 7)**.
+
+**Recommendation:** `ConfigSched2X7+CG` becomes the candidate for the deployed
+configuration, with `ConfigSched2+CG` as the conservative fallback, and the
+group-A deficit recorded as the open cost. **`ConfigSched2` without CG is no
+longer the right comparison for anything** — CG is worth more than every
+scheduler change measured here combined, and it is a MAC feature, not the
+scheduler's to spend.
