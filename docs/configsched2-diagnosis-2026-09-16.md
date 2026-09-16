@@ -802,3 +802,58 @@ measured without an aggressor, so no control qualifies them. **The group-B
 trade in §19.2 stands exactly as written.** What changes is that group D is no
 longer part of X7's cost: the frontier is heartbeat-versus-camera, and G7 is not
 on it.
+
+---
+
+## 21. X7 +CG REGISTERED — written while the run is in flight, before any result
+
+**Process note, recorded because it is a lapse against the standing rule.** The
+`INC=e8 ARM=ConfigSched2X7+CG` run was launched BEFORE these expectations were
+written. Every other increment in this document was registered first. This
+section is written while the run is still executing and before any of its output
+has been read, which preserves the scoring but not the discipline — noted so the
+next one is not launched the same way.
+
+### 21.1 Why this experiment
+
+§19.2's frontier is heartbeat (G3) versus camera (G5), and **G3 is the only
+group X7 gives up**. `docs/results-cg-2026-09-14.md` already measured that
+restricted configured grants close the **entire uplink heartbeat class on every
+arm** — G3 to 10/10 at every fleet size. If that holds under X7's density
+budget, the trade dissolves: the camera keeps fleet 8 and the heartbeat is
+rescued by a mechanism that is not the scheduler's to spend.
+
+Nothing in the E-series could have shown this, because every increment ran
+without CG.
+
+### 21.2 Registered expectations and falsifiers
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | **G3 part-3 boundary recovers to >= 10** | staying at or below 6 — then CG does not rescue the heartbeat under a density budget, and the §19.2 trade is intrinsic to this cell |
+| 2 | group C retained: G5 admissible fleet **8**, knee >= 1.3 | falling to 6–7 — CG is sized for the heartbeat and never carries the camera (CLAUDE.md), so a fall would contradict the recorded CG design and needs tracing before anything is claimed |
+| 3 | G10 admissible stays 10 | regressing |
+| 4 | group A (G1, G2) unchanged within noise | a material move — CG is uplink and G1/G2 are downlink, so a real shift is a cross-direction effect (the `HarqProcessPool.due_this_slot` mechanism) and must be traced, not absorbed |
+| 5 | G7 clause 2 no worse | worsening — the SR-suppression failure belongs to unrestricted `+CGu`; this is restricted `+CG` |
+
+### 21.3 THE COMPARISON THIS NEEDS, and why the obvious one is invalid
+
+**X7+CG must NOT be compared against `ConfigSched2` without CG to claim
+dominance.** CG improves every arm it is applied to; a like-for-unlike
+comparison would credit the scheduler with CG's effect. That is the same
+category error as quoting a measurement outside its configuration.
+
+So a dominance claim requires **`ConfigSched2+CG`** as the comparator, and that
+run does not exist — the 2026-09-16 campaign's CG artefacts are for
+`ConfigSched` (v1), not `ConfigSched2`. It is registered as required before any
+"X7+CG is the arm of record" statement, and the two legitimate readings of e8
+alone are:
+
+* **X7+CG vs X7** (`e7`) — isolates what CG does for this arm. Valid now.
+* **X7+CG vs ConfigSched2+CG** — the dominance question. **Needs the missing run.**
+
+**If expectation 1 holds and X7+CG still leads `ConfigSched2+CG` on group C,
+that is the first variant in this entire series to dominate**, and it would
+displace the baseline as the arm of record. If expectation 1 fails, the §19.2
+recommendation stands unchanged: the frontier is real and the choice is a
+product decision.
