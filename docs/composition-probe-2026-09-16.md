@@ -153,10 +153,24 @@ G12 can actually score*, not across the deployment's plausible range.
 
 ## 8. A LATENT GUARD GAP, recorded separately
 
-`sim/scenarios/g12.py` defines `assert_cell_is_scoreable` precisely for this —
-its docstring names the `sensor_dense` case and says such a cell "must be
+`sim/scenarios/g12.py:365` defines `assert_cell_is_scoreable` precisely for this
+— its docstring names the `sensor_dense` case and says such a cell "must be
 EXCLUDED by name, not scored to a one-element order that reads like a result".
-**It did not fire**, because the ramp path reaches `min()` in
-`g12_campaign.py:run_ramp` without calling it. A vacuous cell therefore raises
-deep inside a worker and kills the whole pool, instead of being excluded by name
-at task-build time. Worth fixing on its own merits; not bundled here.
+
+**The guard exists and IS called — but only on the path that did not crash.**
+`g12_campaign.py:126` calls it while selecting candidate cells. `g12_stress.py`
+builds its task list directly from `--cells` and never calls it, so `run_ramp`
+reaches the `min()` at `g12_campaign.py:236` unguarded. A vacuous cell therefore
+raises inside a worker and kills the entire pool, instead of being excluded by
+name at task-build time.
+
+**This is the fix-at-one-site pattern this repo has recorded repeatedly**: a
+guard written for one entry point, with a second entry point added later that
+bypasses it. The same shape as the three private arm registries found this
+morning, and as the `bootstrap_ci` ordering note in `g9_stress`'s own source.
+
+**The fix is one line in `g12_stress.py`** — call `assert_cell_is_scoreable`
+when building the task list and drop the cell by name with a reason. Not bundled
+into this probe: it is a runner change, it would land mid-run, and the probe's
+own correctness does not depend on it now that the vacuous cells are excluded by
+hand. Registered as owed.
