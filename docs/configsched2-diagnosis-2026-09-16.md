@@ -150,3 +150,56 @@ reverted regardless of what else improves.
 Default off, so `ConfigSched2` stays byte-identical when the flag is unset —
 verified by digest, as the decision sink was. The tuned arm gets its own name so
 the frozen arm keeps meaning what the campaign measured.
+
+---
+
+## 8. Encoding E2 REGISTERED BEFORE BUILDING (2026-09-16)
+
+Written before the arm exists, and before E1's full measurement has returned.
+
+### 8.1 Why E1 makes E2 possible, and why E2 alone would be wrong
+
+`_place` sizes every visit against
+
+    per_visit_cap = (prb_count // cap) * se // 8
+
+— **a cap-th of the slot, always.** The module's own comment says why: four
+cameras due in one slot, each sized to a whole slot, take 108 PRBs of a
+106-PRB slot and three of them become crumbs. The clamp is a defence against
+the plan overcommitting a slot.
+
+**E1 removes the thing it defends against.** Once visits are charged the
+density they actually occupy, the plan can no longer map more than `cap` units
+onto one slot — that is exactly what `sum(1/T) <= cap` means. So the
+worst-case clamp is defending against a state the outer problem now excludes,
+and it costs the camera its frame on every visit.
+
+**This ordering is load-bearing: E2 must not be built without E1.** Relaxing
+the clamp while the plan can still overcommit is the crumb cascade the comment
+records, which the first build measured at 32 992 missed visits.
+
+### 8.2 The encoding
+
+A promised visit carries **its plan share** (`plan.bytes_per_visit`, already
+computed by the outer problem against the density budget), bounded only by what
+is actually left in the slot and by the flow's own backlog — not re-clamped to
+a fixed cap-th. The realisation stops overriding a decision the optimisation
+already made.
+
+**Structure class: the outer problem is UNCHANGED.** E2 removes a
+realisation-side override, so the greedy's exactness is untouched. It is the
+second half of the same idea: the plan decides, the realisation executes.
+
+### 8.3 Registered expectations, and what falsifies each
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | `crumb_qfi2` and `crumb_short_bytes_qfi2` fall **below the ConfigSched2 baseline**, not merely below E1's | no fall — then the clamp was never what fragmented the camera, and §4 of this document is wrong |
+| 2 | group C (G5) improves: admissible fleet and/or frame age p95 at N = 10 | no movement — the camera's loss was not sizing |
+| 3 | the per-slot cap assertion in `allocate()` never fires | it raising — E1's density bound is not delivering the concurrency guarantee E2 relies on, which would invalidate §8.1 |
+| 4 | `prb_exhausted` rises somewhat (visits are larger) but `granted` does not fall | `granted` falling materially — larger visits would be starving later units |
+| 5 | groups A/B/D/E/F do not regress | any regression, judged exactly as D1 was |
+
+**Expectation 3 is the structural one.** It is the direct test of whether E1's
+outer-problem constraint actually holds in the realisation; if it fires, E2 is
+reverted and E1's claim is re-opened.
