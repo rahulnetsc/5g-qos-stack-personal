@@ -67,6 +67,14 @@ def resolve_arm(name: str, min_rb: int = 5):
         # published artefact's `code_state` scope.
         from sim.baselines.config_sched2 import ConfigSched2
         return ConfigSched2(min_rb=min_rb, density_budget=True)
+    if name == "ConfigSched2X2":
+        # E1 + E2 stacked (2026-09-16). E2 requires E1 by construction -- the
+        # constructor refuses the combination otherwise -- because the clamp
+        # E2 removes is what bounds an overcommitted slot until E1 makes the
+        # density constraint real.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, density_budget=True,
+                            plan_share_sizing=True)
     if not is_proto(name):
         from g11_campaign import _arm
         return _arm(name)

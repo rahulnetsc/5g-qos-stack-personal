@@ -130,7 +130,8 @@ class ConfigSched2:
 
     def __init__(self, min_rb: int = 5, window_ms: float = 100.0,
                  resolve_ms: float = 10.0, deadline_margin_slots: int = 6,
-                 min_period_slots: int = 2, density_budget: bool = False) -> None:
+                 min_period_slots: int = 2, density_budget: bool = False,
+                 plan_share_sizing: bool = False) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
         self.resolve_ms = float(resolve_ms)
@@ -147,6 +148,22 @@ class ConfigSched2:
         #: track, instead of one unit against a window-total budget. Default
         #: off: the arm stays byte-identical when unset.
         self.density_budget = bool(density_budget)
+        #: E2 (2026-09-16, diagnosis doc sec 8). A PROMISED contracted visit
+        #: carries the plan share the outer problem already chose for it,
+        #: bounded by the slot's remaining room and the flow's own backlog --
+        #: instead of being re-clamped to a cap-th of the slot. REQUIRES
+        #: `density_budget`: the clamp defends against the plan overcommitting
+        #: a slot, and only E1 makes `sum(1/T) <= cap` true, so relaxing it
+        #: without E1 is the crumb cascade the first build measured.
+        #: Best-effort and leftover sizing are deliberately UNCHANGED -- letting
+        #: leftover service take the slot is what over-fed the over-driven
+        #: camera past its MFBR in increment 5 (G7 clause 2 0.92 -> 1.04x).
+        self.plan_share_sizing = bool(plan_share_sizing)
+        if self.plan_share_sizing and not self.density_budget:
+            raise ValueError(
+                "plan_share_sizing requires density_budget: without E1 the plan "
+                "can still map more than `cap` units onto one slot, and the "
+                "per-visit clamp is the only thing bounding the overcommit.")
         self.counters: dict[str, int] = defaultdict(int)
         #: DIAGNOSIS HOOK (2026-09-16). `None` -- and therefore inert --
         #: unless a caller sets it at construction, exactly as
@@ -612,6 +629,10 @@ class ConfigSched2:
                 _note(unit, rank, "cce_short", need=cce_cost, left=cce_left)
                 continue
             per_visit_cap = max(1, ((int(slot.prb_count) // max(1, cap)) * se) // 8)   # PRBs first (see Tier 1)
+            # E2: for a PROMISED contracted visit the bound is what the slot
+            # actually has left, not a worst-case cap-th of it.
+            promised_cap = (max(1, (prbs_left * se) // 8)
+                            if self.plan_share_sizing else per_visit_cap)
             # size: what this grant is for. A PLANNED contracted flow carries
             # its plan share, an UNPLANNED one what it reports, a best-effort
             # visit its r/n share -- each bounded by a cap-th of the slot so
@@ -637,9 +658,9 @@ class ConfigSched2:
                 contracted = self._contracted.get(key, False)
                 if contracted:
                     if plan is not None and plan.n_visits > 0:
-                        want = min(reported, max(1, plan.bytes_per_visit), per_visit_cap)
+                        want = min(reported, max(1, plan.bytes_per_visit), promised_cap)
                     else:
-                        want = min(reported, per_visit_cap)
+                        want = min(reported, promised_cap)
                 elif key in mapped_now or key in self._owed:
                     want = min(reported, plan.bytes_per_visit if plan is not None and plan.n_visits > 0 else reported)
                 elif rank[0] >= 2:

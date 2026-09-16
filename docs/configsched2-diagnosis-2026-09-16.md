@@ -203,3 +203,40 @@ second half of the same idea: the plan decides, the realisation executes.
 **Expectation 3 is the structural one.** It is the direct test of whether E1's
 outer-problem constraint actually holds in the realisation; if it fires, E2 is
 reverted and E1's claim is re-opened.
+
+---
+
+## 9. E1 MEASURED, 9 steps rc 0 (`sweeps/cs2-increments/e1/`, against `inc9`)
+
+Scored against the expectations registered in §7.3 **before** the build.
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | `visit_density_bound` > 0 | **MET** — 616 at N=8, 988 at N=10; the encoding is not inert |
+| 2 | track repairs fall | **MET** — `track_dropped_best_effort` 129 → 0 at N=8, others already 0 |
+| 3 | `cap_skipped_promised` and `mapped_visit_missed` fall | **PARTLY MET** — total `cap_skipped` 10 369 → 6 431 at N=10 (−38 %) and promised 2 591 → 2 251, but `mapped_visit_missed` rose at N=10 |
+| 4 | `prb_exhausted` roughly flat | **NOT MET** — 1 774 → 2 454, pressure moved off DCIs onto PRBs |
+| 5 | group C (G5) improves | **MET, strongly** — admissible fleet **6 → 7**, load knee 1.0 → 1.3; gt32 ×1.1 3/0/4 at 137 ms → **10/10/10 at 33 ms**, ×1.2 0/0/2 at 146 ms → **10/10/10 at 38 ms**; gt31 N=7 52 → 29 ms |
+| 6 | no regression in A/B/D/E/F | **FAILED** |
+
+**Where it fails, and it is severe.** Group B collapses: G3 `part3_pass`
+`10 10 10 10 10 7 0 0 0` → `9 3 2 3 3 1 0 0 0`, **boundary 10 → None**, and
+telemetry p98 goes 8.5 → 84.25 ms at N = 2 — the heartbeat is damaged at every
+fleet size, not only under load. Group D's clause 1 and 3 follow: A-telemetry
+p98 57.8 → 97.8 ms, A-camera p98 46.9 → 106.0 ms, B-telemetry p98 6.0 → 58.2 ms
+(clause 2 improves, 1.04x → 0.88x). Group A, E and F are flat to slightly
+better (G2 cap-2 missed 291 → 268; G6 UL A/B 217/216 of 220 → 223/226 of 227).
+
+**So E1 is NOT keepable on its own** under the regression contract — the same
+judgement D1 got, and for the same reason.
+
+**The registered hypothesis for the G3 collapse** (to be tested, not assumed):
+it is the crumb effect §4 named and §8 exists to fix. E1 grants fewer visits
+for the same bytes while `_place` still clamps each visit to a cap-th of the
+slot, so a 300 B heartbeat is split across visits — exactly the mechanism that
+made increment 2 fail (`bytes_per_visit = ceil(r_i / n_i)` halving a message).
+If that is right, **E1+E2 should restore G3 while keeping E1's group-C gain.**
+If G3 stays broken under E1+E2, the density budget is starving short-period
+contracted flows directly and E1 needs importance-ordered shedding instead —
+which is the `degrade-by-importance` requirement in
+`guarantee-groups-2026-09-16.md` §7 expressed inside the constraint.
