@@ -901,7 +901,39 @@ the cost is CG's and X7+CG dominates; if it holds 10, the cost is X7's.
 transforms group C, at the price of group E's boundary and a little containment
 headroom — with the attribution of that price still open.*
 
-### 22.2 One flag for the next reader
+### 22.2 CORRECTED — G9 is a real group-F regression the headline metric hid
+
+*(This section replaces a weaker note that called the change "qualitative" and
+"unexplained". Decoded from the artefacts, it is neither.)*
+
+The verdict letters are `P` = PASS, **`F` = JOIN FAILURE**, **`B` = CELL ALREADY
+BROKEN** — and `B` is an *unscoreable* outcome, not a pass. Counting outcomes
+directly from `g9.json`:
+
+| population | X7 (no CG) | X7+CG |
+|---|---|---|
+| seeded (18 cells) | 12 PASS, **6 CELL ALREADY BROKEN** | 16 PASS, **2 JOIN FAILURE** |
+| unseeded (18 cells) | 12 PASS, **6 CELL ALREADY BROKEN** | 15 PASS, **3 JOIN FAILURE** |
+
+**X7 has ZERO join failures** — its six non-passing cells could not answer the
+question at all. **X7+CG makes all eighteen answerable and then genuinely fails
+two to three of them.** Those are real joins that never complete.
+
+**Both arms report `informative cells passed of 12: 12`.** That headline counts
+PASSes over a fixed subset of cells and **cannot distinguish "excluded as
+unscoreable" from "failed"**, so it is identical across an arm with no failures
+and an arm with three. This is the assert-completions-not-just-counts rule
+(CLAUDE.md) landing on this document's own reporting: §22's table quoted 12/12
+as "held", and it was hiding the finding.
+
+**What is established:** under CG this arm gains G9 answerability and loses
+2–3 joins outright. **What is not:** whether that belongs to CG or to X7 — the
+third cost, alongside G10's boundary and clause 2, awaiting the same
+`ConfigSched2+CG` comparator registered in §21.3. If the baseline with CG also
+fails joins, all three costs are CG's price and X7+CG dominates; if it does not,
+they are X7's.
+
+### 22.3 One flag for the next reader
 
 G9's per-cell verdict codes change character under CG: cells that read `P…`/`B…`
 on `X7` now include `F…` entries (`Fc1b1`, `Fc2b1`, `Fc1b2`) even though
