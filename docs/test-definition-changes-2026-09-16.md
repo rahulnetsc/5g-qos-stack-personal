@@ -136,3 +136,55 @@ comparisons and `ProtoRRageD2`'s — is an **upper bound on harm**: it counts
 capacity failures as containment failures, and cannot count them the other way.
 The clause-2 and clause-3 results are unaffected (clause 2 is a ratio against
 the aggressor's own MFBR; clause 3 is internal to Asset B).
+
+---
+
+## 3. G7 clause 1 gains a paired control — REGISTERED BEFORE BUILDING (2026-09-16)
+
+§2.1 found the defect; this specifies the fix before it is written, so the
+result cannot be walked back later.
+
+### 3.1 What changes
+
+For every (arm, seed) G7 already runs, run a **paired control**: the identical
+scenario with Asset B's camera at its **nominal** rate instead of 2.1× MFBR.
+Everything else — fleet, seeds, cap, attach path, horizon — held fixed, so the
+comparison is within-seed, the only form that can attribute.
+
+Clause 1 is then scored as G6's part A now is:
+
+* **control fails its own SLO** → the cell is **unscoreable** for containment,
+  emitted with a reason and counted, never silently dropped;
+* **control passes, treatment fails** → containment genuinely failed;
+* **both pass** → clause 1 passes.
+
+Clauses 2 and 3 are untouched: clause 2 is a ratio against the aggressor's own
+MFBR, clause 3 is internal to Asset B, and neither asks a victim-health
+question.
+
+### 3.2 Cost, and why it is affordable
+
+G7's step is ~4 s of a ~10 min increment, so a paired control roughly doubles
+the cheapest step in the suite. There is no reason to approximate this.
+
+### 3.3 Registered expectations and falsifiers
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | a non-zero number of cells come back **unscoreable** at N = 8 | zero — then the victim was never pre-broken and §2.1's concern, while structurally right, does not bite on this cell; the gate stays anyway, as G12's does |
+| 2 | part of the ConfigSched2X3 clause-1 regression (A telemetry p98 57.8 → 96.5 ms) is revealed as pre-existing rather than caused by the aggressor | the treatment/control gap being as large as the raw regression — then the regression is real containment harm and the E-series verdicts on group D stand unchanged |
+| 3 | the arms re-rank on clause 1 once gated, as they did on G6 | no re-ranking |
+
+**Expectation 2 is the one that matters for the scheduler work**, because every
+E-series arm is currently judged partly on a clause 1 that cannot separate
+containment from capacity. Until this lands, **every G7 clause-1 figure in this
+repo — baseline and increments alike — is an upper bound on harm**, and the
+increment write-ups say so.
+
+### 3.4 Sequencing
+
+This is a scenario-and-runner change, not a rescore, so it needs its own commit
+and its own re-measurement of G7 across the arms. It is deliberately NOT bundled
+with the config-scheduler increments: bundling a test-definition change with a
+scheduler change makes every moved number uninterpretable, which is the whole
+point of the one-change-per-commit rule.

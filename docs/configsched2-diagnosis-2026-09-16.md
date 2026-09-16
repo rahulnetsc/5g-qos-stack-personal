@@ -468,3 +468,98 @@ then E1+E3+E4 is the first increment to move a group without paying for it
 elsewhere, and it becomes the candidate. If not, the honest conclusion is that
 on this cell the camera and the heartbeat compete for the per-slot DCI cap and
 no encoding creates capacity.
+
+---
+
+## 15. X5 (E1+E3+E4) MEASURED — expectation 2 FALSIFIED, and the E-series verdict
+
+9 steps rc 0 (`sweeps/cs2-increments/e5/`), `ConfigSched2X5` against `inc9`.
+
+| # | registered (§14.1) | outcome |
+|---|---|---|
+| 1 | telemetry bpv 300 not 150, T = 32 | **MET** (checked before the run) |
+| 2 | **G3 part-3 boundary returns to >= 10** | **FALSIFIED — boundary 10 → None**, *worse* than E3's 4 |
+| 3 | group C retained at fleet 8 | **MET** — admissible **8**, knee 1.3, gt33 ×5 98 → 67 ms, ×15 139 → 99 ms |
+| 4 | G10 admissible stays 10 | **MET** — 10 held, M08 at N=10 0.970 → 0.973, N=12 0.781 → 0.811 |
+| 5 | G7 clause 1 recovers | **NOT MET** — A telemetry p98 57.8 → 98.0 ms (clause 3 does improve, 6.0 → 42.0; clause 2 1.04 → 0.97) |
+
+**§13.1's mechanism is refuted on its own registered terms.** E4 demonstrably
+fixed the message splitting — telemetry reads `bpv 300` at gt22 N=6, confirmed
+before the run — and G3 got **worse**, not better. Message splitting was
+therefore not what was costing group B.
+
+### 15.1 The E-series trade, all measured on the same seeds
+
+| arm | G3 part-3 boundary | G5 admissible fleet | G5 knee | G10 admissible | G2 cap-4 missed |
+|---|---|---|---|---|---|
+| `ConfigSched2` (baseline) | **10** | 6 | 1.0 | 10 | 202 |
+| E1 (density budget) | None | 7 | 1.3 | 10 | — |
+| E1+E2 (plan-share sizing) | None | 7 | 1.3 | **8** | — |
+| E1+E3 (importance order) | **4** | **8** | 1.3 | 10 | 186 |
+| E1+E3+E4 (byte-sized visits) | None | **8** | 1.3 | 10 | **181** |
+
+**No variant dominates the baseline.** Every encoding that wins the camera
+loses the heartbeat, and the three successive attempts to recover group B —
+sizing (E2), claim order (E3), share (E4) — each fixed the mechanism it
+targeted, verified by trace before the run, and none recovered G3.
+
+### 15.2 What is established, and what is not
+
+**Established.** The per-slot DCI cap is the binding constraint (§1–§2);
+encoding it in the outer problem is worth a large, reproducible group-C gain
+(admissible fleet 6 → 8, load knee 1.0 → 1.3, the load ramp transformed) and
+carries G2, G6, G12 order-agreement and G10's M08 with it.
+
+**Not established, and NOT to be asserted:** that group B's loss is an
+irreducible capacity wall. §14.1 offered that as the conclusion if expectation 2
+failed, but the evidence does not support it yet — because the BASELINE achieves
+G3 p98 8.5 ms with *worse* telemetry periods than any E-variant (two of six
+heartbeats at T = 32, four at T = 64, against E3/X5's six at T = 32). A cell
+where the loser has better periods and worse latency is not a capacity wall; it
+is an unexplained mechanism, and the next step is to find it rather than to add
+a fifth encoding against a guess (§8e's own rule).
+
+### 15.3 THE MECHANISM, FOUND — the budget moved the cell from DCI-bound to PRB-bound
+
+§15.2 said the loss was unexplained and must not be called a capacity wall.
+Traced at gt22 N=6, it is neither a wall nor anything the three encodings
+targeted:
+
+| arm | UL grants issued | `cap_skipped` | `prb_exhausted` | `mapped_visit_missed` | telemetry p98 |
+|---|---|---|---|---|---|
+| `ConfigSched2` | **11 858** | 2 639 | 2 196 | 1 383 | **8.5–24.0 ms** |
+| E1+E3 | 6 154 | **73** | 3 566 | 3 231 | 86.5–99.5 ms |
+| E1+E3+E4 | 7 105 | 367 | 3 420 | 2 861 | 78.5–99.0 ms |
+
+**The E-variants issue roughly HALF the uplink grants the baseline does.** The
+density budget does exactly what it was built to do — `cap_skipped` collapses
+2 639 → 73, a 97 % cut in DCIs lost to the per-slot cap — and the cell simply
+moves to the other side of the trade: `prb_exhausted` rises and the total number
+of grants nearly halves.
+
+The chain is: a density budget constrains `n_visits`, so `bytes_per_visit =
+r_i / n_i` grows, so each grant demands more PRBs, so a slot's PRBs run out
+after fewer units. **Fewer, larger visits.** Telemetry's p98 is 8.5 ms → ~90 ms
+because the heartbeat is served half as often in absolute terms — not because
+of its period (E3 fixed that), not its share (E4 fixed that), and not the cap.
+
+**The warning was in E1's own scorecard and was not heeded.** §9 recorded
+expectation 4 as NOT MET: *"prb_exhausted 1 774 → 2 454, pressure moved off
+DCIs onto PRBs."* That was the finding, one increment in; E2, E3 and E4 were
+each aimed at a downstream symptom instead. **A registered expectation that
+fails is information about the mechanism, not an acceptable cost of admission**
+— this is the fourth instance in this project of carrying on past a miss.
+
+**What this means for the formulation, and it is not a wall.** The outer problem
+optimises against the DCI cap alone; the realisation is bounded by BOTH DCIs and
+PRBs. A budget over one resource, tightened until it binds, silently loads the
+other. The Rel-16-correct next encoding is therefore a **joint** constraint —
+visits AND the PRBs those visits will demand — which is still separable per
+direction and still a knapsack, so it stays TYPE 1. That is registered as the
+next candidate and is deliberately NOT built here: three encodings in a row were
+aimed at guesses downstream of an unheeded measurement, and the rule in §8e says
+to diagnose first.
+
+**Standing recommendation until then:** `ConfigSched2` (baseline) remains the
+arm of record. The E-series flags stay in the tree, default off, each with its
+measured result, exactly as the D1 flag did.
