@@ -492,10 +492,21 @@ def main(argv) -> int:
                     # runner did not inherit it -- the fix-at-one-site
                     # pattern again. Sorting makes the artefact a function of
                     # the runs alone, not of how the campaign was resumed.
+                    # `committed_mult` IS PART OF THE GROUP KEY (2026-09-16).
+                    # Without it, every level sharing a `total_ues` was pooled
+                    # and the same 30-seed verdict written three times under
+                    # three keys -- the key on the line below carries the mult,
+                    # so the artefact LOOKED per-level while the numbers were
+                    # not. Invisible on the old axis, where every level had a
+                    # unique UE count; surfaced the moment an axis reused n=8.
+                    # The ledger's own key_fields always included the mult, so
+                    # the banked runs were correct throughout and only the
+                    # grouping was wrong.
                     group = sorted(
                         (r for r in rows
                          if r["case"] == case and r["arm"] == arm
-                         and r["total_ues"] == ues and r["rejoin_seed"] == col),
+                         and r["total_ues"] == ues and r["rejoin_seed"] == col
+                         and r["committed_mult"] == mult),
                         key=lambda r: r["seed"])
                     if not group:
                         continue

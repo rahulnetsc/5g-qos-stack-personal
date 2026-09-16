@@ -169,10 +169,15 @@ Recorded because the corrections are the evidence that the method worked.
   boundary) and has been re-anchored to this cell's measured boundary, taking
   unscoreable cells from 12 of 36 to **0 of 36**. The failures survive that fix:
   the recommended arm fails one join at 0.25× the boundary — two UEs at nominal
-  load — which is not a capacity effect and is **untraced**. Re-measured on the
-  anchored axis the two arms separate in the recommended arm's favour,
-  **31 PASS / 5 failures against the fallback's 24 / 12**, a difference the old
-  axis had been masking.
+  load — which is not a capacity effect and is **untraced**. Re-measured on the anchored axis the two arms are
+  **exactly tied at 31 PASS / 5 failures** — an earlier claim that they
+  separated came from an artefact whose verdict grouping omitted
+  `committed_mult`, now fixed. Their *distributions* differ (the fallback is
+  clean below the boundary and fails 4 of 5 at 1.5×; the recommended arm
+  spreads one across nearly every level), but neither has a G9 advantage.
+  Separately, **"JOIN FAILURE" is largely not about joins here**: all 17 failing
+  cells met the 90 % join-yield rule and 16 were caused by an SRB dialogue still
+  in flight at the horizon — untraced, and it may be a horizon-edge effect.
 * **G4, G8 and G11 are not measured.**
 * **DL SPS is not implemented.** It is the downlink analogue of CG, inside the
   Rel-16 baseline (TS 38.321 §5.8.1; 8 configurations per BWP against CG's 12),

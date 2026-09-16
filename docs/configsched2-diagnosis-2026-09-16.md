@@ -1084,8 +1084,18 @@ boundary itself. The axis was genuinely mis-anchored, and fixing it took
 unscoreable cells from 12 of 36 to **0 of 36**; but it was not the explanation
 for the failures.
 
-**What the fix did reveal is the opposite of a problem for the recommendation.**
-On the old axis both arms read an identical 31 PASS / 5 JOIN FAILURE. Anchored,
-they separate: **`ConfigSched2X7+CG` 31/5 against `ConfigSched2+CG` 24/12.** The
-stale axis had been hiding that the recommended arm is materially better at
-joins than its fallback.
+**CORRECTED.** An earlier version of this section claimed the anchored axis
+revealed the arms to separate, 31/5 against 24/12. That was wrong: the artefact
+it read had a grouping bug (`committed_mult` omitted from the verdict key), so
+the three levels sharing `n = 8` were pooled and emitted three times. Regrouped
+from the banked runs, **both arms are exactly tied at 31 PASS / 5 JOIN
+FAILURE** — see `docs/test-definition-changes-2026-09-16.md` §4.6.
+
+The distributions do differ: the fallback is clean below the boundary and
+concentrates 4 of 5 failures at 1.50×B, while the recommended arm spreads one
+across nearly every level. Same count, different shape — and **no totals
+advantage to either arm on G9.**
+
+And the label is largely not about joins: of the 17 failing cells, all met the
+90 % join-yield rule and **16 were caused by an SRB dialogue still in flight at
+the horizon** (§4.7 there).

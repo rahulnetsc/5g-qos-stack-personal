@@ -312,6 +312,11 @@ justifies it. The old artefacts stay as measured.
 
 ### 4.5 MEASURED (`sweeps/cs2-increments/g9_newaxis_2026-09-16.json`, 720 runs)
 
+> **SUPERSEDED BY §4.6.** The per-level table and totals below were computed
+> from an artefact whose verdict grouping omitted `committed_mult`, so every
+> level sharing `n = 8` was pooled and written three times. The corrected
+> numbers are in §4.6; the runs themselves were always correct.
+
 Both CG arms, 3 cases x 2 seed-columns x 6 levels x 10 seeds.
 
 | effective load | xB | `ConfigSched2+CG` P/F | `ConfigSched2X7+CG` P/F |
@@ -356,3 +361,64 @@ capacity effect and has no explanation yet.
 
 The anchored axis is now `g9_stress.py`'s default, in its own commit, as §4.4
 said it would be.
+
+### 4.6 CORRECTED — a grouping bug in the runner, surfaced by this very axis
+
+Regrouping the 720 banked runs by the full key shows the artefact of §4.5 was
+wrong, and why.
+
+**The bug.** `g9_stress.py`'s verdict grouping selected rows on
+`(case, arm, total_ues, rejoin_seed)` and **omitted `committed_mult`**, while
+the output key it wrote was built *with* the mult. Every level sharing a UE
+count was therefore pooled into one 30-seed verdict and emitted three times
+under three different keys — an artefact that *looked* per-level and was not.
+The ledger's own `key_fields` always included the mult, so the banked runs were
+correct throughout; only the grouping was wrong.
+
+**It was invisible on the old axis by construction**: every old level had a
+unique `total_ues` (3, 4, 5, 6, 7, 8), so the missing filter never collided.
+The re-anchored axis is the first to reuse `n = 8`, and surfaced it immediately
+(cells reporting `n_seeds = 30` against an axis of 10 seeds).
+
+**Corrected per-level verdicts** (72 groups, each exactly 10 seeds):
+
+| effective load | ×B | `ConfigSched2+CG` P/F | `ConfigSched2X7+CG` P/F |
+|---|---|---|---|
+| 2.0 | 0.25 | 6 / 0 | 5 / **1** |
+| 4.0 | 0.50 | 6 / 0 | 6 / 0 |
+| 6.0 | 0.75 | 6 / 0 | 5 / **1** |
+| 8.0 | 1.00 | 5 / 1 | 5 / 1 |
+| 10.0 | 1.25 | 6 / 0 | 5 / 1 |
+| 12.0 | 1.50 | 2 / **4** | 5 / 1 |
+| **total** | | **31 / 5** | **31 / 5** |
+
+**The two arms are EXACTLY TIED at 31 / 5.** §4.5's claim that the anchored axis
+revealed the recommended arm to be "materially better at joins" is **withdrawn**
+— that difference was manufactured by triple-counted rows, and expectation 4 is
+met at parity, not exceeded.
+
+**What survives unchanged:** expectation 1 and 3 (zero unscoreable cells
+anywhere; 36 of 36 scoreable against 24 of 36 on the old axis) and expectation 2
+(**falsified** — `ConfigSched2X7+CG` fails at 0.25×B and 0.75×B, well inside
+capacity).
+
+**What is new, and is a distribution rather than a total:** the fallback
+concentrates 4 of its 5 failures at 1.50×B and is clean below the boundary; the
+recommended arm spreads one failure across almost every level including the
+lightest. Same count, different shape.
+
+### 4.7 And "JOIN FAILURE" is largely not about joins
+
+Decomposing all 17 failing cells of the pre-fix artefact: **every one met the
+90 % join-yield rule**, 5 had *every* join pass, and **16 of 17 were caused by
+`srb_active_at_end` — an SRB dialogue still in flight at the horizon.** The
+`nb_ok` neighbour-epsilon statistic is computed and reported but **never enters
+the outcome**, so it is not implicated.
+
+`_verdict` treats an unfinished dialogue as catastrophic by design — the
+docstring argues that past the admissible boundary "a mechanism that fired and
+did not finish is the answer, not a defect". That argument does not obviously
+hold at **0.25×B, two UEs on nominal load**, where a dialogue merely straddling
+the horizon is as good an explanation. **Untraced, and flagged rather than
+asserted:** whether `srb_active_at_end` is a real stall or a horizon-edge effect
+decides whether G9 has any join finding here at all.

@@ -34,7 +34,7 @@
     2.0,
     5.0
   ],
-  "_wall_s": 190.4,
+  "_wall_s": 0.0,
   "_n_runs": 720,
   "_mean_wall_s_per_run": 7.88,
   "unseeded/warm/n2_cm1/ConfigSched2+CG": {
@@ -772,19 +772,19 @@
   "unseeded/warm/n8_cm1/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "15/30",
+      "neighbours_within_eps": "4/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.01862500000000017,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": 4.25,
+        "lo": 0.34875000000000006,
+        "hi": 8.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -798,23 +798,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 80.8
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "20/30",
+      "neighbours_within_eps": "4/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.01862500000000017,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": 4.25,
+        "lo": 0.34875000000000006,
+        "hi": 8.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -828,23 +828,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 80.8
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
+      "neighbours_within_eps": "4/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.01862500000000017,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": 4.25,
+        "lo": 0.34875000000000006,
+        "hi": 8.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -858,23 +858,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 80.8
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "26/30",
+      "neighbours_within_eps": "7/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.01862500000000017,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": 4.25,
+        "lo": 0.34875000000000006,
+        "hi": 8.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -888,25 +888,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 80.8
     }
   },
   "unseeded/warm/n8_cm1/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "5/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000104,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": 1.8,
+        "lo": -4.05,
+        "hi": 9.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -920,23 +920,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 81.9
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "23/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000104,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": 1.8,
+        "lo": -4.05,
+        "hi": 9.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -950,23 +950,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 81.9
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000104,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": 1.8,
+        "lo": -4.05,
+        "hi": 9.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -980,23 +980,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 81.9
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "26/30",
+      "neighbours_within_eps": "7/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000104,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": 1.8,
+        "lo": -4.05,
+        "hi": 9.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1010,25 +1010,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 81.9
     }
   },
   "unseeded/warm/n8_cm1.25/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "15/30",
+      "neighbours_within_eps": "1/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.02299999999999977,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -1.3811999999999955,
+        "lo": -2.7185899999999967,
+        "hi": -0.23438499999999948,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1042,23 +1042,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 91.0
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "20/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.02299999999999977,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -1.3811999999999955,
+        "lo": -2.7185899999999967,
+        "hi": -0.23438499999999948,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1072,23 +1072,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 91.0
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
+      "neighbours_within_eps": "7/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.02299999999999977,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -1.3811999999999955,
+        "lo": -2.7185899999999967,
+        "hi": -0.23438499999999948,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1102,23 +1102,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 91.0
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "26/30",
+      "neighbours_within_eps": "9/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.02299999999999977,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -1.3811999999999955,
+        "lo": -2.7185899999999967,
+        "hi": -0.23438499999999948,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1132,25 +1132,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 91.0
     }
   },
   "unseeded/warm/n8_cm1.25/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "4/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000242,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.6721999999999966,
+        "lo": -3.565639999999992,
+        "hi": 1.3221300000000038,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1164,23 +1164,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 84.6
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "23/30",
+      "neighbours_within_eps": "7/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000242,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.6721999999999966,
+        "lo": -3.565639999999992,
+        "hi": 1.3221300000000038,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1194,23 +1194,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 84.6
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "8/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000242,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.6721999999999966,
+        "lo": -3.565639999999992,
+        "hi": 1.3221300000000038,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1224,23 +1224,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 84.6
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "26/30",
+      "neighbours_within_eps": "9/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.023000000000000242,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.6721999999999966,
+        "lo": -3.565639999999992,
+        "hi": 1.3221300000000038,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1254,25 +1254,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 84.6
     }
   },
   "unseeded/warm/n8_cm1.5/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "15/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.052375000000000116,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -0.08669999999999903,
+        "lo": -0.18971249999999898,
+        "hi": 0.027400000000005843,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1286,23 +1286,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 83.1
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "20/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.052375000000000116,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -0.08669999999999903,
+        "lo": -0.18971249999999898,
+        "hi": 0.027400000000005843,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1316,23 +1316,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 83.1
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.052375000000000116,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -0.08669999999999903,
+        "lo": -0.18971249999999898,
+        "hi": 0.027400000000005843,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1346,23 +1346,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 83.1
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "26/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.022999999999999854,
+      "attach_p50_s": 0.052375000000000116,
       "nb_dp98_ci": {
-        "point": 0.9273666666666684,
-        "lo": -0.5950558333333312,
-        "hi": 2.7811908333333353,
-        "n": 30
+        "point": -0.08669999999999903,
+        "lo": -0.18971249999999898,
+        "hi": 0.027400000000005843,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1376,25 +1376,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 254.8
+      "wall_s_total": 83.1
     }
   },
   "unseeded/warm/n8_cm1.5/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "9/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.0028999999999996364,
+        "lo": -0.1661125000000056,
+        "hi": 0.14670000000000413,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1408,23 +1408,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 91.3
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "23/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.0028999999999996364,
+        "lo": -0.1661125000000056,
+        "hi": 0.14670000000000413,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1438,23 +1438,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 91.3
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.0028999999999996364,
+        "lo": -0.1661125000000056,
+        "hi": 0.14670000000000413,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1468,23 +1468,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 91.3
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "26/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023750000000000077,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": 0.37496666666666795,
-        "lo": -1.8604866666666637,
-        "hi": 2.975712499999998,
-        "n": 30
+        "point": -0.0028999999999996364,
+        "lo": -0.1661125000000056,
+        "hi": 0.14670000000000413,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -1498,7 +1498,7 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 257.8
+      "wall_s_total": 91.3
     }
   },
   "unseeded/cold/n2_cm1/ConfigSched2+CG": {
@@ -2235,734 +2235,734 @@
   },
   "unseeded/cold/n8_cm1/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "7/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.24049999999999994,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": 3.3,
+        "lo": -2.65,
+        "hi": 9.801249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 82.8
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.24049999999999994,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": 3.3,
+        "lo": -2.65,
+        "hi": 9.801249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 82.8
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "14/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.24049999999999994,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": 3.3,
+        "lo": -2.65,
+        "hi": 9.801249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 82.8
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.24049999999999994,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": 3.3,
+        "lo": -2.65,
+        "hi": 9.801249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 82.8
     }
   },
   "unseeded/cold/n8_cm1/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "12/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "3/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.2467499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -1.7,
+        "lo": -7.101249999999999,
+        "hi": 2.8524999999999863,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 667,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 47
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 86.6
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "12/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "3/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.2467499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -1.7,
+        "lo": -7.101249999999999,
+        "hi": 2.8524999999999863,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 667,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 47
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 86.6
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "13/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "3/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.2467499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -1.7,
+        "lo": -7.101249999999999,
+        "hi": 2.8524999999999863,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 667,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 47
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 86.6
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "15/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "5/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.2467499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -1.7,
+        "lo": -7.101249999999999,
+        "hi": 2.8524999999999863,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 667,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 48,
+        "srb_dialogues_completed": 47
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 86.6
     }
   },
   "unseeded/cold/n8_cm1.25/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "7/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.2842500000000001,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -24.904199999999996,
+        "lo": -36.36303249999999,
+        "hi": -15.33051749999999,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 86.5
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.2842500000000001,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -24.904199999999996,
+        "lo": -36.36303249999999,
+        "hi": -15.33051749999999,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 86.5
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "14/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.2842500000000001,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -24.904199999999996,
+        "lo": -36.36303249999999,
+        "hi": -15.33051749999999,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 86.5
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 0.2842500000000001,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -24.904199999999996,
+        "lo": -36.36303249999999,
+        "hi": -15.33051749999999,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 86.5
     }
   },
   "unseeded/cold/n8_cm1.25/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "12/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.29800000000000004,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -20.225200000000005,
+        "lo": -35.64042499999999,
+        "hi": -9.034785000000001,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 649,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 83.8
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "12/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.29800000000000004,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -20.225200000000005,
+        "lo": -35.64042499999999,
+        "hi": -9.034785000000001,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 649,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 83.8
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "13/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.29800000000000004,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -20.225200000000005,
+        "lo": -35.64042499999999,
+        "hi": -9.034785000000001,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 649,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 83.8
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "15/30",
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.29800000000000004,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -20.225200000000005,
+        "lo": -35.64042499999999,
+        "hi": -9.034785000000001,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 649,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 83.8
     }
   },
   "unseeded/cold/n8_cm1.5/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "7/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.6364999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 1.273,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -0.47489999999999954,
+        "lo": -0.6303500000000024,
+        "hi": -0.2991824999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 292,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_dialogues_started": 21,
+        "srb_dialogues_completed": 19
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.1
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.6364999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 1.273,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -0.47489999999999954,
+        "lo": -0.6303500000000024,
+        "hi": -0.2991824999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 292,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_dialogues_started": 21,
+        "srb_dialogues_completed": 19
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.1
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "14/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.6364999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 1.273,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -0.47489999999999954,
+        "lo": -0.6303500000000024,
+        "hi": -0.2991824999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 292,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_dialogues_started": 21,
+        "srb_dialogues_completed": 19
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.1
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30199999999999994,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.6364999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.2755000000000001,
+      "attach_p50_s": 1.273,
       "nb_dp98_ci": {
-        "point": -7.359699999999999,
-        "lo": -13.724267499999996,
-        "hi": -1.7872383333333344,
-        "n": 30
+        "point": -0.47489999999999954,
+        "lo": -0.6303500000000024,
+        "hi": -0.2991824999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1692,
+        "srb_steps": 292,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 121,
-        "srb_dialogues_completed": 119
+        "srb_dialogues_started": 21,
+        "srb_dialogues_completed": 19
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.1
     }
   },
   "unseeded/cold/n8_cm1.5/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.9085,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.5182499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -0.3366000000000014,
+        "lo": -0.6921099999999992,
+        "hi": -0.1241849999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 490,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 35,
+        "srb_dialogues_completed": 35
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 88.7
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 0.9085,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.5182499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -0.3366000000000014,
+        "lo": -0.6921099999999992,
+        "hi": -0.1241849999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 490,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 35,
+        "srb_dialogues_completed": 35
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 88.7
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.9085,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.5182499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -0.3366000000000014,
+        "lo": -0.6921099999999992,
+        "hi": -0.1241849999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 490,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 35,
+        "srb_dialogues_completed": 35
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 88.7
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "15/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.9085,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.29800000000000004,
+      "attach_p50_s": 0.5182499999999999,
       "nb_dp98_ci": {
-        "point": -7.420600000000001,
-        "lo": -13.961647500000002,
-        "hi": -2.3892508333333358,
-        "n": 30
+        "point": -0.3366000000000014,
+        "lo": -0.6921099999999992,
+        "hi": -0.1241849999999964,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1806,
+        "srb_steps": 490,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 130,
-        "srb_dialogues_completed": 128
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 35,
+        "srb_dialogues_completed": 35
       },
-      "wall_s_total": 259.1
+      "wall_s_total": 88.7
     }
   },
   "unseeded/rlf/n2_cm1/ConfigSched2+CG": {
@@ -3699,734 +3699,734 @@
   },
   "unseeded/rlf/n8_cm1/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "10/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.05625,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": 0.8417000000000001,
+        "lo": -4.0165999999999995,
+        "hi": 6.25,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 125.0
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.05625,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": 0.8417000000000001,
+        "lo": -4.0165999999999995,
+        "hi": 6.25,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 125.0
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "18/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.05625,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": 0.8417000000000001,
+        "lo": -4.0165999999999995,
+        "hi": 6.25,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 125.0
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "26/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.05625,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": 0.8417000000000001,
+        "lo": -4.0165999999999995,
+        "hi": 6.25,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 125.0
     }
   },
   "unseeded/rlf/n8_cm1/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "11/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0584999999999996,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": 0.36000000000000015,
+        "lo": -2.94,
+        "hi": 3.4512499999999933,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 130.6
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0584999999999996,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": 0.36000000000000015,
+        "lo": -2.94,
+        "hi": 3.4512499999999933,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 130.6
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0584999999999996,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": 0.36000000000000015,
+        "lo": -2.94,
+        "hi": 3.4512499999999933,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 130.6
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "28/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0584999999999996,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": 0.36000000000000015,
+        "lo": -2.94,
+        "hi": 3.4512499999999933,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 130.6
     }
   },
   "unseeded/rlf/n8_cm1.25/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "10/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.0599999999999996,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -2.0846999999999922,
+        "lo": -2.9302099999999878,
+        "hi": -1.4348874999999879,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 130.1
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.0599999999999996,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -2.0846999999999922,
+        "lo": -2.9302099999999878,
+        "hi": -1.4348874999999879,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 130.1
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "18/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.0599999999999996,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -2.0846999999999922,
+        "lo": -2.9302099999999878,
+        "hi": -1.4348874999999879,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 130.1
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "26/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.0599999999999996,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -2.0846999999999922,
+        "lo": -2.9302099999999878,
+        "hi": -1.4348874999999879,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 130.1
     }
   },
   "unseeded/rlf/n8_cm1.25/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "11/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0739999999999998,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -1.5427999999999968,
+        "lo": -1.9384074999999998,
+        "hi": -1.2386925,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 128.7
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "0/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0739999999999998,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -1.5427999999999968,
+        "lo": -1.9384074999999998,
+        "hi": -1.2386925,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 128.7
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0739999999999998,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -1.5427999999999968,
+        "lo": -1.9384074999999998,
+        "hi": -1.2386925,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 128.7
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "28/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.0739999999999998,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -1.5427999999999968,
+        "lo": -1.9384074999999998,
+        "hi": -1.2386925,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 128.7
     }
   },
   "unseeded/rlf/n8_cm1.5/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "10/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.7160000000000002,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -0.4472999999999985,
+        "lo": -0.6465075000000002,
+        "hi": -0.26027499999999537,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 134.6
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.7160000000000002,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -0.4472999999999985,
+        "lo": -0.6465075000000002,
+        "hi": -0.26027499999999537,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 134.6
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "18/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.7160000000000002,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -0.4472999999999985,
+        "lo": -0.6465075000000002,
+        "hi": -0.26027499999999537,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 134.6
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "26/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0614999999999997,
+      "attach_p50_s": 1.7160000000000002,
       "nb_dp98_ci": {
-        "point": -0.5634333333333302,
-        "lo": -2.202610833333327,
-        "hi": 1.3720733333333346,
-        "n": 30
+        "point": -0.4472999999999985,
+        "lo": -0.6465075000000002,
+        "hi": -0.26027499999999537,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 389.7
+      "wall_s_total": 134.6
     }
   },
   "unseeded/rlf/n8_cm1.5/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "11/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -0.3093999999999994,
+        "lo": -0.7066150000000002,
+        "hi": -0.042995000000000685,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 132.6
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -0.3093999999999994,
+        "lo": -0.7066150000000002,
+        "hi": -0.042995000000000685,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 132.6
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -0.3093999999999994,
+        "lo": -0.7066150000000002,
+        "hi": -0.042995000000000685,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 132.6
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "28/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0909999999999997,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.49739999999999873,
-        "lo": -1.5734824999999972,
-        "hi": 0.5849591666666647,
-        "n": 30
+        "point": -0.3093999999999994,
+        "lo": -0.7066150000000002,
+        "hi": -0.042995000000000685,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 391.8
+      "wall_s_total": 132.6
     }
   },
   "seeded/warm/n2_cm1/ConfigSched2+CG": {
@@ -5164,19 +5164,19 @@
   "seeded/warm/n8_cm1/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.01812500000000039,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": 4.65,
+        "lo": 0.5,
+        "hi": 10.15,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5190,23 +5190,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.9
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "19/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.01812500000000039,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": 4.65,
+        "lo": 0.5,
+        "hi": 10.15,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5220,23 +5220,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.9
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.01812500000000039,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": 4.65,
+        "lo": 0.5,
+        "hi": 10.15,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5250,23 +5250,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.9
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "8/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.01812500000000039,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": 4.65,
+        "lo": 0.5,
+        "hi": 10.15,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5280,25 +5280,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.9
     }
   },
   "seeded/warm/n8_cm1/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "2/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.022999999999999743,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -3.8,
+        "lo": -8.70125,
+        "hi": 1.45,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5312,23 +5312,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 84.3
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "19/30",
+      "neighbours_within_eps": "3/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.022999999999999743,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -3.8,
+        "lo": -8.70125,
+        "hi": 1.45,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5342,23 +5342,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 84.3
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "22/30",
+      "neighbours_within_eps": "4/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.022999999999999743,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -3.8,
+        "lo": -8.70125,
+        "hi": 1.45,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5372,23 +5372,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 84.3
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "5/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.022999999999999743,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -3.8,
+        "lo": -8.70125,
+        "hi": 1.45,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5402,25 +5402,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 84.3
     }
   },
   "seeded/warm/n8_cm1.25/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "2/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.023625000000000007,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -3.497399999999993,
+        "lo": -10.103114999999994,
+        "hi": 1.2297975000000028,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5434,23 +5434,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.8
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "19/30",
+      "neighbours_within_eps": "3/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.023625000000000007,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -3.497399999999993,
+        "lo": -10.103114999999994,
+        "hi": 1.2297975000000028,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5464,23 +5464,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.8
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
+      "neighbours_within_eps": "5/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.023625000000000007,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -3.497399999999993,
+        "lo": -10.103114999999994,
+        "hi": 1.2297975000000028,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5494,23 +5494,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.8
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.023625000000000007,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -3.497399999999993,
+        "lo": -10.103114999999994,
+        "hi": 1.2297975000000028,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5524,25 +5524,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 84.8
     }
   },
   "seeded/warm/n8_cm1.25/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.02300000000000013,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -1.3165000000000007,
+        "lo": -4.990869999999999,
+        "hi": 0.9083274999999968,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5556,23 +5556,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.0
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "19/30",
+      "neighbours_within_eps": "6/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.02300000000000013,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -1.3165000000000007,
+        "lo": -4.990869999999999,
+        "hi": 0.9083274999999968,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5586,23 +5586,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.0
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "22/30",
+      "neighbours_within_eps": "8/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.02300000000000013,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -1.3165000000000007,
+        "lo": -4.990869999999999,
+        "hi": 0.9083274999999968,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5616,23 +5616,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.0
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "9/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.02300000000000013,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -1.3165000000000007,
+        "lo": -4.990869999999999,
+        "hi": 0.9083274999999968,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5646,25 +5646,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 89.0
     }
   },
   "seeded/warm/n8_cm1.5/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.043250000000000066,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -0.034999999999993744,
+        "lo": -0.15123249999999439,
+        "hi": 0.07450750000000322,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5678,23 +5678,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 86.4
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "19/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.043250000000000066,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -0.034999999999993744,
+        "lo": -0.15123249999999439,
+        "hi": 0.07450750000000322,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5708,23 +5708,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 86.4
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "21/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.043250000000000066,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -0.034999999999993744,
+        "lo": -0.15123249999999439,
+        "hi": 0.07450750000000322,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5738,23 +5738,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 86.4
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.023625000000000007,
+      "attach_p50_s": 0.043250000000000066,
       "nb_dp98_ci": {
-        "point": 0.37253333333333766,
-        "lo": -2.409932499999994,
-        "hi": 3.143041666666669,
-        "n": 30
+        "point": -0.034999999999993744,
+        "lo": -0.15123249999999439,
+        "hi": 0.07450750000000322,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5768,25 +5768,25 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 256.1
+      "wall_s_total": 86.4
     }
   },
   "seeded/warm/n8_cm1.5/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "18/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -0.006299999999998818,
+        "lo": -0.14073249999999546,
+        "hi": 0.11230249999999606,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5800,23 +5800,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 85.1
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "19/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -0.006299999999998818,
+        "lo": -0.14073249999999546,
+        "hi": 0.11230249999999606,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5830,23 +5830,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 85.1
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "22/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -0.006299999999998818,
+        "lo": -0.14073249999999546,
+        "hi": 0.11230249999999606,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5860,23 +5860,23 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 85.1
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "24/30",
+      "neighbours_within_eps": "10/10",
       "first_service_p50_s": 0.0,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.02300000000000013,
+      "attach_p50_s": 0.028000000000000025,
       "nb_dp98_ci": {
-        "point": -1.7075999999999998,
-        "lo": -3.7276474999999993,
-        "hi": 0.2255975000000031,
-        "n": 30
+        "point": -0.006299999999998818,
+        "lo": -0.14073249999999546,
+        "hi": 0.11230249999999606,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
@@ -5890,7 +5890,7 @@
         "srb_dialogues_started": 0,
         "srb_dialogues_completed": 0
       },
-      "wall_s_total": 258.4
+      "wall_s_total": 85.1
     }
   },
   "seeded/cold/n2_cm1/ConfigSched2+CG": {
@@ -6628,733 +6628,733 @@
   "seeded/cold/n8_cm1/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "9/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.2139999999999999,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.15299999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": 4.45,
+        "lo": -1.15,
+        "hi": 10.551249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 656,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.1
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.2139999999999999,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.15299999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": 4.45,
+        "lo": -1.15,
+        "hi": 10.551249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 656,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.1
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "15/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.2139999999999999,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.15299999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": 4.45,
+        "lo": -1.15,
+        "hi": 10.551249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 656,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.1
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 1,
+      "neighbours_within_eps": "5/10",
+      "first_service_p50_s": 0.2139999999999999,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.15299999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": 4.45,
+        "lo": -1.15,
+        "hi": 10.551249999999994,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 656,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 1,
+        "srb_dialogues_started": 47,
+        "srb_dialogues_completed": 46
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.1
     }
   },
   "seeded/cold/n8_cm1/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "10/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.21974999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.1479999999999997,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": 3.85,
+        "lo": -4.8,
+        "hi": 11.7,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 86.4
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.21974999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.1479999999999997,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": 3.85,
+        "lo": -4.8,
+        "hi": 11.7,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 86.4
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 0.21974999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.1479999999999997,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": 3.85,
+        "lo": -4.8,
+        "hi": 11.7,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 86.4
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 0.21974999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.1479999999999997,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": 3.85,
+        "lo": -4.8,
+        "hi": 11.7,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 86.4
     }
   },
   "seeded/cold/n8_cm1.25/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "9/30",
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.21924999999999994,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -15.170300000000001,
+        "lo": -22.583734999999997,
+        "hi": -9.4067575,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.8
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "13/30",
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.21924999999999994,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -15.170300000000001,
+        "lo": -22.583734999999997,
+        "hi": -9.4067575,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.8
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "15/30",
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.21924999999999994,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -15.170300000000001,
+        "lo": -22.583734999999997,
+        "hi": -9.4067575,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.8
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "16/30",
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "1/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 0.21924999999999994,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -15.170300000000001,
+        "lo": -22.583734999999997,
+        "hi": -9.4067575,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 84.8
     }
   },
   "seeded/cold/n8_cm1.25/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "10/30",
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.22050000000000003,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -15.836899999999996,
+        "lo": -31.860512499999995,
+        "hi": -5.180652500000004,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 87.1
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.22050000000000003,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -15.836899999999996,
+        "lo": -31.860512499999995,
+        "hi": -5.180652500000004,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 87.1
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
+      "neighbours_within_eps": "0/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.22050000000000003,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -15.836899999999996,
+        "lo": -31.860512499999995,
+        "hi": -5.180652500000004,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 87.1
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "16/30",
+      "neighbours_within_eps": "3/10",
       "first_service_p50_s": 0.30100000000000005,
       "stable_cell_p50_s": 0.0,
       "attach_p50_s": 0.22050000000000003,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -15.836899999999996,
+        "lo": -31.860512499999995,
+        "hi": -5.180652500000004,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 700,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 50,
+        "srb_dialogues_completed": 50
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 87.1
     }
   },
   "seeded/cold/n8_cm1.5/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "9/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 2,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.4034999999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 1.2629999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -0.4966999999999985,
+        "lo": -0.7631049999999967,
+        "hi": -0.2097200000000045,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 301,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 22,
+        "srb_dialogues_completed": 20
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 86.6
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "13/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 2,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 1.4034999999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 1.2629999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -0.4966999999999985,
+        "lo": -0.7631049999999967,
+        "hi": -0.2097200000000045,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 301,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 22,
+        "srb_dialogues_completed": 20
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 86.6
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "15/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 2,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.4034999999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 1.2629999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -0.4966999999999985,
+        "lo": -0.7631049999999967,
+        "hi": -0.2097200000000045,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 301,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 22,
+        "srb_dialogues_completed": 20
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 86.6
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "29/30",
+      "n_seeds": 10,
+      "pass_rate": "9/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 3,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "catastrophic_seeds": 2,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.4034999999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.21550000000000002,
+      "attach_p50_s": 1.2629999999999997,
       "nb_dp98_ci": {
-        "point": -3.738999999999999,
-        "lo": -8.254515000000001,
-        "hi": 0.45477083333333373,
-        "n": 30
+        "point": -0.4966999999999985,
+        "lo": -0.7631049999999967,
+        "hi": -0.2097200000000045,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1657,
+        "srb_steps": 301,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 3,
-        "srb_dialogues_started": 119,
-        "srb_dialogues_completed": 116
+        "srb_active_at_end": 2,
+        "srb_dialogues_started": 22,
+        "srb_dialogues_completed": 20
       },
-      "wall_s_total": 255.5
+      "wall_s_total": 86.6
     }
   },
   "seeded/cold/n8_cm1.5/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "10/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "8/10",
+      "first_service_p50_s": 0.509,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.503625,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -0.2384999999999991,
+        "lo": -0.4034449999999935,
+        "hi": -0.10839250000000601,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 546,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 39,
+        "srb_dialogues_completed": 39
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 88.2
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.509,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.503625,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -0.2384999999999991,
+        "lo": -0.4034449999999935,
+        "hi": -0.10839250000000601,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 546,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 39,
+        "srb_dialogues_completed": 39
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 88.2
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.509,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.503625,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -0.2384999999999991,
+        "lo": -0.4034449999999935,
+        "hi": -0.10839250000000601,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 546,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 39,
+        "srb_dialogues_completed": 39
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 88.2
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 0.30100000000000005,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 0.509,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 0.22050000000000003,
+      "attach_p50_s": 0.503625,
       "nb_dp98_ci": {
-        "point": -4.075133333333332,
-        "lo": -10.843234999999996,
-        "hi": 1.3142541666666652,
-        "n": 30
+        "point": -0.2384999999999991,
+        "lo": -0.4034449999999935,
+        "hi": -0.10839250000000601,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 1946,
+        "srb_steps": 546,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 139,
-        "srb_dialogues_completed": 139
+        "srb_dialogues_started": 39,
+        "srb_dialogues_completed": 39
       },
-      "wall_s_total": 261.6
+      "wall_s_total": 88.2
     }
   },
   "seeded/rlf/n2_cm1/ConfigSched2+CG": {
@@ -8091,734 +8091,734 @@
   },
   "seeded/rlf/n8_cm1/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.05375,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": 1.1,
+        "lo": -3.2,
+        "hi": 6.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 126.4
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.05375,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": 1.1,
+        "lo": -3.2,
+        "hi": 6.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 126.4
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "19/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.05375,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": 1.1,
+        "lo": -3.2,
+        "hi": 6.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 126.4
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "24/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.0504999999999995,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.05375,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": 1.1,
+        "lo": -3.2,
+        "hi": 6.4,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 126.4
     }
   },
   "seeded/rlf/n8_cm1/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.056,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.8,
+        "lo": -5.75,
+        "hi": 3.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.3
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.056,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.8,
+        "lo": -5.75,
+        "hi": 3.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.3
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "22/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "3/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.056,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.8,
+        "lo": -5.75,
+        "hi": 3.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.3
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "27/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.0517499999999997,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.056,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.8,
+        "lo": -5.75,
+        "hi": 3.5,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.3
     }
   },
   "seeded/rlf/n8_cm1.25/ConfigSched2+CG": {
     "eps0.5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "2/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.0587499999999999,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -1.118399999999997,
+        "lo": -3.592587499999995,
+        "hi": 1.5818599999999987,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 129.4
     },
     "eps1ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "4/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.0587499999999999,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -1.118399999999997,
+        "lo": -3.592587499999995,
+        "hi": 1.5818599999999987,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 129.4
     },
     "eps2ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "19/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "6/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.0587499999999999,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -1.118399999999997,
+        "lo": -3.592587499999995,
+        "hi": 1.5818599999999987,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 129.4
     },
     "eps5ms": {
-      "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "outcome": "PASS",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 0,
-      "catastrophic_seeds": 2,
-      "neighbours_within_eps": "24/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "catastrophic_seeds": 0,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.053,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.0587499999999999,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -1.118399999999997,
+        "lo": -3.592587499999995,
+        "hi": 1.5818599999999987,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
-        "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_active_at_end": 0,
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 129.4
     }
   },
   "seeded/rlf/n8_cm1.25/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.0875,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -1.2579000000000007,
+        "lo": -1.6200874999999988,
+        "hi": -0.8947925000000035,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.1
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "1/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.0875,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -1.2579000000000007,
+        "lo": -1.6200874999999988,
+        "hi": -0.8947925000000035,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.1
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "22/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.0875,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -1.2579000000000007,
+        "lo": -1.6200874999999988,
+        "hi": -0.8947925000000035,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.1
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
-      "cell_broken_seeds": 1,
+      "n_seeds": 10,
+      "pass_rate": "10/10",
+      "cell_broken_seeds": 0,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "27/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.068,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.0875,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -1.2579000000000007,
+        "lo": -1.6200874999999988,
+        "hi": -0.8947925000000035,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 128.1
     }
   },
   "seeded/rlf/n8_cm1.5/ConfigSched2+CG": {
     "eps0.5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "7/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.7134999999999998,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -0.43530000000000085,
+        "lo": -0.6558199999999993,
+        "hi": -0.24810000000000215,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 120.3
     },
     "eps1ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "16/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.7134999999999998,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -0.43530000000000085,
+        "lo": -0.6558199999999993,
+        "hi": -0.24810000000000215,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 120.3
     },
     "eps2ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "19/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.7134999999999998,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -0.43530000000000085,
+        "lo": -0.6558199999999993,
+        "hi": -0.24810000000000215,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 120.3
     },
     "eps5ms": {
       "outcome": "JOIN FAILURE",
-      "n_seeds": 30,
-      "pass_rate": "28/30",
+      "n_seeds": 10,
+      "pass_rate": "8/10",
       "cell_broken_seeds": 0,
       "catastrophic_seeds": 2,
-      "neighbours_within_eps": "24/30",
-      "first_service_p50_s": 1.0542500000000001,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.7105000000000001,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.07375,
+      "attach_p50_s": 1.7134999999999998,
       "nb_dp98_ci": {
-        "point": -0.15123333333333258,
-        "lo": -1.862134999999997,
-        "hi": 1.8616075000000003,
-        "n": 30
+        "point": -0.43530000000000085,
+        "lo": -0.6558199999999993,
+        "hi": -0.24810000000000215,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 2,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 28
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 8
       },
-      "wall_s_total": 376.1
+      "wall_s_total": 120.3
     }
   },
   "seeded/rlf/n8_cm1.5/ConfigSched2X7+CG": {
     "eps0.5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.32960000000000206,
+        "lo": -0.7156350000000062,
+        "hi": -0.07249499999999943,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 98.4
     },
     "eps1ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "12/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "9/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.32960000000000206,
+        "lo": -0.7156350000000062,
+        "hi": -0.07249499999999943,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 98.4
     },
     "eps2ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "22/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.32960000000000206,
+        "lo": -0.7156350000000062,
+        "hi": -0.07249499999999943,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 98.4
     },
     "eps5ms": {
       "outcome": "PASS",
-      "n_seeds": 30,
-      "pass_rate": "30/30",
+      "n_seeds": 10,
+      "pass_rate": "10/10",
       "cell_broken_seeds": 1,
       "catastrophic_seeds": 0,
-      "neighbours_within_eps": "27/30",
-      "first_service_p50_s": 1.0854999999999997,
+      "neighbours_within_eps": "10/10",
+      "first_service_p50_s": 1.1229999999999998,
       "stable_cell_p50_s": 0.0,
-      "attach_p50_s": 1.0884999999999998,
+      "attach_p50_s": 1.126,
       "nb_dp98_ci": {
-        "point": -0.7958333333333343,
-        "lo": -2.579809166666669,
-        "hi": 0.6836858333333353,
-        "n": 30
+        "point": -0.32960000000000206,
+        "lo": -0.7156350000000062,
+        "hi": -0.07249499999999943,
+        "n": 10
       },
       "checks_total": {
         "sched_inactive_fired": 0,
         "srb_floor_fired": 0,
         "cp_floor_fired": 0,
         "has_srb_decisive": 0,
-        "srb_steps": 90,
+        "srb_steps": 30,
         "ra_failed": 0,
         "ra_active_at_end": 0,
         "srb_active_at_end": 0,
-        "srb_dialogues_started": 30,
-        "srb_dialogues_completed": 30
+        "srb_dialogues_started": 10,
+        "srb_dialogues_completed": 10
       },
-      "wall_s_total": 354.8
+      "wall_s_total": 98.4
     }
   }
 }
