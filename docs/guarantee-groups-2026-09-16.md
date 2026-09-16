@@ -77,6 +77,47 @@ For every increment, on the arm being tuned:
 result it affects is re-run before anything from it is reported.** A known
 bug plus a published number is not an acceptable combination at any point.
 
+
+## 3a. THE CONTRACT HAS A HOLE: guarantees in no group are silently exempt
+
+Found 2026-09-16, after nine increments had been scored against it.
+
+§1's six groups cover **G1, G2, G3, G5, G6, G7, G9, G10, G12** — nine of the
+twelve guarantees. **G4, G8 and G11 belong to no group**, and the regression
+contract in §3 is expressed per group. So "no regression in the other groups",
+the expectation every increment in
+`docs/configsched2-diagnosis-2026-09-16.md` was registered against, **could
+never have covered them.**
+
+That is not a theoretical gap. **G4 regressed monotonically across the entire
+increment series and nobody saw it**: post-silence resume p98 at duty 1.0 went
+22.00 ms (`ConfigSched+CG`) → 29.47 (`ConfigSched2+CG`) → 47.25
+(`ConfigSched2X7+CG`), leaving the recommended arm the worst of any arm
+measured. `sweeps/cs2-increments/run_increment.sh` does not run G4 — its runner
+takes no `--arms` — so nine increments were scored over **eight** guarantees
+while the contract was written as though it covered everything outside the
+group under test.
+
+**A deferral became an exemption, silently.** G4 was deferred early as one of
+three "come back to these at the end". Deferring a *measurement* is a schedule
+decision; dropping it from the *contract* is a scope decision, and the first
+quietly made the second.
+
+### 3a.1 The rule this adds
+
+**Every guarantee is either in a group, or named in the contract as exempt with
+a reason.** There is no third state. Concretely, as of now:
+
+| guarantee | status |
+|---|---|
+| G1, G2, G3, G5, G6, G7, G9, G10, G12 | in groups A–F, covered by §3 |
+| **G4 (GT-2.3)** | **not in a group, and NOT exempt** — measured for all 24 arm/CG combinations 2026-09-16, and it must be scored per increment or the runner must be given `--arms` |
+| **G8, G11** | **not in a group, deferred, and unmeasured on this cell** — no arm has a result, so no increment's effect on them is known in either direction |
+
+**For G8 and G11 the honest statement is not "they pass" or "they are
+unaffected" — it is that nothing is known.** Any claim about an arm's overall
+standing is a claim over nine of twelve guarantees, and the write-ups say so.
+
 ## 4. Where each tuning target stands per group, before any of this work
 
 From the campaign (`docs/results-cell-2026-09-15.md`) and the ConfigSched2
