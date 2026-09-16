@@ -367,3 +367,104 @@ survives.** If group C's gain cannot coexist with group B's deadline, then the
 per-slot cap is a genuine capacity wall on this cell and the honest answer is
 that the camera and the heartbeat are competing for a resource neither
 scheduling nor encoding can create.
+
+---
+
+## 13. E3 MEASURED (`sweeps/cs2-increments/e3/`), and the remaining mechanism
+
+9 steps rc 0, `ConfigSched2X3` against `inc9`. Scored against §12.1.
+
+| # | registered | outcome |
+|---|---|---|
+| 1 | telemetry back to T <= 32, no best-effort at 0.5 | **MET** (checked before the run) |
+| 2 | G3 part-3 boundary >= 10, p98 under ~35 ms | **PARTLY** — boundary None → **4**, not 10; p98 still 76–98 ms |
+| 3 | group C retained (fleet 7, knee >= 1.3) | **EXCEEDED** — admissible fleet 6 → **8**, knee 1.0 → 1.3 |
+| 4 | best-effort throughput falls | met (the intended trade) |
+| 5 | G10 admissible stays 10; G7 clause 1 no worse | **SPLIT** — G10 **10 held**; G7 clause 1 p98 57.8 → 96.5 ms, clause 3 6.0 → 53.0 ms, both worse |
+
+### 13.0 The remaining groups, and one expectation FALSIFIED
+
+| group | statistic | baseline `ConfigSched2` | E3 | verdict |
+|---|---|---|---|---|
+| **A (G2)** | cap-4 missed STOPs | 202/18300 | **186/18300** | win |
+| **A (G2)** | cap-2 missed STOPs | 291/18300 | **239/18300** | win |
+| **D (G6)** | UL flood part A/B | 217/216 of 220 | **223/222 of 225** | win |
+| **D (G6)** | camera window floor | 1/3 | 3/5 | win |
+| **F (G9)** | informative cells | 12 of 12 | **12 of 12** | held |
+| **E (G12)** | clause 4 | 10/0/0 | 10/0/0 | held |
+| **E (G12)** | order agreement | 9/10 | **10/10** | win |
+| **E (G12)** | telemetry M02 at ×1.8/×2.0 | 0.025/0.071 | **0.100/0.284** | regression |
+| **E (G12)** | background Mbps at ×2.0 | 6.5 | **9.0** | **expectation 4 FALSIFIED** |
+
+**§12.1 expectation 4 said best-effort throughput would FALL** — that was the
+intended trade of shedding best-effort first. It ROSE, 6.5 → 9.0 Mbps, and
+telemetry's PDB-violation rate rose with it. The reason is that E1 frees DCIs
+(`cap_skipped` −38 %), so more traffic of every class gets through; E3 changes
+the *order* of claims on density but does not reduce the total carried. The
+registered expectation confused "shed best-effort first when the budget binds"
+with "carry less best-effort overall", and only the first is what E3 does.
+
+**Group B and E's telemetry regression share one cause**, identified in §13.1
+below — the heartbeat's share halved to 150 B — so both should move together
+under E4, and if only one moves the explanation is incomplete.
+
+**Group C is now the best any increment has produced** — admissible fleet 8
+against the baseline's 6 and E1's 7, with the load ramp transformed (gt32 ×1.1
+and ×1.2 at 10/10/10, ×1.3 at 10/6/10) — and **group E is held at 10**, which
+E2 could not do. Group B is recovered from "no boundary at all" to 4, and
+group D is still regressed.
+
+### 13.1 Why group B is still broken, traced to the line
+
+The §11 mechanism was right and E3 fixed it: the heartbeat's period is back to
+T = 32. But the trace shows a SECOND mechanism that importance-ordering
+introduced:
+
+| | baseline | E1 | E3 |
+|---|---|---|---|
+| telemetry `qfi1` | n_visits **1**, bpv **300** | n_visits 1, bpv 300 | n_visits **2**, bpv **150** |
+
+**The 300 B heartbeat is now split across two visits of 150 B.** That is
+verbatim the failure this project already measured and recorded as increment 2
+(`docs/campaign-cell-2026-09-16-linux.md`): *"two visits per window halve the
+heartbeat's visit to 150 B for a 300 B message, so every message is split
+across visits 50 ms apart, delivery rate = arrival rate with no slack, and one
+missed visit grows the backlog without bound."*
+
+The cause is that `bytes_per_visit = ceil(r_i / n_i)` divides the window's
+bytes by the FINAL visit count — and E3 raised that count for a **deadline**
+reason, not a byte reason. A visit added to meet a deadline should still be
+able to carry a whole message; instead it halved the share.
+
+**This is why E2 does not fix it either**: E2 relaxes the per-slot clamp in
+`_place`, but `want` is still bounded by `plan.bytes_per_visit`, which is
+already 150 before `_place` is reached.
+
+---
+
+## 14. Encoding E4 REGISTERED BEFORE BUILDING
+
+**The encoding.** Size a visit by the flow's BYTE need, not by a visit count
+that a deadline inflated: `bytes_per_visit = ceil(r_i / n_bytes)` where
+`n_bytes` is the byte-driven visit count before the deadline floor is applied.
+The flow still gets its deadline-driven visits; each one may simply carry a
+whole message rather than a fraction of one.
+
+**Structure class: TYPE 1.** Neither the budget nor the feasible region moves —
+only the reported share of an already-chosen allocation. Greedy stays exact.
+
+### 14.1 Registered expectations and falsifiers
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | at gt22 N=6, telemetry reads n_visits 2 with **bpv 300** (not 150), period still T = 32 | bpv staying 150 — the divisor is not where §13.1 says it is |
+| 2 | G3 part-3 boundary returns to **>= 10** | no recovery — then message splitting is not what is costing group B, and §13.1 is wrong |
+| 3 | group C retained: admissible fleet **8**, knee >= 1.3 | falling back — the gain would depend on the splitting |
+| 4 | G10 admissible stays 10 | regressing |
+| 5 | G7 clause 1 recovers toward baseline as the telemetry share is restored | no movement — then G7's clause 1 has a separate cause (and note it is an UPPER BOUND on harm anyway, having no control run) |
+
+**Expectation 2 decides it.** If G3 recovers to 10 while group C holds at 8,
+then E1+E3+E4 is the first increment to move a group without paying for it
+elsewhere, and it becomes the candidate. If not, the honest conclusion is that
+on this cell the camera and the heartbeat compete for the per-slot DCI cap and
+no encoding creates capacity.

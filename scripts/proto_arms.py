@@ -74,6 +74,12 @@ def resolve_arm(name: str, min_rb: int = 5):
         from sim.baselines.config_sched2 import ConfigSched2
         return ConfigSched2(min_rb=min_rb, density_budget=True,
                             importance_order=True)
+    if name == "ConfigSched2X5":
+        # E1 + E3 + E4 (2026-09-16). Deliberately WITHOUT E2, which cost
+        # group E (G10 admissible 10 -> 8) while E3 holds it at 10.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, density_budget=True,
+                            importance_order=True, byte_sized_visits=True)
     if name == "ConfigSched2X4":
         # E1 + E2 + E3, measured only if E3 earns its keep on its own.
         from sim.baselines.config_sched2 import ConfigSched2

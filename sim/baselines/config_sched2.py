@@ -132,7 +132,8 @@ class ConfigSched2:
                  resolve_ms: float = 10.0, deadline_margin_slots: int = 6,
                  min_period_slots: int = 2, density_budget: bool = False,
                  plan_share_sizing: bool = False,
-                 importance_order: bool = False) -> None:
+                 importance_order: bool = False,
+                 byte_sized_visits: bool = False) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
         self.resolve_ms = float(resolve_ms)
@@ -174,6 +175,21 @@ class ConfigSched2:
         #: while every heartbeat sat at T=64 against a 100 ms PDB.
         #: REQUIRES `density_budget` -- it orders claims against that budget.
         self.importance_order = bool(importance_order)
+        #: E4 (2026-09-16, diagnosis doc sec 14). Size a visit by the flow's
+        #: BYTE need, not by a visit count a DEADLINE inflated.
+        #: `bytes_per_visit = ceil(r_i / n_i)` divides the window's bytes by
+        #: the final visit count, so E3's deadline-driven extra visit halved
+        #: the heartbeat's share to 150 B for a 300 B message -- verbatim the
+        #: increment-2 failure this project already measured: every message
+        #: split across visits 50 ms apart, delivery rate = arrival rate with
+        #: no slack. A visit added for a deadline must still be able to carry
+        #: a whole message. REQUIRES `importance_order`, which is what creates
+        #: the deadline-driven visits in the first place.
+        self.byte_sized_visits = bool(byte_sized_visits)
+        if self.byte_sized_visits and not self.importance_order:
+            raise ValueError(
+                "byte_sized_visits requires importance_order: without it no "
+                "visit count is deadline-inflated, so there is nothing to undo.")
         if self.importance_order and not self.density_budget:
             raise ValueError(
                 "importance_order requires density_budget: it orders claims "
@@ -441,6 +457,7 @@ class ConfigSched2:
                 # bytes need and what its DEADLINE needs. Telemetry asks for
                 # one visit on bytes alone (a single 300 B message), which is
                 # why its period drifted to 64 once the repair path was gone.
+                need_bytes = max(1, need)      # E4: the BYTE-driven count
                 if self.importance_order and contracted:
                     need = max(need, self._deadline_visits(key, W_dir))
                 extra = max(0, need - n_i)
@@ -467,9 +484,13 @@ class ConfigSched2:
                 if n_i <= 0:
                     self._plan[key] = FlowPlan(0, 0, self._window_slots, fv, contracted)
                     continue
+                # E4: divide by the BYTE-driven count, so a deadline-driven
+                # visit carries a whole message instead of a fraction of one.
+                bpv_div = (min(n_i, need_bytes)
+                           if (self.byte_sized_visits and contracted) else n_i)
                 self._plan[key] = FlowPlan(
                     n_visits=n_i,
-                    bytes_per_visit=max(1, int(math.ceil(r_i / n_i))),
+                    bytes_per_visit=max(1, int(math.ceil(r_i / max(1, bpv_div)))),
                     interval_slots=max(1, self._window_slots // n_i),
                     floor_visits=fv, contracted=contracted)
             self._assign_periods_and_tracks(direction, rows, cap)
