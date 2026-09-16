@@ -97,3 +97,56 @@ ProtoRRageD2 to **E** alone, and ConfigSched2 to **C and D** — which share
 one traced cause (the table gives a contracted flow with backlog any free
 DCI beyond its plan, so an over-driven camera exceeds MFBR and a competing
 camera takes the instrument's bytes). One increment addresses both.
+
+## 5. Group E, diagnosed before any code (2026-09-16)
+
+**The artefact cannot answer "which flow missed", so a probe was built and
+gated.** `g10.json` records `M08_fraction` but no flow identity. The probe
+re-scores a run with the scorecard's own M07/M08 over the runner's own
+population (`Population.protected_fleet()`, `g5_consolidation.py:76`) and
+is **gated on reproducing the artefact's value before anything is read** —
+0 mismatches in 10 of 10 seeds on both arms. Two earlier attempts are
+recorded as not quotable: one used a `FlowRecord` field that does not
+exist and one omitted `record_timeseries=True`, and that one returned
+0.000 for every flow on both arms — an empty selection wearing a
+measurement.
+
+**What it found.** At N = 8, every protected GBR flow is a **4 Mbps
+camera** — one contract, eight instances — so there is no "largest flow"
+to blame. Proto's failure is **unequal treatment of identical contracts**:
+
+| | worst flow (median over 10 seeds) | worst seed | spread across the identical contracts, median / max |
+|---|---|---|---|
+| PF | 0.988 | 0.982 | 0.023 / 0.030 |
+| ProtoRRageD2 | **0.917** | **0.782** | **0.096 / 0.230** |
+
+On the worst seed two cameras sit at 0.782 and 0.939 while four others are
+at 0.986–0.995. **Grant sizing is refuted as the cause** — the contracts
+are identical, so size cannot separate them. Pure slots-since-last-grant
+equalises *visits*, and bytes per visit then diverge; nothing in the arm's
+uplink key carries the GBR deficit, because `denial_ordered_periodic`
+REPLACES Tier 2 with `-age` rather than refining it
+(`two_tier_proto.py::_ul_rank_key`).
+
+**So group E's increment is a GBR-deficit tie-break inside the age order,
+not a rate-aware term** — confirmed by construction rather than
+correlation: G10 runs at `snr_spread_db = 0.0`, so the cameras are
+identical in channel as well as contract, and the spread cannot be a
+channel effect.
+
+## 6. Group D: M1 is refuted, and stays refuted
+
+`TwoTierProto` already carries an MFBR mechanism (`mfbr_enforced`, arm
+`ProtoM1`) and it is **not** group D's lever. `_m1_view` caps
+`bytes_reported` — the gNB's BSR *estimate* — and the UE fills the granted
+block from its real queue, so shrinking the estimate shrinks the block
+asked for without capping delivery (`docs/g7-slide-source.md` §5;
+`docs/HANDOVER-2026-09-12.md` lists it under "edits tried and REFUTED —
+do not retry without new evidence", together with the process note that
+its first measurement was of an unwired no-op). Enforcement has to act on
+`tbs_bytes` after sizing, or on eligibility.
+
+That is exactly the shape of ConfigSched2's increment 10 (a contracted
+flow over its planned bytes for the window drops to best-effort rank), so
+group D is carried by that increment on the ConfigSched side, and on the
+Proto side there is no new evidence to justify retrying M1.
