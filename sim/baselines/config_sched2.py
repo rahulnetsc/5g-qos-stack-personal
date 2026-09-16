@@ -524,10 +524,18 @@ class ConfigSched2:
                     self._owed.setdefault(k, now)
                 continue
             per_visit_cap = max(1, ((int(slot.prb_count) // max(1, cap)) * se) // 8)   # PRBs first (see Tier 1)
-            # size: what this grant is for. A promised contracted flow carries
-            # what it reports up to a cap-th of the slot; a best-effort visit
-            # its r/n share; an unplanned contracted flow what it reports; a
-            # leftover contracted flow what it reports up to a cap-th.
+            # size: what this grant is for. A PLANNED contracted flow carries
+            # its plan share, an UNPLANNED one what it reports, a best-effort
+            # visit its r/n share -- each bounded by a cap-th of the slot so
+            # `cap` units fit. Increment 9 (2026-09-16) removed a floor of a
+            # cap-th on contracted flows: increment 3 added it to stop a
+            # two-visit plan halving a 300 B message, increment 2 (that plan)
+            # was then reverted, and the floor only inflated afterwards --
+            # the telemetry's share IS its whole message (300 B) while a
+            # camera's is ~800 B and the floor handed it 1 530 B. Measured as
+            # the over-driven camera served past its MFBR-capped plan (G7
+            # clause 2 0.92 -> 1.08x, A-telemetry p98 31.5 -> 70.0 ms) and
+            # G5's admissible fleet 7 -> 6 with its load knee at x1.0.
             planned = 0
             backlog = 0
             served: list[tuple[FlowConfig, int]] = []
@@ -540,8 +548,10 @@ class ConfigSched2:
                 plan = self._plan.get(key)
                 contracted = self._contracted.get(key, False)
                 if contracted:
-                    share = plan.bytes_per_visit if (plan is not None and plan.n_visits > 0) else 0
-                    want = min(reported, max(share, per_visit_cap))
+                    if plan is not None and plan.n_visits > 0:
+                        want = min(reported, max(1, plan.bytes_per_visit), per_visit_cap)
+                    else:
+                        want = min(reported, per_visit_cap)
                 elif key in mapped_now or key in self._owed:
                     want = min(reported, plan.bytes_per_visit if plan is not None and plan.n_visits > 0 else reported)
                 elif rank[0] >= 2:
