@@ -1068,3 +1068,24 @@ group-A deficit recorded as the open cost. **`ConfigSched2` without CG is no
 longer the right comparison for anything** — CG is worth more than every
 scheduler change measured here combined, and it is a MAC feature, not the
 scheduler's to spend.
+
+---
+
+## 24. §22.2a's axis caveat is WITHDRAWN (2026-09-16)
+
+§22.2a argued the five join failures sat on a stale occupancy axis and so were
+"not yet a property of the arm". The axis was re-anchored to this cell's
+measured boundary and both CG arms re-run (720 runs,
+`docs/test-definition-changes-2026-09-16.md` §4.5).
+
+**The failures survive.** `ConfigSched2X7+CG` fails a join at **0.25x** the
+boundary — two UEs at nominal load — and the fallback fails four cells at the
+boundary itself. The axis was genuinely mis-anchored, and fixing it took
+unscoreable cells from 12 of 36 to **0 of 36**; but it was not the explanation
+for the failures.
+
+**What the fix did reveal is the opposite of a problem for the recommendation.**
+On the old axis both arms read an identical 31 PASS / 5 JOIN FAILURE. Anchored,
+they separate: **`ConfigSched2X7+CG` 31/5 against `ConfigSched2+CG` 24/12.** The
+stale axis had been hiding that the recommended arm is materially better at
+joins than its fallback.

@@ -58,16 +58,34 @@ CQI_DELAY_SLOTS = 8
 
 #: THE OCCUPANCY AXIS. One knob, two dials: an operator does not experience
 #: "six robots" and "1.5x the committed load" as separate facts. Levels are
-#: named by TOTAL UEs (joiner + incumbents) so they can be read straight
-#: against G10's admissible boundary.
+#: read against G10's admissible boundary by their EFFECTIVE LOAD
+#: (total_ues x committed_mult), never by UE count alone -- see the anchoring
+#: note on OCCUPANCY below, and docs/test-definition-changes-2026-09-16.md sec 4.
 OCCUPANCY = (
-    # (total_ues, committed_mult)
-    (3, 0.50),
-    (4, 0.75),
-    (5, 1.00),
-    (6, 1.25),
-    (7, 1.50),
-    (8, 2.00),
+    # (total_ues, committed_mult), ANCHORED to this cell's measured G10 boundary
+    # (2026-09-16). A level's effective promised load is `total_ues x
+    # committed_mult` UE-equivalents, because `sim/workload.py::
+    # scale_committed_load` scales each committed flow's offered load AND its
+    # contract fields together -- so the axis is labelled by that product, not
+    # by UE count alone.
+    #
+    # WHY THE OLD AXIS WAS WRONG. It read ((3,0.50) ... (8,2.00)), i.e. 1.5 to
+    # 16.0 UE-equivalents, and its comment claimed levels could "be read
+    # straight against G10's admissible boundary" -- true only of (5, 1.00),
+    # since G10's boundary is measured at committed_mult = 1.0. Against this
+    # cell's boundary (10 without CG, 8 with it) the top two levels sat at
+    # 1.31x and 2.00x capacity, and EVERY unscoreable cell and join failure
+    # landed there. Measured on the axis below, the same arms lose nothing to
+    # unanswerable points: 36 of 36 cells score, against 24 of 36 before.
+    #
+    # B = 8 UE-equivalents, the +CG boundary the deployed candidate runs at.
+    (2, 1.00),    # 0.25x B
+    (4, 1.00),    # 0.50x B
+    (6, 1.00),    # 0.75x B
+    (8, 1.00),    # 1.00x B -- exactly at the boundary
+    (8, 1.25),    # 1.25x B
+    (8, 1.50),    # 1.50x B -- past capacity by a CONTROLLED margin, to
+                  # exercise the gate without spending the grid on it
 )
 
 CASES = {

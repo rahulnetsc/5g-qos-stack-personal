@@ -164,10 +164,15 @@ Recorded because the corrections are the evidence that the method worked.
 * **Group A deficit is real and unexplained.** The recommended arm misses 10
   more STOPs at cap 4 and 12 more at cap 2 than the fallback. It has not been
   traced.
-* **G9's occupancy axis is stale.** It was derived from the *previous* cell's
-  G10 boundary, so its top two points are past capacity here — and all five
-  join failures sit exactly there. The failure rate is therefore not yet a
-  property of any arm.
+* **G9's join failures are real, and the recommended arm has fewer of them.**
+  The occupancy axis was mis-anchored (derived from the *previous* cell's G10
+  boundary) and has been re-anchored to this cell's measured boundary, taking
+  unscoreable cells from 12 of 36 to **0 of 36**. The failures survive that fix:
+  the recommended arm fails one join at 0.25× the boundary — two UEs at nominal
+  load — which is not a capacity effect and is **untraced**. Re-measured on the
+  anchored axis the two arms separate in the recommended arm's favour,
+  **31 PASS / 5 failures against the fallback's 24 / 12**, a difference the old
+  axis had been masking.
 * **G4, G8 and G11 are not measured.**
 * **DL SPS is not implemented.** It is the downlink analogue of CG, inside the
   Rel-16 baseline (TS 38.321 §5.8.1; 8 configurations per BWP against CG's 12),

@@ -309,3 +309,50 @@ capacity, the five failures are real arm behaviour and the standalone doc's
 re-measurement is a runner invocation with no code change**. Only promoting the
 new default is an edit, and that is its own commit, made *after* the measurement
 justifies it. The old artefacts stay as measured.
+
+### 4.5 MEASURED (`sweeps/cs2-increments/g9_newaxis_2026-09-16.json`, 720 runs)
+
+Both CG arms, 3 cases x 2 seed-columns x 6 levels x 10 seeds.
+
+| effective load | xB | `ConfigSched2+CG` P/F | `ConfigSched2X7+CG` P/F |
+|---|---|---|---|
+| 2.0 | 0.25 | 6 / 0 | 5 / **1** |
+| 4.0 | 0.50 | 6 / 0 | 6 / 0 |
+| 6.0 | 0.75 | 6 / 0 | 5 / **1** |
+| 8.0 | 1.00 | 2 / **4** | 5 / 1 |
+| 10.0 | 1.25 | 2 / 4 | 5 / 1 |
+| 12.0 | 1.50 | 2 / 4 | 5 / 1 |
+| **total** | | **24 / 12** | **31 / 5** |
+
+**Unscoreable cells: 0 of 36 on both arms** (against 12 of 36 on `X7` under the
+old axis).
+
+| # | registered (§4.3) | outcome |
+|---|---|---|
+| 1 | zero unscoreable at <= 1.00xB | **MET** — zero at every level |
+| 2 | join failures only above 1.00xB | **FALSIFIED** |
+| 3 | scoreable cells rise materially | **MET** — 24 of 36 → **36 of 36** |
+| 4 | X7+CG at least at parity | **MET and exceeded** — 31/5 against 24/12 |
+
+**Expectation 2, the load-bearing one, is falsified.** `ConfigSched2X7+CG` fails
+a join at **0.25xB** — two UEs at nominal load, deep inside capacity — and again
+at 0.75xB, each on 1 seed of 10. `ConfigSched2+CG` fails four cells *at* the
+boundary itself. **So the join failures are NOT an axis artefact**, and the
+caveat written in `docs/qos-scheduler-result-2026-09-16.md` §5 and
+`docs/configsched2-diagnosis-2026-09-16.md` §22.2a — that the failure rate is
+"not yet a property of any arm" — is withdrawn. It is partly a property of the
+arms, and both documents are corrected.
+
+**And the stale axis was masking a real difference between the arms.** On the
+old axis both read an identical 31 PASS / 5 JOIN FAILURE. Anchored, they
+separate sharply: **X7+CG 31/5 against the fallback's 24/12**, with the fallback
+failing `cold` and `rlf` on both columns at every level from the boundary
+upward. That strengthens the recommendation rather than weakening it — but it
+was invisible while a third of the grid was unanswerable.
+
+**Still untraced:** X7+CG's two sporadic failures well inside capacity (1 seed
+of 10 at 0.25xB and at 0.75xB, both `cold`). A join failure at two UEs is not a
+capacity effect and has no explanation yet.
+
+The anchored axis is now `g9_stress.py`'s default, in its own commit, as §4.4
+said it would be.
