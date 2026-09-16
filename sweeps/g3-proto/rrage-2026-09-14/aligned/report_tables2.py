@@ -89,7 +89,8 @@ if g2:
 g6 = load("g6.json")
 if g6:
     print("## G6 tables\n")
-    dl = g6["deltas"]
+    # GATED DELTAS EXCLUDED: a delta whose CONTROL already failed its own bound is not evidence about isolation (g6_isolation.py, 2026-09-16), so it is excluded here and the denominator says so.
+    dl = [d for d in g6["deltas"] if d.get("scored", True)]
     conds = [c for c in ("ul", "dl") if any(d["condition"] == c for d in dl)]
     print("**pass counts over all paired deltas (3 instruments x 3 fleet sizes x 10 seeds x statistics)** — part A (within its own bound) / part B (shift <= +20 % toward harm)\n")
     rows = []

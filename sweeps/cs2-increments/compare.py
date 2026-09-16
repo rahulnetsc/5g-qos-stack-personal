@@ -153,12 +153,14 @@ b, a = load(BEFORE, "g6.json"), load(INC, "g6.json")
 if b and a:
     section("G6 -- part A / part B of 270 per flood direction; worst telemetry gap")
     for cnd in ("ul", "dl"):
-        db = [d for d in b["deltas"] if d["arm"] == ARM_B and d["condition"] == cnd]
-        da = [d for d in a["deltas"] if d["arm"] == ARM_A and d["condition"] == cnd]
+        # SCORED ONLY: a delta whose CONTROL already failed its own bound is not evidence about isolation (g6_isolation.py, 2026-09-16), so it is excluded here and the denominator says so. Summing part_a over gated cells
+        # counted an arm's pre-existing capacity failure as isolation harm.
+        db = [d for d in b["deltas"] if d["arm"] == ARM_B and d["condition"] == cnd and d.get("scored", True)]
+        da = [d for d in a["deltas"] if d["arm"] == ARM_A and d["condition"] == cnd and d.get("scored", True)]
         line(f"{cnd.upper()} flood A/B", f"{sum(d['part_a'] for d in db)}/{sum(d['part_b'] for d in db)} of {len(db)}", f"{sum(d['part_a'] for d in da)}/{sum(d['part_b'] for d in da)} of {len(da)}")
     for s in ("g5_cam_window_floor", "g3_tele_gap_worst_ms"):
-        db = [d for d in b["deltas"] if d["arm"] == ARM_B and d["condition"] == "ul" and d["stat"] == s]
-        da = [d for d in a["deltas"] if d["arm"] == ARM_A and d["condition"] == "ul" and d["stat"] == s]
+        db = [d for d in b["deltas"] if d["arm"] == ARM_B and d["condition"] == "ul" and d["stat"] == s and d.get("scored", True)]
+        da = [d for d in a["deltas"] if d["arm"] == ARM_A and d["condition"] == "ul" and d["stat"] == s and d.get("scored", True)]
         line(f"UL {s} A/B of 30", f"{sum(d['part_a'] for d in db)}/{sum(d['part_b'] for d in db)}", f"{sum(d['part_a'] for d in da)}/{sum(d['part_b'] for d in da)}")
     for s in ("g3_tele_gap_worst_ms", "g5_tele_gap_worst_ms"):
         vb = max((d["value"] for d in b["deltas"] if d["arm"] == ARM_B and d["stat"] == s and d["condition"] != "none"), default=None)

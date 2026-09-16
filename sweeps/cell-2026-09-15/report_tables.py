@@ -301,7 +301,11 @@ if g2:
 g6 = load("g6.json")
 if g6:
     print("## G6 tables\n")
-    dl = g6["deltas"]
+    # GATED DELTAS ARE EXCLUDED: a delta whose CONTROL already failed its own bound is not evidence about isolation (g6_isolation.py, 2026-09-16), so it is excluded here and the denominator says so.
+    dl = [d for d in g6["deltas"] if d.get("scored", True)]
+    _gated = len(g6["deltas"]) - len(dl)
+    if _gated:
+        print(f"_{_gated} of {len(g6[chr(34)+chr(100)+chr(101)+chr(108)+chr(116)+chr(97)+chr(115)+chr(34)])} deltas excluded: the no-flood control already failed its own bound._\n")
     conds = [c for c in ("ul", "dl") if any(d["condition"] == c for d in dl)]
     print("**pass counts over all paired deltas (3 instruments x 3 fleet sizes x 10 seeds x statistics)** — part A (within its own bound) / part B (shift <= +20 % toward harm)\n")
     rows = []
@@ -314,13 +318,13 @@ if g6:
     md(["arm"] + [f"{c.upper()} flood: A / B of n" for c in conds], rows)
     stats = sorted({d["stat"] for d in dl})
     for cnd in conds:
-        print(f"**{cnd.upper()} flood — per statistic, part A / part B passes of 30 (3 fleet sizes x 10 seeds)**\n")
+        print(f"**{cnd.upper()} flood — per statistic, part A / part B passes of the SCORED cells (gated cells excluded)**\n")
         rows = []
         for s in stats:
             row = [s]
             for a in ARMS:
                 ds = [d for d in dl if d["arm"] == a and d["condition"] == cnd and d["stat"] == s]
-                row.append(f"{sum(d['part_a'] for d in ds)}/{sum(d['part_b'] for d in ds)}" if ds else "-")
+                row.append(f"{sum(d['part_a'] for d in ds)}/{sum(d['part_b'] for d in ds)} of {len(ds)}" if ds else "gated")
             rows.append(row)
         md(["statistic"] + list(ARMS), rows)
     print("**worst absolute telemetry gap under flood, any cell (ms)** — the G6 slide's own headline beside the pass count\n")

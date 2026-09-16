@@ -689,31 +689,74 @@ cap 4. `scripts/g6_isolation.py`, 1 350 runs plain.
 
 ### 6.3 Results
 
-**Pass counts over 270 paired deltas per arm and direction — part A / part B** (previous cell in brackets)
+> **CORRECTED 2026-09-16 — THE TABLES AND THE CONCLUSION BELOW ARE RESCORED,
+> AND ONE HEADLINE CLAIM IS WITHDRAWN.** `scripts/g6_isolation.py` had two
+> test-definition defects (`docs/test-definition-changes-2026-09-16.md`):
+> part A ignored whether the **control** (same seed, same fleet, NO flood)
+> already failed the bound, and part B compared a pure ratio with no absolute
+> floor. Both are re-scorings of the same raw statistics — **no run was
+> repeated** — because the runner emits raw rows and scores separately.
+>
+> **Withdrawn:** *"G1's command p98 … still shifts by more than 20 % on a
+> fifth of them on every arm."* With a floor of 5 % of each statistic's own
+> bound, `cmd_vel` p98 **passes part B 30/30 on every arm** (failures were
+> PF 14, Reservation 11, ConfigSched 9, ProtoRRageD2 8, TwoTier 4 → all 0).
+> Those failures were moves of 1.5–4.0 ms against a **95 ms** bound.
+>
+> The denominators below are the **scored** cells; a cell whose control had
+> already failed is excluded and counted separately, because it cannot answer
+> an isolation question.
 
-| arm | UL flood | DL flood |
-|---|---|---|
-| PF | 229 / 255 (259 / 251) | 222 / 240 (261 / 250) |
-| Reservation | 204 / 227 (225 / 241) | 204 / 233 (233 / 246) |
-| TwoTier | **143 / 182** (176 / 176) | 175 / 225 (207 / 233) |
-| ProtoRRageD2 | **240 / 256** (255 / 258) | **238 / 253** (257 / 246) |
-| ConfigSched | 225 / 254 | 229 / 255 |
+**Part A / part B passes, over SCORED paired deltas per arm and direction**
 
-**UL flood, per statistic (part A / part B of 30)**
+| arm | UL flood: A / B of scored | gated | DL flood: A / B of scored | gated |
+|---|---|---|---|---|
+| PF | 225 / 216 of 226 | 44 | 216 / 205 of 226 | 44 |
+| Reservation | 197 / 184 of 210 | 60 | 196 / 196 of 210 | 60 |
+| TwoTier | **143 / 143 of 180** | **90** | 171 / 173 of 180 | 90 |
+| ProtoRRageD2 | **231 / 232 of 245** | **25** | 233 / 237 of 245 | 25 |
+| ConfigSched | 222 / 212 of 227 | 43 | 224 / 220 of 227 | 43 |
+
+**UL flood, per statistic — part A / part B of the cells still scored**
 
 | statistic | PF | Reservation | TwoTier | ProtoRRageD2 | ConfigSched |
 |---|---|---|---|---|---|
-| G1 `cmd_vel` p98 | 30 / 25 | 30 / 27 | 30 / 29 | 30 / 30 | 30 / 29 |
-| G3 telemetry worst gap | 30 / 26 | 20 / 24 | **11 / 11** | 30 / 28 | 30 / 26 |
-| G3 gaps ≥ 2 s | 30 / 30 | 24 / 26 | 20 / 22 | 30 / 30 | 30 / 30 |
-| G5 frame age p95 | 20 / 30 | 20 / 21 | **0 / 17** | 23 / 24 | 20 / 26 |
-| G5 frame completeness | 20 / 30 | 20 / 28 | 6 / 15 | 28 / 30 | 21 / 30 |
-| G5 windowed GFBR floor | 9 / 30 | 6 / 24 | 0 / 11 | 9 / 30 | **4 / 30** |
-| G5 telemetry gap | 30 / 24 | 24 / 17 | 19 / 20 | 30 / 24 | 30 / 23 |
+| G1 `cmd_vel` p98 | 30/30 of 30 | 30/30 of 30 | 30/30 of 30 | 30/30 of 30 | 30/30 of 30 |
+| G1 gaps over | 30/30 of 30 | 30/30 of 30 | 30/30 of 30 | 30/30 of 30 | 30/30 of 30 |
+| G3 telemetry worst gap | 30/26 of 30 | 20/20 of 22 | **11/8 of 20** | 30/28 of 30 | 30/26 of 30 |
+| G3 gaps ≥ 2 s | 30/30 of 30 | 22/22 of 26 | 20/20 of 23 | 30/30 of 30 | 30/30 of 30 |
+| G3 silent | 30/30 of 30 | 30/30 of 30 | 27/27 of 30 | 30/30 of 30 | 30/30 of 30 |
+| G5 frame age p95 | 20/20 of 20 | 20/12 of 20 | **0/0 of 10** | 20/19 of 24 | 20/16 of 20 |
+| G5 frame completeness | 20/20 of 20 | 20/20 of 20 | 6/10 of 13 | 27/29 of 29 | 20/20 of 20 |
+| G5 windowed GFBR floor | 5/6 of **6** | 2/6 of **6** | 0/3 of **4** | 4/12 of **12** | 2/7 of **7** |
+| G5 telemetry gap | 30/24 of 30 | 23/14 of 26 | 19/15 of 20 | 30/24 of 30 | 30/23 of 30 |
 
-Under the DL flood the pattern is the same with smaller effects; G1's
-`cmd_vel` p98 is again the statistic every arm fails part B on (21–27 of
-30 pass) while staying inside its bound on every cell.
+**The windowed GFBR floor row is the one to read twice.** Of 30 cells it is
+scored on only **4–7**: on the other 23–26 the camera already misses its own
+2 s GFBR floor **with no flood at all**. G6 was reporting a capacity failure
+as an isolation failure.
+
+### 6.4 Conclusion
+
+**G6 still fails on every arm — but on the camera alone, not on the command
+flow.** After the correction the split is clean:
+
+* **The command flow is isolated on every arm.** Both G1 statistics pass part
+  A and part B on 30 of 30 cells, in both flood directions.
+* **The telemetry half separates the arms**, as before. TwoTier loses part A
+  outright under the UL flood (worst gap 11 of 20 scored, frame age 0 of 10)
+  with silences of 8.2–9.6 s; Reservation less so (6.5–8.9 s). PF,
+  `ProtoRRageD2` and ConfigSched hold every G3 statistic with worst silences
+  of 300–500 ms.
+* **The camera half is largely not an isolation question at all.** Its cells
+  are gated 43–90 per arm because the control already fails; what survives
+  still fails, so the camera's problem is capacity and the scheduler's, which
+  is what §5 and G10 measure directly.
+
+`ProtoRRageD2` is the strongest arm here on the corrected scoring — the
+fewest gated cells (25 against 43–90) *and* the highest scored pass counts —
+which says its control is healthier before the flood arrives, not only that it
+resists the flood better.
 
 **Worst absolute telemetry gap under flood, any cell (ms)**
 
@@ -725,29 +768,6 @@ Under the DL flood the pattern is the same with smaller effects; G1's
 | ProtoRRageD2 | **300** | **397** |
 | ConfigSched | 399 | **395** |
 
-### 6.4 Conclusion
-**G6 fails on every arm, as on the previous cell, and the cell lowers
-every arm's part-A count by 15–30 through one instrument.** The G5 camera
-already fails its own frame-age and completeness bounds at N = 12 on
-every arm (§5), so those cells fail part A whether or not the flood is
-on — PF's G5 frame age goes 30/30 → 20/30 with no change to what the
-flood does to it. Part B, the shift test that G6 exists for, is nearly
-unchanged (PF 251 → 255 under the UL flood). The shared failure is the
-same: G1's command p98 stays inside its bound on every cell and still
-shifts by more than 20 % on a fifth of them on every arm.
-
-The arms separate as before. **TwoTier loses part A outright** on the G3
-and G5 statistics under the UL flood (telemetry worst gap 11/30, frame
-age 0/30) with worst silences of 8.2–9.6 s; Reservation less so
-(6.5–8.9 s). PF, `ProtoRRageD2` and ConfigSched hold every G3 statistic
-on every cell with worst silences of 300–500 ms. **ConfigSched is PF
-here**, to within a handful of cells on every statistic, with one
-exception in PF's favour: the windowed GFBR floor (goodput ≥ GFBR in every
-2 s window) at 4/30 against PF's 9 — the same shape as its G5 load knee
-(§5.4), the camera's above-floor demand waiting behind an equal PRB share
-for the flood. No expectation was registered for G6; this is its first
-measurement.
-
 ### 6.5 With configured grants (`cg/g6_cg.json`, 2 700 runs)
 
 **The telemetry half of G6 is fixed on every arm.** Under either CG,
@@ -755,7 +775,7 @@ every G3 statistic passes part A on 30 of 30 cells on all ten CG arms,
 and the worst telemetry silence under flood is one message period on
 every one of them:
 
-| arm | worst telemetry gap under flood, G3 / G5 instrument (ms): plain → +CG / +CGt | part A / B, UL flood: plain → +CG |
+| arm | worst telemetry gap under flood, G3 / G5 instrument (ms): plain → +CG / +CGt | part A / B, UL flood: plain → +CG **(pre-correction scoring, see §6.3)** |
 |---|---|---|
 | PF | 300 / 498 → 214 / 204 · 201 / 201 | 229 / 255 → 228 / 264 |
 | Reservation | 6 538 / 8 907 → **220 / 200** · 200 / 201 | 204 / 227 → **228 / 258** |
@@ -766,8 +786,8 @@ every one of them:
 What does not change is the G5 half: the camera's frame age (0/30 on
 TwoTier, 20/30 on the rest under the UL flood) and the windowed GFBR
 floor (4–9 of 30 on the arms without a lock-out) are the same numbers
-with the CG on, so **G6 still fails on every arm** — on the camera, and
-on G1's command p98 shifting more than 20 % inside its bound. A guarantee
+with the CG on, so **G6 still fails on every arm** — on the camera alone,
+the command-p98 half of this claim having been withdrawn in §6.3. A guarantee
 about isolation from background traffic is, on this cell, two
 guarantees: the heartbeat's, which a CG closes structurally, and the
 camera's, which is capacity and the scheduler's.
