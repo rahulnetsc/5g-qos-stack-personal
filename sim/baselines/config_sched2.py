@@ -130,7 +130,7 @@ class ConfigSched2:
 
     def __init__(self, min_rb: int = 5, window_ms: float = 100.0,
                  resolve_ms: float = 10.0, deadline_margin_slots: int = 6,
-                 min_period_slots: int = 2) -> None:
+                 min_period_slots: int = 2, density_budget: bool = False) -> None:
         self.min_rb = int(min_rb)
         self.window_ms = float(window_ms)
         self.resolve_ms = float(resolve_ms)
@@ -142,6 +142,11 @@ class ConfigSched2:
         # shorten a period.
         self.deadline_margin_slots = int(deadline_margin_slots)
         self.min_period_slots = max(1, int(min_period_slots))
+        #: E1 (2026-09-16, docs/configsched2-diagnosis-2026-09-16.md sec 7).
+        #: Charge a visit the DENSITY it will actually cost on its harmonic
+        #: track, instead of one unit against a window-total budget. Default
+        #: off: the arm stays byte-identical when unset.
+        self.density_budget = bool(density_budget)
         self.counters: dict[str, int] = defaultdict(int)
         #: DIAGNOSIS HOOK (2026-09-16). `None` -- and therefore inert --
         #: unless a caller sets it at construction, exactly as
@@ -243,6 +248,42 @@ class ConfigSched2:
 
     # ------------------------------------------------------------ Tier 1
 
+    def _visit_density(self, key, n: int, contracted: bool, W_dir: int) -> float:
+        """The density `1/T` a flow granted `n` visits will actually occupy.
+
+        Deliberately the SAME expression `_assign_periods_and_tracks` uses --
+        `_pow2_floor` of the window share, tightened by the deadline bound for
+        a contracted flow -- because the whole point of E1 is that the budget
+        charged equals the cost paid. Charging `n` units against `cap * s_dir`
+        instead is what let the plan overcommit: `_pow2_floor` rounds the
+        period DOWN, so it rounds the realised visit rate UP by as much as 2x.
+        """
+        if n <= 0:
+            return 0.0
+        T = _pow2_floor(max(1, W_dir // n))
+        if contracted:
+            W = self._window_slots
+            pdb_dir = max(1, (self._pdb_slots.get(key, W) - self.deadline_margin_slots) * W_dir // W)
+            T = min(T, _pow2_floor(pdb_dir))
+        return 1.0 / max(1, T)
+
+    def _fit_visits(self, key, contracted: bool, have: int, want: int,
+                    used: float, cap: int, W_dir: int) -> tuple[int, float]:
+        """Largest `n` in [have, want] whose density still fits under `cap`.
+
+        The cost is non-decreasing in `n`, so walking down from `want` finds
+        the greedy optimum -- this is the step that keeps E1 a TYPE 1 encoding
+        (separable, one additive budget, greedy still exact).
+        """
+        base = self._visit_density(key, have, contracted, W_dir)
+        n = want
+        while n > have:
+            if used - base + self._visit_density(key, n, contracted, W_dir) <= cap + 1e-9:
+                break
+            n -= 1
+        return n, used - base + self._visit_density(key, n, contracted, W_dir)
+
+
     def _resolve_tier1(self, slot: Any, buffers: Any, channel: Any) -> None:
         self.counters["t1_resolves"] += 1
         w_s = self._window_slots * self._slot_s
@@ -282,12 +323,24 @@ class ConfigSched2:
             # floors first, most urgent contract first (priority, then PDB)
             rows.sort(key=lambda r: (not r[1], r[0].priority_level, r[0].pdb_ms, r[0].ue_id, r[0].qfi))
             visits_left, prb_left = visit_budget, prb_budget
+            W_dir = max(1, s_dir)
+            density_used = 0.0
             grant_bytes: dict[tuple[int, int], int] = {}
             grant_visits: dict[tuple[int, int], int] = {}
             for f, contracted, fv, fb, demand, se, tb_max in rows:
                 key = (f.ue_id, f.qfi)
                 need_prb = int(math.ceil(fb * 8 / se)) if fb > 0 else 0
-                if fv > visits_left or need_prb > prb_left:
+                if self.density_budget:
+                    fit, density_used = self._fit_visits(
+                        key, contracted, 0, fv, density_used, cap, W_dir)
+                    if fit < fv or need_prb > prb_left:
+                        self.counters["floors_unmet"] += 1
+                        if fit < fv:
+                            self.counters["visit_density_bound"] += 1
+                    fv = fit
+                    need_prb = min(need_prb, prb_left)
+                    fb = min(fb, (need_prb * se) // 8)
+                elif fv > visits_left or need_prb > prb_left:
                     self.counters["floors_unmet"] += 1
                     fv = min(fv, visits_left)
                     need_prb = min(need_prb, prb_left)
@@ -334,14 +387,26 @@ class ConfigSched2:
                 per_visit_max = max(1, ((self._prb_count // max(1, cap)) * se) // 8)
                 need = int(math.ceil(r_i / per_visit_max)) if per_visit_max > 0 else 0
                 extra = max(0, need - n_i)
-                if extra > 0:
-                    take = min(extra, visits_left)
-                    if take < extra:
-                        self.counters["visit_budget_bound"] += 1
-                    n_i += take
-                    visits_left -= take
-                if r_i > 0 and n_i == 0 and visits_left > 0:
-                    n_i, visits_left = 1, visits_left - 1
+                if self.density_budget:
+                    if extra > 0:
+                        fit, density_used = self._fit_visits(
+                            key, contracted, n_i, need, density_used, cap, W_dir)
+                        if fit < need:
+                            self.counters["visit_density_bound"] += 1
+                        n_i = fit
+                    if r_i > 0 and n_i == 0:
+                        fit, density_used = self._fit_visits(
+                            key, contracted, 0, 1, density_used, cap, W_dir)
+                        n_i = fit
+                else:
+                    if extra > 0:
+                        take = min(extra, visits_left)
+                        if take < extra:
+                            self.counters["visit_budget_bound"] += 1
+                        n_i += take
+                        visits_left -= take
+                    if r_i > 0 and n_i == 0 and visits_left > 0:
+                        n_i, visits_left = 1, visits_left - 1
                 if n_i <= 0:
                     self._plan[key] = FlowPlan(0, 0, self._window_slots, fv, contracted)
                     continue

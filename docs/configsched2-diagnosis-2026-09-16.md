@@ -88,3 +88,65 @@ parsed `camera_flow_key`'s `"ue1_qfi2"` string as a tuple and matched nothing,
 printing `{}` — an empty selection wearing a measurement. It was caught by a
 `matched == 0` gate that raises instead of reporting, and the numbers above are
 from the corrected run (1 893 and 2 291 camera decisions matched).
+
+---
+
+## 7. Encoding E1 REGISTERED BEFORE BUILDING (2026-09-16)
+
+Per the user's standing instruction — build the requirement before running, so
+a result never has to be walked back — this section is written **before** the
+arm is measured.
+
+### 7.1 The defect, stated precisely
+
+`_resolve_tier1` charges every visit against `visit_budget = cap * s_dir`, a
+**window total**. But a flow's visits are realised as a harmonic track of period
+`T = _pow2_floor(W_dir // n_i)` (`_assign_periods_and_tracks`), and the
+constraint that must hold is the **density** one, `sum(1/T) <= cap`.
+
+Those two budgets are NOT the same, and the gap is the power-of-two rounding:
+`_pow2_floor` rounds `T` **down**, which rounds a flow's realised visit rate
+**up**, by up to 2x. So a plan can satisfy `sum n_i <= cap * W_dir` and still be
+infeasible in density. When that happens `_assign_periods_and_tracks` repairs it
+*after the fact* — lengthening periods (`period_over_deadline`), dropping
+best-effort tracks (`track_dropped_best_effort`), or leaving a flow unplaced
+(`track_unplaced`) — and `plan.n_visits` then disagrees with the track the flow
+actually got, while `bytes_per_visit` was already computed from the larger
+number.
+
+**That is why `visit_budget_bound` reads 0 at every load while `cap_skipped` is
+35–37 %:** the budget being checked is not the constraint that binds.
+
+### 7.2 The encoding
+
+Charge visits against a **density budget of `cap`**, using the same rounded
+harmonic cost the realisation will actually pay, at both allocation sites (the
+contract floors, and the residual visits). New counter `visit_density_bound`
+fires when the density budget refuses visits.
+
+**Structure class: TYPE 1 — separable, greedy stays exact.** The feasible set is
+still "each flow picks a visit count, subject to one additive budget"; only the
+per-unit cost changes from 1 to `1/T(n_i)`. The cost is a non-decreasing step
+function of `n_i`, so the greedy still takes flows in contract order and stops
+at the budget. No solver change, no coupling between directions.
+
+### 7.3 Registered expectations, and what falsifies each
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | `visit_density_bound` > 0 at N >= 8 | reading **0** — the encoding would be inert, the same could-not-fail defect as the first G6 floor |
+| 2 | `track_dropped_best_effort`, `period_over_deadline`, `track_unplaced` all FALL | any of them rising — the plan would still be overcommitting |
+| 3 | `cap_skipped_promised` and `mapped_visit_missed` fall | no movement — then the lost DCIs were never the plan's overcommitment and §1–§3's diagnosis is WRONG |
+| 4 | `prb_exhausted` roughly flat | a large rise — the budget would have been re-aimed at the wrong resource |
+| 5 | group C (G5) improves: admissible fleet and/or frame age at N=10 | no movement, which would mean the cap was not what bound the camera |
+| 6 | groups A/B/D/E/F do not regress (the contract in `guarantee-groups-2026-09-16.md` section 3) | any regression — then it is judged exactly as D1 was, and D1 was rejected for precisely this |
+
+**Expectation 3 is the load-bearing one.** If the DCIs lost to the cap do not
+fall, the whole diagnosis in sections 1–3 is refuted and the encoding should be
+reverted regardless of what else improves.
+
+### 7.4 Build constraints
+
+Default off, so `ConfigSched2` stays byte-identical when the flag is unset —
+verified by digest, as the decision sink was. The tuned arm gets its own name so
+the frozen arm keeps meaning what the campaign measured.

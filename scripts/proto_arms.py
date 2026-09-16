@@ -59,6 +59,14 @@ def is_proto(name: str) -> bool:
 
 def resolve_arm(name: str, min_rb: int = 5):
     """A `TwoTierProto` for `name`, or `g11_campaign._arm(name)` otherwise."""
+    if name == "ConfigSched2X1":
+        # E1 (2026-09-16): ConfigSched2 with the outer problem charging a
+        # visit its real harmonic DENSITY instead of one unit against a
+        # window total. Registered HERE rather than in `g11_campaign._arm`
+        # for the reason this module exists: that function is inside every
+        # published artefact's `code_state` scope.
+        from sim.baselines.config_sched2 import ConfigSched2
+        return ConfigSched2(min_rb=min_rb, density_budget=True)
     if not is_proto(name):
         from g11_campaign import _arm
         return _arm(name)
