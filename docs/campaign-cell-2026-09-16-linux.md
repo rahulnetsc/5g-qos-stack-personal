@@ -471,6 +471,71 @@ artefact.
 / C4 variants did — the result has to stay reproducible. `ProtoRRageD2` remains
 the divergence candidate, unchanged.
 
+
+### 8.y  The E-series: encoding the binding constraint in the outer problem (2026-09-16)
+
+Driven by the standing rule that a hard operational requirement is expressed as
+a constraint or objective term in the OUTER problem before any inner heuristic
+(`config-scheduler-handoff.md` §8e). Full diagnosis, per-increment expectations
+and falsifiers: `docs/configsched2-diagnosis-2026-09-16.md`.
+
+**Diagnosis first.** `ConfigSched2.decision_sink` (a per-slot decision trace,
+inert unless hooked, bit-identical when off) established that the binding
+constraint is the **per-slot DCI cap**, not PRBs and not the rate budget:
+`cap_skipped` rises 11 % → 30 % → 37 % of units considered as load rises while
+`prb_exhausted` FALLS, and `visit_budget_bound` reads **0 at every load** —
+the plan's visit budget is a window total while the constraint that binds is
+per-slot concurrency.
+
+| inc | arm | change | measured | kept |
+|---|---|---|---|---|
+| E1 | `ConfigSched2X1` | charge a visit its real harmonic **density** (`1/T`) instead of one unit against a window total | G5 admissible **6 → 7**, knee 1.0 → 1.3; **G3 boundary 10 → None**; `prb_exhausted` 1 774 → 2 454 (registered expectation MISSED) | **no** |
+| E2 | `ConfigSched2X2` | a promised visit carries its **plan share**, not a cap-th clamp | camera crumb short-bytes 902 kB → **192 kB**; G3 still None; **G10 10 → 8** | **no** |
+| E3 | `ConfigSched2X3` | claim the density budget in **importance order** (contracted meet their deadline bound first, best-effort takes the rest) | G5 **6 → 8**, knee 1.3; G3 None → **4**; G10 held; G2 cap-4 202 → 186; G6 better; G12 order agreement 9/10 → 10/10 | **no** |
+| E4 | `ConfigSched2X5` | size a visit by its **byte** need, not a deadline-inflated count | telemetry bpv 150 → **300** (the split fixed, verified pre-run); **G3 → None**, i.e. WORSE — the registered hypothesis was falsified | **no** |
+| E5 | `ConfigSched2X6` (standalone) | bound the **unit's total** to a cap-th, not each flow's share | G3 **8**; G5 6 → 7, knee 1.1; G10 held; G2 cap-2 291 → 266; G6 better; G7 A-telemetry throughput **held at 24 000 bps** | **no** |
+| E5 | `ConfigSched2X7` (stacked) | E1+E3+E4+E5 | G5 **6 → 8**, knee **1.3**; G3 **6**; G10 held; G2 cap-4 **176** (best); G6 better; G9 12/12 | **best density variant** |
+
+**Two mechanisms found by trace rather than guessed, both recorded to the line.**
+
+1. *Why E1 broke group B.* The heartbeat gets ONE visit per window on both arms;
+   what changed was its PERIOD (T = 32 → 64), because E1 removes the plan's
+   overcommit **and with it the repair pass that was doing importance-ordered
+   shedding**. E3 fixed exactly that and G3 only reached 4.
+2. *Why none of them recovered group B.* The E-variants issue roughly **half**
+   the uplink grants the baseline does (6 154 / 7 105 against 11 858), because
+   PRBs per grant double, 26 → 52 median. `per_visit_cap` bounds a **flow**, but
+   a UL unit is `(ue_id, -1)` — every uplink flow of a UE shares ONE grant sized
+   from their SUM — so nothing bounded the total. **The density budget converted
+   a DCI-limited cell into a PRB-limited one**, and the PRB wall costs more
+   grants than the DCI cap did. E5 fixes that aggregation defect, which is
+   latent in the baseline too.
+
+**Outcome: no variant dominates the baseline; the series mapped a real frontier**
+— heartbeat first (`ConfigSched2`, G3 boundary 10 / camera fleet 6) versus
+camera first (`X7`, fleet 8 and the load ramp transformed / G3 boundary 6). Which
+point is right is a product decision, and it is the degrade-by-importance
+question in `guarantee-groups-2026-09-16.md` §7. **`ConfigSched2` remains the arm
+of record**; every E flag is default-off with its result recorded.
+
+**In flight at the time of writing:** `X7+CG` and `ConfigSched2+CG`. G3 is the
+only group X7 gives up and restricted CG closed the entire uplink heartbeat class
+on every arm previously measured, so CG may dissolve the trade. Registered in the
+diagnosis doc §21 **before** the results were read, including why X7+CG must be
+compared against `ConfigSched2+CG` and not against a baseline without CG.
+
+### 8.z  Test-definition corrections made during this work
+
+`docs/test-definition-changes-2026-09-16.md` is the running log. Two G6 defects
+(no control-health gate; a relative shift with no absolute floor) were fixed as
+**re-scorings** — 43 M slots were not re-simulated — and all ten stored `g6.json`
+artefacts were rescored, with the three tools that read `deltas` made gate-aware.
+One published claim was **withdrawn**: `cmd_vel` p98 now passes G6 part B 30/30
+on every arm. G7 clause 1 gained a **paired no-aggressor control**, which showed
+the raw p98 was overstating containment harm several-fold and **corrected the
+group-D verdicts for every E-series arm** (X7's containment is +0.8 ms, the best
+of any arm; X6's is +23.2 ms, the worst — the opposite of the raw ranking).
+
 ---
 
 ## DL SPS — the downlink analogue of CG, NOT IMPLEMENTED (registered 2026-09-16)

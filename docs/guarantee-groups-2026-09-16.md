@@ -98,6 +98,30 @@ one traced cause (the table gives a contracted flow with backlog any free
 DCI beyond its plan, so an over-driven camera exceeds MFBR and a competing
 camera takes the instrument's bytes). One increment addresses both.
 
+
+## 4a. Where each tuning target stands, updated 2026-09-16 (after D1 and the E-series)
+
+Supersedes §4, which predates this work.
+
+| group | baseline `ConfigSched2` | best variant found | cost |
+|---|---|---|---|
+| **A — DL deadline** (G1, G2) | G2 cap-4 202/18300 | **X7: 176** | none measured |
+| **B — UL liveness** (G3) | **boundary 10** | nothing beats the baseline | every density variant pays here (None → 8) |
+| **C — UL video** (G5) | fleet 6, knee 1.0 | **X7: fleet 8, knee 1.3** | group B |
+| **D — isolation** (G6, G7) | G6 217/216; G7 containment +9.0 ms | **X7: G6 222/221, containment +0.8 ms** | none, once controls are used |
+| **E — capacity** (G10, G12) | adm. 10, clause 4 10/0/0 | X7 holds both | G12 telemetry M02 worsens on every density variant |
+| **F — transitions** (G9) | 12/12 | X7 holds 12/12 | none |
+
+**The Proto side:** `ProtoRRageD2` remains the divergence candidate; its tuned
+increment **D1 was rejected** (won G10 7 → 8, regressed five groups). With G7's
+new controls, `ProtoRRageD2`'s camera containment measures **−1.1 ms** — the
+aggressor is indistinguishable from no aggressor at all — which is the strongest
+containment figure of any arm.
+
+**The open structural item** is that group B and group C compete for the
+per-slot DCI cap on this cell, and no encoding has created capacity. The live
+question is whether configured grants remove group B from the contest entirely.
+
 ## 5. Group E, diagnosed before any code (2026-09-16)
 
 **The artefact cannot answer "which flow missed", so a probe was built and
