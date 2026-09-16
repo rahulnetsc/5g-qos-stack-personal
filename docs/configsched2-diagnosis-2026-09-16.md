@@ -933,6 +933,45 @@ third cost, alongside G10's boundary and clause 2, awaiting the same
 fails joins, all three costs are CG's price and X7+CG dominates; if it does not,
 they are X7's.
 
+### 22.2a CORRECTED AGAIN — decoded across all four arms, it is a net GAIN, not a loss
+
+§22.2 said X7+CG "loses 2-3 joins outright" against an arm with none. Decoded
+across every arm, that framing is wrong in the same way the thing it was
+correcting was wrong.
+
+| arm | PASS | JOIN FAILURE | CELL ALREADY BROKEN |
+|---|---|---|---|
+| `ConfigSched2` | 28 | **0** | 8 |
+| X6 (E5 alone) | 23 | 1 | 12 |
+| X7 | 24 | **0** | 12 |
+| **X7+CG** | **31** | **5** | **0** |
+
+**The five failing cells are exactly where X7 could not measure at all.** They
+are `cold/n8_cm2`, `rlf/n8_cm2`, `cold/n7_cm1.5` (seeded and unseeded) — the top
+of the occupancy axis — and on X7 those same twelve cells read CELL ALREADY
+BROKEN with **`cell_broken_seeds = 10`, i.e. all ten seeds**. CG did not create
+failures in healthy cells; it made the cell functional enough that
+previously-unanswerable points became answerable, and **7 of those 12 now pass
+while 5 fail**.
+
+**X7+CG has the most passes of any arm (31 against 24) and zero unscoreable
+cells.** Comparing its failure count against an arm that was not measuring those
+cells is the decompose-before-attributing error one level down — the
+denominators are different populations, which is precisely what §22.2 accused
+the headline metric of.
+
+**And the axis these failures sit on is known stale**:
+`guarantee-groups-2026-09-16.md` §2 records that G9's occupancy axis was derived
+from the PREVIOUS cell's G10 boundary, so its top two points are past capacity
+for this cell. The failures are at exactly those points. That does not excuse
+them — a join that never completes is a real event — but it does mean the axis
+should be re-derived from this cell's boundary before the failure rate is quoted
+as a property of the arm.
+
+**Net reading, stated once:** on group F, X7+CG converts twelve unanswerable
+cells into seven passes and five failures, with attribution between CG and X7
+still open pending `ConfigSched2+CG`.
+
 ### 22.3 One flag for the next reader
 
 G9's per-cell verdict codes change character under CG: cells that read `P…`/`B…`
