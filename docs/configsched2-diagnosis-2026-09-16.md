@@ -1197,3 +1197,63 @@ gives `ProtoRRageD2+CG` and the faithful ports their good G4 numbers on identica
 scenarios, and E1's own behaviour was verified by trace when it was built. It is
 a property of the design choice, whose cost was never scored because G4 sits in
 no regression group and is absent from the increment runner.
+
+---
+
+## 27. THE E1 MECHANISM, TRACED — and a second reading of mine withdrawn
+
+§26.2 left "why constraining plan density raises latency for continuously-active
+flows" open. Traced at duty 1.0, N=8, the operating point where the penalty
+actually lives.
+
+### 27.1 What I said, and why it was wrong
+
+I reported that under E1 "the cameras take the whole budget and telemetry has no
+track". **Both halves of the comparison are identical between arms**, so there is
+no difference to attribute:
+
+| | `ConfigSched2` | `ConfigSched2X1` (E1) |
+|---|---|---|
+| `qfi1` telemetry, planned with a track | **0 of 8** | **0 of 8** |
+| `qfi2` camera, planned with a track | 8 of 8, density **4.000** | 8 of 8, density **4.000** |
+
+Telemetry has no periodic track on **either** arm — E1 did not take one away.
+The observation was real; reading it as a *difference* was not. Same error shape
+as §26.1: a true statement about one arm, mistaken for a contrast.
+
+### 27.2 The real structural difference
+
+| | `ConfigSched2` | `ConfigSched2X1` |
+|---|---|---|
+| `qfi9` best-effort **planned at all** | 8 flows (no track) | **0 flows** |
+| `track_dropped_best_effort` | **2 017** | 0 |
+| `visit_density_bound` | 0 | **2 303** |
+
+The parent **plans best-effort and then drops its track**; E1 **refuses it at
+plan time**. Same end state for the track, different point of refusal — and the
+counters swap accordingly.
+
+### 27.3 The cost is not confined to the unplanned classes
+
+Per-flow at duty 1.0, `ConfigSched2` → `ConfigSched2X1`:
+
+* telemetry p98 **43.5–71.0 → 86.5–99.5 ms**
+* camera p98 **41.0–53.7 → 101.6–114.5 ms**
+* best-effort throughput **~1.0 → 0.22–0.52 Mbps**
+
+**E1 degrades every class at high duty, including the contracted cameras that
+hold the entire density budget.** At duty 0.1 the arms converge (telemetry
+14–87 ms on all three arms, camera ~147 ms on all), which is exactly why G4's
+penalty vanishes there — and why the effect is a high-duty phenomenon rather
+than a silence-resume one.
+
+### 27.4 The proximate cause
+
+At duty 1.0 grants fall **12 682 → 8 874 (−30 %)**, with `prb_exhausted` rising
+**7 % → 23 %** while `cap_skipped` collapses **34 % → 4 %**, PRBs per grant
+**26 → 32**, bytes per grant **1 179 → 1 542**, and crumbs **1 560 → 3 871**.
+
+So E1 relieves the DCI cap and immediately re-binds on PRBs — the same
+DCI→PRB inversion §15.3 found, here costing a third of all grants. **The cell
+does less total work, and every class pays.** That is the mechanism; it is a
+property of the design choice, not a modelling defect.
