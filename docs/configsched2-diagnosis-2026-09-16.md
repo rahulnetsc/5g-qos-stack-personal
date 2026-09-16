@@ -1137,3 +1137,63 @@ document has been wrong three times by doing otherwise.
 
 **Owed:** add G4 to the increment runner, or state in the regression contract
 that it is exempt and why.
+
+---
+
+## 26. G4 ATTRIBUTED TO E1 BY LADDER — and my mechanism for it is WITHDRAWN
+
+`sweeps/cs2-increments/g4_ladder_2026-09-16.json`. G4 re-run with every E-series
+flag registered as its own arm, so the regression attributes to a flag rather
+than to the stack. Paired against the `ConfigSched2` parent, ~1 360 cells
+(positive = slower resume):
+
+| arm | flags | Δ vs parent | 95 % CI |
+|---|---|---|---|
+| `ConfigSched2X1+CG` | **E1 density budget ALONE** | **+17.24 ms** | [15.72, 18.75] |
+| `ConfigSched2X3+CG` | E1 + E3 | +16.82 | [15.32, 18.41] |
+| `ConfigSched2X5+CG` | E1 + E3 + E4 | +14.94 | [13.51, 16.42] |
+| `ConfigSched2X6+CG` | **E5 unit cap ALONE** | **+0.89** | [0.34, 1.46] |
+| `ConfigSched2X7+CG` | all four | +8.97 | [7.83, 10.13] |
+
+**E1 causes the whole regression by itself**; E3, E4 and E5 each claw some back,
+so the stack REPAIRS E1 rather than compounding it. E5 standalone costs almost
+nothing (+0.89 ms), so the realisation-side change is nearly free and the price
+is entirely in the outer-problem change.
+
+### 26.1 The mechanism I proposed is refuted
+
+I argued: a flow resuming after silence has no plan entry at Tier-1 solve time,
+ranks as unplanned, and waits for slack E1 removed. **Two independent measurements
+contradict it.**
+
+1. **`unplanned_contracted_due` is 0 on every arm** (`ConfigSched2`,
+   `ConfigSched2X1`, `ConfigSched2X7`, gt22 N=12). The counter that names exactly
+   that mechanism never fires.
+2. **The penalty is largest where silence is SHORTEST.** By duty: +27.79 ms at
+   duty 1.0 (continuous), +20.14 at 0.5, **+0.99 at duty 0.1** (longest pauses).
+   By gap bucket: worst at `[10,100)` ms (+27.30), near zero at `[1000,inf)`
+   (+1.57). A silence-resume effect would run the other way.
+
+**So E1 hurts continuous, short-gap traffic — not post-silence resumption.** The
+guarantee's NAME ("silence-and-resume") led me to a mechanism its data does not
+support. Same error shape as reading G3 at N=2 and G6's axis: reasoning from what
+a test is called rather than from the operating point where the effect lives.
+
+### 26.2 What is established, and what is open
+
+**Established:** E1 is the cause, isolated by the ladder; the effect concentrates
+at high duty and short gaps; and at gt22 N=12 the cell issues essentially the same
+grants under E1 (12 901 against the parent's 12 884) while `cap_skipped` rises
+from 33 % to 39 %, and under the full stack to **62 %**, with `visits_stamped`
+falling 19 560 → 14 300.
+
+**Open, and NOT to be asserted:** why constraining plan density raises latency for
+continuously-active flows. The grant COUNT is unchanged, so it is not starvation.
+The candidate-refusal rate is what moves. Whether that is a queueing-order effect,
+a per-visit sizing effect, or something in the track phase assignment is untraced.
+
+**Not a modelling error and not a missing simulator feature**: the same machinery
+gives `ProtoRRageD2+CG` and the faithful ports their good G4 numbers on identical
+scenarios, and E1's own behaviour was verified by trace when it was built. It is
+a property of the design choice, whose cost was never scored because G4 sits in
+no regression group and is absent from the increment runner.

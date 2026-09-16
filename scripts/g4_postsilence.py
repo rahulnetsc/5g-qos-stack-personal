@@ -318,6 +318,14 @@ def _schedulers() -> dict:
             # increment runner skips -- its runner takes no --arms -- so the
             # ConfigSched2 family had no GT-2.3 result at all until this.
             "ConfigSched2X7": lambda: resolve_arm("ConfigSched2X7"),
+            # The E-series LADDER, to attribute the G4 regression to a flag
+            # rather than to the stack (2026-09-16). X1 = density budget only;
+            # X3 = +importance order; X5 = +byte-sized visits; X6 = unit cap
+            # STANDALONE on the untouched baseline; X7 = all four.
+            "ConfigSched2X1": lambda: resolve_arm("ConfigSched2X1"),
+            "ConfigSched2X3": lambda: resolve_arm("ConfigSched2X3"),
+            "ConfigSched2X5": lambda: resolve_arm("ConfigSched2X5"),
+            "ConfigSched2X6": lambda: resolve_arm("ConfigSched2X6"),
             # the configuration-based divergence arm (2026-09-15)
             "ConfigSched": lambda: resolve_arm("ConfigSched"),
             "ConfigSched2": lambda: resolve_arm("ConfigSched2")}
