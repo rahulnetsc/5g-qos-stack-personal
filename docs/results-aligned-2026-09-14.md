@@ -741,6 +741,15 @@ design earn its place:
 | G10 | admissible fleet | 12 | 6 | 7 | **10** |
 | G12 | safety telemetry survives overload / order scoreable | pass / no | pass / no | pass / no (violation fraction 0.30 at ×2.0) | pass / no |
 
+> **WITHDRAWN 2026-09-16.** The claim in this paragraph about G1's command
+> p98 failing G6's shift test no longer holds. `scripts/g6_isolation.py`'s
+> part B compared a pure ratio with no absolute floor; with a floor of 5 %
+> of each statistic's own bound, `cmd_vel` p98 passes part B on 30 of 30
+> cells on EVERY arm. The failures it describes were moves of 1.5-4.0 ms
+> against a 95 ms bound. See `docs/test-definition-changes-2026-09-16.md`
+> and `docs/results-cell-2026-09-15.md` section 6.3. The paragraph is kept
+> as written, for the record.
+
 1. **On the uplink, both faithful QoS schedulers fail the liveness, video,
    containment and post-silence guarantees that the contract-blind PF
    passes** (G3, G4, G5, G7, and G6's UL half), and TwoTier alone fails

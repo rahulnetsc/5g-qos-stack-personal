@@ -91,3 +91,48 @@ isolation question.
 than how they are scored, and would need a re-run. Registered as the next G6
 decision: either run the axis per-arm inside each arm's own admissible boundary,
 or keep the wide axis and report the gate count as a first-class result.
+
+---
+
+## 2. Audit: does the same defect class exist in the other runners? (2026-09-16)
+
+Prompted by the standing instruction to re-check finished runs whenever a new
+defect is found. G6's two defects were (a) scoring a treatment without asking
+whether the **control** was already failing, and (b) a **ratio with no absolute
+floor**. Every runner that scores a comparison was checked for both.
+
+| runner | control-health gate | ratio without a floor | verdict |
+|---|---|---|---|
+| `g6_isolation.py` | was MISSING | was PRESENT | **both fixed** (§1) |
+| `g9_stress.py` | `_cell_broken_pre_join` | n/a | **clean** — it is the precedent G6's fix mirrors |
+| `g12_stress.py` | `_gate` + `assert_ramp_bottom_clean` | n/a | **clean**, and it reasons explicitly about what *not* to gate on |
+| `g5_video.py` | n/a (absolute-bound test, no control condition) | no | **clean** |
+| `g7_aggressor.py` | **MISSING, and cannot be added by rescoring** | no — the 10 % tolerance is declared as a judgement in the source | **OPEN, see below** |
+
+### 2.1 G7 clause 1 has no control — OPEN, needs a run not a rescore
+
+GT-4.3 clause 1 is *"Asset A entirely within SLO"*, judged against absolute
+bounds while Asset B's camera is over-driven to 2.1x MFBR. **There is no
+paired no-aggressor run**, so the procedure cannot distinguish
+
+* the aggressor harmed Asset A — *containment failed*, which is what the
+  clause claims to measure; from
+* Asset A was already outside SLO at N = 8 with no aggressor at all —
+  *capacity*, which says nothing about containment.
+
+This matters here specifically because G6's corrected scoring showed that
+exact confusion was inflating G6: the camera statistics are gated on 43–90
+cells per arm because the control already failed. G7 runs at N = 8 with a
+camera on every asset, so the precondition for the same confusion is present.
+
+**Why it is not fixed in this commit.** G6's defects were re-scorings — the
+runner already recorded the control, so 43 M slots did not have to be repeated.
+G7 records no control, so closing this means adding a paired no-aggressor run
+per seed and re-running the procedure. That is a scenario and runtime change,
+not a scoring change, and it gets its own commit and its own re-measurement.
+
+**Until then**, every G7 clause-1 result — including the ConfigSched2 increment
+comparisons and `ProtoRRageD2`'s — is an **upper bound on harm**: it counts
+capacity failures as containment failures, and cannot count them the other way.
+The clause-2 and clause-3 results are unaffected (clause 2 is a ratio against
+the aggressor's own MFBR; clause 3 is internal to Asset B).
