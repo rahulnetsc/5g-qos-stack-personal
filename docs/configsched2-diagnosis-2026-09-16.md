@@ -695,3 +695,110 @@ arm of record on its own. Whether the stack (E1+E3+E4+E5) does is exactly what
 X7 measures: E5 restores the grant count that E1 destroyed, so the stack is the
 first variant where the density budget's group-C gain and a working grant rate
 coexist.
+
+---
+
+## 19. X7 = E1+E3+E4+E5 MEASURED, and the whole series as one table
+
+9 steps rc 0 (`sweeps/cs2-increments/e7/`) against `inc9`.
+
+| # | registered (§17.1) | outcome |
+|---|---|---|
+| 1 | PRBs/grant ~26, units/slot ~3.3 | **MET** (25.95 / 3.59, pre-run) |
+| 2 | G3 boundary recovers materially toward 10 | **PARTLY** — **6**, the best of any density-budget variant, still short of 10 |
+| 3 | group C retained at fleet 8 | **MET** — admissible **8**, knee **1.3** |
+| 4 | G10 admissible stays 10 | **MET** — 10 held, M08 essentially identical to baseline |
+
+### 19.1 Every variant, same seeds, same runners
+
+| arm | G3 part-3 boundary | G5 fleet | G5 knee | G10 adm. | G2 cap-4 | G6 UL A/B | G9 |
+|---|---|---|---|---|---|---|---|
+| `ConfigSched2` (baseline) | **10** | 6 | 1.0 | 10 | 202 | 217/216 of 220 | 12 |
+| E1 | None | 7 | 1.3 | 10 | — | — | — |
+| E1+E2 | None | 7 | 1.3 | **8** | — | — | — |
+| E1+E3 | 4 | **8** | 1.3 | 10 | 186 | 223/222 of 225 | 12 |
+| E1+E3+E4 | None | **8** | 1.3 | 10 | 181 | 222/220 of 225 | 12 |
+| E5 alone (X6) | 8 | 7 | 1.1 | 10 | 210 | 221/219 of 224 | 12 |
+| **E1+E3+E4+E5 (X7)** | **6** | **8** | **1.3** | 10 | **176** | 222/221 of 226 | 12 |
+
+### 19.2 The conclusion: this is a real trade curve, not a failed search
+
+**No variant beats the baseline on group B, and no variant matches X7 on group
+C.** The series did not fail to find a dominating point — it established that on
+this cell there is not one, and mapped the frontier:
+
+* **`ConfigSched2`** — heartbeat first. G3 boundary **10**, camera fleet 6.
+* **X6 (E5 alone)** — the middle. G3 **8**, fleet 7, and the only variant that
+  keeps G7's A-telemetry throughput at the baseline's 24 000 bps.
+* **X7 (E1+E3+E4+E5)** — camera first. Fleet **8** with the load ramp
+  transformed (gt33 ×5/×10/×15 frame age 98/142/139 ms → ~29 ms; gt32 ×1.1 and
+  ×1.2 at 10/10/10), G2 cap-4 best of all at **176**, G10 and G9 held — bought
+  with G3's boundary at 6.
+
+**Which point is right is a product decision, not a scheduling one**, and it is
+exactly the degrade-by-importance question in
+`guarantee-groups-2026-09-16.md` §7: if the heartbeat is the safety-bearing
+flow, the baseline wins and the camera is under-served by design; if the fleet
+must carry 8 cameras, X7 is the arm and the heartbeat needs a CG (which
+`docs/results-cg-2026-09-14.md` already shows closes the entire uplink
+heartbeat class on every arm).
+
+**That last point is the one to test next** and it is cheap: X7 **+CG**. CG
+closed G3's class structurally on every arm measured, and G3 is the only group
+X7 gives up. If the combination holds group C at fleet 8 while CG restores the
+heartbeat, the trade dissolves — and nothing in the E-series could have shown
+that, because every increment was run without CG.
+
+**Until that is measured, `ConfigSched2` remains the arm of record** and every
+E flag stays default-off with its result recorded.
+
+---
+
+## 20. G7 CLAUSE 1 RE-MEASURED WITH CONTROLS — the group-D verdicts above are CORRECTED
+
+`sweeps/cs2-increments/g7_controls_2026-09-16.json`, N = 8, 10 seeds, each arm
+run twice per seed: over-driven (2.1x MFBR) and its paired no-aggressor control.
+
+| arm | A telemetry p98 | control | **aggressor-attributable** | A camera p98 | control | **attributable** |
+|---|---|---|---|---|---|---|
+| `ConfigSched2` | 57.8 | 48.8 | **+9.0** | 46.9 | 36.2 | **+10.7** |
+| X6 (E5 alone) | 75.2 | 52.0 | **+23.2** | 50.9 | 37.4 | **+13.5** |
+| **X7 (E1+E3+E4+E5)** | 97.8 | 97.0 | **+0.8** | 101.7 | 100.7 | **+1.0** |
+| `ProtoRRageD2` | 74.0 | 66.2 | +7.8 | 32.8 | 33.9 | **−1.1** |
+
+0 of 10 cells gated on every arm: no arm's victim is pre-broken at N = 8, so
+all four rows are scoreable.
+
+### 20.1 What this corrects
+
+**§13, §15 and §19 recorded "G7 clause 1 regressed" for every density-budget
+arm. On the containment question G7 actually asks, that is wrong.** X7's raw
+97.8 ms is almost entirely its OWN latency under load — the aggressor adds
+**+0.8 ms**. Ranked by containment, X7 is the **best** arm measured:
+
+    X7 +0.8  <  ProtoRRageD2 +7.8  <  ConfigSched2 +9.0  <  X6 +23.2
+
+and `ProtoRRageD2`'s camera is **−1.1 ms**, i.e. indistinguishable from no
+aggressor at all.
+
+**The corrected group-D readings:**
+
+* **X7: containment is essentially perfect, standalone latency is worse.** Its
+  group-D cost is real but it is a *capacity* cost, the same one group B pays,
+  not a failure to contain a bad actor.
+* **X6: the only arm whose containment genuinely degrades** (+23.2 against the
+  baseline's +9.0), despite a better-looking raw number. Raw p98 ranked the two
+  arms in exactly the wrong order.
+
+**This is the decompose-before-attributing rule landing on my own results.** A
+raw p98 under an aggressor sums two populations — the cell's own load and the
+aggressor's marginal harm — and every E-series group-D verdict above quoted the
+sum while claiming the second.
+
+### 20.2 What does NOT change
+
+X7's G3 boundary (6 against the baseline's 10) and G12's telemetry M02 are
+measured without an aggressor, so no control qualifies them. **The group-B
+trade in §19.2 stands exactly as written.** What changes is that group D is no
+longer part of X7's cost: the frontier is heartbeat-versus-camera, and G7 is not
+on it.
