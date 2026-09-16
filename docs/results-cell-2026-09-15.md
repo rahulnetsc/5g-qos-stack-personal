@@ -1064,7 +1064,7 @@ seed at N = 7, 9/10). ConfigSched stays at 10 under every form.
 ## 10. G12 — "When the cell truly runs out, what breaks first — and does safety telemetry survive?"
 
 ### 10.1 The experiment
-GT-5.3, *ordered degradation*: the parametric `mixed` composition at
+GT-7.3, *overload degradation ordering*: the parametric `mixed` composition at
 N = 6 and N = 4, its committed portfolio ramped ×0.5 → ×2.0 in eleven
 points, 5 s per point; scored for whether the telemetry is ever starved
 while the background still moves bytes (clause 4) and for the first ramp
