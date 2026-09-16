@@ -48,6 +48,8 @@ from g12_campaign import (BG_QFIS, CQI_DELAY_SLOTS, HORIZON_SLOTS,  # noqa: E402
                           QFI_TELEMETRY, _arms, order_for, run_ramp)
 from regime_sweep import (arm_cost, invocation_config, paired_seeds,  # noqa: E402
                           RunLedger, run_cells)
+from sim.scenarios.g12 import (assert_cell_is_scoreable,  # noqa: E402
+                               build_g12_scenario)
 
 #: The ramp. Resolution where the arms separate; the endpoints are the
 #: re-based origin (x0.5, the largest origin the deployed cap sustains) and
@@ -204,6 +206,30 @@ def main(argv) -> int:
 
     arms = [x for x in a.arms.split(",") if x]
     cells = [(c.split(":")[0], int(c.split(":")[1])) for c in a.cells.split(",") if c]
+    # EXCLUDE A VACUOUS CELL BY NAME, not by crashing in a worker (2026-09-16).
+    # `assert_cell_is_scoreable` existed for exactly this and was called only by
+    # g12_campaign.py's candidate selection; this runner builds its task list
+    # straight from --cells, so a composition lacking a GBR class reached
+    # `min()` in run_ramp and killed the whole pool 90 sweeps in. Measured:
+    # sensor_dense has no UGV (3 % share) and therefore no 5QI-4 at any
+    # practical N, so `sensor_dense:6` is unscoreable, not merely sparse.
+    kept = []
+    for comp, n in cells:
+        try:
+            assert_cell_is_scoreable(build_g12_scenario(
+                composition=comp, n_ues=n, seed=1, committed_mult=1.0))
+        except ValueError as exc:
+            # ValueError ONLY: that is what assert_cell_is_scoreable raises.
+            # A broad `except Exception` here caught a NameError from a missing
+            # import and printed it as "EXCLUDED", silently discarding every
+            # cell including the valid ones -- strictly worse than the crash
+            # this guard replaced, because it looked like a clean exclusion.
+            print(f"  EXCLUDED {comp}:{n} -- {exc}", flush=True)
+            continue
+        kept.append((comp, n))
+    if not kept:
+        raise SystemExit("every requested cell is unscoreable; nothing to run")
+    cells = kept
     seeds = paired_seeds(a.seeds)
     tbs = [None if x == "none" else int(x) for x in a.tie_break_seeds.split(",") if x]
 

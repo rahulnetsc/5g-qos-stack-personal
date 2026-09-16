@@ -118,6 +118,46 @@ a reason.** There is no third state. Concretely, as of now:
 unaffected" — it is that nothing is known.** Any claim about an arm's overall
 standing is a claim over nine of twelve guarantees, and the write-ups say so.
 
+
+## 3b. FLEET COMPOSITION IS A STANDING AXIS (2026-09-16)
+
+Every result in this evaluation before this date was measured on **one fleet
+composition**. `sim/fleet.py` defines four — `mixed`, `ugv_heavy`,
+`drone_heavy`, `sensor_dense` — over five UE roles, and argues in its own
+docstring that composition is a primary axis because *"'N=16' is not an index in
+a heterogeneous deployment"*. Only `sim/scenarios/g12.py` imports it, and G12
+itself had only ever run `mixed`.
+
+**Probed and it earned its place** (`docs/composition-probe-2026-09-16.md`,
+2 640 runs, 6 cells x 2 arms x 10 seeds x 2 tie-break):
+
+* it does **not** change which arm wins — clause 4 holds 10/0/0 on all 24 cells
+  and no ranking inverts;
+* it **does** change the degradation order in 45–60 % of seeds, paired
+  within-seed, on both arms;
+* and it exposed a **3x best-effort throughput deficit** in the recommended arm
+  that `mixed` had kept below the threshold where any guarantee notices it.
+
+### 3b.1 The rule
+
+**A result quoted without its composition is incomplete**, in the same way a
+measurement quoted outside its configuration is (CLAUDE.md's category-error
+rule). Concretely:
+
+1. Any new increment measured on G12 runs **`mixed`, `ugv_heavy` and
+   `drone_heavy`** at the sizes under test. `sensor_dense` is **unscoreable** for
+   G12's ordering test at any practical N — a 3 % UGV share means no 5QI-4 — and
+   `g12_stress.py` now excludes such a cell by name rather than crashing in a
+   worker.
+2. Guarantees whose builders take no composition parameter (G1, G2, G3, G5, G6,
+   G9) state that limitation beside their result. **G5's admissible-fleet
+   headline is the one that matters most**, and plumbing composition into
+   `build_gt31_scenario` is the registered next step if that number is to be
+   relied on.
+3. Order comparisons across compositions are scored **paired within-seed**. A
+   set comparison of `orders_seen` cannot distinguish composition from an arm's
+   own seed-to-seed instability, and on this data it concealed a real effect.
+
 ## 4. Where each tuning target stands per group, before any of this work
 
 From the campaign (`docs/results-cell-2026-09-15.md`) and the ConfigSched2

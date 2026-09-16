@@ -37,8 +37,9 @@ order, at a small cost in downlink STOP latency.
 | G2 missed STOPs, cap 2 | **263** / 18 300 | 275 / 18 300 |
 
 **It is not a strict dominator.** It loses on G2 (both caps), on a few G1
-percentile points, and — newly measured — it is **the worst arm on G4**,
-post-silence resume (§5). Everything else is a win or a tie.
+percentile points, it is **the worst arm on G4** (post-silence resume, §5), and
+it carries **roughly a third of `ProtoRRageD2+CG`'s best-effort throughput**
+(§5, composition probe). Everything else is a win or a tie.
 
 **Against the faithful ports, like-for-like** (every arm with the same
 restricted CG, from the campaign's own `cg/` artefacts):
@@ -242,6 +243,25 @@ Recorded because the corrections are the evidence that the method worked.
   **untraced**, and it is a second group-A-adjacent deficit alongside G2.
 * **G8 and G11 are not measured on this cell at all** — the only artefacts are
   from the 2026-09-04/05 directories, a different radio.
+* **The recommended arm has a ~3x best-effort throughput deficit, and one fleet
+  composition was hiding it.** Every guarantee in this evaluation ran a single
+  fleet mix (`mixed`); `sim/fleet.py` defines four and only G12 can vary them.
+  Probed on G12 (`docs/composition-probe-2026-09-16.md`, 2 640 runs):
+  `ConfigSched2X7+CG` delivers **10.0 Mbps** of background against
+  `ProtoRRageD2+CG`'s **29.7** at the lightest ramp point on `mixed` — a 3x gap
+  under no load stress at all — falling to **0.8–1.3 Mbps** on `ugv_heavy` and
+  `drone_heavy`, where telemetry M02 finally lifts off the floor (0.020).
+  **Composition does not change which arm wins**: clause 4 holds 10/0/0 on all
+  24 cells and neither arm's ranking inverts. What it changes is whether the
+  deficit is *visible*. Untraced, and the obvious suspect is the same
+  fewer-larger-grants mechanism behind the G4 regression.
+* **Composition changes the degradation ORDER in 45–60 % of seeds**, on both
+  arms, measured paired within-seed — invisible in the cell-level statistics,
+  which read a stable `10/10` for the recommended arm.
+* **G5's admissible fleet is measured on ONE composition.** `build_gt31_scenario`
+  takes no composition parameter, so the headline "fleet 24 against 10" has not
+  been tested across fleet mixes. The probe raises the prior that it would move;
+  it is not evidence that it does.
 * **DL SPS is not implemented.** It is the downlink analogue of CG, inside the
   Rel-16 baseline (TS 38.321 §5.8.1; 8 configurations per BWP against CG's 12),
   and the downlink has had no intervention equivalent to the one that dominated
