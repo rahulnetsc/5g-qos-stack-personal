@@ -1,0 +1,13 @@
+G3 stress: 100 driver runs, 3.8M slots (0.53 simulated hours)
+  parts ['A']  arms ['ConfigSched2']  caps [4]  seeds 10  fixed N=6
+  bounds: max gap <= 500 ms, zero gaps >= 2000 ms (campaign), p98 <= 95 ms
+    gt22: 100 runs, 3.8M slots
+  projected cost: 0.42 h CPU -> 1 min wall at 31 workers (x0.77 measured pool efficiency)
+  projected peak memory: 15.1 GB (500 MB x 31 workers, worst task 200,000 slots)
+  0 banked, 100 to run
+    ... 25/100 (35s)
+    ... 50/100 (48s)
+    ... 75/100 (58s)
+    ... 100/100 (74s)
+
+wrote sweeps/cs2-increments/inc7/aligned/g3.json  (74s, 100 runs)

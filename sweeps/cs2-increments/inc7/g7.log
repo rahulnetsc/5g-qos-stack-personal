@@ -1,0 +1,14 @@
+10 runs = 1 arms x 10 seeds, asset B (ue2) camera offered at 2.1x MFBR
+  [1/10] ConfigSched2 seed=1826701614 B_cam=9.94 Mbps (MFBR 8.0)
+  [2/10] ConfigSched2 seed=161576974 B_cam=7.89 Mbps (MFBR 8.0)
+  [3/10] ConfigSched2 seed=1367864806 B_cam=9.35 Mbps (MFBR 8.0)
+  [4/10] ConfigSched2 seed=661058651 B_cam=8.90 Mbps (MFBR 8.0)
+  [5/10] ConfigSched2 seed=579362555 B_cam=7.49 Mbps (MFBR 8.0)
+  [6/10] ConfigSched2 seed=1746484539 B_cam=8.85 Mbps (MFBR 8.0)
+  [7/10] ConfigSched2 seed=35492826 B_cam=8.18 Mbps (MFBR 8.0)
+  [8/10] ConfigSched2 seed=376383645 B_cam=8.88 Mbps (MFBR 8.0)
+  [9/10] ConfigSched2 seed=87989972 B_cam=8.45 Mbps (MFBR 8.0)
+  [10/10] ConfigSched2 seed=1097657231 B_cam=8.20 Mbps (MFBR 8.0)
+achieved offered rate: 2.08-2.13x MFBR (GT-4.3 requires >= 2.0x)
+
+wrote sweeps/cs2-increments/inc7/aligned/g7.json

@@ -1,0 +1,19 @@
+G1 stress: 320 driver runs
+  A  2 clause parts x 9 UE counts x 1 arms x 10 seeds x 2 caps  (committed x1)
+  B  2 clause parts x 8 load levels x 1 arms x 10 seeds x 2 caps  (N=6)
+  horizon 20000 slots, 2 driven robots, bound p98 <= 95 ms, gap bound 200 ms
+  0 banked, 320 to run
+    ... 25/320 (32s)
+    ... 50/320 (47s)
+    ... 75/320 (57s)
+    ... 100/320 (61s)
+    ... 125/320 (68s)
+    ... 150/320 (74s)
+    ... 175/320 (80s)
+    ... 200/320 (85s)
+    ... 225/320 (90s)
+    ... 250/320 (94s)
+    ... 275/320 (99s)
+    ... 300/320 (103s)
+
+wrote sweeps/cs2-increments/inc7/aligned/g1.json  (105s, 320 runs)
