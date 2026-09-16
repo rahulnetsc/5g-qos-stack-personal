@@ -234,3 +234,78 @@ capacity — or less. It has to be run per arm.
 **Owed:** re-measure G7 with controls across the arms before any G7 clause-1
 comparison between them is quoted again. Until that lands, the upper-bound
 caveat in §2.1 stands for every arm except `ConfigSched2` at N = 8.
+
+---
+
+## 4. G9's occupancy axis is anchored to the WRONG CELL — REGISTERED BEFORE BUILDING
+
+### 4.1 The defect
+
+`scripts/g9_stress.py`'s axis is
+
+    OCCUPANCY = ((3, 0.50), (4, 0.75), (5, 1.00), (6, 1.25), (7, 1.50), (8, 2.00))
+
+as `(total_ues, committed_mult)`, and its own comment says levels are *"named by
+TOTAL UEs so they can be read straight against G10's admissible boundary."*
+
+**That reading is false for every level except `(5, 1.00)`.**
+`sim/workload.py::scale_committed_load` scales each committed flow's offered
+load *and its contract fields* by `committed_mult`, so a level's effective
+promised load is **n x mult** UE-equivalents — while **G10's boundary is
+measured at `committed_mult = 1.0`** (`g5_consolidation.py:56`; the campaign
+passes no override). The two quantities are not comparable.
+
+Effective load per level, against this cell's measured boundary:
+
+| level | n x mult | vs boundary 8 (CG arms) | vs boundary 10 (no-CG arms) |
+|---|---|---|---|
+| (3, 0.50) | 1.5 | 0.19x | 0.15x |
+| (4, 0.75) | 3.0 | 0.38x | 0.30x |
+| (5, 1.00) | 5.0 | 0.63x | 0.50x |
+| (6, 1.25) | 7.5 | 0.94x | 0.75x |
+| (7, 1.50) | 10.5 | **1.31x** | 1.05x |
+| (8, 2.00) | 16.0 | **2.00x** | **1.60x** |
+
+Boundaries re-derived from the artefacts (`M07_met == M07_total` across all ten
+seeds): `ConfigSched2` / `X6` / `X7` = **10**; `ConfigSched2+CG` /
+`ConfigSched2X7+CG` = **8**.
+
+**This is where every anomaly landed.** All twelve unscoreable cells on `X7`
+and all five join failures on both CG arms occur at `n7_cm1.5` and `n8_cm2` —
+i.e. at 1.31x and 2.00x the measured capacity. A failure rate dominated by two
+points that are 31 % and 100 % past capacity is not a property of the arm.
+
+### 4.2 The change
+
+Keep the deliberate two-dial design — the docstring's *"an operator does not
+experience six robots and 1.5x the committed load as separate facts"* is a real
+argument and is not being discarded — but **anchor the levels to this cell's
+measured boundary and label them by effective load**:
+
+    OCCUPANCY = ((2, 1.00), (4, 1.00), (6, 1.00), (8, 1.00), (8, 1.25), (8, 1.50))
+    #   effective load: 2, 4, 6, 8, 10, 12  =  0.25x 0.50x 0.75x 1.00x 1.25x 1.50x of B=8
+
+Four levels inside capacity, one exactly at the boundary, two past it by a
+**controlled** 25 % and 50 % instead of 100 %. The top of the axis still
+exercises the gate — that is what the gate is for — without spending a third of
+the grid on points nothing can answer.
+
+### 4.3 Registered expectations and falsifiers
+
+| # | expectation | falsified by |
+|---|---|---|
+| 1 | **zero** CELL ALREADY BROKEN at levels <= 1.00x on the CG arms | any broken cell inside capacity — then the boundary or this arithmetic is wrong, and the axis is not the explanation |
+| 2 | join failures, if any, occur only **above** 1.00x | a failure at <= 0.75x — then failures are a property of the arm, not the axis, and §22.2a's reading must be revisited |
+| 3 | scoreable cells rise materially against the old axis (12 unscoreable on `X7` → far fewer) | no rise — the axis was not what made cells unanswerable |
+| 4 | `ConfigSched2X7+CG` retains at least parity with `ConfigSched2+CG` at matched levels | it falling behind — the recommendation in `docs/qos-scheduler-result-2026-09-16.md` §1 would need revisiting |
+
+**Expectation 2 is the load-bearing one.** If join failures appear inside
+capacity, the five failures are real arm behaviour and the standalone doc's
+"not yet a property of any arm" caveat becomes a finding instead.
+
+### 4.4 Sequencing, and why no module edit is needed to measure it
+
+`g9_stress.py` already takes `--occupancy 'ues:mult,...'`, so **the
+re-measurement is a runner invocation with no code change**. Only promoting the
+new default is an edit, and that is its own commit, made *after* the measurement
+justifies it. The old artefacts stay as measured.
