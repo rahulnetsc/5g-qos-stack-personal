@@ -1460,6 +1460,29 @@ and "admissible fleet" means something different in each.
 
 **Registered as a hypothesis, not a finding:** X7+CG's density budget favours
 planned contracted flows and should do relatively better with one aggressor than
-with N of them. Consistent with §26–27's traces, but untested directly — and two
-mechanisms in this area have already been refuted by exactly this kind of
-reasoning.
+with N of them.
+
+### 29.5 TESTED IMMEDIATELY, AND NOT SUPPORTED
+
+G10's own scenario at N = 8, PF flows stripped from all but one UE, 3 seeds,
+worst-flow GFBR fraction:
+
+| arm | all 8 aggressors | one aggressor | gain |
+|---|---|---|---|
+| `ConfigSched+CG` | 0.9764 | 0.9792 | +0.003 |
+| `ConfigSched2X7+CG` | 0.9622 | 0.9738 | **+0.012** |
+
+X7+CG does gain ~4x more from removing aggressors, which is the predicted
+direction — **but it remains BEHIND `ConfigSched+CG` even with a single
+aggressor** (0.9738 against 0.9792). Removing the supposed cause does not close
+the gap, so aggressor count is not what separates these arms on G10.
+
+**The hypothesis is therefore not supported**, and the G5/G10 inversion stays
+explained only as far as the load table above establishes: the two guarantees
+ask materially different questions. Why `ConfigSched+CG` specifically holds a
+boundary of 10 is **unexplained**.
+
+**And this test is underpowered on its own terms** — 3 seeds, against per-cell
+MDE arithmetic that put 10 seeds ~20x too coarse for effects of this size. It is
+recorded as a direction, not a measurement, and the result above should not be
+quoted as a number.
