@@ -36,23 +36,71 @@ order, at a small cost in downlink STOP latency.
 | G2 missed STOPs, cap 4 | **181** / 18 300 | 191 / 18 300 |
 | G2 missed STOPs, cap 2 | **263** / 18 300 | 275 / 18 300 |
 
+**READ THE TWO G2 ROWS WITH THEIR CONTROL (added 2026-09-17).** Lifting the STOP
+bearer's PDB from the faithful 5 ms to 100 ms, changing nothing else, removes
+essentially the entire loss on every arm — 1 890 runs, 128 100 events, total
+**17 misses (0.013 %)**, with PF+CG going 1.377 % → 0.000 %. The mechanism
+matches the arithmetic written down first: 5QI 85's PDB is 5 ms against
+`k1+k2` = 3.0 ms, so exactly one retry fits and the floor is BLER² ≈ 1 %. All
+seven `+CG` arms sit in 0.989 %–1.377 %, a 0.39 pp spread on a ~1 pp floor. The
+*excess over* the floor is still the scheduler's, but the **level is a property
+of the 5QI, not of scheduling**, and the 10-STOP gap in this table is inside
+that band. `sweeps/cs2-increments/g2_liftedpdb_2026-09-17.json`.
+
 **It is not a strict dominator.** It loses on G2 (both caps), on a few G1
-percentile points, it is **the worst arm on G4** (post-silence resume, §5), and
-it carries **roughly a third of `ProtoRRageD2+CG`'s best-effort throughput**
-(§5, composition probe). Everything else is a win or a tie.
+percentile points, it is **the worst arm on G4** (post-silence resume, §5), it
+carries **roughly a third of `ProtoRRageD2+CG`'s best-effort throughput**
+(§5, composition probe), and on **G8 it is admissible only at fleet 8 at nominal
+load, collapsing to 0/10 the moment promised load rises, where `PF+CG` holds
+fleet 12** (§5). Everything else is a win or a tie.
 
 **Against the faithful ports, like-for-like** (every arm with the same
 restricted CG, from the campaign's own `cg/` artefacts):
 
-| arm, all `+CG` | G5 admissible fleet | G10 admissible |
-|---|---|---|
-| `TwoTier+CG` | none | 7 |
-| `ConfigSched+CG` (v1) | 7 | 10 |
-| `ConfigSched2+CG` | 7 | 8 |
-| `PF+CG` | 8 | 8 |
-| `Reservation+CG` | 8 | 8 |
-| **`ProtoRRageD2+CG`** | **10** | 7 |
-| **`ConfigSched2X7+CG`** | **24** | 8 |
+| arm, all `+CG` | G5 admissible fleet | G10 admissible | G8 admissible cell |
+|---|---|---|---|
+| `TwoTier+CG` | none | 7 | none |
+| `ConfigSched+CG` (v1) | 7 | 10 | N=8 ×1.0 |
+| `ConfigSched2+CG` | 7 | 8 | N=8 ×1.0 |
+| `PF+CG` | 8 | 8 | **N=12 ×1.0** |
+| `Reservation+CG` | 8 | 8 | N=8 ×1.0 |
+| **`ProtoRRageD2+CG`** | **10** | 7 | non-monotone |
+| **`ConfigSched2X7+CG`** | **24** | 8 | N=8 ×1.0 |
+
+The G5 and G10 columns for the two `ConfigSched2` arms were measured across
+campaigns when first written; since 2026-09-17 they rest on the campaign's own
+invocations run for those arms into one directory
+(`sweeps/cs2-increments/sevenarm-2026-09-17/`), which confirms both — G5 holds
+p1 AND p2 at 10/10 for `ConfigSched2X7+CG` at **every** fleet size out to N=24
+(age p95 pinned at 20–31 ms against a 66.67 ms bound), and G10 is 8 for both.
+
+**Past the boundary the ranking inverts, and it is worth stating plainly.** At
+N=16 the worst-flow GFBR floor is `ConfigSched2X7+CG` 0.025 and
+`ConfigSched2+CG` 0.027, beside `ConfigSched+CG` 0.007 and `TwoTier+CG` 0.013 —
+against `PF+CG` **0.601**, `Reservation+CG` 0.502 and `ProtoRRageD2+CG` 0.415.
+The arms that carry the most load collapse hardest once past it. `never_granted`
+is 0 everywhere, so this is rate collapse, not blackout.
+
+**On degradation order, `ConfigSched2X7+CG` is the only arm that is both correct
+and DETERMINISTIC**: `[[4, 2]]` in all four G12 cells with 10/10 seed agreement —
+one order, every seed, shedding 5QI 4 (PDB 300 ms) before 5QI 2 (PDB 150 ms).
+`ConfigSched2+CG` sheds 5QI 2 *first* (`[[2], [2,4]]`), the same inversion as
+`ConfigSched+CG` (`[[], [2]]`, which never sheds 4 before 2).
+
+Be careful what `PF+CG` is and is not: its orders are `[[4], [4, 2]]`, so 4
+always precedes 2 and the order is **never wrong** — the 5–7/10 figure beside it
+is `order_agreement`, which counts how often seeds produce the *same* order, not
+how often the order is correct. PF varies seed to seed in whether 5QI 2 degrades
+at all. Correctness and determinism are different properties and the agreement
+column measures the second.
+
+**And none of these can match the specified order, because the metric cannot
+express it.** `SPECIFIED_ORDER` is `(9, 4, 2)` — shed best-effort first — but
+`Scorecard.first_violation_order` iterates `flows_by(flow_class="GBR")` and 5QI 9
+is PF, so it can never enter an order: **0 of 334 observed orders across 32
+artefacts contain it**. `matches_specified = 0` on every arm reads as universal
+failure and is a dead metric. This is the conjunct the degrade-by-importance
+requirement most wants checked, and it is currently unverifiable.
 
 **`ProtoRRageD2+CG` is the serious alternative, and stronger than this document
 first implied.** It is a single ordering change plus a tie-break on the deployed
@@ -94,7 +142,8 @@ scheduled UEs** (M-6) applies.
 | E — capacity | G10 (GT-5.2), G12 (GT-7.3) | the cell at and past its limit; the order classes break in |
 | F — transitions | G9 (GT-6.1/6.2/6.3) | join, re-join, RLF recovery |
 
-**Deferred and not measured here: G4 (GT-2.3), G8, G11.**
+**Deferred when this section was written: G4 (GT-2.3), G8, G11. G4 and G8 have
+since been measured and are in §5; G11 has not.**
 
 **The arms.** Three faithful ports of the deployed OAI scheduler (PF,
 Reservation, TwoTier); one flagged divergence of the two-tier port
@@ -184,6 +233,21 @@ Recorded because the corrections are the evidence that the method worked.
   already failed, and part B compared a ratio with no absolute floor. One
   published claim was withdrawn as a result — `cmd_vel` p98 passes G6 part B
   30/30 on every arm.
+* **The metric proposed to separate the arms turned out to measure the bearer,
+  not the scheduler** (2026-09-17). "Fraction of STOP signs lost" puts all seven
+  `+CG` arms in 0.989 %–1.377 %; a lifted-PDB control removes ~100 % of that
+  loss on every arm. The band's *level* is the 5QI's 5 ms deadline against HARQ
+  retry timing. A ranking was nearly read off a number four times smaller than
+  the floor beneath it.
+* **A defect I diagnosed in G5's clause 3 was wrong as first stated, and the
+  correction is the more useful finding.** I reported it as unpassable "for a
+  source reason" — the camera under-offering its own GFBR. The helper already
+  caps at what was offered (`owed = min(offered, need)`), and full offering does
+  *not* produce a pass: in the 2 seeds of 10 per arm where `offered_floor ≥ 1.0`,
+  p3 still fails 1–2 times. The real shape is a **zero-tolerance threshold on
+  the minimum of five windows** — the floor's max exceeds 1.0 on every arm, so
+  it is passable, just rarely (2–4 of 10 at N=4). `TwoTier+CG` is the one
+  genuine under-deliverer there (floor min 0.6039 against ~0.985).
 
 ---
 
@@ -241,8 +305,55 @@ Recorded because the corrections are the evidence that the method worked.
   `ConfigSched2X7`. Every step of this work made post-silence resume worse, and
   the E-series could not see it because G4 is not in the increment runner. It is
   **untraced**, and it is a second group-A-adjacent deficit alongside G2.
-* **G8 and G11 are not measured on this cell at all** — the only artefacts are
-  from the 2026-09-04/05 directories, a different radio.
+* **G8 IS NOW MEASURED, AND THE RECOMMENDED ARM IS NOT THE BEST ON IT**
+  (2026-09-17). G8 had no scenario and no runner at all: `sweeps/g8-fairness/`
+  held artefacts dated **2026-09-12** (this section previously said 2026-09-04/05
+  — wrong date, right substance) whose `horizon: 40000` literal predates
+  `deployed_cell.py`, so they describe the old numerology-2 `DSUUU` radio.
+  Built as `sim/scenarios/g8.py` + `scripts/g8_fairness.py`, 630 runs, 7 arms ×
+  fleet {8,12,16} × promised load {1.0,1.5,2.0} × 10 seeds, 20 s horizon
+  (`sweeps/g8-fairness/g8_deployed_v2_2026-09-17.json`).
+
+  G8 is a conjunction of four clauses. Scored with part 4 at its tolerant
+  reading (see below), the admissible cell is:
+
+  | arm, all `+CG` | G8 admissible cell |
+  |---|---|
+  | **`PF+CG`** | **N=12 ×1.0** — the only arm clean at fleet 12 |
+  | `ProtoRRageD2+CG` | 10/10 at N=12 ×1.0 but **8/10 at N=8 ×1.0** — non-monotone, so *none* by the standing rule |
+  | `ConfigSched+CG` | N=8 ×1.0 |
+  | `Reservation+CG` | N=8 ×1.0 |
+  | `ConfigSched2+CG` | N=8 ×1.0, then **0/10 at every higher cell** |
+  | `ConfigSched2X7+CG` | N=8 ×1.0, then **0/10 at every higher cell** |
+  | `TwoTier+CG` | none (9/10 at best) |
+
+  **The configuration-scheduler family's collapse is windowed goodput, not
+  fairness**: at N=8 ×1.5 their window floors sit at 0.78–0.82 where PF holds
+  0.985. **Part 2 (zero starvation epochs ≥ 1 s) separates the arms in the other
+  direction**: PF, ConfigSched, ConfigSched2, X7 and Proto all score **0**
+  failures of 90, while **Reservation fails 18 and TwoTier 37** (worst 21
+  epochs). Part 1 failures of 90: PF 32, ConfigSched 38, Reservation 40, Proto
+  42, ConfigSched2 45, X7 50, TwoTier 58. **Part 3 never fires** — worst
+  telemetry gap 360 ms against a 1000 ms bound across all 630 runs — and is
+  reported as non-discriminating rather than as seven passes.
+
+  **Part 4's literal clause is below the instrument's resolution.** `floor >= 1.0`
+  fails 90/90 on every arm because the floor's *maximum* at the healthiest cell
+  is 0.9870. Re-derived at this horizon, 0.97 admits 70/70 healthy runs and
+  rejects 70/70 overloaded ones; both readings are reported and the strict one
+  remains the verdict.
+
+  **The first 630-run pass was discarded: three defects were in G8's own
+  runner.** (i) Per-role Jain was scored over the UNSCOPED record, so the
+  best-effort 5QI-9 filler — which a QoS-aware scheduler is *supposed* to starve
+  — entered the fairness contest; the ConfigSched family read 0.7500 against
+  PF's 0.9996, and scoped to the protected fleet X7+CG goes to 0.9996. That
+  finding was written up and withdrawn. (ii) The starvation bound sat exactly on
+  a source's own period: a 1 Hz camera-control flow delivered 20 of 20 still
+  scored a 1.00 s "starvation", because a 1 Hz source leaves ~1 s of silence
+  between bursts. (iii) Part 4's tolerance did not transfer from G5's 5-window
+  horizon to this 10-window one.
+* **G11 is still not measured on this cell.**
 * **The recommended arm has a ~3x best-effort throughput deficit, and one fleet
   composition was hiding it.** Every guarantee in this evaluation ran a single
   fleet mix (`mixed`); `sim/fleet.py` defines four and only G12 can vary them.
@@ -282,6 +393,19 @@ INC=e9 ARM=ConfigSched2+CG   bash sweeps/cs2-increments/run_increment.sh
 uv run python sweeps/cs2-increments/compare.py sweeps/cs2-increments/e8 \
     --before sweeps/cs2-increments/e9 \
     --arm-before "ConfigSched2+CG" --arm "ConfigSched2X7+CG"
+
+# 2026-09-17: the seven-arm footing, G8, and G2's control
+bash sweeps/cs2-increments/run_sevenarm.sh          # the two missing arms
+uv run python scripts/g8_fairness.py --arms "$ARMS7" --compositions mixed \
+    --n-ues 8,12,16 --load-axis 1.0,1.5,2.0 --seeds 10 --cap 4 \
+    --out sweeps/g8-fairness/g8_deployed_v2_2026-09-17.json
+uv run python sweeps/g8-fairness/report_g8.py
+uv run python scripts/g2_stress.py --arms "$ARMS7" --fixed-n 12 --fixed-stop 2 \
+    --caps 4 --seeds 10 --lifted-pdb \
+    --out sweeps/cs2-increments/g2_liftedpdb_2026-09-17.json
+uv run python scripts/g9_stress.py --arms "$ARMS7" --cases warm,cold,rlf \
+    --seeds 10 --cap 4 --rejoin-seed off,on \
+    --out sweeps/cs2-increments/g9_groupF_2026-09-17.json
 ```
 
 Artefacts: `sweeps/cs2-increments/{inc9,e1,e2,e3,e5,e6,e7,e8,e9}/aligned/*.json`;
@@ -290,7 +414,13 @@ through `scripts/proto_arms.py`, the single registry.
 
 **Known suite state:** three tests fail (`test_verify_claims` ×2,
 `test_wp9_sweep_memory` ×1) and **pre-date this work** — verified by running
-them at HEAD with the changes stashed. `regression_corpus.py --check` is clean,
+them at HEAD with the changes stashed, and again on 2026-09-17 with both G8
+files moved aside (3 failed, 8 passed). Adding `sim/scenarios/g8.py` briefly
+took that to five: the builder census
+(`test_the_sweep_COVERS_every_builder_rather_than_the_easy_ones`) exists so that
+"adding one without adding a case fails HERE, loudly", and it did. Fixed by
+sweeping the new builder for flow-key collisions rather than silencing it; the
+suite is back to 3 failed, 1 597 passed. `regression_corpus.py --check` is clean,
 and `verify_claims --check` reads 8/22, identical to the baseline measured
 before any of this work began.
 
