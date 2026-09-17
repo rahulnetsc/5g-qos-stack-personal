@@ -1416,3 +1416,50 @@ having measured nothing.
 **What is defensible:** X7+CG is the only arm producing a single consistent,
 two-element order at 10/10 agreement. That is a determinism result, not a
 compliance one.
+
+### 29.3 CORRECTION — M07 does judge the whole fleet, and group E belongs to ConfigSched+CG
+
+**Withdrawn:** I read `M07_total = 2` from an artefact row and inferred that G10
+scores "a fixed two-UE protected population" rather than the fleet. That was the
+**first row of a sorted list — the N = 2 cell**. Checked across every point,
+`M07_total` equals N exactly (2, 4, 5, 6, 7, 8, 10, 12, 16) on both arms. G10
+judges every UE's GBR flow, as the clause says. Reading a sorted artefact's first
+entry as representative is the same error shape as the G3-at-N=2 trace.
+
+**Also withdrawn:** `M08_worst_flow` and `never_granted` are null on all 90 rows —
+never populated by this runner — so the hypothesis that X7+CG "sheds a particular
+fleet flow" had no evidence and is discarded rather than reported.
+
+**Stated plainly, because an earlier framing obscured it: `ConfigSched+CG` is the
+best arm in group E.** Admissible N = **10** against every other arm's 7–8, and
+at N = 10 it meets every GBR flow in 10/10 seeds where `ConfigSched2X7+CG`
+manages 1/10. `ConfigSched+CG` is the **v1 prototype the entire E-series was
+built to improve on**. The "level inside the boundary" framing in §29.1 is true
+but reads as a defence; the headline procurement number is not level.
+
+### 29.4 Why G5 and G10 invert — a LOAD difference, and still a hypothesis
+
+The same two arms rank oppositely on the two capacity metrics:
+
+| arm | G5 camera fleet | G10 GBR fleet |
+|---|---|---|
+| `ConfigSched2X7+CG` | **24** | 8 |
+| `ConfigSched+CG` | 7 | **10** |
+
+They are not two measurements of the same thing. At N = 8:
+
+| | G5 `gt31` | G10 `sweep_scenario` |
+|---|---|---|
+| saturating PF flows | **1** (UE 2 only) | **8** (every UE) |
+| UL GBR flows judged | 17 | 8 |
+| telemetry class | GBR | Delay |
+
+G5 judges one camera against a single aggressor; **G10 requires all N GBR flows
+to hold 95 % of GFBR while every UE saturates**. G10 is the far harsher question,
+and "admissible fleet" means something different in each.
+
+**Registered as a hypothesis, not a finding:** X7+CG's density budget favours
+planned contracted flows and should do relatively better with one aggressor than
+with N of them. Consistent with §26–27's traces, but untested directly — and two
+mechanisms in this area have already been refuted by exactly this kind of
+reasoning.
