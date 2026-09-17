@@ -81,11 +81,43 @@ against `PF+CG` **0.601**, `Reservation+CG` 0.502 and `ProtoRRageD2+CG` 0.415.
 The arms that carry the most load collapse hardest once past it. `never_granted`
 is 0 everywhere, so this is rate collapse, not blackout.
 
-**On degradation order, `ConfigSched2X7+CG` is the only arm that is both correct
-and DETERMINISTIC**: `[[4, 2]]` in all four G12 cells with 10/10 seed agreement —
-one order, every seed, shedding 5QI 4 (PDB 300 ms) before 5QI 2 (PDB 150 ms).
-`ConfigSched2+CG` sheds 5QI 2 *first* (`[[2], [2,4]]`), the same inversion as
-`ConfigSched+CG` (`[[], [2]]`, which never sheds 4 before 2).
+**On degradation order, read the TERMINAL FRACTION, not the order list — an arm
+with no order is the best case, not the worst** (corrected 2026-09-17). A first
+reading of this ranked arms by `orders_seen`/`order_agreement` and concluded
+`ConfigSched2X7+CG` was "the only arm both correct and deterministic". Its order
+*is* unanimous and correctly directed (`[[4, 2]]`, 10/10 seeds, all four cells),
+but that is unanimity of **breaching both GBR classes in every single seed**,
+while `Reservation+CG` has no order in 10 of 10 seeds and `TwoTier+CG` in 6 of
+10 *because nothing degraded at all*. Ranking by the order list inverts the
+result.
+
+Censoring-free (mixed N=6, tie-break off, every seed contributing, breaching or
+not; `terminal` = fraction of contract still held at ramp top ×2.0):
+
+| arm, all `+CG` | 5QI 2 breached | 5QI 4 breached | terminal 5QI 2 | terminal 5QI 4 |
+|---|---|---|---|---|
+| **`Reservation+CG`** | **0/10** | **0/10** | **0.993** | **1.000** |
+| `TwoTier+CG` | 1/10 | 4/10 | 0.991 | 0.982 |
+| `ProtoRRageD2+CG` | 4/10 | 10/10 | 0.971 | 0.759 |
+| `PF+CG` | 6/10 | 10/10 | 0.927 | 0.624 |
+| `ConfigSched+CG` | 9/10 | 0/10 | 0.929 | 0.986 |
+| `ConfigSched2+CG` | 10/10 | 2/10 | 0.697 | 1.000 |
+| **`ConfigSched2X7+CG`** | **10/10** | **10/10** | **0.753** | **0.434** |
+
+**`ConfigSched2X7+CG` is the WORST arm on G12**, not the best: both classes
+breach in every seed and it ends holding 43 % of the 5QI-4 contract.
+`ConfigSched+CG` and `ConfigSched2+CG` show the real inversion — they protect
+the *laxer* 5QI 4 (terminal 0.986 / 1.000) while sacrificing the tighter 5QI 2
+(0.929 / 0.697). `PF+CG` and `ProtoRRageD2+CG` degrade in the correct direction,
+protecting 5QI 2 over 5QI 4.
+
+Two cautions for anyone re-reading these fields. **`order_agreement` measures
+determinism, not correctness** — PF's orders are `[[4], [4, 2]]`, 4 always before
+2, never wrong. And **`is_scoreable` is `len(order) >= 2 and not ties`**
+([`sim/scenarios/g12.py`](../sim/scenarios/g12.py) `OrderVerdict`), so a zero
+there means either nothing breached (the good case) or both classes breached at
+the *same* ramp index, making the emitted order dict-insertion artefact — 3 of
+10 seeds are ties on each of X7, PF and Proto.
 
 Be careful what `PF+CG` is and is not: its orders are `[[4], [4, 2]]`, so 4
 always precedes 2 and the order is **never wrong** — the 5–7/10 figure beside it
