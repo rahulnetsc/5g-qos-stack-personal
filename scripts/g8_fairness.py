@@ -115,9 +115,39 @@ TELEMETRY_GAP_MS = 1000.0        #: "zero windows where ... telemetry gap >= 1 s
 MIN_ARRIVAL_DENSITY = 0.75
 MIN_ACTIVE_SPAN_S = 5.0
 
-#: Part 4's second reading. NOT the verdict; derived from the observed floor
-#: distribution of healthy runs (module docstring).
-WINDOW_FLOOR_TOLERANCE = 0.98
+#: AND THE THIRD CONDITION, which the first production run forced.
+#: `ue5_qfi82` is `periodic_control` at `period_ms = 1000`: it arrives 64 B
+#: once per second and was DELIVERED 64 B in that same second, 20 of 20 --
+#: no starvation at all. But a 1 Hz source leaves ~1 s of zero-delivery
+#: buckets BETWEEN its bursts, so a >= 1 s epoch fires on it by construction.
+#: It was the worst flow in 69 of 70 runs of the lightest cell, on every arm,
+#: with a longest silence of 1.00-1.01 s -- pinned exactly on the bound.
+#:
+#: Density cannot catch this (density is 1.0: the flow does offer every
+#: second). The discriminator is the source's own INTER-ARRIVAL PERIOD, and
+#: it is derived from the arrival series rather than read from config, so it
+#: needs no per-scenario knowledge. A flow whose typical gap between
+#: arrivals is itself a sizeable fraction of the epoch cannot distinguish
+#: "starved" from "idle by design", so it is not scored.
+#:
+#: This is CLAUDE.md's threshold-on-a-quantised-value rule: the fix is to
+#: threshold in the units the MECHANISM works in, never to nudge the operator.
+MAX_SOURCE_PERIOD_S = STARVATION_EPOCH_S / 2.0
+
+#: Part 4's second reading. NOT the verdict; RE-DERIVED at this runner's own
+#: 20 s horizon after the first production run, because a tolerance carried
+#: over from G5's 5 s / 5-window data does not transfer: more windows means a
+#: harsher minimum, and here the floor's MAXIMUM at the healthiest cell is
+#: 0.9870, so strict `>= 1.0` admits 0 of 630. Measured pass rates, healthy
+#: cell (N=8 x1.0) against overloaded (N=12 x1.5):
+#:
+#:     tol 1.00   healthy   0/70   overloaded 0/70   <- unusable
+#:     tol 0.98   healthy  68/70   overloaded 0/70
+#:     tol 0.97   healthy  70/70   overloaded 0/70   <- clean separation
+#:
+#: 0.97 admits every demonstrably-healthy run and rejects every overloaded
+#: one. Chosen for that separation, not to make any arm pass.
+WINDOW_FLOOR_TOLERANCE = 0.97
 
 #: 20 s. A guarantee about CONTINUOUS service cannot be scored on the 5 s
 #: every other builder defaults to: at 5 s a 1 s epoch is a fifth of the run
@@ -199,8 +229,16 @@ def _scored_starvation(rec: RunRecord) -> dict[str, Any]:
         active_span_s = max(
             1, int(time_s[live[-1]]) - int(time_s[live[0]]) + 1)
         density = arrival_seconds / active_span_s
-        if active_span_s < MIN_ACTIVE_SPAN_S or density < MIN_ARRIVAL_DENSITY:
-            sparse.append([key, round(density, 3), active_span_s])
+        # The source's own cadence, read off the series: the median gap
+        # between consecutive arrival buckets. A 1 Hz source gives 1.0 s here
+        # however dense its per-second offering looks.
+        gaps = [live[j + 1] - live[j] for j in range(len(live) - 1)]
+        period_s = (sorted(gaps)[len(gaps) // 2] * dt) if gaps else 0.0
+        if (active_span_s < MIN_ACTIVE_SPAN_S
+                or density < MIN_ARRIVAL_DENSITY
+                or period_s > MAX_SOURCE_PERIOD_S):
+            sparse.append([key, round(density, 3), active_span_s,
+                           round(period_s, 4)])
             continue
         scored += 1
         run_len = 0
@@ -230,6 +268,16 @@ def _per_role_jain(rec: RunRecord, roles: dict[int, str],
     and the ratio was padded to 1.0 (M09's convention, kept so the two
     numbers stay comparable), and the number of roles scored.
     """
+    # THE PROTECTED FLEET, NOT EVERY FLOW. The first production run scored
+    # this over the unscoped record and produced a false headline: at N=8
+    # x1.5 the ConfigSched family read Jain 0.7500 while PF read 0.9996, and
+    # the worst second's ratios show BOTH zeros were 5QI 9 -- the best-effort
+    # filler a QoS-aware scheduler is SUPPOSED to starve. `Population`'s own
+    # docstring records exactly this case ("G8's TwoTier FAILs all-flow at
+    # Jain 0.8783 and passes protected at 0.9584"). Scoring fairness over a
+    # population that includes the sacrificial class penalises the arms doing
+    # the right thing.
+    rec = Population.protected_fleet().restrict(rec)
     time_s = rec.timeseries_time_s or []
     if len(time_s) < 2:
         return {}, 0, 0
@@ -392,7 +440,8 @@ def main(argv: list[str]) -> int:
     print(f"  horizon {a.horizon_ms:g} ms = {horizon} slots; bounds: Jain >= "
           f"{JAIN_BOUND} per role, 0 starvation epochs >= {STARVATION_EPOCH_S}s "
           f"(flows with arrival density >= {MIN_ARRIVAL_DENSITY} over a span "
-          f">= {MIN_ACTIVE_SPAN_S:g}s), "
+          f">= {MIN_ACTIVE_SPAN_S:g}s and source period "
+          f"<= {MAX_SOURCE_PERIOD_S:g}s), "
           f"telemetry gap < {TELEMETRY_GAP_MS}ms, window floor >= 1.0 "
           f"(tolerant reading at {WINDOW_FLOOR_TOLERANCE})", flush=True)
 
@@ -412,6 +461,8 @@ def main(argv: list[str]) -> int:
         "_starvation_epoch_s": STARVATION_EPOCH_S,
         "_min_arrival_density": MIN_ARRIVAL_DENSITY,
         "_min_active_span_s": MIN_ACTIVE_SPAN_S,
+        "_max_source_period_s": MAX_SOURCE_PERIOD_S,
+        "_jain_population": "protected_fleet",
         "_telemetry_gap_ms": TELEMETRY_GAP_MS,
         "_window_floor_tolerance": WINDOW_FLOOR_TOLERANCE,
         "_horizon_ms": a.horizon_ms, "_horizon_slots": horizon,

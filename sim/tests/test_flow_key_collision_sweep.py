@@ -65,6 +65,7 @@ def _cases():
     from sim.scenarios.g2 import build_gt12_scenario
     from sim.scenarios.g3 import (build_gt21_scenario, build_gt22_scenario,
                                   build_gt23_scenario)
+    from sim.scenarios.g8 import build_g8_scenario
     from sim.scenarios.g11 import build_g11_scenario
     from sim.scenarios.g12 import BG_OFFERED_BPS, COMPOSITIONS, build_g12_scenario
     from sim.scenarios.g9 import (gt61_warm_rejoin, gt62_cold_attach,
@@ -141,6 +142,19 @@ def _cases():
         cases.append((f"g9.{fn.__name__}",
                       fn(seed=1, n_neighbours=3, horizon_slots=40000)))
 
+    # G8 / GT-5.1, added with its builder rather than after someone notices.
+    # `build_g8_scenario` returns (scenario, roles) -- the ue_id -> fleet-role
+    # map has no other source in the repo -- so the case takes [0]. Swept at
+    # the fleet sizes its runner uses AND at both ends of the committed axis,
+    # because `scale_committed_load` rewrites contract fields and rebuilds the
+    # flow list, so a collision could exist at one end of that axis only.
+    for n in (8, 12, 16):
+        for cm in (1.0, 2.0):
+            cases.append((f"g8(n={n},cm={cm:g})",
+                          build_g8_scenario(composition="mixed", n_ues=n,
+                                            seed=1, committed_mult=cm,
+                                            horizon_slots=2000)[0]))
+
     # G5's three, added with the builders. A builder with no case here cannot
     # be reported as collision-free, which is how G12's collision survived the
     # first sweep -- and G5 puts FOUR uplink flows on one robot (telemetry,
@@ -212,6 +226,7 @@ def test_the_sweep_COVERS_every_builder_rather_than_the_easy_ones():
                     "factory_robots_scenario"):
             continue                       # reached via scenario(<id>)
         key = {"build_g12_scenario": "g12(", "build_g11_scenario": "g11(",
+               "build_g8_scenario": "g8(",
                "build_gt11_scenario": "gt11(",
                "build_gt12_scenario": "gt12(",
                "build_gt21_scenario": "gt21(",
