@@ -1462,27 +1462,58 @@ and "admissible fleet" means something different in each.
 planned contracted flows and should do relatively better with one aggressor than
 with N of them.
 
-### 29.5 TESTED IMMEDIATELY, AND NOT SUPPORTED
+### 29.5 TESTED IMMEDIATELY — HALF SUPPORTED, AND THE FIRST VERDICT'S REASONING IS WITHDRAWN
 
-G10's own scenario at N = 8, PF flows stripped from all but one UE, 3 seeds,
-worst-flow GFBR fraction:
+**CORRECTED 2026-09-17.** What this section originally concluded — *"it remains
+BEHIND `ConfigSched+CG` even with a single aggressor, so aggressor count is not
+what separates these arms"* — is **withdrawn**. The conclusion "not supported"
+survives; the reason given for it does not, and the reason was the part that got
+quoted forward.
+
+**The first run, kept for the record and NOT quotable.** N = 8, PF flows
+stripped from all but one UE, **3 seeds**, worst-flow GFBR fraction, medians
+compared ACROSS conditions:
 
 | arm | all 8 aggressors | one aggressor | gain |
 |---|---|---|---|
 | `ConfigSched+CG` | 0.9764 | 0.9792 | +0.003 |
 | `ConfigSched2X7+CG` | 0.9622 | 0.9738 | **+0.012** |
 
-X7+CG does gain ~4x more from removing aggressors, which is the predicted
-direction — **but it remains BEHIND `ConfigSched+CG` even with a single
-aggressor** (0.9738 against 0.9792). Removing the supposed cause does not close
-the gap, so aggressor count is not what separates these arms on G10.
+A 10-seed repeat of the same unpaired comparison put X7+CG *ahead* (0.9839
+against 0.9803) — i.e. the two runs disagreed in SIGN on the between-arm
+question, which is the signature of reading an unpaired median at an effect
+size near the noise floor, not of a real reversal.
 
-**The hypothesis is therefore not supported**, and the G5/G10 inversion stays
-explained only as far as the load table above establishes: the two guarantees
-ask materially different questions. Why `ConfigSched+CG` specifically holds a
-boundary of 10 is **unexplained**.
+**The paired measurement, which is the one that stands.** Same 10 seeds in both
+conditions and on both arms, bootstrap CI on the WITHIN-SEED delta
+(`scripts/`-free probe, `regime_sweep.bootstrap_ci`, seed 41), MDE = 2.83·SD/√n:
 
-**And this test is underpowered on its own terms** — 3 seeds, against per-cell
-MDE arithmetic that put 10 seeds ~20x too coarse for effects of this size. It is
-recorded as a direction, not a measurement, and the result above should not be
-quoted as a number.
+| contrast | delta | 95 % CI | MDE | resolved? |
+|---|---|---|---|---|
+| `ConfigSched+CG`, one − all 8 | −0.0008 | [−0.0072, +0.0055] | 0.0091 | no effect |
+| `ConfigSched2X7+CG`, one − all 8 | **+0.0113** | **[+0.0038, +0.0185]** | 0.0107 | **real** |
+| X7 − `ConfigSched`, all 8 aggressors | **−0.0118** | **[−0.0163, −0.0073]** | 0.0066 | **X7 behind** |
+| X7 − `ConfigSched`, one aggressor | +0.0003 | [−0.0016, +0.0021] | 0.0026 | **tie** |
+
+**So the mechanism half of the hypothesis IS supported and the ranking half is
+not.** X7+CG really does recover when only one flow saturates — its gain clears
+zero, while `ConfigSched+CG`'s does not — but recovery takes it to **parity**,
+never past. The last row is a resolved tie, not an underpowered one: the CI is
+±0.002 wide against an MDE of 0.0026, so an advantage the size of the one the
+unpaired 10-seed medians appeared to show (+0.0036) is excluded.
+
+**What this licenses, and it is more than the original section claimed.**
+X7+CG's G10 deficit is **aggressor-count dependent** — it is a real −0.0118 with
+a saturating PF flow on every UE and vanishes with one. That is a direct
+measurement of the load difference §29's table could only infer from the
+scenario definitions: G5's `gt31` puts one saturating flow on UE 2, G10's
+`sweep_scenario` puts one on all N. **Why `ConfigSched+CG` holds a boundary of
+10 remains unexplained** — parity under one aggressor does not explain an
+admissible-fleet gap of 10 against 8, and nothing here touches that.
+
+**The transferable error is the standing one in `CLAUDE.md`: an unpaired
+statistic cannot settle a within-seed design.** Both earlier runs were
+arithmetically correct and disagreed with each other because the comparison was
+across seeds in a paired experiment. The 3-seed run was labelled
+not-quotable in its own closing paragraph and its conclusion was carried into a
+commit message and this section's heading anyway.
