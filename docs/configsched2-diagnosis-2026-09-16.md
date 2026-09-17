@@ -1348,3 +1348,71 @@ E1's cost is real and traced (+17.24 ms on G4, DCI→PRB inversion, §26–27), 
 this cell it is **headroom, not failure**. It matters for hardware, where a real
 link is less forgiving than a 20 dB simulated SNR — and it is not a group-B
 failure on the deployed cell.
+
+---
+
+## 29. GROUP E (G10, G12) — and G12's ordering half is unobservable on this cell
+
+### 29.1 G10: the boundary hides where the arms actually differ
+
+Admissible N (largest N with all ten seeds meeting every GBR flow's 95 % of
+GFBR), all `+CG` arms:
+
+| arm | admissible | M08 at N=10 |
+|---|---|---|
+| **`ConfigSched+CG`** | **10** | 0.983 |
+| `PF+CG` | 8 | 0.948 |
+| `Reservation+CG` | 8 | 0.957 |
+| `ConfigSched2+CG` | 8 | 0.915 |
+| `ConfigSched2X7+CG` | 8 | 0.834 |
+| `ProtoRRageD2+CG` | 7 | 0.664 |
+| `TwoTier+CG` | 7 | 0.618 |
+
+**Paired M08, pooled over all N, reads X7+CG behind almost everything** (−0.132
+vs PF, −0.045 vs ConfigSched). **Restricted to N <= 8 — inside the boundary,
+where the guarantee is actually claimed — the差 collapses**: −0.0017 vs
+`ConfigSched+CG`, −0.0007 vs `ConfigSched2+CG` (not significant), and **+0.015
+vs `ProtoRRageD2+CG`**, +0.008 vs `TwoTier+CG`.
+
+**So the pooled comparison is dominated by behaviour past the boundary, where no
+guarantee is claimed.** Quoting it as a capacity ranking would repeat the
+decompose-before-attributing error: the rows summed are not the rows the claim is
+about.
+
+### 29.2 G12: two halves, and only one is testable here
+
+GT-7.3 demands **both** a safety property (*"telemetry intact until nothing
+lower-class remains"*) and an **order** (`5QI 9 → 4 → 2`), with *"any inversion a
+FAIL regardless of absolute numbers"*.
+
+**The safety half passes on all seven arms**: `clause4` is `10/0/0` everywhere,
+and `_clause4_verdict` tests exactly that — telemetry never starved anywhere on
+the ramp.
+
+**The ordering half is unobservable on this cell, for every arm.**
+`matches_specified` is **0 of 10 on all seven arms**, and that is not seven
+failures: `sim/scenarios/g12.py` records it as G12's *primary finding* —
+only 5QI 2 breaches at or below 145 % of the measured ceiling, so the specified
+sequence **cannot be observed at the load the guarantee specifies**. The first
+element (5QI-9 exhaustion) never occurs in range.
+
+Consequently the `orders_seen` column must be read as *fragments*, not verdicts:
+
+| arm | `orders_seen` | agreement | reading |
+|---|---|---|---|
+| **`ConfigSched2X7+CG`** | `[[4, 2]]` | **10/10** | one consistent order, and the longest observed |
+| `Reservation+CG` | `[[]]` | 10/10 | **nothing breached in range** — least informative, not best |
+| `ConfigSched+CG` | `[[], [2]]` | 9/10 | mostly nothing, sometimes 5QI-2 alone |
+| `ConfigSched2+CG` | `[[2], [2, 4]]` | 8/10 | 5QI-2 first |
+| `PF+CG`, `ProtoRRageD2+CG` | `[[4], [4, 2]]` | 6/10 | 5QI-4 first |
+| `TwoTier+CG` | `[[], [2, 4], [4]]` | 6/10 | three different fragments |
+
+**A correction to my own first reading:** I took `ConfigSched2+CG`'s `[[2],[2,4]]`
+for an inversion against the specified order. With 5QI-9 never breaching, every
+observed order is a partial fragment and "inversion" is not well defined at this
+load. `[[]]` at 10/10 is the trap in the other direction — perfect agreement on
+having measured nothing.
+
+**What is defensible:** X7+CG is the only arm producing a single consistent,
+two-element order at 10/10 agreement. That is a determinism result, not a
+compliance one.
